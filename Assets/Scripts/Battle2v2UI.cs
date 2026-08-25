@@ -1,0 +1,4791 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+
+/// <summary>
+/// Trình Điều Khiển Chiến Trường Đấu 2v2 Xếp Hạng Độc Lập (Đại Việt Chiến)
+/// - Đồng bộ 100% đầy đủ 8 tính năng nâng cấp chuẩn thực chiến:
+///   1. Mở Kho Cứu Tế chuẩn Tutorial (Modal hiển thị N lá bài, luân phiên từng người tự chọn 1 lá vào tay).
+///   2. Dòng chú thích chuyển lên cao không che bài, Việt hóa toàn bộ chất & bậc số (♠ Bích 8, ♥ Cơ A (Át), ♣ Chuồn J (Bồi)...).
+///   3. Thách Đấu do người chơi tự chọn lá Trảm trên tay để đáp trả (kèm bảng chọn [⚔️ ĐÁP TRẢ] / [❌ CHỊU MÁU]).
+///   4. Mục tiêu đang chọn có khung viền dày 6px màu vàng Neon rực rỡ kèm huy hiệu [🎯 MỤC TIÊU ĐANG CHỌN].
+///   5. Cận Tử (0 Máu) hỏi từng người theo vòng bắt đầu từ người gây sát thương; người tử trận bị xám tối toàn bộ thẻ bài [☠️ ĐÃ TỬ TRẬN].
+///   6. Nút Kết Thúc Lượt chỉ hiện khi đang trong lượt ra bài của người chơi, ẩn hoàn toàn khi đang lượt người khác.
+///   7. Chọn mượt mà 100% Trang Bị, Cẩm Nang Trì Hoãn và Bài Trên Tay trong Modal Vườn Không, Đột Kích, Diệu Kế.
+///   8. Mục tiêu không lưu lại: mỗi lần dùng lá bài cần mục tiêu đều phải chạm chọn lại mục tiêu mới.
+/// </summary>
+public class Battle2v2UI : MonoBehaviour
+{
+    public static Battle2v2UI Instance { get; private set; }
+
+    [Header("UI Canvas & Layout")]
+    private GameObject canvasGo;
+    private CanvasScaler scaler;
+    private Font font;
+
+    [Header("Draft / Hero Pick Phase State")]
+    private GameObject draftScreenGo;
+    private Text draftTurnStatusText;
+    private Text draftTimerText;
+    private Image draftTimerFill;
+    private float draftTimer = 40.0f;
+    private bool isDraftTimerRunning = false;
+    private int currentDraftPickerIndex = 0; // 0..3
+    private HeroDatabase100.HeroData inspectingHero = null;
+    private Button draftConfirmBtn;
+    private Text draftConfirmBtnText;
+    private GameObject draftInspectPanelGo;
+
+    // Inspect Elements Cache
+    private Text inspectTitleText;
+    private Text inspectSubText;
+    private Image inspectAvatarImg;
+    private Text inspectSkillTitleText;
+    private Text inspectSkillDescText;
+    private Transform inspectLotusContainer;
+
+    private readonly List<DraftSlot> draftSlots = new List<DraftSlot>();
+    private readonly HashSet<int> selectedHeroIds = new HashSet<int>();
+    private HashSet<int> weeklyFreeHeroIds = new HashSet<int>();
+    private List<HeroDatabase100.HeroData> availableHeroes = new List<HeroDatabase100.HeroData>();
+    private readonly Dictionary<int, GameObject> heroGridItems = new Dictionary<int, GameObject>();
+
+    [System.Serializable]
+    public class MatchmakingSlotInfo
+    {
+        public int seatNumber;
+        public string playerName;
+        public bool isPlayer;
+        public bool isAlly;
+        public bool isAI;
+        public int rankPoints;
+    }
+
+    private class DraftSlot
+    {
+        public int seatNumber;        // 1..4
+        public string playerTitle;    // "BẠN (Người Chơi)", "ĐỒNG ĐỘI AI", "ĐỐI THỦ 1", "ĐỐI THỦ 2"
+        public bool isPlayer;
+        public bool isAlly;
+        public bool isAI;
+        public HeroDatabase100.HeroData chosenHero;
+        public GameObject slotGo;
+        public Text statusText;
+        public Text heroNameText;
+        public Image frameImg;
+        public Image avatarImg;
+    }
+
+    [Header("Generals (4 Vị Trí Trận Đấu)")]
+    private GeneralCardUI playerCard;     // Người chơi (Dưới Cùng Bên Phải)
+    private GeneralCardUI allyCard;       // AI Đồng Đội (Đồng Minh)
+    private GeneralCardUI enemy1Card;     // AI Địch 1 (Đối Thủ)
+    private GeneralCardUI enemy2Card;     // AI Địch 2 (Đối Thủ)
+
+    private readonly List<GeneralCardUI> allGenerals = new List<GeneralCardUI>();
+    private readonly List<GeneralCardUI> turnOrderGenerals = new List<GeneralCardUI>();
+
+    [Header("Hand Cards & Decks")]
+    private CardDeckManager deckManager;
+    private PlayerHandUI playerHandUI;
+    private readonly List<CardModel> playerHandCards = new List<CardModel>();
+    private readonly List<CardModel> allyHandCards = new List<CardModel>();
+    private readonly List<CardModel> enemy1HandCards = new List<CardModel>();
+    private readonly List<CardModel> enemy2HandCards = new List<CardModel>();
+
+    [Header("Battle Turn & Timer State")]
+    private int currentTurnIndex = 0; // 0..3 trong turnOrderGenerals
+    private bool isFirstTurnOfMatch = true;
+    private float turnTimer = 40.0f;
+    private bool isTimerRunning = false;
+    private bool isDiscardPhaseActive = false;
+    private int discardExcessRequired = 0;
+    private readonly List<CardUI> selectedDiscardCards = new List<CardUI>();
+
+    private GameObject battleRootGo;
+    private Text globalTurnText;
+    private Text logText;
+    private GameObject historyOverlayGo;
+    private ScrollRect historyScrollRect;
+    private Text historyContentText;
+    private readonly List<string> battleLogHistory = new List<string>();
+    private Button endTurnBtn;
+    private Text endTurnBtnText;
+    private Button discardConfirmBtn;
+    private Text discardConfirmBtnText;
+
+    // Nút Dùng Bài Hành Động 2 Bước chuẩn Tutorial
+    private GameObject actionBtnGo;
+    private Text actionBtnText;
+    private CardUI currentSelectedCardUI;
+
+    // Hộp Mô Tả Chi Tiết Lá Bài Khi Chạm Chọn
+    private GameObject cardDescBoxGo;
+    private Text cardDescBodyText;
+
+    [Header("Combat Modifiers & State")]
+    private bool isWineBuffActive = false;
+    private int slashesUsedThisTurn = 0;
+    private bool playerPlayPhaseLocked = false;
+    private bool playerDrawPhaseLocked = false;
+    private bool isPlayerTurnActive = false;
+
+    [Header("Draw Deck Pile HUD")]
+    private GameObject deckHudGo;
+    private Text deckInfoText;
+
+    [Header("Center Presentation & Action")]
+    private GameObject currentCenterCardGo;
+    private Coroutine centerCardDismissCoroutine;
+    private bool actionInProgress = false;
+    private bool battleFinished = false;
+    private GeneralCardUI currentSelectedTarget = null;
+    private GameObject targetHighlightGo;
+    private GameObject activeCardPickModal = null;
+
+    private Action onExitCallback;
+
+    public enum TargetCardZone
+    {
+        Hand,
+        Equipment,
+        Delayed
+    }
+
+    public sealed class TargetCardOption
+    {
+        public CardModel Card;
+        public TargetCardZone Zone;
+        public EquipmentType EquipmentType;
+        public CardSubType DelayedType;
+        public string Label;
+    }
+
+    public enum SlashDefenseResult
+    {
+        Hit,
+        Dodged,
+        Negated
+    }
+
+    private static List<MatchmakingSlotInfo> pendingMatchedSlots = null;
+
+    public static Battle2v2UI Create(Transform parent = null, Action onExit = null)
+    {
+        return CreateWithSlots(null, parent, onExit);
+    }
+
+    public static Battle2v2UI CreateWithSlots(List<MatchmakingSlotInfo> slots, Transform parent = null, Action onExit = null)
+    {
+        pendingMatchedSlots = slots;
+        if (Instance != null)
+        {
+            Destroy(Instance.gameObject);
+        }
+
+        var go = new GameObject("Battle2v2UI", typeof(Battle2v2UI));
+        if (parent != null) go.transform.SetParent(parent, false);
+        var ui = go.GetComponent<Battle2v2UI>();
+        ui.onExitCallback = onExit;
+        return ui;
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void AutoInitInBattleScene()
+    {
+        var scene = SceneManager.GetActiveScene();
+        if (scene.name == "Battle2v2Scene" && Instance == null)
+        {
+            Create();
+        }
+    }
+
+    private void Awake()
+    {
+        Instance = this;
+    }
+
+    private void Start()
+    {
+        font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        weeklyFreeHeroIds = HeroDatabase100.GetWeeklyFreeHeroIds();
+        availableHeroes = HeroDatabase100.GetAvailablePickHeroes();
+
+        deckManager = gameObject.AddComponent<CardDeckManager>();
+        deckManager.InitializeDeck(104);
+
+        BuildMainCanvas();
+        StartCoroutine(StartDraftPhaseSequence());
+    }
+
+    private void Update()
+    {
+        if (battleFinished) return;
+
+        // Đếm giờ chọn tướng (Draft Phase)
+        if (isDraftTimerRunning && draftTimer > 0f)
+        {
+            draftTimer -= Time.deltaTime;
+            UpdateDraftTimerVisual();
+            if (draftTimer <= 0f)
+            {
+                draftTimer = 0f;
+                UpdateDraftTimerVisual();
+                OnDraftTimerExpired();
+            }
+        }
+
+        // Đếm giờ trong trận đấu (Battle Phase)
+        if (isTimerRunning && turnTimer > 0f)
+        {
+            turnTimer -= Time.deltaTime;
+
+            // Cập nhật số đếm ngược 40, 39, ... ngay trên đầu avatar tướng đang đánh
+            if (turnOrderGenerals.Count > currentTurnIndex)
+            {
+                var activeGen = turnOrderGenerals[currentTurnIndex];
+                if (activeGen != null)
+                {
+                    activeGen.UpdateHeadTimer(Mathf.CeilToInt(turnTimer));
+                }
+            }
+
+            if (turnTimer <= 0f)
+            {
+                turnTimer = 0f;
+                OnTimerExpired();
+            }
+        }
+    }
+
+    #region 1. KHỞI TẠO CANVAS CHÍNH
+    private void BuildMainCanvas()
+    {
+        Screen.orientation = ScreenOrientation.LandscapeRight;
+        Screen.autorotateToPortrait = false;
+        Screen.autorotateToPortraitUpsideDown = false;
+        Screen.autorotateToLandscapeLeft = true;
+        Screen.autorotateToLandscapeRight = true;
+
+        canvasGo = new GameObject("Battle2v2Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        canvasGo.transform.SetParent(transform, false);
+        var canvas = canvasGo.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 20;
+
+        scaler = canvasGo.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1280, 720);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 0.5f;
+
+        // Hình Nền Chiến Trường
+        var bgGo = new GameObject("Background", typeof(RectTransform), typeof(RawImage));
+        bgGo.transform.SetParent(canvasGo.transform, false);
+        var bgImg = bgGo.GetComponent<RawImage>();
+        var bgTex = Resources.Load<Texture2D>("UI/home_background");
+        if (bgTex == null) bgTex = Resources.Load<Texture2D>("UI/login_background");
+        if (bgTex != null) bgImg.texture = bgTex;
+        var bgRt = bgGo.GetComponent<RectTransform>();
+        Fill(bgRt, new Vector2(-30, -20), new Vector2(30, 20));
+
+        var shadeGo = new GameObject("Shade", typeof(RectTransform), typeof(Image));
+        shadeGo.transform.SetParent(canvasGo.transform, false);
+        var shadeImg = shadeGo.GetComponent<Image>();
+        shadeImg.color = new Color(0.02f, 0.04f, 0.08f, 0.65f);
+        shadeImg.raycastTarget = false;
+        Fill(shadeGo.GetComponent<RectTransform>());
+    }
+    #endregion
+
+    #region 2. GIAI ĐOẠN CHỌN TƯỚNG (HERO DRAFT PHASE 1 -> 4)
+    private IEnumerator StartDraftPhaseSequence()
+    {
+        draftSlots.Clear();
+
+        if (pendingMatchedSlots != null && pendingMatchedSlots.Count == 4)
+        {
+            foreach (var s in pendingMatchedSlots)
+            {
+                string title = s.isPlayer ? $"👤 {s.playerName} (BẠN)" : (s.isAI ? (s.isAlly ? "🤖 ĐỒNG ĐỘI AI" : $"🤖 ĐỐI THỦ AI #{s.seatNumber}") : $"👤 {s.playerName} (NGƯỜI CHƠI)");
+                draftSlots.Add(new DraftSlot
+                {
+                    seatNumber = s.seatNumber,
+                    playerTitle = title,
+                    isPlayer = s.isPlayer,
+                    isAlly = s.isAlly,
+                    isAI = s.isAI
+                });
+            }
+            pendingMatchedSlots = null;
+        }
+        else
+        {
+            var seats = new List<int> { 1, 2, 3, 4 };
+            for (int i = 0; i < seats.Count; i++)
+            {
+                int r = UnityEngine.Random.Range(i, seats.Count);
+                int temp = seats[i];
+                seats[i] = seats[r];
+                seats[r] = temp;
+            }
+
+            string pName = !string.IsNullOrWhiteSpace(AuthUI.CurrentUserName) ? AuthUI.CurrentUserName : "Đại Tướng Quân";
+            draftSlots.Add(new DraftSlot { seatNumber = seats[0], playerTitle = $"👤 {pName} (BẠN)", isPlayer = true, isAlly = true, isAI = false });
+            draftSlots.Add(new DraftSlot { seatNumber = seats[1], playerTitle = "🤖 ĐỒNG ĐỘI AI", isPlayer = false, isAlly = true, isAI = true });
+            draftSlots.Add(new DraftSlot { seatNumber = seats[2], playerTitle = "🤖 ĐỐI THỦ AI #1", isPlayer = false, isAlly = false, isAI = true });
+            draftSlots.Add(new DraftSlot { seatNumber = seats[3], playerTitle = "🤖 ĐỐI THỦ AI #2", isPlayer = false, isAlly = false, isAI = true });
+        }
+
+        draftSlots.Sort((a, b) => a.seatNumber.CompareTo(b.seatNumber));
+
+        selectedHeroIds.Clear();
+        BuildDraftScreenUI();
+
+        var defaultInspect = availableHeroes.Count > 0 ? availableHeroes[0] : HeroDatabase100.GetHero(47);
+        InspectHero(defaultInspect);
+
+        yield return new WaitForSeconds(0.6f);
+
+        for (int i = 0; i < draftSlots.Count; i++)
+        {
+            currentDraftPickerIndex = i;
+            var slot = draftSlots[i];
+            UpdateDraftTurnStatus();
+
+            draftTimer = 40.0f;
+            isDraftTimerRunning = true;
+
+            if (slot.isPlayer)
+            {
+                if (draftConfirmBtn != null) draftConfirmBtn.interactable = (inspectingHero != null && !selectedHeroIds.Contains(inspectingHero.id));
+                while (slot.chosenHero == null)
+                {
+                    yield return null;
+                }
+            }
+            else
+            {
+                if (draftConfirmBtn != null) draftConfirmBtn.interactable = false;
+                yield return new WaitForSeconds(1.8f);
+
+                var candidates = new List<HeroDatabase100.HeroData>();
+                foreach (var h in availableHeroes)
+                {
+                    if (!selectedHeroIds.Contains(h.id))
+                    {
+                        candidates.Add(h);
+                    }
+                }
+
+                if (candidates.Count == 0)
+                {
+                    foreach (var h in HeroDatabase100.AllHeroes)
+                    {
+                        if (!selectedHeroIds.Contains(h.id))
+                        {
+                            candidates.Add(h);
+                        }
+                    }
+                }
+
+                var aiPick = candidates[UnityEngine.Random.Range(0, candidates.Count)];
+                InspectHero(aiPick);
+                yield return new WaitForSeconds(0.4f);
+                ChooseHeroForSlot(slot, aiPick);
+            }
+
+            isDraftTimerRunning = false;
+            yield return new WaitForSeconds(0.5f);
+        }
+
+        if (draftTurnStatusText != null)
+        {
+            draftTurnStatusText.text = "⚔️ CẢ 4 CHIẾN TƯỚNG ĐÃ SẴN SÀNG! ĐANG VÀO CHIẾN TRƯỜNG...";
+        }
+        yield return new WaitForSeconds(1.5f);
+
+        if (draftScreenGo != null) Destroy(draftScreenGo);
+        StartBattleWithChosenHeroes();
+    }
+
+    private void BuildDraftScreenUI()
+    {
+        draftScreenGo = new GameObject("DraftScreenRoot", typeof(RectTransform));
+        draftScreenGo.transform.SetParent(canvasGo.transform, false);
+        Fill(draftScreenGo.GetComponent<RectTransform>());
+
+        var headerGo = new GameObject("DraftHeader", typeof(RectTransform), typeof(Image));
+        headerGo.transform.SetParent(draftScreenGo.transform, false);
+        var hImg = headerGo.GetComponent<Image>();
+        hImg.color = new Color(0.04f, 0.07f, 0.14f, 0.98f);
+        var hRt = headerGo.GetComponent<RectTransform>();
+        SetRect(hRt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 52f), Vector2.zero);
+
+        var titleTxt = AddText(headerGo.transform, "Title", "👑 ĐẠI VIỆT CHIẾN - GIAI ĐOẠN CHỌN TƯỚNG 2v2", 15, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft);
+        SetRect(titleTxt.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(450f, 30f), new Vector2(20f, 0f));
+
+        draftTurnStatusText = AddText(headerGo.transform, "Status", "⏳ Đang chuẩn bị lượt chọn 1..4...", 13, new Color(0.55f, 0.9f, 1f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(draftTurnStatusText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(460f, 30f), Vector2.zero);
+
+        var timerBoxGo = new GameObject("TimerBox", typeof(RectTransform), typeof(Image));
+        timerBoxGo.transform.SetParent(headerGo.transform, false);
+        var tbImg = timerBoxGo.GetComponent<Image>();
+        tbImg.color = new Color(0.08f, 0.12f, 0.22f, 0.95f);
+        var tbRt = timerBoxGo.GetComponent<RectTransform>();
+        SetRect(tbRt, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(160f, 32f), new Vector2(-16f, 0f));
+
+        var fillGo = new GameObject("Fill", typeof(RectTransform), typeof(Image));
+        fillGo.transform.SetParent(timerBoxGo.transform, false);
+        draftTimerFill = fillGo.GetComponent<Image>();
+        draftTimerFill.color = new Color(1f, 0.8f, 0.2f, 1f);
+        var fRt = fillGo.GetComponent<RectTransform>();
+        fRt.anchorMin = Vector2.zero; fRt.anchorMax = Vector2.one;
+        fRt.pivot = new Vector2(0f, 0.5f);
+        fRt.offsetMin = fRt.offsetMax = Vector2.zero;
+
+        var tTxtGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
+        tTxtGo.transform.SetParent(timerBoxGo.transform, false);
+        draftTimerText = tTxtGo.GetComponent<Text>();
+        draftTimerText.font = font;
+        draftTimerText.fontSize = ThemeUI.SizeBody;
+        draftTimerText.fontStyle = FontStyle.Bold;
+        draftTimerText.alignment = TextAnchor.MiddleCenter;
+        draftTimerText.color = Color.white;
+        Fill(tTxtGo.GetComponent<RectTransform>());
+
+        BuildDraftSlotsLeftColumn();
+        BuildHeroGridCenterColumn();
+        BuildHeroInspectRightColumn();
+    }
+
+    private void BuildDraftSlotsLeftColumn()
+    {
+        var leftColGo = new GameObject("LeftSlotsCol", typeof(RectTransform));
+        leftColGo.transform.SetParent(draftScreenGo.transform, false);
+        var lcRt = leftColGo.GetComponent<RectTransform>();
+        SetRect(lcRt, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(250f, -60f), new Vector2(16f, -30f));
+
+        var titleTxt = AddText(leftColGo.transform, "Title", "⚔️ THỨ TỰ CHỌN (#1 ➜ #4):", 12, new Color(1f, 0.88f, 0.45f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft);
+        SetRect(titleTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 24f), new Vector2(0f, -4f));
+
+        float startY = -34f;
+        for (int i = 0; i < draftSlots.Count; i++)
+        {
+            var slot = draftSlots[i];
+            var sGo = new GameObject("Slot_" + i, typeof(RectTransform), typeof(Image));
+            sGo.transform.SetParent(leftColGo.transform, false);
+            var sImg = sGo.GetComponent<Image>();
+            var slotSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
+            if (slotSpr != null) { sImg.sprite = slotSpr; sImg.type = Image.Type.Sliced; }
+            sImg.color = new Color(0.06f, 0.09f, 0.16f, 0.95f);
+
+            var sRt = sGo.GetComponent<RectTransform>();
+            SetRect(sRt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 130f), new Vector2(0f, startY));
+            startY -= 138f;
+
+            slot.slotGo = sGo;
+
+            var frameGo = new GameObject("Frame", typeof(RectTransform), typeof(Image));
+            frameGo.transform.SetParent(sGo.transform, false);
+            slot.frameImg = frameGo.GetComponent<Image>();
+            var fSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+            if (fSpr != null) { slot.frameImg.sprite = fSpr; slot.frameImg.type = Image.Type.Sliced; }
+            slot.frameImg.color = slot.isAlly ? new Color(0.25f, 0.72f, 1f, 1f) : new Color(1f, 0.38f, 0.38f, 1f);
+            var fRt = frameGo.GetComponent<RectTransform>();
+            Fill(fRt, new Vector2(-1, -1), new Vector2(1, 1));
+
+            var badgeTxt = AddText(sGo.transform, "Seat", $"#{slot.seatNumber}", 13, new Color(1f, 0.9f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft);
+            SetRect(badgeTxt.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(50f, 24f), new Vector2(8f, -4f));
+
+            string teamTag = slot.isAlly ? "<color=#55DDFF>[ĐỒNG MINH]</color>" : "<color=#FF5555>[ĐỐI THỦ]</color>";
+            var nameTxt = AddText(sGo.transform, "Title", $"{teamTag} {slot.playerTitle}", 11, Color.white, FontStyle.Bold, TextAnchor.MiddleLeft);
+            SetRect(nameTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(-60f, 24f), new Vector2(50f, -4f));
+
+            var avGo = new GameObject("Avatar", typeof(RectTransform), typeof(Image));
+            avGo.transform.SetParent(sGo.transform, false);
+            slot.avatarImg = avGo.GetComponent<Image>();
+            slot.avatarImg.sprite = HeroDatabase100.GetAvatarSprite("UI/ly_thuong_kiet");
+            slot.avatarImg.color = new Color(1f, 1f, 1f, 0.35f);
+            var avRt = avGo.GetComponent<RectTransform>();
+            SetRect(avRt, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(68f, 90f), new Vector2(8f, 8f));
+
+            slot.heroNameText = AddText(sGo.transform, "HeroName", "Chưa chọn...", 12, new Color(1f, 0.88f, 0.4f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft);
+            SetRect(slot.heroNameText.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0f, 0.5f), new Vector2(-90f, 24f), new Vector2(86f, 10f));
+
+            slot.statusText = AddText(sGo.transform, "Status", "Đang chờ lượt...", 10, new Color(0.7f, 0.8f, 0.9f, 0.85f), FontStyle.Italic, TextAnchor.MiddleLeft);
+            SetRect(slot.statusText.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0f, 0.5f), new Vector2(-90f, 20f), new Vector2(86f, -14f));
+        }
+    }
+
+    private void BuildHeroGridCenterColumn()
+    {
+        var centerColGo = new GameObject("CenterGridCol", typeof(RectTransform));
+        centerColGo.transform.SetParent(draftScreenGo.transform, false);
+        var ccRt = centerColGo.GetComponent<RectTransform>();
+        SetRect(ccRt, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f), new Vector2(-640f, -68f), new Vector2(-30f, -28f));
+
+        var subTxt = AddText(centerColGo.transform, "Sub", $"🎴 <b>DANH TƯỚNG KHẢ DỤNG ({availableHeroes.Count} TƯỚNG SỞ HỮU & FREE TUẦN)</b> • Chạm thẻ để xem tuyệt kỹ:", 11, new Color(0.9f, 0.95f, 1f, 0.95f), FontStyle.Normal, TextAnchor.MiddleLeft);
+        SetRect(subTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(0f, 22f), new Vector2(0f, 0f));
+
+        var scrollGo = new GameObject("HeroesScrollView", typeof(RectTransform), typeof(Image), typeof(RectMask2D), typeof(ScrollRect));
+        scrollGo.transform.SetParent(centerColGo.transform, false);
+        var sRt = scrollGo.GetComponent<RectTransform>();
+        SetRect(sRt, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f), new Vector2(0f, -28f), new Vector2(0f, -14f));
+
+        var sImg = scrollGo.GetComponent<Image>();
+        sImg.color = new Color(0.02f, 0.04f, 0.08f, 0.5f);
+
+        var scroll = scrollGo.GetComponent<ScrollRect>();
+        scroll.horizontal = false;
+        scroll.vertical = true;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
+        scroll.scrollSensitivity = 35f;
+
+        var contentGo = new GameObject("Content", typeof(RectTransform), typeof(GridLayoutGroup), typeof(ContentSizeFitter));
+        contentGo.transform.SetParent(scrollGo.transform, false);
+        var cRt = contentGo.GetComponent<RectTransform>();
+        cRt.anchorMin = new Vector2(0f, 1f);
+        cRt.anchorMax = new Vector2(1f, 1f);
+        cRt.pivot = new Vector2(0.5f, 1f);
+        cRt.offsetMin = cRt.offsetMax = Vector2.zero;
+
+        var glg = contentGo.GetComponent<GridLayoutGroup>();
+        glg.cellSize = new Vector2(138f, 184f);
+        glg.spacing = new Vector2(10f, 10f);
+        glg.padding = new RectOffset(6, 6, 6, 6);
+        glg.childAlignment = TextAnchor.UpperLeft;
+
+        var csf = contentGo.GetComponent<ContentSizeFitter>();
+        csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        scroll.viewport = sRt;
+        scroll.content = cRt;
+
+        heroGridItems.Clear();
+        foreach (var hero in availableHeroes)
+        {
+            var hCardGo = CreateCombatStyleHeroCardItem(contentGo.transform, hero);
+            heroGridItems[hero.id] = hCardGo;
+        }
+    }
+
+    private GameObject CreateCombatStyleHeroCardItem(Transform parent, HeroDatabase100.HeroData hero)
+    {
+        var cardGo = new GameObject("HeroCard_" + hero.id, typeof(RectTransform), typeof(Image), typeof(Button));
+        cardGo.transform.SetParent(parent, false);
+
+        var cImg = cardGo.GetComponent<Image>();
+        var bgSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
+        if (bgSpr != null) { cImg.sprite = bgSpr; cImg.type = Image.Type.Sliced; }
+        cImg.color = new Color(0.06f, 0.09f, 0.16f, 0.98f);
+
+        bool isFree = weeklyFreeHeroIds.Contains(hero.id);
+
+        var frameGo = new GameObject("Frame", typeof(RectTransform), typeof(Image));
+        frameGo.transform.SetParent(cardGo.transform, false);
+        var fImg = frameGo.GetComponent<Image>();
+        var fSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+        if (fSpr != null) { fImg.sprite = fSpr; fImg.type = Image.Type.Sliced; }
+        fImg.color = isFree ? new Color(1f, 0.85f, 0.35f, 1f) : new Color(0.35f, 0.7f, 0.95f, 0.9f);
+        Fill(frameGo.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
+
+        var avGo = new GameObject("Avatar", typeof(RectTransform), typeof(Image));
+        avGo.transform.SetParent(cardGo.transform, false);
+        var avImg = avGo.GetComponent<Image>();
+        avImg.sprite = HeroDatabase100.GetAvatarSprite(hero.avatarPath);
+        avImg.preserveAspect = true;
+        Fill(avGo.GetComponent<RectTransform>(), new Vector2(4, 4), new Vector2(-4, -4));
+
+        var gradBottom = new GameObject("GradBottom", typeof(RectTransform), typeof(Image));
+        gradBottom.transform.SetParent(cardGo.transform, false);
+        var gbImg = gradBottom.GetComponent<Image>();
+        gbImg.color = new Color(0.02f, 0.04f, 0.08f, 0.85f);
+        var gbRt = gradBottom.GetComponent<RectTransform>();
+        SetRect(gbRt, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 48f), Vector2.zero);
+
+        var gradTop = new GameObject("GradTop", typeof(RectTransform), typeof(Image));
+        gradTop.transform.SetParent(cardGo.transform, false);
+        var gtImg = gradTop.GetComponent<Image>();
+        gtImg.color = new Color(0.02f, 0.04f, 0.08f, 0.85f);
+        var gtRt = gradTop.GetComponent<RectTransform>();
+        SetRect(gtRt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 26f), Vector2.zero);
+
+        var npGo = new GameObject("NamePlaque", typeof(RectTransform), typeof(Image));
+        npGo.transform.SetParent(cardGo.transform, false);
+        var npImg = npGo.GetComponent<Image>();
+        var npSpr = LotusHealthUI.LoadSpriteFromResources("UI/name_plaque");
+        if (npSpr != null) { npImg.sprite = npSpr; npImg.type = Image.Type.Sliced; }
+        npImg.color = new Color(0.12f, 0.08f, 0.05f, 0.95f);
+        var npRt = npGo.GetComponent<RectTransform>();
+        SetRect(npRt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(-12f, 22f), new Vector2(0f, -4f));
+
+        var nameTxt = AddText(npGo.transform, "Name", hero.name, 10, new Color(1f, 0.92f, 0.45f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        Fill(nameTxt.rectTransform);
+
+        var hpContainer = new GameObject("LotusHpRow", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        hpContainer.transform.SetParent(cardGo.transform, false);
+        var hpRt = hpContainer.GetComponent<RectTransform>();
+        SetRect(hpRt, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(60f, 18f), new Vector2(-6f, -28f));
+        var hlg = hpContainer.GetComponent<HorizontalLayoutGroup>();
+        hlg.childAlignment = TextAnchor.MiddleRight;
+        hlg.spacing = 2f;
+        hlg.childControlWidth = hlg.childControlHeight = false;
+
+        var lotusSpr = LotusHealthUI.LoadSpriteFromResources("UI/lotus_full");
+        for (int i = 0; i < hero.maxHp; i++)
+        {
+            var lGo = new GameObject("Lotus_" + i, typeof(RectTransform), typeof(Image));
+            lGo.transform.SetParent(hpContainer.transform, false);
+            var lImg = lGo.GetComponent<Image>();
+            if (lotusSpr != null) lImg.sprite = lotusSpr;
+            lImg.color = new Color(1f, 0.45f, 0.65f, 1f);
+            var lRt = lGo.GetComponent<RectTransform>();
+            lRt.sizeDelta = new Vector2(12f, 12f);
+        }
+
+        var facGo = new GameObject("FactionBadge", typeof(RectTransform), typeof(Image));
+        facGo.transform.SetParent(cardGo.transform, false);
+        var fbgImg = facGo.GetComponent<Image>();
+        var facSpr = LotusHealthUI.LoadSpriteFromResources("UI/badge_faction");
+        if (facSpr != null) { fbgImg.sprite = facSpr; fbgImg.type = Image.Type.Sliced; }
+        fbgImg.color = new Color(0.1f, 0.2f, 0.35f, 0.95f);
+        var facRt = facGo.GetComponent<RectTransform>();
+        SetRect(facRt, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(68f, 18f), new Vector2(6f, 26f));
+
+        var facTxt = AddText(facGo.transform, "Txt", hero.faction, 9, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        Fill(facTxt.rectTransform);
+
+        var skillBarGo = new GameObject("SkillBar", typeof(RectTransform), typeof(Image));
+        skillBarGo.transform.SetParent(cardGo.transform, false);
+        var sbImg = skillBarGo.GetComponent<Image>();
+        if (bgSpr != null) { sbImg.sprite = bgSpr; sbImg.type = Image.Type.Sliced; }
+        sbImg.color = new Color(0.08f, 0.14f, 0.24f, 0.95f);
+        var sbRt = skillBarGo.GetComponent<RectTransform>();
+        SetRect(sbRt, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(-12f, 20f), new Vector2(0f, 4f));
+
+        var skillTxt = AddText(skillBarGo.transform, "Skill", $"⚡ {hero.skillName}", 10, new Color(0.4f, 0.92f, 1f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        Fill(skillTxt.rectTransform);
+
+        if (isFree)
+        {
+            var freeBadgeGo = new GameObject("FreeWeekBadge", typeof(RectTransform), typeof(Image));
+            freeBadgeGo.transform.SetParent(cardGo.transform, false);
+            var fbImg = freeBadgeGo.GetComponent<Image>();
+            if (bgSpr != null) { fbImg.sprite = bgSpr; fbImg.type = Image.Type.Sliced; }
+            fbImg.color = new Color(0.75f, 0.55f, 0.1f, 0.98f);
+            var fbRt = freeBadgeGo.GetComponent<RectTransform>();
+            SetRect(fbRt, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(46f, 18f), new Vector2(-6f, 26f));
+
+            var fbTxt = AddText(freeBadgeGo.transform, "Txt", "FREE", 9, new Color(1f, 0.92f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+            Fill(fbTxt.rectTransform);
+        }
+
+        var btn = cardGo.GetComponent<Button>();
+        btn.onClick.AddListener(() =>
+        {
+            AudioManager.Instance.PlayCardSelect();
+            InspectHero(hero);
+        });
+
+        return cardGo;
+    }
+
+    private void BuildHeroInspectRightColumn()
+    {
+        draftInspectPanelGo = new GameObject("RightInspectCol", typeof(RectTransform), typeof(Image));
+        draftInspectPanelGo.transform.SetParent(draftScreenGo.transform, false);
+        var ipImg = draftInspectPanelGo.GetComponent<Image>();
+        var bgSpr = LotusHealthUI.LoadSpriteFromResources("UI/auth_card_bg");
+        if (bgSpr != null) { ipImg.sprite = bgSpr; ipImg.type = Image.Type.Sliced; }
+        ipImg.color = new Color(0.06f, 0.1f, 0.18f, 0.98f);
+
+        var ipRt = draftInspectPanelGo.GetComponent<RectTransform>();
+        SetRect(ipRt, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(330f, -68f), new Vector2(-16f, -28f));
+
+        var borderGo = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        borderGo.transform.SetParent(draftInspectPanelGo.transform, false);
+        var bImg = borderGo.GetComponent<Image>();
+        var fSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+        if (fSpr != null) { bImg.sprite = fSpr; bImg.type = Image.Type.Sliced; }
+        bImg.color = new Color(1f, 0.85f, 0.35f, 1f);
+        Fill(borderGo.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
+
+        inspectTitleText = AddText(draftInspectPanelGo.transform, "Title", "LÝ THƯỜNG KIỆT", 16, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(inspectTitleText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(300f, 26f), new Vector2(0f, -12f));
+
+        inspectSubText = AddText(draftInspectPanelGo.transform, "Sub", "Thế Lực: Thời Lý • Máu: 4 đóa sen", 11, new Color(0.8f, 0.9f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
+        SetRect(inspectSubText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(300f, 20f), new Vector2(0f, -38f));
+
+        var avGo = new GameObject("InspectAvatar", typeof(RectTransform), typeof(Image));
+        avGo.transform.SetParent(draftInspectPanelGo.transform, false);
+        inspectAvatarImg = avGo.GetComponent<Image>();
+        inspectAvatarImg.sprite = HeroDatabase100.GetAvatarSprite("UI/ly_thuong_kiet");
+        inspectAvatarImg.preserveAspect = true;
+        var avRt = avGo.GetComponent<RectTransform>();
+        SetRect(avRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(115f, 150f), new Vector2(0f, -60f));
+
+        var avFrame = new GameObject("AvFrame", typeof(RectTransform), typeof(Image));
+        avFrame.transform.SetParent(avGo.transform, false);
+        var avfImg = avFrame.GetComponent<Image>();
+        if (fSpr != null) { avfImg.sprite = fSpr; avfImg.type = Image.Type.Sliced; }
+        avfImg.color = new Color(1f, 0.85f, 0.35f, 0.9f);
+        Fill(avFrame.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
+
+        var hpRowGo = new GameObject("LotusContainer", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        hpRowGo.transform.SetParent(draftInspectPanelGo.transform, false);
+        var hrRt = hpRowGo.GetComponent<RectTransform>();
+        SetRect(hrRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(180f, 20f), new Vector2(0f, -216f));
+        var hlg = hpRowGo.GetComponent<HorizontalLayoutGroup>();
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+        hlg.spacing = 6f;
+        hlg.childControlWidth = hlg.childControlHeight = false;
+        inspectLotusContainer = hpRowGo.transform;
+
+        var skillBoxGo = new GameObject("SkillBox", typeof(RectTransform), typeof(Image));
+        skillBoxGo.transform.SetParent(draftInspectPanelGo.transform, false);
+        var sbImg = skillBoxGo.GetComponent<Image>();
+        var slotSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
+        if (slotSpr != null) { sbImg.sprite = slotSpr; sbImg.type = Image.Type.Sliced; }
+        sbImg.color = new Color(0.04f, 0.07f, 0.14f, 0.95f);
+        var sbRt = skillBoxGo.GetComponent<RectTransform>();
+        SetRect(sbRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(305f, 310f), new Vector2(0f, -242f));
+
+        inspectSkillTitleText = AddText(skillBoxGo.transform, "SkillTitle", "⚡ TUYỆT KỸ: [TIẾN THOÁI]", 13, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft);
+        SetRect(inspectSkillTitleText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(-16f, 26f), new Vector2(10f, -8f));
+
+        inspectSkillDescText = AddText(skillBoxGo.transform, "SkillDesc", "Bạn có thể sử dụng lá Trảm như lá Đỡ, và sử dụng lá Đỡ như lá Trảm.", 11, new Color(0.9f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.UpperLeft);
+        Fill(inspectSkillDescText.rectTransform, new Vector2(10f, 8f), new Vector2(-10f, -34f));
+
+        var confirmBtnGo = new GameObject("DraftConfirmBtn", typeof(RectTransform), typeof(Image), typeof(Button));
+        confirmBtnGo.transform.SetParent(draftInspectPanelGo.transform, false);
+        var cbImg = confirmBtnGo.GetComponent<Image>();
+        var btnSpr = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
+        if (btnSpr != null) { cbImg.sprite = btnSpr; cbImg.type = Image.Type.Sliced; }
+        cbImg.color = new Color(0.9f, 0.65f, 0.15f, 1f);
+
+        var cbRt = confirmBtnGo.GetComponent<RectTransform>();
+        SetRect(cbRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(290f, 46f), new Vector2(0f, 18f));
+
+        draftConfirmBtn = confirmBtnGo.GetComponent<Button>();
+        draftConfirmBtnText = AddText(confirmBtnGo.transform, "Txt", "👑 XÁC NHẬN CHỌN TƯỚNG", 13, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        Fill(draftConfirmBtnText.rectTransform);
+
+        draftConfirmBtn.onClick.AddListener(() =>
+        {
+            if (currentDraftPickerIndex < draftSlots.Count && draftSlots[currentDraftPickerIndex].isPlayer)
+            {
+                if (inspectingHero != null && !selectedHeroIds.Contains(inspectingHero.id))
+                {
+                    AudioManager.Instance.PlayCardSelect();
+                    ChooseHeroForSlot(draftSlots[currentDraftPickerIndex], inspectingHero);
+                }
+            }
+        });
+    }
+
+    private void InspectHero(HeroDatabase100.HeroData hero)
+    {
+        if (hero == null || draftInspectPanelGo == null) return;
+        inspectingHero = hero;
+
+        if (inspectTitleText != null) inspectTitleText.text = hero.name.ToUpper();
+
+        string freeTag = weeklyFreeHeroIds.Contains(hero.id) ? " <color=#FFD700>[🌟 FREE TUẦN]</color>" : " <color=#55DDFF>[ĐÃ SỞ HỮU]</color>";
+        if (inspectSubText != null) inspectSubText.text = $"Thế Lực: <b>{hero.faction}</b> • Máu: <b>{hero.maxHp} đóa sen</b>{freeTag}";
+
+        if (inspectAvatarImg != null) inspectAvatarImg.sprite = HeroDatabase100.GetAvatarSprite(hero.avatarPath);
+
+        if (inspectLotusContainer != null)
+        {
+            for (int i = inspectLotusContainer.childCount - 1; i >= 0; i--)
+            {
+                Destroy(inspectLotusContainer.GetChild(i).gameObject);
+            }
+            var lotusSpr = LotusHealthUI.LoadSpriteFromResources("UI/lotus_full");
+            for (int i = 0; i < hero.maxHp; i++)
+            {
+                var lGo = new GameObject("Lotus_" + i, typeof(RectTransform), typeof(Image));
+                lGo.transform.SetParent(inspectLotusContainer, false);
+                var lImg = lGo.GetComponent<Image>();
+                if (lotusSpr != null) lImg.sprite = lotusSpr;
+                lImg.color = new Color(1f, 0.45f, 0.65f, 1f);
+                var lRt = lGo.GetComponent<RectTransform>();
+                lRt.sizeDelta = new Vector2(16f, 16f);
+            }
+        }
+
+        if (inspectSkillTitleText != null) inspectSkillTitleText.text = $"⚡ TUYỆT KỸ: [{hero.skillName.ToUpper()}]";
+        if (inspectSkillDescText != null) inspectSkillDescText.text = hero.skillDesc;
+
+        bool isCurrentSlotPlayer = (currentDraftPickerIndex < draftSlots.Count && draftSlots[currentDraftPickerIndex].isPlayer);
+        bool isAvailable = !selectedHeroIds.Contains(hero.id);
+
+        if (draftConfirmBtn != null)
+        {
+            draftConfirmBtn.interactable = (isCurrentSlotPlayer && isAvailable);
+            if (selectedHeroIds.Contains(hero.id))
+            {
+                draftConfirmBtnText.text = "🔒 TƯỚNG NÀY ĐÃ ĐƯỢC CHỌN";
+            }
+            else if (!isCurrentSlotPlayer)
+            {
+                draftConfirmBtnText.text = "⏳ ĐANG CHỜ ĐẾN LƯỢT CHỌN";
+            }
+            else
+            {
+                draftConfirmBtnText.text = "👑 XÁC NHẬN CHỌN TƯỚNG";
+            }
+        }
+    }
+
+    private void ChooseHeroForSlot(DraftSlot slot, HeroDatabase100.HeroData hero)
+    {
+        if (slot == null || hero == null || selectedHeroIds.Contains(hero.id)) return;
+
+        slot.chosenHero = hero;
+        selectedHeroIds.Add(hero.id);
+
+        if (slot.heroNameText != null) slot.heroNameText.text = $"👑 {hero.name}";
+        if (slot.statusText != null) slot.statusText.text = $"Đã chọn ({hero.maxHp}💮)";
+        if (slot.avatarImg != null)
+        {
+            slot.avatarImg.sprite = HeroDatabase100.GetAvatarSprite(hero.avatarPath);
+            slot.avatarImg.color = Color.white;
+        }
+
+        if (heroGridItems.TryGetValue(hero.id, out var itemGo) && itemGo != null)
+        {
+            var overlayGo = new GameObject("ChosenOverlay", typeof(RectTransform), typeof(Image));
+            overlayGo.transform.SetParent(itemGo.transform, false);
+            var oImg = overlayGo.GetComponent<Image>();
+            oImg.color = new Color(0.04f, 0.05f, 0.08f, 0.78f);
+            Fill(overlayGo.GetComponent<RectTransform>());
+
+            var btn = itemGo.GetComponent<Button>();
+            if (btn != null) btn.interactable = false;
+
+            var chosenTag = AddText(overlayGo.transform, "ChosenTag", "🔒 ĐÃ CHỌN", 12, new Color(1f, 0.35f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+            Fill(chosenTag.rectTransform);
+        }
+
+        if (inspectingHero != null && inspectingHero.id == hero.id)
+        {
+            InspectHero(hero);
+        }
+    }
+
+    private void UpdateDraftTurnStatus()
+    {
+        if (currentDraftPickerIndex >= draftSlots.Count) return;
+        var slot = draftSlots[currentDraftPickerIndex];
+
+        foreach (var s in draftSlots)
+        {
+            if (s.chosenHero == null)
+            {
+                if (s == slot)
+                {
+                    s.statusText.text = "<color=#FFFF55>👉 Đang chọn tướng...</color>";
+                    s.statusText.color = new Color(1f, 0.95f, 0.4f, 1f);
+                }
+                else
+                {
+                    s.statusText.text = "Đang chờ lượt...";
+                    s.statusText.color = new Color(0.7f, 0.8f, 0.9f, 0.85f);
+                }
+            }
+        }
+
+        string pickerName = slot.isPlayer ? "<color=#FFFF55>BẠN (Người Chơi)</color>" : slot.playerTitle;
+        draftTurnStatusText.text = $"LƯỢT #{slot.seatNumber}: {pickerName} ĐANG CHỌN TƯỚNG!";
+
+        if (inspectingHero != null) InspectHero(inspectingHero);
+    }
+
+    private void UpdateDraftTimerVisual()
+    {
+        float ratio = Mathf.Clamp01(draftTimer / 40.0f);
+        if (draftTimerFill != null) draftTimerFill.rectTransform.anchorMax = new Vector2(ratio, 1f);
+        if (draftTimerText != null) draftTimerText.text = $"⏳ {draftTimer:0.0}s / 40s";
+    }
+
+    private void OnDraftTimerExpired()
+    {
+        if (currentDraftPickerIndex < draftSlots.Count)
+        {
+            var slot = draftSlots[currentDraftPickerIndex];
+            if (slot.chosenHero == null)
+            {
+                HeroDatabase100.HeroData pick = null;
+                if (inspectingHero != null && !selectedHeroIds.Contains(inspectingHero.id))
+                {
+                    pick = inspectingHero;
+                }
+                else
+                {
+                    foreach (var h in availableHeroes)
+                    {
+                        if (!selectedHeroIds.Contains(h.id))
+                        {
+                            pick = h;
+                            break;
+                        }
+                    }
+                }
+                if (pick != null) ChooseHeroForSlot(slot, pick);
+            }
+        }
+    }
+    #endregion
+
+    #region 3. KHỞI TẠO BÀN CHIẾN ĐẤU 2v2 VỚI TƯỚNG ĐÃ CHỌN
+    private void StartBattleWithChosenHeroes()
+    {
+        battleRootGo = new GameObject("Battle2v2BattleRoot", typeof(RectTransform));
+        battleRootGo.transform.SetParent(canvasGo.transform, false);
+        Fill(battleRootGo.GetComponent<RectTransform>());
+
+        BuildHeaderBar();
+        BuildFourGenerals();
+        BuildPlayerHandArea();
+        BuildLogAndStatusArea();
+        BuildDeckStatusHUD();
+
+        StartCoroutine(StartBattleCardDealSequence());
+    }
+
+    private void BuildHeaderBar()
+    {
+        var headerGo = new GameObject("HeaderBar", typeof(RectTransform), typeof(Image));
+        headerGo.transform.SetParent(battleRootGo.transform, false);
+        var hImg = headerGo.GetComponent<Image>();
+        hImg.color = new Color(0.04f, 0.07f, 0.14f, 0.95f);
+        var hRt = headerGo.GetComponent<RectTransform>();
+        SetRect(hRt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 44f), Vector2.zero);
+
+        var homeBtnGo = new GameObject("HomeBtn", typeof(RectTransform), typeof(Image), typeof(Button));
+        homeBtnGo.transform.SetParent(headerGo.transform, false);
+        var hbImg = homeBtnGo.GetComponent<Image>();
+        var slotSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
+        if (slotSpr != null) { hbImg.sprite = slotSpr; hbImg.type = Image.Type.Sliced; }
+        hbImg.color = new Color(0.2f, 0.12f, 0.08f, 0.95f);
+        var hbRt = homeBtnGo.GetComponent<RectTransform>();
+        hbRt.anchorMin = hbRt.anchorMax = hbRt.pivot = new Vector2(0f, 0.5f);
+        hbRt.sizeDelta = new Vector2(130f, 32f);
+        hbRt.anchoredPosition = new Vector2(12f, 0f);
+
+        var hbTxt = AddText(homeBtnGo.transform, "Txt", "🏠 VỀ TRANG CHỦ", 11, new Color(1f, 0.88f, 0.4f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        Fill(hbTxt.rectTransform);
+        homeBtnGo.GetComponent<Button>().onClick.AddListener(() =>
+        {
+            AudioManager.Instance.PlayCardSelect();
+            ConfirmExitBattle();
+        });
+
+        var titleTxt = AddText(headerGo.transform, "Title", "🛡️ ĐẤU TRƯỜNG 2v2 XẾP HẠNG (PHỐI HỢP ĐỒNG MINH)", 15, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(titleTxt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(500f, 30f), Vector2.zero);
+
+        var turnTxt = AddText(headerGo.transform, "GlobalTurn", "⏳ Đang chuẩn bị chia bài...", 12, new Color(0.6f, 0.9f, 1f, 1f), FontStyle.Bold, TextAnchor.MiddleRight);
+        SetRect(turnTxt.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(280f, 30f), new Vector2(-16f, 0f));
+        globalTurnText = turnTxt;
+    }
+
+    private void BuildFourGenerals()
+    {
+        var genContainer = new GameObject("GeneralsContainer", typeof(RectTransform));
+        genContainer.transform.SetParent(battleRootGo.transform, false);
+        Fill(genContainer.GetComponent<RectTransform>());
+
+        Vector2 cardSize = new Vector2(184f, 245f);
+
+        DraftSlot pSlot = draftSlots.Find(s => s.isPlayer) ?? draftSlots[0];
+        DraftSlot aSlot = draftSlots.Find(s => s.isAlly && !s.isPlayer) ?? draftSlots[1];
+        DraftSlot e1Slot = draftSlots.Find(s => !s.isAlly) ?? draftSlots[2];
+        DraftSlot e2Slot = draftSlots.FindLast(s => !s.isAlly) ?? draftSlots[3];
+
+        HeroDatabase100.HeroData pHero = pSlot.chosenHero ?? HeroDatabase100.GetHero(47);
+        HeroDatabase100.HeroData aHero = aSlot.chosenHero ?? HeroDatabase100.GetHero(53);
+        HeroDatabase100.HeroData e1Hero = e1Slot.chosenHero ?? HeroDatabase100.GetHero(1);
+        HeroDatabase100.HeroData e2Hero = e2Slot.chosenHero ?? HeroDatabase100.GetHero(2);
+
+        // 1. NGƯỜI CHƠI
+        playerCard = GeneralCardUI.Create(genContainer.transform, cardSize, pHero.name, "ĐỒNG MINH", pHero.maxHp, 4, pHero.avatarPath);
+        var pRt = playerCard.GetComponent<RectTransform>();
+        pRt.anchorMin = new Vector2(1f, 0f);
+        pRt.anchorMax = new Vector2(1f, 0f);
+        pRt.pivot = new Vector2(1f, 0f);
+        pRt.sizeDelta = cardSize;
+        pRt.anchoredPosition = new Vector2(-18f, 18f);
+        playerCard.SetTeamVisual(true);
+        playerCard.SetSeatBadge(pSlot.seatNumber);
+        playerCard.SetSkill($"⚡ {pHero.skillName.ToUpper()}", OnPlayerSkillClicked);
+        playerCard.OnGeneralClicked += OnGeneralTargetClicked;
+
+        // 2. ĐỒNG ĐỘI AI
+        allyCard = GeneralCardUI.Create(genContainer.transform, cardSize, aHero.name, "ĐỒNG MINH", aHero.maxHp, 4, aHero.avatarPath);
+        allyCard.SetTeamVisual(true);
+        allyCard.SetSeatBadge(aSlot.seatNumber);
+        allyCard.OnGeneralClicked += OnGeneralTargetClicked;
+
+        // 3. ĐỐI THỦ AI 1
+        enemy1Card = GeneralCardUI.Create(genContainer.transform, cardSize, e1Hero.name, "ĐỐI THỦ", e1Hero.maxHp, 4, e1Hero.avatarPath);
+        enemy1Card.SetTeamVisual(false);
+        enemy1Card.SetSeatBadge(e1Slot.seatNumber);
+        enemy1Card.OnGeneralClicked += OnGeneralTargetClicked;
+
+        // 4. ĐỐI THỦ AI 2
+        enemy2Card = GeneralCardUI.Create(genContainer.transform, cardSize, e2Hero.name, "ĐỐI THỦ", e2Hero.maxHp, 4, e2Hero.avatarPath);
+        enemy2Card.SetTeamVisual(false);
+        enemy2Card.SetSeatBadge(e2Slot.seatNumber);
+        enemy2Card.OnGeneralClicked += OnGeneralTargetClicked;
+
+        allGenerals.Clear();
+        allGenerals.Add(playerCard);
+        allGenerals.Add(allyCard);
+        allGenerals.Add(enemy1Card);
+        allGenerals.Add(enemy2Card);
+
+        int playerSeat = playerCard.SeatNumber;
+        foreach (var g in allGenerals)
+        {
+            if (g == playerCard) continue;
+
+            int offset = (g.SeatNumber - playerSeat + 4) % 4;
+            var gRt = g.GetComponent<RectTransform>();
+            gRt.anchorMin = new Vector2(0.5f, 0.5f);
+            gRt.anchorMax = new Vector2(0.5f, 0.5f);
+            gRt.pivot = new Vector2(0.5f, 0.5f);
+            gRt.sizeDelta = cardSize;
+
+            if (offset == 1)
+            {
+                gRt.anchoredPosition = new Vector2(360f, 185f);
+            }
+            else if (offset == 2)
+            {
+                gRt.anchoredPosition = new Vector2(-80f, 185f);
+            }
+            else
+            {
+                gRt.anchoredPosition = new Vector2(-510f, -40f);
+            }
+        }
+    }
+
+    private void BuildPlayerHandArea()
+    {
+        var handRootGo = new GameObject("HandAreaRoot", typeof(RectTransform));
+        handRootGo.transform.SetParent(battleRootGo.transform, false);
+        var hrRt = handRootGo.GetComponent<RectTransform>();
+        hrRt.anchorMin = new Vector2(0.5f, 0f);
+        hrRt.anchorMax = new Vector2(0.5f, 0f);
+        hrRt.pivot = new Vector2(0.5f, 0f);
+        hrRt.sizeDelta = new Vector2(1280f, 250f);
+        hrRt.anchoredPosition = Vector2.zero;
+
+        var phGo = new GameObject("PlayerHandUI", typeof(RectTransform), typeof(PlayerHandUI));
+        phGo.transform.SetParent(handRootGo.transform, false);
+        playerHandUI = phGo.GetComponent<PlayerHandUI>();
+        playerHandUI.BindHeroCard(playerCard);
+        var phRt = phGo.GetComponent<RectTransform>();
+        phRt.anchorMin = new Vector2(0.5f, 0f);
+        phRt.anchorMax = new Vector2(0.5f, 0f);
+        phRt.pivot = new Vector2(0.5f, 0f);
+        phRt.sizeDelta = new Vector2(620f, 170f);
+        phRt.anchoredPosition = new Vector2(-80f, 18f);
+        playerHandUI.OnCardSelected += HandlePlayerCardSelected;
+
+        // 1. Hộp Mô Tả Chi Tiết Lá Bài (Nằm cao ở y = 195f để không bao giờ che bài trên tay)
+        cardDescBoxGo = new GameObject("CardDescBox", typeof(RectTransform), typeof(Image));
+        cardDescBoxGo.transform.SetParent(handRootGo.transform, false);
+        var cdImg = cardDescBoxGo.GetComponent<Image>();
+        var bgSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
+        if (bgSpr != null) { cdImg.sprite = bgSpr; cdImg.type = Image.Type.Sliced; }
+        cdImg.color = new Color(0.04f, 0.07f, 0.14f, 0.98f);
+        var cdRt = cardDescBoxGo.GetComponent<RectTransform>();
+        SetRect(cdRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(660f, 54f), new Vector2(-80f, 195f));
+
+        var cdFrame = new GameObject("Frame", typeof(RectTransform), typeof(Image));
+        cdFrame.transform.SetParent(cardDescBoxGo.transform, false);
+        var cdfImg = cdFrame.GetComponent<Image>();
+        var fSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+        if (fSpr != null) { cdfImg.sprite = fSpr; cdfImg.type = Image.Type.Sliced; }
+        cdfImg.color = new Color(1f, 0.85f, 0.35f, 0.9f);
+        Fill(cdFrame.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
+
+        var cdTxtGo = new GameObject("DescText", typeof(RectTransform), typeof(Text));
+        cdTxtGo.transform.SetParent(cardDescBoxGo.transform, false);
+        cardDescBodyText = cdTxtGo.GetComponent<Text>();
+        cardDescBodyText.font = font;
+        cardDescBodyText.fontSize = 12; // Cỡ chữ nhỏ đi 1.5 lần (từ 18 xuống 12pt)
+        cardDescBodyText.color = new Color(0.95f, 0.98f, 1f, 1f);
+        cardDescBodyText.alignment = TextAnchor.MiddleLeft;
+        cardDescBodyText.horizontalOverflow = HorizontalWrapMode.Wrap; // Hỗ trợ hiển thị 2 dòng
+        cardDescBodyText.verticalOverflow = VerticalWrapMode.Truncate;
+        cardDescBodyText.lineSpacing = 1.2f;
+        Fill(cdTxtGo.GetComponent<RectTransform>(), new Vector2(12, 4), new Vector2(-12, -4));
+        cardDescBoxGo.SetActive(false);
+
+        var btnSpr = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
+
+        // 2. Nút Dùng Bài Hành Động 2 Bước (y = 245f)
+        actionBtnGo = new GameObject("ActionPlayBtn", typeof(RectTransform), typeof(Image), typeof(Button));
+        actionBtnGo.transform.SetParent(handRootGo.transform, false);
+        var abImg = actionBtnGo.GetComponent<Image>();
+        if (btnSpr != null) { abImg.sprite = btnSpr; abImg.type = Image.Type.Sliced; }
+        abImg.color = new Color(0.92f, 0.65f, 0.15f, 1f);
+        var abRt = actionBtnGo.GetComponent<RectTransform>();
+        SetRect(abRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(260f, 38f), new Vector2(-80f, 245f));
+
+        var abTxt = AddText(actionBtnGo.transform, "Txt", "🃏 DÙNG LÁ BÀI", 12, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        Fill(abTxt.rectTransform);
+        actionBtnText = abTxt;
+
+        actionBtnGo.GetComponent<Button>().onClick.AddListener(OnPlayerActionBtnClicked);
+        actionBtnGo.SetActive(false);
+
+        // 3. Nút Kết Thúc Lượt (Mặc định ẩn, chỉ hiện trong lượt của người chơi)
+        var etBtnGo = new GameObject("EndTurnBtn", typeof(RectTransform), typeof(Image), typeof(Button));
+        etBtnGo.transform.SetParent(handRootGo.transform, false);
+        var etImg = etBtnGo.GetComponent<Image>();
+        if (btnSpr != null) { etImg.sprite = btnSpr; etImg.type = Image.Type.Sliced; }
+        etImg.color = new Color(0.9f, 0.6f, 0.15f, 1f);
+        var etRt = etBtnGo.GetComponent<RectTransform>();
+        SetRect(etRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(140f, 36f), new Vector2(215f, 245f));
+
+        endTurnBtn = etBtnGo.GetComponent<Button>();
+        endTurnBtnText = AddText(etBtnGo.transform, "Txt", "KẾT THÚC LƯỢT ➜", 10, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        Fill(endTurnBtnText.rectTransform);
+        endTurnBtn.onClick.AddListener(OnPlayerEndTurnClicked);
+        etBtnGo.SetActive(false);
+
+        // 4. Nút Bỏ Bài Thừa (Khi kết thúc lượt thừa bài)
+        var dcBtnGo = new GameObject("DiscardConfirmBtn", typeof(RectTransform), typeof(Image), typeof(Button));
+        dcBtnGo.transform.SetParent(handRootGo.transform, false);
+        var dcImg = dcBtnGo.GetComponent<Image>();
+        if (btnSpr != null) { dcImg.sprite = btnSpr; dcImg.type = Image.Type.Sliced; }
+        dcImg.color = new Color(0.85f, 0.25f, 0.25f, 1f);
+        var dcRt = dcBtnGo.GetComponent<RectTransform>();
+        SetRect(dcRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(140f, 36f), new Vector2(-345f, 245f));
+
+        discardConfirmBtn = dcBtnGo.GetComponent<Button>();
+        discardConfirmBtnText = AddText(dcBtnGo.transform, "Txt", "BỎ BÀI (0/0)", 10, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        Fill(discardConfirmBtnText.rectTransform);
+        discardConfirmBtn.onClick.AddListener(OnPlayerConfirmDiscardClicked);
+        dcBtnGo.SetActive(false);
+    }
+
+    private void BuildLogAndStatusArea()
+    {
+        // 1. NÚT [📜 LỊCH SỬ] Ở GÓC DƯỚI CÙNG BÊN TRÁI
+        var histBtnGo = new GameObject("HistoryButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        histBtnGo.transform.SetParent(battleRootGo.transform, false);
+        var hbImg = histBtnGo.GetComponent<Image>();
+        var slotSpr = ThemeUI.LoadSprite("UI/slot_bg");
+        if (slotSpr != null) { hbImg.sprite = slotSpr; hbImg.type = Image.Type.Sliced; }
+        hbImg.color = new Color(0.08f, 0.14f, 0.25f, 0.95f);
+
+        var hbRt = histBtnGo.GetComponent<RectTransform>();
+        hbRt.anchorMin = Vector2.zero;
+        hbRt.anchorMax = Vector2.zero;
+        hbRt.pivot = Vector2.zero;
+        hbRt.sizeDelta = new Vector2(150f, 44f);
+        hbRt.anchoredPosition = new Vector2(16f, 16f);
+
+        var hbFrame = new GameObject("Frame", typeof(RectTransform), typeof(Image));
+        hbFrame.transform.SetParent(histBtnGo.transform, false);
+        var hbfImg = hbFrame.GetComponent<Image>();
+        var fSpr = ThemeUI.LoadSprite("UI/card_frame");
+        if (fSpr != null) { hbfImg.sprite = fSpr; hbfImg.type = Image.Type.Sliced; }
+        hbfImg.color = new Color(1f, 0.85f, 0.35f, 0.95f);
+        hbfImg.raycastTarget = false;
+        Fill(hbFrame.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
+
+        var hbTxt = ThemeUI.CreateText(histBtnGo.transform, "Txt", "📜 LỊCH SỬ", ThemeUI.SizeButton, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter, true);
+        Fill(hbTxt.rectTransform);
+
+        histBtnGo.GetComponent<Button>().onClick.AddListener(() =>
+        {
+            AudioManager.Instance.PlayCardSelect();
+            if (historyOverlayGo != null)
+            {
+                historyOverlayGo.SetActive(true);
+                historyOverlayGo.transform.SetAsLastSibling();
+                if (historyScrollRect != null)
+                {
+                    Canvas.ForceUpdateCanvases();
+                    historyScrollRect.verticalNormalizedPosition = 0f;
+                }
+            }
+        });
+
+        // 2. POPUP MODAL LỊCH SỬ TRẬN ĐẤU (CHUẨN TUTORIAL)
+        historyOverlayGo = new GameObject("HistoryModalOverlay", typeof(RectTransform), typeof(Image));
+        historyOverlayGo.transform.SetParent(battleRootGo.transform, false);
+        historyOverlayGo.transform.SetAsLastSibling();
+        var ovImg = historyOverlayGo.GetComponent<Image>();
+        ovImg.color = new Color(0.02f, 0.03f, 0.07f, 0.88f);
+        Fill(historyOverlayGo.GetComponent<RectTransform>());
+
+        var panelGo = new GameObject("Panel", typeof(RectTransform), typeof(Image));
+        panelGo.transform.SetParent(historyOverlayGo.transform, false);
+        var pImg = panelGo.GetComponent<Image>();
+        var bgSpr = ThemeUI.LoadSprite("UI/auth_card_bg");
+        if (bgSpr != null) { pImg.sprite = bgSpr; pImg.type = Image.Type.Sliced; }
+        pImg.color = new Color(0.06f, 0.09f, 0.18f, 0.98f);
+
+        var pRt = panelGo.GetComponent<RectTransform>();
+        pRt.anchorMin = pRt.anchorMax = pRt.pivot = new Vector2(0.5f, 0.5f);
+        pRt.sizeDelta = new Vector2(740f, 480f);
+        pRt.anchoredPosition = Vector2.zero;
+
+        var pBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        pBorder.transform.SetParent(panelGo.transform, false);
+        var pbImg = pBorder.GetComponent<Image>();
+        if (fSpr != null) { pbImg.sprite = fSpr; pbImg.type = Image.Type.Sliced; }
+        pbImg.color = ThemeUI.GoldPrimary;
+        pbImg.raycastTarget = false;
+        Fill(pBorder.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
+
+        var headerGo = new GameObject("Header", typeof(RectTransform), typeof(Image));
+        headerGo.transform.SetParent(panelGo.transform, false);
+        var hImg = headerGo.GetComponent<Image>();
+        var bSpr = ThemeUI.LoadSprite("UI/badge_faction");
+        if (bSpr != null) { hImg.sprite = bSpr; hImg.type = Image.Type.Sliced; }
+        hImg.color = new Color(0.12f, 0.35f, 0.65f, 0.98f);
+        var hRt = headerGo.GetComponent<RectTransform>();
+        SetRect(hRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(700f, 48f), new Vector2(0f, -12f));
+
+        var titleTxt = ThemeUI.CreateText(headerGo.transform, "Title", "📜 LỊCH SỬ TRẬN ĐẤU (DIỄN BIẾN CHIẾN TRƯỜNG)", ThemeUI.SizeTitleLarge, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, true);
+        Fill(titleTxt.rectTransform);
+
+        // Nút Đóng [❌]
+        var closeBtnGo = new GameObject("CloseBtn", typeof(RectTransform), typeof(Image), typeof(Button));
+        closeBtnGo.transform.SetParent(panelGo.transform, false);
+        var clImg = closeBtnGo.GetComponent<Image>();
+        var btnSpr = ThemeUI.LoadSprite("UI/btn_gold");
+        if (btnSpr != null) { clImg.sprite = btnSpr; clImg.type = Image.Type.Sliced; }
+        clImg.color = new Color(0.85f, 0.25f, 0.25f, 1f);
+        var clRt = closeBtnGo.GetComponent<RectTransform>();
+        SetRect(clRt, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(40f, 40f), new Vector2(-16f, -16f));
+
+        var clTxt = ThemeUI.CreateText(closeBtnGo.transform, "Txt", "❌", ThemeUI.SizeButton, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter, true);
+        Fill(clTxt.rectTransform);
+        closeBtnGo.GetComponent<Button>().onClick.AddListener(() =>
+        {
+            AudioManager.Instance.PlayCardSelect();
+            historyOverlayGo.SetActive(false);
+        });
+
+        // ScrollView Chứa Nội Dung Lịch Sử
+        var scrollGo = new GameObject("HistoryScroll", typeof(RectTransform), typeof(ScrollRect), typeof(Image), typeof(Mask));
+        scrollGo.transform.SetParent(panelGo.transform, false);
+        var sImg = scrollGo.GetComponent<Image>();
+        sImg.color = new Color(0.02f, 0.04f, 0.08f, 0.55f);
+        var mask = scrollGo.GetComponent<Mask>();
+        mask.showMaskGraphic = false;
+
+        var scrollRt = scrollGo.GetComponent<RectTransform>();
+        scrollRt.anchorMin = Vector2.zero;
+        scrollRt.anchorMax = Vector2.one;
+        scrollRt.offsetMin = new Vector2(20f, 20f);
+        scrollRt.offsetMax = new Vector2(-20f, -66f);
+
+        var contentGo = new GameObject("Content", typeof(RectTransform), typeof(Text), typeof(ContentSizeFitter));
+        contentGo.transform.SetParent(scrollGo.transform, false);
+        var contentRt = contentGo.GetComponent<RectTransform>();
+        contentRt.anchorMin = new Vector2(0f, 1f);
+        contentRt.anchorMax = new Vector2(1f, 1f);
+        contentRt.pivot = new Vector2(0.5f, 1f);
+        contentRt.offsetMin = new Vector2(12f, 0f);
+        contentRt.offsetMax = new Vector2(-12f, 0f);
+
+        var csf = contentGo.GetComponent<ContentSizeFitter>();
+        csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        historyContentText = contentGo.GetComponent<Text>();
+        historyContentText.font = font;
+        historyContentText.fontSize = ThemeUI.SizeBody;
+        historyContentText.color = new Color(0.95f, 0.98f, 1f, 1f);
+        historyContentText.lineSpacing = 1.3f;
+        historyContentText.alignment = TextAnchor.UpperLeft;
+        ThemeUI.AddTextShadow(historyContentText);
+
+        historyScrollRect = scrollGo.GetComponent<ScrollRect>();
+        historyScrollRect.horizontal = false;
+        historyScrollRect.vertical = true;
+        historyScrollRect.viewport = scrollRt;
+        historyScrollRect.content = contentRt;
+        historyScrollRect.scrollSensitivity = 40f;
+
+        historyOverlayGo.SetActive(false);
+
+        battleLogHistory.Clear();
+        SetLog("⚔️ Trận đấu 2v2 chính thức bắt đầu!");
+    }
+
+    private IEnumerator StartBattleCardDealSequence()
+    {
+        turnOrderGenerals.Clear();
+        for (int s = 1; s <= 4; s++)
+        {
+            foreach (var g in allGenerals)
+            {
+                if (g.SeatNumber == s)
+                {
+                    turnOrderGenerals.Add(g);
+                    break;
+                }
+            }
+        }
+
+        isFirstTurnOfMatch = true;
+        SetLog("🎴 Phát 4 lá bài ban đầu cho toàn thể chiến tướng...");
+        AudioManager.Instance.PlayCardDraw();
+
+        for (int i = 0; i < 4; i++)
+        {
+            var pCard = deckManager.DrawCard();
+            if (pCard != null)
+            {
+                yield return AnimateDealtCard(playerCard);
+                playerHandCards.Add(pCard);
+                playerHandUI.AddCard(pCard);
+            }
+
+            var aCard = deckManager.DrawCard();
+            if (aCard != null)
+            {
+                yield return AnimateDealtCard(allyCard);
+                allyHandCards.Add(aCard);
+            }
+
+            var e1Card = deckManager.DrawCard();
+            if (e1Card != null)
+            {
+                yield return AnimateDealtCard(enemy1Card);
+                enemy1HandCards.Add(e1Card);
+            }
+
+            var e2Card = deckManager.DrawCard();
+            if (e2Card != null)
+            {
+                yield return AnimateDealtCard(enemy2Card);
+                enemy2HandCards.Add(e2Card);
+            }
+
+            UpdateHandCountsVisual();
+            yield return new WaitForSeconds(0.05f);
+        }
+
+        UpdateHandCountsVisual();
+        yield return new WaitForSeconds(1.0f);
+
+        currentTurnIndex = 0;
+        StartCoroutine(ExecuteCurrentTurn());
+    }
+
+    private void BuildDeckStatusHUD()
+    {
+        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        deckHudGo = new GameObject("DeckStatusHUD", typeof(RectTransform));
+        deckHudGo.transform.SetParent(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, false);
+        var rt = deckHudGo.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(1f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot = new Vector2(1f, 1f);
+        rt.sizeDelta = new Vector2(68f, 92f);
+        rt.anchoredPosition = new Vector2(-16f, -54f);
+
+        // Lớp bóng đổ / đáy xấp bài (Layer 1 - Offset 4px)
+        var shadowCardGo = new GameObject("DeckShadow", typeof(RectTransform), typeof(Image));
+        shadowCardGo.transform.SetParent(deckHudGo.transform, false);
+        var sImg = shadowCardGo.GetComponent<Image>();
+        var bgCardSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_back_bg");
+        if (bgCardSpr != null) { sImg.sprite = bgCardSpr; sImg.type = Image.Type.Sliced; }
+        sImg.color = new Color(0.04f, 0.06f, 0.1f, 0.75f);
+        var sRt = shadowCardGo.GetComponent<RectTransform>();
+        sRt.anchorMin = Vector2.zero; sRt.anchorMax = Vector2.one;
+        sRt.offsetMin = new Vector2(-4f, -4f); sRt.offsetMax = new Vector2(-4f, -4f);
+
+        // Lớp thân giữa xấp bài (Layer 2 - Offset 2px)
+        var midCardGo = new GameObject("DeckMid", typeof(RectTransform), typeof(Image));
+        midCardGo.transform.SetParent(deckHudGo.transform, false);
+        var mImg = midCardGo.GetComponent<Image>();
+        if (bgCardSpr != null) { mImg.sprite = bgCardSpr; mImg.type = Image.Type.Sliced; }
+        mImg.color = new Color(0.12f, 0.18f, 0.3f, 0.95f);
+        var mRt = midCardGo.GetComponent<RectTransform>();
+        mRt.anchorMin = Vector2.zero; mRt.anchorMax = Vector2.one;
+        mRt.offsetMin = new Vector2(-2f, -2f); mRt.offsetMax = new Vector2(-2f, -2f);
+
+        // Lớp bài trên cùng (Top Card)
+        var topCardGo = new GameObject("DeckTop", typeof(RectTransform), typeof(Image));
+        topCardGo.transform.SetParent(deckHudGo.transform, false);
+        var topImg = topCardGo.GetComponent<Image>();
+        if (bgCardSpr != null) { topImg.sprite = bgCardSpr; topImg.type = Image.Type.Sliced; }
+        topImg.color = Color.white;
+        Fill(topCardGo.GetComponent<RectTransform>());
+
+        // Viền hoàng kim cho lá bài trên cùng
+        var frameGo = new GameObject("Frame", typeof(RectTransform), typeof(Image));
+        frameGo.transform.SetParent(topCardGo.transform, false);
+        var fImg = frameGo.GetComponent<Image>();
+        var fSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+        if (fSpr != null) { fImg.sprite = fSpr; fImg.type = Image.Type.Sliced; }
+        fImg.color = new Color(1f, 0.85f, 0.35f, 0.95f);
+        Fill(frameGo.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
+
+        // Bảng số lượng bài còn lại ở chân chồng bài
+        var plaqueGo = new GameObject("Plaque", typeof(RectTransform), typeof(Image));
+        plaqueGo.transform.SetParent(deckHudGo.transform, false);
+        var pImg = plaqueGo.GetComponent<Image>();
+        var pSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
+        if (pSpr != null) { pImg.sprite = pSpr; pImg.type = Image.Type.Sliced; }
+        pImg.color = new Color(0.06f, 0.09f, 0.16f, 0.96f);
+        var pRt = plaqueGo.GetComponent<RectTransform>();
+        pRt.anchorMin = new Vector2(0f, 0f); pRt.anchorMax = new Vector2(1f, 0f);
+        pRt.pivot = new Vector2(0.5f, 0f);
+        pRt.sizeDelta = new Vector2(0f, 22f);
+        pRt.anchoredPosition = new Vector2(0f, 0f);
+
+        var pFrameGo = new GameObject("PFrame", typeof(RectTransform), typeof(Image));
+        pFrameGo.transform.SetParent(plaqueGo.transform, false);
+        var pfImg = pFrameGo.GetComponent<Image>();
+        if (fSpr != null) { pfImg.sprite = fSpr; pfImg.type = Image.Type.Sliced; }
+        pfImg.color = new Color(1f, 0.85f, 0.35f, 0.8f);
+        Fill(pFrameGo.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
+
+        var txtGo = new GameObject("DeckText", typeof(RectTransform), typeof(Text));
+        txtGo.transform.SetParent(plaqueGo.transform, false);
+        deckInfoText = txtGo.GetComponent<Text>();
+        deckInfoText.font = font;
+        deckInfoText.fontSize = 12;
+        deckInfoText.fontStyle = FontStyle.Bold;
+        deckInfoText.color = new Color(1f, 0.88f, 0.35f, 1f);
+        deckInfoText.alignment = TextAnchor.MiddleCenter;
+        Fill(txtGo.GetComponent<RectTransform>());
+
+        deckManager.OnDeckCountsChanged += UpdateDeckHUD;
+        deckManager.OnDeckReshuffled += HandleDeckReshuffled;
+        UpdateDeckHUD(deckManager.DrawPileCount, deckManager.DiscardPileCount);
+    }
+
+    private void UpdateDeckHUD(int drawCount, int discardCount)
+    {
+        if (deckInfoText != null)
+        {
+            deckInfoText.text = $"🎴 {drawCount}";
+        }
+    }
+
+    private void HandleDeckReshuffled()
+    {
+        SetLog("🔄 <color=#FFD700><b>KHO BÀI ĐÃ ĐƯỢC XÁO LẠI!</b></color> Toàn bộ xấp bài đã dùng được xáo lại.");
+    }
+
+    private IEnumerator AnimateDealtCard(GeneralCardUI targetGeneral)
+    {
+        if (targetGeneral == null) yield break;
+        AudioManager.Instance.PlayCardDraw();
+
+        var flyingGo = new GameObject("DealingCard", typeof(RectTransform), typeof(Image));
+        flyingGo.transform.SetParent(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, false);
+        flyingGo.transform.SetAsLastSibling();
+        var image = flyingGo.GetComponent<Image>();
+        image.sprite = LotusHealthUI.LoadSpriteFromResources("UI/card_back_bg");
+        image.type = Image.Type.Sliced;
+        image.raycastTarget = false;
+
+        var flyingRt = flyingGo.GetComponent<RectTransform>();
+        flyingRt.anchorMin = flyingRt.anchorMax = flyingRt.pivot = new Vector2(0.5f, 0.5f);
+        flyingRt.sizeDelta = new Vector2(58, 80);
+
+        var rootRt = canvasGo.GetComponent<RectTransform>();
+        Vector2 start;
+        if (deckHudGo != null && deckHudGo.activeInHierarchy)
+        {
+            var sourceRt = deckHudGo.GetComponent<RectTransform>();
+            Vector2 sourceScreen = RectTransformUtility.WorldToScreenPoint(null, sourceRt.position);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(rootRt, sourceScreen, null, out start);
+        }
+        else
+        {
+            start = new Vector2(rootRt.rect.width * 0.5f - 50f, rootRt.rect.height * 0.5f - 50f);
+        }
+
+        var targetRt = targetGeneral.GetComponent<RectTransform>();
+        Vector2 targetScreen = RectTransformUtility.WorldToScreenPoint(null, targetRt.position);
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(rootRt, targetScreen, null, out var end);
+
+        float elapsed = 0f;
+        const float duration = 0.2f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
+            flyingRt.anchoredPosition = Vector2.Lerp(start, end, t);
+            flyingRt.localRotation = Quaternion.Euler(0, 0, Mathf.Lerp(-15f, 10f, t));
+            yield return null;
+        }
+        Destroy(flyingGo);
+    }
+
+    private void UpdateHandCountsVisual()
+    {
+        playerCard.SetHandCardCount(playerHandCards.Count);
+        allyCard.SetHandCardCount(allyHandCards.Count);
+        enemy1Card.SetHandCardCount(enemy1HandCards.Count);
+        enemy2Card.SetHandCardCount(enemy2HandCards.Count);
+    }
+    #endregion
+
+    #region 4. CỰ LY & TẦM ĐÁNH CHUẨN TUTORIAL
+    public int CalculateDistance(GeneralCardUI from, GeneralCardUI to)
+    {
+        if (from == null || to == null || from == to) return 0;
+
+        // Lấy danh sách toàn bộ các chiến tướng CÒN SỐNG theo vòng ghế
+        var livingGenerals = new List<GeneralCardUI>();
+        for (int s = 1; s <= 4; s++)
+        {
+            foreach (var g in allGenerals)
+            {
+                if (g.SeatNumber == s && g.CurrentHp > 0)
+                {
+                    livingGenerals.Add(g);
+                    break;
+                }
+            }
+        }
+
+        if (!livingGenerals.Contains(from) || !livingGenerals.Contains(to)) return 99;
+
+        int N = livingGenerals.Count;
+        if (N <= 1) return 1;
+
+        int i = livingGenerals.IndexOf(from);
+        int j = livingGenerals.IndexOf(to);
+
+        // Tính cự ly theo 2 hướng: Hướng Phải (Theo chiều kim đồng hồ) và Hướng Trái (Ngược chiều kim đồng hồ)
+        int distRight = (j - i + N) % N;
+        int distLeft = (i - j + N) % N;
+        int baseDist = Mathf.Min(distRight, distLeft);
+
+        int defMod = to.GetDefensiveDistanceModifier();  // Ngựa thủ (+1)
+        int offMod = from.GetOffensiveDistanceModifier(); // Ngựa công (-1)
+
+        return Mathf.Max(1, baseDist + defMod + offMod);
+    }
+
+    public bool IsTargetInAttackRange(GeneralCardUI attacker, GeneralCardUI target, CardModel card = null)
+    {
+        if (attacker == null || target == null) return false;
+        int dist = CalculateDistance(attacker, target);
+        int slashDistBonus = 0;
+        if (attacker.GeneralName.Contains("Đào Hãn") && (card == null || IsSlashCard(card)))
+        {
+            slashDistBonus = 2; // Kỹ năng Xạ Thuẫn: Giảm 2 cự ly khi dùng Trảm
+        }
+        int effectiveDist = Mathf.Max(1, dist - slashDistBonus);
+        int range = attacker.GetAttackRange();
+        return range >= effectiveDist;
+    }
+
+    private bool IsSlashLimitReached(GeneralCardUI caster, CardModel card)
+    {
+        if (caster.HasEquipment(EquipmentType.Weapon, "Nỏ Thần")) return false;
+        return slashesUsedThisTurn > 0;
+    }
+    #endregion
+
+    #region 5. VÒNG LẶP LƯỢT & GIAI ĐOẠN PHÁN XÉT
+    private IEnumerator ExecuteCurrentTurn()
+    {
+        if (battleFinished) yield break;
+
+        var currentGeneral = turnOrderGenerals[currentTurnIndex];
+
+        if (currentGeneral.CurrentHp <= 0)
+        {
+            AdvanceToNextTurn();
+            yield break;
+        }
+
+        // Ẩn nút kết thúc lượt nếu không phải lượt người chơi
+        if (endTurnBtn != null) endTurnBtn.gameObject.SetActive(currentGeneral == playerCard);
+
+        foreach (var g in allGenerals) g.SetTurnActive(g == currentGeneral);
+
+        string teamLabel = currentGeneral.IsAlly ? "<color=#55DDFF>[ĐỒNG MINH]</color>" : "<color=#FF5555>[ĐỐI THỦ]</color>";
+        globalTurnText.text = $"LƯỢT #{currentGeneral.SeatNumber}: {teamLabel} {currentGeneral.GeneralName}";
+        SetLog($"⚔️ Bắt đầu lượt của <b>{currentGeneral.GeneralName}</b> (Ghế #{currentGeneral.SeatNumber})!");
+
+        slashesUsedThisTurn = 0;
+        isWineBuffActive = false;
+        playerPlayPhaseLocked = false;
+        playerDrawPhaseLocked = false;
+        ClearSelectedTarget();
+
+        // 1. GIAI ĐOẠN PHÁN XÉT
+        yield return ResolveJudgementPhase(currentGeneral);
+        if (currentGeneral.CurrentHp <= 0 || battleFinished)
+        {
+            AdvanceToNextTurn();
+            yield break;
+        }
+
+        // 2. GIAI ĐOẠN RÚT BÀI (Yêu cầu 1: Người đi đầu tiên chỉ bốc 1 lá)
+        if (!playerDrawPhaseLocked)
+        {
+            int drawCount = isFirstTurnOfMatch ? 1 : 2;
+            if (isFirstTurnOfMatch)
+            {
+                SetLog($"🎴 <color=#FFD700><b>[LƯỢT ĐẦU TIÊN]</b></color>: <b>{currentGeneral.GeneralName}</b> đi đầu tiên trong trận nên chỉ được rút <b>1 lá bài</b>!");
+                isFirstTurnOfMatch = false;
+            }
+
+            for (int i = 0; i < drawCount; i++)
+            {
+                var d = deckManager.DrawCard();
+                if (d != null)
+                {
+                    yield return AnimateDealtCard(currentGeneral);
+                    AddCardsToGeneral(currentGeneral, d);
+                }
+            }
+            UpdateHandCountsVisual();
+            yield return new WaitForSeconds(0.4f);
+        }
+        else
+        {
+            SetLog($"🌾 <b>{currentGeneral.GeneralName}</b> bị [Cắt Đường Lương] tước quyền rút bài!");
+            yield return new WaitForSeconds(1.0f);
+        }
+
+        // 3. GIAI ĐOẠN RA BÀI
+        if (!playerPlayPhaseLocked)
+        {
+            if (currentGeneral == playerCard)
+            {
+                yield return StartPlayerPlayPhase();
+            }
+            else
+            {
+                yield return StartAIPlayPhase(currentGeneral);
+            }
+        }
+        else
+        {
+            SetLog($"🕸️ <b>{currentGeneral.GeneralName}</b> bị [Trầm Ảo Sa Bẫy] giam giữ, mất Giai đoạn Ra bài!");
+            yield return new WaitForSeconds(1.0f);
+        }
+
+        // 4. GIAI ĐOẠN BỎ BÀI
+        yield return StartDiscardPhase(currentGeneral);
+
+        AdvanceToNextTurn();
+    }
+
+    private IEnumerator ResolveJudgementPhase(GeneralCardUI g)
+    {
+        if (g.HasDelayedScroll(CardSubType.Lightning))
+        {
+            SetLog($"⚡ [Phán Xét Thần Sấm]: Đang lật bài phán xét cho {g.GeneralName}...");
+            yield return new WaitForSeconds(1.0f);
+            var judgeCard = deckManager.DrawCard();
+            if (judgeCard != null)
+            {
+                ShowCardAtCenter(judgeCard, g, null);
+                bool struck = (judgeCard.suit == CardSuit.Spade && (int)judgeCard.rank >= 2 && (int)judgeCard.rank <= 9);
+                deckManager.DiscardCard(judgeCard);
+
+                if (struck)
+                {
+                    SetLog($"⚡ <color=#FF5555>THẦN SẤM GIÁNG TRÚNG!</color> {g.GeneralName} chịu 3 sát thương Sấm Sét!");
+                    g.RemoveDelayedScroll(CardSubType.Lightning);
+                    g.TakeDamage(3);
+                    AudioManager.Instance.PlayDamage();
+                    StartCoroutine(ShakeCard(g));
+                    yield return CheckNearDeath(g, null);
+                }
+                else
+                {
+                    SetLog($"✨ Phán xét an toàn! Chuyển Thần Sấm Báo Ứng sang người kế tiếp.");
+                    g.RemoveDelayedScroll(CardSubType.Lightning);
+                    var nextGen = GetNextAliveGeneral(g);
+                    if (nextGen != null && !nextGen.HasDelayedScroll(CardSubType.Lightning))
+                    {
+                        var lightCard = new CardModel
+                        {
+                            id = "D1_S_LIGHTNING",
+                            cardName = "Thần Sấm Báo Ứng",
+                            suit = CardSuit.Spade,
+                            rank = CardRank.Ace,
+                            category = CardCategory.DelayedScroll,
+                            subType = CardSubType.Lightning,
+                            iconPath = "UI/icon_lightning"
+                        };
+                        nextGen.AddDelayedScroll(lightCard);
+                    }
+                }
+                yield return new WaitForSeconds(1.2f);
+            }
+        }
+
+        if (g.HasDelayedScroll(CardSubType.SupplyShortage))
+        {
+            SetLog($"🌾 [Phán Xét Cắt Đường Lương]: Lật bài chất Chuồn (♣) để rút bài bình thường...");
+            yield return new WaitForSeconds(1.0f);
+            var judgeCard = deckManager.DrawCard();
+            if (judgeCard != null)
+            {
+                ShowCardAtCenter(judgeCard, g, null);
+                bool pass = (judgeCard.suit == CardSuit.Club);
+                deckManager.DiscardCard(judgeCard);
+                g.RemoveDelayedScroll(CardSubType.SupplyShortage);
+
+                if (!pass)
+                {
+                    playerDrawPhaseLocked = true;
+                    SetLog($"🚫 Phán xét thất bại! {g.GeneralName} bị mất lượt rút bài.");
+                }
+                else
+                {
+                    SetLog($"✨ Phán xét thành công! {g.GeneralName} giải trừ Cắt Đường Lương.");
+                }
+                yield return new WaitForSeconds(1.0f);
+            }
+        }
+
+        if (g.HasDelayedScroll(CardSubType.Acedia))
+        {
+            SetLog($"🕸️ [Phán Xét Trầm Ảo Sa Bẫy]: Lật bài chất Cơ (♥) để thoát bẫy...");
+            yield return new WaitForSeconds(1.0f);
+            var judgeCard = deckManager.DrawCard();
+            if (judgeCard != null)
+            {
+                ShowCardAtCenter(judgeCard, g, null);
+                bool pass = (judgeCard.suit == CardSuit.Heart);
+                deckManager.DiscardCard(judgeCard);
+                g.RemoveDelayedScroll(CardSubType.Acedia);
+
+                if (!pass)
+                {
+                    playerPlayPhaseLocked = true;
+                    SetLog($"🕸️ Phán xét thất bại! {g.GeneralName} bị giam cầm, bỏ qua Giai đoạn Ra bài.");
+                }
+                else
+                {
+                    SetLog($"✨ Phán xét thành công! {g.GeneralName} thoát khỏi Trầm Ảo Sa Bẫy.");
+                }
+                yield return new WaitForSeconds(1.0f);
+            }
+        }
+    }
+
+    private GeneralCardUI GetNextAliveGeneral(GeneralCardUI current)
+    {
+        int idx = turnOrderGenerals.IndexOf(current);
+        for (int i = 1; i < turnOrderGenerals.Count; i++)
+        {
+            int nextIdx = (idx + i) % turnOrderGenerals.Count;
+            if (turnOrderGenerals[nextIdx].CurrentHp > 0) return turnOrderGenerals[nextIdx];
+        }
+        return null;
+    }
+
+    private void AdvanceToNextTurn()
+    {
+        if (battleFinished) return;
+
+        currentTurnIndex = (currentTurnIndex + 1) % turnOrderGenerals.Count;
+        StartCoroutine(ExecuteCurrentTurn());
+    }
+
+    private void AddCardsToGeneral(GeneralCardUI g, params CardModel[] cards)
+    {
+        foreach (var c in cards)
+        {
+            if (c == null) continue;
+            if (g == playerCard) { playerHandCards.Add(c); playerHandUI.AddCard(c); }
+            else if (g == allyCard) allyHandCards.Add(c);
+            else if (g == enemy1Card) enemy1HandCards.Add(c);
+            else if (g == enemy2Card) enemy2HandCards.Add(c);
+        }
+    }
+    #endregion
+
+    #region 6. GIAI ĐOẠN RA BÀI CỦA NGƯỜI CHƠI (CHÚ THÍCH THUẦN VIỆT, KHÔNG LƯU MỤC TIÊU CŨ)
+    private IEnumerator StartPlayerPlayPhase()
+    {
+        isPlayerTurnActive = true;
+        turnTimer = 40.0f;
+        isTimerRunning = true;
+        if (endTurnBtn != null)
+        {
+            endTurnBtn.gameObject.SetActive(true);
+            endTurnBtn.interactable = true;
+        }
+
+        SetLog("👉 <b>Lượt của bạn!</b> Chạm lá bài -> Chạm chọn mục tiêu -> Nhấn nút [DÙNG BÀI]!");
+
+        while (isPlayerTurnActive && !battleFinished)
+        {
+            yield return null;
+        }
+
+        isTimerRunning = false;
+        if (endTurnBtn != null) endTurnBtn.gameObject.SetActive(false);
+        if (actionBtnGo != null) actionBtnGo.SetActive(false);
+        HideCardDescription();
+    }
+
+    private void OnPlayerEndTurnClicked()
+    {
+        if (!isPlayerTurnActive || actionInProgress) return;
+        if (actionBtnGo != null) actionBtnGo.SetActive(false);
+        HideCardDescription();
+        currentSelectedCardUI = null;
+        ClearSelectedTarget();
+        AudioManager.Instance.PlayCardSelect();
+        isPlayerTurnActive = false;
+    }
+
+    private string GetVietnameseCardDetail(CardModel card)
+    {
+        if (card == null) return "";
+
+        string catStr = card.category switch
+        {
+            CardCategory.Basic => "Bài Cơ Bản",
+            CardCategory.Equipment => card.subType switch
+            {
+                CardSubType.Weapon => "Trang Bị - Vũ Khí",
+                CardSubType.Armor => "Trang Bị - Áo Giáp",
+                CardSubType.OffensiveHorse => "Trang Bị - Ngựa Công",
+                CardSubType.DefensiveHorse => "Trang Bị - Ngựa Thủ",
+                _ => "Trang Bị"
+            },
+            CardCategory.InstantScroll => "Cẩm Nang Tức Thời",
+            CardCategory.DelayedScroll => "Cẩm Nang Trì Hoãn",
+            _ => "Thẻ Bài"
+        };
+
+        string suitSymbol = card.suit switch
+        {
+            CardSuit.Spade => "♠",
+            CardSuit.Heart => "♥",
+            CardSuit.Club => "♣",
+            CardSuit.Diamond => "♦",
+            _ => ""
+        };
+
+        string rankStr = card.rank switch
+        {
+            CardRank.Ace => "A",
+            CardRank.Jack => "J",
+            CardRank.Queen => "Q",
+            CardRank.King => "K",
+            _ => ((int)card.rank).ToString()
+        };
+
+        return $"🎴 <b><color=#FFD700>[{card.cardName.ToUpper()}]</color></b> <color=#55DDFF>({catStr} • {suitSymbol} {rankStr})</color>\n<color=#E2E8F0>{card.description}</color>";
+    }
+
+    private void ShowCardDescription(CardModel card)
+    {
+        if (cardDescBoxGo == null || cardDescBodyText == null || card == null) return;
+        cardDescBodyText.text = GetVietnameseCardDetail(card);
+        cardDescBoxGo.SetActive(true);
+    }
+
+    private void HideCardDescription()
+    {
+        if (cardDescBoxGo != null) cardDescBoxGo.SetActive(false);
+    }
+
+    private void HandlePlayerCardSelected(CardUI cardUI)
+    {
+        if (cardUI == null || cardUI.Data == null)
+        {
+            currentSelectedCardUI = null;
+            if (actionBtnGo != null) actionBtnGo.SetActive(false);
+            HideCardDescription();
+            return;
+        }
+
+        if (isDiscardPhaseActive)
+        {
+            if (selectedDiscardCards.Contains(cardUI))
+            {
+                selectedDiscardCards.Remove(cardUI);
+                cardUI.SetSelected(false);
+            }
+            else if (selectedDiscardCards.Count < discardExcessRequired)
+            {
+                selectedDiscardCards.Add(cardUI);
+                cardUI.SetSelected(true);
+            }
+
+            discardConfirmBtnText.text = $"BỎ BÀI ({selectedDiscardCards.Count}/{discardExcessRequired})";
+            discardConfirmBtn.interactable = selectedDiscardCards.Count == discardExcessRequired;
+            return;
+        }
+
+        if (!isPlayerTurnActive || actionInProgress || battleFinished)
+        {
+            if (actionBtnGo != null) actionBtnGo.SetActive(false);
+            HideCardDescription();
+            return;
+        }
+
+        if (playerPlayPhaseLocked)
+        {
+            SetLog("🕸️ [Trầm Ảo Sa Bẫy]: Bạn đã bị bỏ qua Giai đoạn Ra bài trong lượt này.");
+            if (actionBtnGo != null) actionBtnGo.SetActive(false);
+            HideCardDescription();
+            return;
+        }
+
+        // Mỗi lần chọn lá bài mới -> Xóa mục tiêu cũ đã chọn trước đó
+        ClearSelectedTarget();
+        currentSelectedCardUI = cardUI;
+        ShowCardDescription(cardUI.Data);
+        UpdateActionButtonState();
+    }
+
+    public void UpdatePlayerSkillButtonState()
+    {
+        if (playerCard == null || playerCard.SkillButtonGo == null) return;
+
+        bool isUsable = false;
+        bool isMyTurn = isPlayerTurnActive && !playerPlayPhaseLocked && !actionInProgress && !battleFinished;
+
+        string pName = playerCard.GeneralName;
+        if (pName.Contains("Cao Lỗ"))
+        {
+            bool hasSpade = playerHandCards.Exists(c => c != null && (c.suit == CardSuit.Spade || c.originalSubType.HasValue || c.originalCategory.HasValue));
+            isUsable = isMyTurn && hasSpade;
+        }
+        else if (pName.Contains("Lý Thường Kiệt"))
+        {
+            bool hasSlashOrDodge = playerHandCards.Exists(c => c != null && (IsSlashCard(c) || c.subType == CardSubType.Dodge));
+            isUsable = isMyTurn && hasSlashOrDodge;
+        }
+        else if (pName.Contains("Đào Hãn"))
+        {
+            isUsable = false;
+        }
+        else
+        {
+            isUsable = isMyTurn;
+        }
+
+        playerCard.SetSkillState(isUsable);
+    }
+
+    private void UpdateActionButtonState()
+    {
+        UpdatePlayerSkillButtonState();
+        if (actionBtnGo == null || currentSelectedCardUI == null || currentSelectedCardUI.Data == null)
+        {
+            if (actionBtnGo != null) actionBtnGo.SetActive(false);
+            return;
+        }
+
+        var card = currentSelectedCardUI.Data;
+        var btn = actionBtnGo.GetComponent<Button>();
+        var btnImg = actionBtnGo.GetComponent<Image>();
+
+        actionBtnGo.SetActive(true);
+
+        if (card.subType == CardSubType.Dodge)
+        {
+            btn.interactable = false;
+            btnImg.color = new Color(0.4f, 0.45f, 0.55f, 0.9f);
+            actionBtnText.text = "🛡️ LÁ PHẢN ỨNG (DÙNG KHI BỊ TẤN CÔNG)";
+            SetLog("🛡️ [Đỡ]: Lá này chỉ dùng khi bị tấn công hoặc bấm kỹ năng [⚡ TIẾN THOÁI] để đổi thành Trảm!");
+            return;
+        }
+
+        if (card.subType == CardSubType.Peach && playerCard.CurrentHp >= playerCard.MaxHp)
+        {
+            btn.interactable = false;
+            btnImg.color = new Color(0.4f, 0.45f, 0.55f, 0.9f);
+            actionBtnText.text = "💮 MÁU ĐÃ ĐẦY (KHÔNG THỂ HỒI)";
+            SetLog($"💮 Máu của bạn đã đầy ({playerCard.CurrentHp}/{playerCard.MaxHp}), không thể sử dụng thêm Bánh Chưng!");
+            return;
+        }
+
+        if (IsSlashCard(card) && IsSlashLimitReached(playerCard, card))
+        {
+            btn.interactable = false;
+            btnImg.color = new Color(0.55f, 0.25f, 0.25f, 0.9f);
+            actionBtnText.text = "❌ ĐÃ DÙNG 1 TRẢM TRONG LƯỢT";
+            SetLog("❌ <color=#FF5555>Bạn đã dùng 1 lá Trảm trong lượt này rồi!</color> (Trang bị [Nỏ Thần Kim Quy] để bỏ giới hạn).");
+            return;
+        }
+
+        if (RequiresTarget(card))
+        {
+            if (currentSelectedTarget == null || currentSelectedTarget == playerCard || currentSelectedTarget.CurrentHp <= 0)
+            {
+                btn.interactable = false;
+                btnImg.color = new Color(0.45f, 0.5f, 0.55f, 0.95f);
+                actionBtnText.text = "🎯 HÃY CHỌN MỤC TIÊU";
+                SetLog($"🎯 Đã chọn [{card.cardName}]. Hãy chạm chọn 1 mục tiêu trên bàn đấu!");
+                return;
+            }
+
+            if (IsSlashCard(card) && !IsTargetInAttackRange(playerCard, currentSelectedTarget, card))
+            {
+                int rawDist = CalculateDistance(playerCard, currentSelectedTarget);
+                int slashDistBonus = playerCard.GeneralName.Contains("Đào Hãn") ? 2 : 0;
+                int dist = Mathf.Max(1, rawDist - slashDistBonus);
+                int range = playerCard.GetAttackRange();
+                btn.interactable = false;
+                btnImg.color = new Color(0.55f, 0.25f, 0.25f, 0.9f);
+                actionBtnText.text = $"❌ NGOÀI TẦM ĐÁNH (CỰ LY {dist} > TẦM {range})";
+                SetLog($"❌ Mục tiêu [{currentSelectedTarget.GeneralName}] ở Cự ly {dist} vượt quá Tầm đánh {range} của bạn!");
+                return;
+            }
+
+            if (card.subType == CardSubType.Snatch && CalculateDistance(playerCard, currentSelectedTarget) > 1)
+            {
+                int dist = CalculateDistance(playerCard, currentSelectedTarget);
+                btn.interactable = false;
+                btnImg.color = new Color(0.55f, 0.25f, 0.25f, 0.9f);
+                actionBtnText.text = $"❌ CỰ LY QUÁ XA (CỰ LY {dist} > 1)";
+                SetLog($"❌ [Đột Kích Trộm Lương] chỉ tác dụng ở Cự ly 1 (Hiện tại là {dist})!");
+                return;
+            }
+
+            if (card.subType == CardSubType.SupplyShortage && CalculateDistance(playerCard, currentSelectedTarget) > 1)
+            {
+                int dist = CalculateDistance(playerCard, currentSelectedTarget);
+                btn.interactable = false;
+                btnImg.color = new Color(0.55f, 0.25f, 0.25f, 0.9f);
+                actionBtnText.text = $"❌ CỰ LY QUÁ XA (CỰ LY {dist} > 1)";
+                SetLog($"❌ [Cắt Đường Lương] chỉ gài ở Cự ly 1 (Hiện tại là {dist})!");
+                return;
+            }
+
+            btn.interactable = true;
+            btnImg.color = new Color(0.92f, 0.65f, 0.15f, 1f);
+
+            if (IsSlashCard(card)) actionBtnText.text = $"⚔️ TRẢM [{currentSelectedTarget.GeneralName.ToUpper()}]";
+            else if (card.subType == CardSubType.Snatch) actionBtnText.text = $"🌾 TRỘM LƯƠNG [{currentSelectedTarget.GeneralName.ToUpper()}]";
+            else if (card.subType == CardSubType.Dismantle) actionBtnText.text = $"🏚️ PHÁ HỦY BÀI [{currentSelectedTarget.GeneralName.ToUpper()}]";
+            else if (card.subType == CardSubType.FlawlessDefense) actionBtnText.text = $"🛡️ HỦY BÀI [{currentSelectedTarget.GeneralName.ToUpper()}]";
+            else if (card.subType == CardSubType.Duel) actionBtnText.text = $"⚔️ THÁCH ĐẤU [{currentSelectedTarget.GeneralName.ToUpper()}]";
+            else if (card.subType == CardSubType.SupplyShortage) actionBtnText.text = $"🌾 GÀI CẮT LƯƠNG [{currentSelectedTarget.GeneralName.ToUpper()}]";
+            else if (card.subType == CardSubType.Acedia) actionBtnText.text = $"🕸️ GÀI TRẦM ẢO [{currentSelectedTarget.GeneralName.ToUpper()}]";
+            else actionBtnText.text = $"🃏 DÙNG LÊN [{currentSelectedTarget.GeneralName.ToUpper()}]";
+
+            SetLog($"💡 Nhấn nút [{actionBtnText.text}] để thi triển!");
+        }
+        else
+        {
+            btn.interactable = true;
+            btnImg.color = new Color(0.92f, 0.65f, 0.15f, 1f);
+
+            if (card.category == CardCategory.Equipment)
+                actionBtnText.text = $"🛡️ TRANG BỊ [{card.cardName.ToUpper()}]";
+            else if (card.subType == CardSubType.Peach)
+                actionBtnText.text = "💮 HỒI 1 HOA SEN MÁU";
+            else if (card.subType == CardSubType.Wine)
+                actionBtnText.text = "🍶 UỐNG HỦ RƯỢU (+1 CÔNG)";
+            else if (card.subType == CardSubType.ExNihilo)
+                actionBtnText.text = "📜 RÚT 2 LÁ BÀI (DỤNG BINH)";
+            else if (card.subType == CardSubType.Harvest)
+                actionBtnText.text = "🍚 MỞ KHO CỨU TẾ (CHIA ĐỀU BÀI)";
+            else if (card.subType == CardSubType.BarbarianInvasion)
+                actionBtnText.text = "🪵 BÃI CỌC NGẦM (TẤT CẢ ĐỐI THỦ)";
+            else if (card.subType == CardSubType.ArrowRain)
+                actionBtnText.text = "🏹 MƯA TÊN LIÊN CHÂU (TẤT CẢ ĐỐI THỦ)";
+            else if (card.subType == CardSubType.Lightning)
+                actionBtnText.text = "⚡ GÀI THẦN SẤM BÁO ỨNG";
+            else
+                actionBtnText.text = $"🃏 DÙNG [{card.cardName.ToUpper()}]";
+
+            SetLog($"💡 Nhấn nút [{actionBtnText.text}] để sử dụng lá bài.");
+        }
+    }
+
+    private void OnPlayerActionBtnClicked()
+    {
+        if (currentSelectedCardUI == null || currentSelectedCardUI.Data == null || !isPlayerTurnActive || actionInProgress) return;
+        var cardUI = currentSelectedCardUI;
+        var target = currentSelectedTarget != null ? currentSelectedTarget : playerCard;
+
+        if (actionBtnGo != null) actionBtnGo.SetActive(false);
+        HideCardDescription();
+        StartCoroutine(ExecutePlayerCardPlay(cardUI, target));
+    }
+
+    private IEnumerator ExecutePlayerCardPlay(CardUI cardUI, GeneralCardUI target)
+    {
+        actionInProgress = true;
+        var card = cardUI.Data;
+
+        turnTimer = 40.0f;
+
+        playerHandCards.Remove(card);
+        playerHandUI.RemoveCard(cardUI);
+        currentSelectedCardUI = null;
+        HideCardDescription();
+        UpdateHandCountsVisual();
+
+        if (card.category != CardCategory.Equipment && card.category != CardCategory.DelayedScroll)
+        {
+            deckManager.DiscardCard(card);
+        }
+
+        yield return ResolveFullCardEffect(card, playerCard, target);
+
+        ClearSelectedTarget();
+        actionInProgress = false;
+    }
+
+    private void ClearSelectedTarget()
+    {
+        currentSelectedTarget = null;
+        if (targetHighlightGo != null)
+        {
+            targetHighlightGo.SetActive(false);
+        }
+    }
+    #endregion
+
+    #region 7. GIAI ĐOẠN RA BÀI CỦA AI (CÁCH NHAU 2 GIÂY ĐỂ KỊP NHÌN)
+    private IEnumerator StartAIPlayPhase(GeneralCardUI aiGeneral)
+    {
+        turnTimer = 40.0f;
+        isTimerRunning = true;
+        if (endTurnBtn != null) endTurnBtn.gameObject.SetActive(false);
+
+        var hand = GetHandOfGeneral(aiGeneral);
+
+        SetLog($"🤖 <b>{aiGeneral.GeneralName}</b> đang suy tính chiến thuật...");
+        yield return new WaitForSeconds(1.0f);
+
+        bool acted = true;
+        int maxPlays = 6;
+
+        while (acted && maxPlays > 0 && aiGeneral.CurrentHp > 0 && turnTimer > 0f && !battleFinished)
+        {
+            acted = false;
+            maxPlays--;
+
+            CardModel cardToPlay = null;
+            GeneralCardUI target = null;
+
+            // 0. AI Cao Lỗ kích hoạt [Chế Nỏ] nếu có bài chất Bích trên tay và chưa có Nỏ Thần
+            if (aiGeneral.GeneralName.Contains("Cao Lỗ") && !aiGeneral.HasEquipment(EquipmentType.Weapon, "Nỏ Thần"))
+            {
+                var spadeCard = hand.Find(c => c != null && c.suit == CardSuit.Spade && c.subType != CardSubType.Peach && c.subType != CardSubType.Dodge);
+                if (spadeCard == null) spadeCard = hand.Find(c => c != null && c.suit == CardSuit.Spade && c.subType != CardSubType.Peach);
+                if (spadeCard != null)
+                {
+                    hand.Remove(spadeCard);
+                    deckManager.DiscardCard(spadeCard);
+                    var noThan = CardDatabase.CreateCard("D1_S_2", "Nỏ Thần Kim Quy", CardSuit.Spade, spadeCard.rank, 1, CardCategory.Equipment, CardSubType.Weapon, "Tầm 1. Không giới hạn số lá Trảm trong lượt.", "UI/icon_weapon", 1);
+                    var oldW = aiGeneral.GetEquippedCard(EquipmentType.Weapon);
+                    if (oldW != null) deckManager.DiscardCard(oldW);
+                    aiGeneral.Equip(noThan);
+                    UpdateHandCountsVisual();
+                    ShowCardAtCenter(noThan, aiGeneral, null, "Chế tạo Nỏ Thần");
+                    AudioManager.Instance.PlaySkill();
+                    SetLog($"🏹 <color=#FFD700><b>[CAO LỖ - CHẾ NỎ]</b></color>: <b>{aiGeneral.GeneralName}</b> dùng lá [{spadeCard.cardName}] chất <b>Bích (♠)</b> chế tạo vũ khí <b>[Nỏ Thần Kim Quy]</b>!");
+                    yield return new WaitForSeconds(1.0f);
+                }
+            }
+
+            if (aiGeneral.CurrentHp < aiGeneral.MaxHp)
+            {
+                cardToPlay = hand.Find(c => c.subType == CardSubType.Peach);
+                if (cardToPlay != null) target = aiGeneral;
+            }
+
+            if (cardToPlay == null)
+            {
+                cardToPlay = hand.Find(c => c.category == CardCategory.Equipment);
+                if (cardToPlay != null) target = aiGeneral;
+            }
+
+            if (cardToPlay == null)
+            {
+                cardToPlay = hand.Find(c => c.subType == CardSubType.ExNihilo || c.subType == CardSubType.Harvest);
+                if (cardToPlay != null) target = aiGeneral;
+            }
+
+            if (cardToPlay == null)
+            {
+                var opponent = GetAliveOpponent(aiGeneral);
+                if (opponent != null)
+                {
+                    var snatchCard = hand.Find(c => c.subType == CardSubType.Snatch);
+                    if (snatchCard != null && CalculateDistance(aiGeneral, opponent) <= 1 && BuildTargetCardOptions(opponent, true).Count > 0)
+                    {
+                        cardToPlay = snatchCard;
+                        target = opponent;
+                    }
+                }
+            }
+
+            if (cardToPlay == null)
+            {
+                var opponent = GetAliveOpponent(aiGeneral);
+                if (opponent != null)
+                {
+                    var dismantleCard = hand.Find(c => c.subType == CardSubType.Dismantle && BuildTargetCardOptions(opponent, false).Count > 0);
+                    if (dismantleCard != null)
+                    {
+                        cardToPlay = dismantleCard;
+                        target = opponent;
+                    }
+                }
+            }
+
+            if (cardToPlay == null)
+            {
+                var duelCard = hand.Find(c => c.subType == CardSubType.Duel);
+                if (duelCard != null)
+                {
+                    cardToPlay = duelCard;
+                    target = GetAliveOpponent(aiGeneral);
+                }
+            }
+
+            if (cardToPlay == null)
+            {
+                cardToPlay = hand.Find(c => c.subType == CardSubType.BarbarianInvasion || c.subType == CardSubType.ArrowRain);
+                if (cardToPlay != null) target = aiGeneral;
+            }
+
+            if (cardToPlay == null)
+            {
+                if (!IsSlashLimitReached(aiGeneral, null))
+                {
+                    var slash = hand.Find(c => IsSlashCard(c));
+                    if (slash != null)
+                    {
+                        foreach (var g in allGenerals)
+                        {
+                            if (g.IsAlly != aiGeneral.IsAlly && g.CurrentHp > 0 && IsTargetInAttackRange(aiGeneral, g))
+                            {
+                                cardToPlay = slash;
+                                target = g;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (cardToPlay != null)
+            {
+                acted = true;
+                hand.Remove(cardToPlay);
+                UpdateHandCountsVisual();
+
+                if (cardToPlay.category != CardCategory.Equipment && cardToPlay.category != CardCategory.DelayedScroll)
+                {
+                    deckManager.DiscardCard(cardToPlay);
+                }
+
+                yield return ResolveFullCardEffect(cardToPlay, aiGeneral, target);
+
+                // Đánh lá mới lại có lại 40s suy nghĩ
+                turnTimer = 40.0f;
+
+                // Tăng thời gian dùng bài của AI lên 3s để người chơi kịp theo dõi
+                yield return new WaitForSeconds(3.0f);
+            }
+        }
+
+        isTimerRunning = false;
+    }
+
+    private GeneralCardUI GetAliveOpponent(GeneralCardUI self)
+    {
+        var enemies = new List<GeneralCardUI>();
+        foreach (var g in allGenerals)
+        {
+            if (g.IsAlly != self.IsAlly && g.CurrentHp > 0)
+            {
+                enemies.Add(g);
+            }
+        }
+        if (enemies.Count == 0) return null;
+        return enemies[UnityEngine.Random.Range(0, enemies.Count)];
+    }
+    #endregion
+
+    #region 8. ENGINE XỬ LÝ TOÀN BỘ TÁC DỤNG THẺ BÀI CHUẨN TUTORIAL
+    private IEnumerator ResolveFullCardEffect(CardModel card, GeneralCardUI caster, GeneralCardUI target)
+    {
+        switch (card.category)
+        {
+            case CardCategory.Basic:
+                if (IsSlashCard(card))
+                {
+                    slashesUsedThisTurn++;
+                    yield return ResolveSlashAttack(card, caster, target);
+                }
+                else if (card.subType == CardSubType.Peach)
+                {
+                    ShowCardAtCenter(card, caster, null, "Hồi 1 đóa sen máu");
+                    caster.Heal(1);
+                    AudioManager.Instance.PlayHeal();
+                    SetLog($"💮 <b>{caster.GeneralName}</b> dùng [Bánh Chưng] hồi 1 đóa sen máu! ({caster.CurrentHp}/{caster.MaxHp})");
+                }
+                else if (card.subType == CardSubType.Wine)
+                {
+                    ShowCardAtCenter(card, caster, null, "Tăng +1 công đòn Trảm kế tiếp");
+                    isWineBuffActive = true;
+                    AudioManager.Instance.PlaySkill();
+                    SetLog($"🍶 <b>{caster.GeneralName}</b> uống [Hủ Rượu]: Đòn Trảm kế tiếp gây +1 sát thương (+2 tổng)! ");
+                }
+                break;
+
+            case CardCategory.Equipment:
+                ShowCardAtCenter(card, caster, null, $"Trang bị [{card.cardName}]");
+                AudioManager.Instance.PlaySkill();
+                if (caster.TryEquip(card, out var replaced))
+                {
+                    if (replaced != null) deckManager.DiscardCard(replaced);
+                    SetLog($"🛡️ <b>{caster.GeneralName}</b> trang bị [{card.cardName}]: {card.description}");
+                }
+                break;
+
+            case CardCategory.InstantScroll:
+                yield return ResolveInstantScroll(card, caster, target);
+                break;
+
+            case CardCategory.DelayedScroll:
+                yield return ResolveDelayedScrollPlacement(card, caster, target);
+                break;
+        }
+
+        yield return new WaitForSeconds(0.4f);
+    }
+
+    /// <summary>
+    /// Xử lý sát thương có tính toán Áo Bào Hoàng Tộc: Giảm 1 điểm sát thương (sàn 0), tối đa 3 lần.
+    /// Khi hết 3 lần, Áo Bào tiêu biến.
+    /// </summary>
+    private int ApplyDamageMitigation(GeneralCardUI victim, int rawDamage, string sourceName)
+    {
+        if (victim == null || rawDamage <= 0) return rawDamage;
+
+        if (victim.HasEquipment(EquipmentType.Armor, "Áo Bào"))
+        {
+            if (victim.AoBaoCharges > 0)
+            {
+                victim.TryConsumeAoBaoCharge();
+                int finalDamage = Mathf.Max(0, rawDamage - 1);
+                SetLog($"🛡️ <color=#FFD700><b>[ÁO BÀO HOÀNG TỘC]</b></color>: Giảm 1 sát thương từ {sourceName} (còn {victim.AoBaoCharges}/3 lần)! Nhận {finalDamage} sát thương.");
+
+                if (victim.AoBaoCharges == 0)
+                {
+                    if (victim.TryUnequip(EquipmentType.Armor, out var unequipped))
+                    {
+                        if (unequipped != null) deckManager.DiscardCard(unequipped);
+                        SetLog($"🛡️ <b>{victim.GeneralName}</b>: [Áo Bào Hoàng Tộc] đã cản đủ 3 lần và tiêu biến!");
+                    }
+                }
+                return finalDamage;
+            }
+        }
+
+        return rawDamage;
+    }
+
+    /// <summary>
+    /// Kỹ năng Khiên Mây Bện (Bát Quái Trận): Mỗi khi cần đánh lá [Đỡ], lật 1 lá bài phán xét.
+    /// Nếu là chất ĐỎ (♥, ♦) -> Coi như đã đánh 1 lá [Đỡ] thành công!
+    /// </summary>
+    private IEnumerator TryKhienMayDefense(GeneralCardUI defender, string attackName, Action<bool> callback)
+    {
+        if (defender == null || !defender.HasEquipment(EquipmentType.Armor, "Khiên Mây"))
+        {
+            callback?.Invoke(false);
+            yield break;
+        }
+
+        yield return new WaitForSeconds(0.3f);
+
+        // 1. Phát âm thanh tuyệt kỹ và đọc voice "Khiên Mây Bện"
+        AudioManager.Instance.PlaySkill();
+        AudioManager.Instance.PlayCardVoice("Khiên Mây Bện");
+
+        SetLog($"🛡️ <b>{defender.GeneralName}</b> kích hoạt <color=#55DDFF><b>[KHIÊN MÂY BỆN]</b></color>: Đang lật bài phán xét né {attackName}...");
+
+        // Rút lá bài phán xét (có hiệu ứng bay từ cọc bài rút)
+        yield return AnimateDealtCard(defender);
+        var judgeCard = deckManager.DrawCard();
+        if (judgeCard == null)
+        {
+            callback?.Invoke(false);
+            yield break;
+        }
+
+        bool isRed = (judgeCard.suit == CardSuit.Heart || judgeCard.suit == CardSuit.Diamond);
+        string suitSym = judgeCard.GetSuitSymbol();
+        string rankStr = judgeCard.GetRankString();
+
+        // 2. Tạo hoạt cảnh phán xét trung tâm với lá bài và biểu tượng TICK ✔ / X ✖
+        var parentTransform = battleRootGo != null ? battleRootGo.transform : canvasGo.transform;
+        var judgeCardGo = CardUI.Create(parentTransform, judgeCard, new Vector2(110f, 150f)).gameObject;
+        judgeCardGo.transform.SetAsLastSibling();
+
+        var rt = judgeCardGo.GetComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = new Vector2(-80f, 20f);
+        judgeCardGo.transform.localScale = Vector3.one * 0.6f;
+
+        // Phóng to lá bài mượt mà
+        float el = 0f;
+        while (el < 0.22f)
+        {
+            el += Time.deltaTime;
+            judgeCardGo.transform.localScale = Vector3.one * Mathf.Lerp(0.6f, 1.15f, el / 0.22f);
+            yield return null;
+        }
+        judgeCardGo.transform.localScale = Vector3.one * 1.15f;
+
+        // Hộp tiêu đề phán xét phía trên lá bài
+        var titleBoxGo = new GameObject("JudgementTitle", typeof(RectTransform), typeof(Image));
+        titleBoxGo.transform.SetParent(judgeCardGo.transform, false);
+        var tbImg = titleBoxGo.GetComponent<Image>();
+        var slotSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
+        if (slotSpr != null) { tbImg.sprite = slotSpr; tbImg.type = Image.Type.Sliced; }
+        tbImg.color = new Color(0.04f, 0.07f, 0.14f, 0.95f);
+        var tbRt = titleBoxGo.GetComponent<RectTransform>();
+        tbRt.anchorMin = new Vector2(0.5f, 1f); tbRt.anchorMax = new Vector2(0.5f, 1f);
+        tbRt.pivot = new Vector2(0.5f, 0f);
+        tbRt.sizeDelta = new Vector2(240f, 28f);
+        tbRt.anchoredPosition = new Vector2(0f, 6f);
+
+        var titleTxt = AddText(titleBoxGo.transform, "Txt", "🛡️ PHÁN XÉT KHIÊN MÂY BỆN", 11, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        Fill(titleTxt.rectTransform);
+
+        // Huy hiệu TICK ✔ (Xanh lá) hoặc X ✖ (Đỏ) ở giữa lá bài
+        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var badgeGo = new GameObject("JudgementBadge", typeof(RectTransform), typeof(Image));
+        badgeGo.transform.SetParent(judgeCardGo.transform, false);
+        var badgeRt = badgeGo.GetComponent<RectTransform>();
+        badgeRt.anchorMin = badgeRt.anchorMax = badgeRt.pivot = new Vector2(0.5f, 0.5f);
+        badgeRt.sizeDelta = new Vector2(140f, 140f);
+        badgeRt.anchoredPosition = Vector2.zero;
+
+        var bImg = badgeGo.GetComponent<Image>();
+        bImg.color = new Color(0.04f, 0.06f, 0.12f, 0.75f);
+
+        var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(Text));
+        iconGo.transform.SetParent(badgeGo.transform, false);
+        var iconTxt = iconGo.GetComponent<Text>();
+        iconTxt.font = font;
+        iconTxt.fontSize = isRed ? 78 : 72;
+        iconTxt.fontStyle = FontStyle.Bold;
+        iconTxt.alignment = TextAnchor.MiddleCenter;
+        iconTxt.text = isRed ? "<color=#44FF55>✔</color>" : "<color=#FF4444>✖</color>";
+        var icShadow = iconGo.AddComponent<Shadow>();
+        icShadow.effectColor = new Color(0, 0, 0, 0.95f);
+        icShadow.effectDistance = new Vector2(2f, -2f);
+        Fill(iconGo.GetComponent<RectTransform>());
+
+        // Nhãn kết quả bên dưới lá bài
+        var labelGo = new GameObject("Label", typeof(RectTransform), typeof(Text));
+        labelGo.transform.SetParent(judgeCardGo.transform, false);
+        var lTxt = labelGo.GetComponent<Text>();
+        lTxt.font = font;
+        lTxt.fontSize = 13;
+        lTxt.fontStyle = FontStyle.Bold;
+        lTxt.alignment = TextAnchor.MiddleCenter;
+        lTxt.text = isRed
+            ? $"<color=#44FF55><b>✔ PHÁN XÉT THÀNH CÔNG (CHẤT ĐỎ {suitSym} {rankStr})</b></color>\n<size=11>Đã hóa giải đòn đánh của đối phương!</size>"
+            : $"<color=#FF5555><b>✖ PHÁN XÉT THẤT BẠI (CHẤT ĐEN {suitSym} {rankStr})</b></color>\n<size=11>Tiếp tục phòng thủ bằng bài trên tay.</size>";
+        var lShadow = labelGo.AddComponent<Shadow>();
+        lShadow.effectColor = new Color(0, 0, 0, 0.95f);
+        lShadow.effectDistance = new Vector2(1f, -1f);
+        var lRt = labelGo.GetComponent<RectTransform>();
+        lRt.anchorMin = lRt.anchorMax = new Vector2(0.5f, 0f);
+        lRt.pivot = new Vector2(0.5f, 1f);
+        lRt.sizeDelta = new Vector2(300f, 44f);
+        lRt.anchoredPosition = new Vector2(0, -8f);
+
+        // Âm thanh và nhật ký
+        if (isRed)
+        {
+            AudioManager.Instance.PlayParry();
+            SetLog($"🛡️ <color=#55FF55><b>[KHIÊN MÂY BỆN - THÀNH CÔNG ✔]</b></color>: Lá phán xét là chất ĐỎ [{suitSym} {rankStr}]. <b>{defender.GeneralName}</b> hóa giải đòn đánh thành công!");
+        }
+        else
+        {
+            AudioManager.Instance.PlayDamage();
+            SetLog($"🛡️ <color=#CBD5E1>[Khiên Mây Bện - Thất Bại ✖]</color>: Lá phán xét là chất ĐEN [{suitSym} {rankStr}]. Phán xét thất bại, tiếp tục phòng thủ.");
+        }
+
+        // Chờ 1.4s để người chơi nhìn rõ kết quả phán xét
+        yield return new WaitForSeconds(1.4f);
+
+        Destroy(judgeCardGo);
+        deckManager.DiscardCard(judgeCard);
+
+        callback?.Invoke(isRed);
+    }
+
+    private IEnumerator ResolveSlashAttack(CardModel card, GeneralCardUI caster, GeneralCardUI target)
+    {
+        if (target == null || target.CurrentHp <= 0) yield break;
+
+        yield return AnimateSlashAttack(card, caster, target);
+
+        int damage = isWineBuffActive ? 2 : 1;
+        string wineLog = isWineBuffActive ? " (kèm hiệu ứng Hủ Rượu: +1 Sát thương!)" : "";
+        isWineBuffActive = false;
+
+        SetLog($"⚔️ <b>{caster.GeneralName}</b> tung chiêu [{card.cardName}]{wineLog} nhắm vào <b>{target.GeneralName}</b>!");
+        yield return new WaitForSeconds(0.4f);
+
+        if (target.HasEquipment(EquipmentType.Armor, "Giáp Đồng") && card.subType == CardSubType.AttackNormal)
+        {
+            AudioManager.Instance.PlayParry();
+            SetLog($"🛡️ <color=#70D8FF><b>[GIÁP ĐỒNG SƠN VI]</b></color>: Giáp Đồng vô hiệu hóa hoàn toàn đòn [{card.cardName}] của {caster.GeneralName}!");
+            yield break;
+        }
+
+        bool dodged = false;
+        bool hasHolyCannon = caster.HasEquipment(EquipmentType.Weapon, "Súng Thần Công");
+
+        target.SetAwaitingReaction(true); // Nhấp nháy nhẹ avatar khi cần phản ứng né đòn
+
+        // 1. Kiểm tra Khiên Mây Bện (Phán xét Bát Quái né Trảm)
+        if (target.HasEquipment(EquipmentType.Armor, "Khiên Mây"))
+        {
+            yield return TryKhienMayDefense(target, "đòn Trảm", (success) =>
+            {
+                if (success) dodged = true;
+            });
+        }
+
+        // 2. Nếu Khiên Mây chưa né được thì mới xét bài Đỡ trên tay
+        if (!dodged)
+        {
+            if (target == playerCard)
+            {
+                yield return AwaitForPlayerSlashDefense(card, damage, hasHolyCannon, (res) =>
+                {
+                    if (res == SlashDefenseResult.Dodged) dodged = true;
+                });
+            }
+            else
+            {
+                var hand = GetHandOfGeneral(target);
+                var legalDodge = hand.Find(c => c.subType == CardSubType.Dodge && (!hasHolyCannon || c.suit != card.suit));
+                if (legalDodge != null)
+                {
+                    hand.Remove(legalDodge);
+                    deckManager.DiscardCard(legalDodge);
+                    UpdateHandCountsVisual();
+                    ShowCardAtCenter(legalDodge, target, caster, "Hóa giải đòn đánh");
+                    AudioManager.Instance.PlayParry();
+                    SetLog($"🛡️ <b>{target.GeneralName}</b> đánh ra [{legalDodge.cardName}] né đòn Trảm!");
+                    dodged = true;
+                    yield return new WaitForSeconds(1.0f);
+                }
+                else if (hasHolyCannon)
+                {
+                    SetLog($"💥 <color=#FF5555><b>[SÚNG THẦN CÔNG HỒ TRIỀU]</b></color>: {target.GeneralName} không thể dùng Đỡ cùng chất!");
+                }
+            }
+        }
+
+        target.SetAwaitingReaction(false); // Dừng nhấp nháy sau khi đã phản ứng xong
+
+        if (dodged)
+        {
+            if (caster.HasEquipment(EquipmentType.Weapon, "Trường Đao"))
+            {
+                var casterHand = GetHandOfGeneral(caster);
+                if (casterHand.Count >= 2)
+                {
+                    yield return new WaitForSeconds(0.4f);
+                    for (int k = 0; k < 2 && casterHand.Count > 0; k++)
+                    {
+                        var disc = casterHand[0];
+                        casterHand.RemoveAt(0);
+                        deckManager.DiscardCard(disc);
+                    }
+                    if (caster == playerCard) { playerHandUI.ClearHand(); playerHandUI.AddCards(playerHandCards); }
+                    UpdateHandCountsVisual();
+
+                    SetLog($"🗡️ <color=#FFD700><b>[TRƯỜNG ĐAO]</b></color>: {caster.GeneralName} bỏ 2 lá trên tay, chém xuyên phòng thủ gây 1 sát thương!");
+                    int daoDamage = ApplyDamageMitigation(target, 1, "Trường Đao");
+                    if (daoDamage > 0)
+                    {
+                        target.TakeDamage(daoDamage);
+                        AudioManager.Instance.PlayDamage();
+                        StartCoroutine(ShakeCard(target));
+                        yield return CheckNearDeath(target, caster);
+                    }
+                }
+            }
+            yield break;
+        }
+
+        // 3. Áp dụng giảm sát thương Áo Bào Hoàng Tộc (tối đa 3 lần)
+        int finalDamage = ApplyDamageMitigation(target, damage, "đòn Trảm");
+
+        if (finalDamage > 0)
+        {
+            target.TakeDamage(finalDamage);
+            AudioManager.Instance.PlayDamage();
+            StartCoroutine(ShakeCard(target));
+            SetLog($"💥 <b>{target.GeneralName}</b> trúng đòn mất {finalDamage} máu! ({target.CurrentHp}/{target.MaxHp})");
+            yield return CheckNearDeath(target, caster);
+        }
+
+        if (finalDamage > 0 && caster.HasEquipment(EquipmentType.Weapon, "Thương Ngâu") && target.CurrentHp > 0)
+        {
+            yield return new WaitForSeconds(0.4f);
+            if (caster == playerCard)
+            {
+                bool chosen = false;
+                ShowCardStealOrDestroyModal(target, false, "🔱 THƯƠNG NGÂU LÃNG BẠC: PHÁ HỦY 1 LÁ CỦA MỤC TIÊU", (discarded) =>
+                {
+                    deckManager.DiscardCard(discarded);
+                    ShowCardAtCenter(discarded, target, null, "Bị phá hủy bởi Thương Ngâu");
+                    AudioManager.Instance.PlaySkill();
+                    SetLog($"🔱 [Thương Ngâu Lãng Bạc]: Bạn đã phá hủy lá [{discarded.cardName}] của {target.GeneralName}!");
+                    chosen = true;
+                });
+                while (!chosen && !battleFinished) yield return null;
+            }
+            else
+            {
+                var tHand = GetHandOfGeneral(target);
+                if (tHand.Count > 0)
+                {
+                    var destroyed = tHand[0];
+                    tHand.RemoveAt(0);
+                    deckManager.DiscardCard(destroyed);
+                    UpdateHandCountsVisual();
+                    SetLog($"🔱 [Thương Ngâu Lãng Bạc]: {caster.GeneralName} phá hủy 1 lá bài của {target.GeneralName}!");
+                }
+            }
+        }
+    }
+
+    private IEnumerator AwaitForPlayerSlashDefense(CardModel slashCard, int damage, bool hasHolyCannon, Action<SlashDefenseResult> onResolved)
+    {
+        bool defenseResolved = false;
+        var result = SlashDefenseResult.Hit;
+
+        SetLog("⚠️ <color=#FF5555><b>BẠN BỊ TẤN CÔNG BẰNG ĐÒN TRẢM!</b></color> Hãy chọn lá [ĐỠ] hoặc bấm [KHÔNG NÉ].");
+
+        var reactionGo = new GameObject("SlashReactionPanel", typeof(RectTransform));
+        reactionGo.transform.SetParent(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, false);
+        var rRt = reactionGo.GetComponent<RectTransform>();
+        SetRect(rRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(680f, 48f), new Vector2(-70f, 238f));
+
+        var btnSpr = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
+
+        var dodgeBtnGo = new GameObject("Btn_Dodge", typeof(RectTransform), typeof(Image), typeof(Button));
+        dodgeBtnGo.transform.SetParent(reactionGo.transform, false);
+        var dImg = dodgeBtnGo.GetComponent<Image>();
+        if (btnSpr != null) { dImg.sprite = btnSpr; dImg.type = Image.Type.Sliced; }
+        var dRt = dodgeBtnGo.GetComponent<RectTransform>();
+        SetRect(dRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(260f, 42f), new Vector2(-100f, 0));
+
+        var dTxt = AddText(dodgeBtnGo.transform, "Txt", "🛡️ ĐÁNH [ĐỠ] ĐỂ HÓA GIẢI", 13, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        Fill(dTxt.rectTransform);
+
+        var dBtn = dodgeBtnGo.GetComponent<Button>();
+        dBtn.interactable = false;
+        dImg.color = new Color(0.5f, 0.5f, 0.5f, 0.8f);
+
+        var noDodgeBtnGo = new GameObject("Btn_NoDodge", typeof(RectTransform), typeof(Image), typeof(Button));
+        noDodgeBtnGo.transform.SetParent(reactionGo.transform, false);
+        var ndImg = noDodgeBtnGo.GetComponent<Image>();
+        if (btnSpr != null) { ndImg.sprite = btnSpr; ndImg.type = Image.Type.Sliced; }
+        ndImg.color = new Color(0.85f, 0.25f, 0.2f, 1f);
+        var ndRt = noDodgeBtnGo.GetComponent<RectTransform>();
+        SetRect(ndRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(210f, 42f), new Vector2(170f, 0));
+
+        var ndTxt = AddText(noDodgeBtnGo.transform, "Txt", "❌ KHÔNG NÉ (CHỊU MÁU)", 13, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        Fill(ndTxt.rectTransform);
+
+        CardUI chosenDodgeUI = null;
+
+        Action<CardUI> onCardSelectedReaction = (cardUI) =>
+        {
+            if (cardUI != null && cardUI.Data != null && cardUI.Data.subType == CardSubType.Dodge)
+            {
+                if (hasHolyCannon && cardUI.Data.suit == slashCard.suit)
+                {
+                    chosenDodgeUI = null;
+                    dBtn.interactable = false;
+                    dImg.color = new Color(0.5f, 0.5f, 0.5f, 0.8f);
+                    SetLog($"❌ [Súng Thần Công]: Không thể dùng lá Đỡ cùng chất [{cardUI.Data.GetSuitSymbol()}] với Trảm!");
+                    return;
+                }
+
+                chosenDodgeUI = cardUI;
+                dBtn.interactable = true;
+                dImg.color = new Color(0.2f, 0.75f, 0.3f, 1f);
+                SetLog($"🛡️ Đã chọn [{cardUI.Data.cardName}]. Nhấn nút [ĐÁNH ĐỠ ĐỂ HÓA GIẢI]!");
+            }
+            else
+            {
+                chosenDodgeUI = null;
+                dBtn.interactable = false;
+                dImg.color = new Color(0.5f, 0.5f, 0.5f, 0.8f);
+            }
+        };
+
+        playerHandUI.HighlightOnlyMatching(c => c != null && c.subType == CardSubType.Dodge && (!hasHolyCannon || c.suit != slashCard.suit));
+        playerHandUI.OnCardSelected += onCardSelectedReaction;
+
+        if (playerHandUI.SelectedCard != null && playerHandUI.SelectedCard.Data != null && playerHandUI.SelectedCard.Data.subType == CardSubType.Dodge)
+        {
+            onCardSelectedReaction(playerHandUI.SelectedCard);
+        }
+
+        dBtn.onClick.AddListener(() =>
+        {
+            if (chosenDodgeUI != null)
+            {
+                var dodgeData = chosenDodgeUI.Data;
+                playerHandCards.Remove(dodgeData);
+                playerHandUI.RemoveCard(chosenDodgeUI);
+                deckManager.DiscardCard(dodgeData);
+                UpdateHandCountsVisual();
+
+                ShowCardAtCenter(dodgeData, playerCard, null, "Hóa giải đòn đánh");
+                AudioManager.Instance.PlayParry();
+                SetLog($"🛡️ <color=#55FF55><b>BẠN ĐÃ DÙNG [ĐỠ] HÓA GIẢI ĐÒN ĐÁNH!</b></color>");
+
+                result = SlashDefenseResult.Dodged;
+                defenseResolved = true;
+            }
+        });
+
+        noDodgeBtnGo.GetComponent<Button>().onClick.AddListener(() =>
+        {
+            result = SlashDefenseResult.Hit;
+            defenseResolved = true;
+        });
+
+        while (!defenseResolved && !battleFinished)
+        {
+            yield return null;
+        }
+
+        playerHandUI.OnCardSelected -= onCardSelectedReaction;
+        playerHandUI.ClearHighlights();
+        if (reactionGo != null) Destroy(reactionGo);
+
+        onResolved?.Invoke(result);
+    }
+
+    private IEnumerator ResolveNullificationChain(CardModel rootScroll, GeneralCardUI caster, GeneralCardUI target, Action<bool> onResult)
+    {
+        if (rootScroll == null || (rootScroll.category != CardCategory.InstantScroll && rootScroll.category != CardCategory.DelayedScroll))
+        {
+            onResult?.Invoke(false);
+            yield break;
+        }
+
+        bool isCurrentlyCanceled = false;
+        GeneralCardUI currentAffected = (target != null && target != caster) ? target : (caster == playerCard ? enemy1Card : playerCard);
+
+        while (!battleFinished)
+        {
+            GeneralCardUI sideToAsk = isCurrentlyCanceled ? caster : currentAffected;
+
+            if (sideToAsk == playerCard || (sideToAsk.IsAlly && playerCard.CurrentHp > 0))
+            {
+                var counterCard = playerHandCards.Find(c => c.subType == CardSubType.FlawlessDefense);
+                if (counterCard != null)
+                {
+                    bool playerUsed = false;
+                    string title = isCurrentlyCanceled
+                        ? $"🛡️ Dùng [Diệu Kế Phá Mưu] để chống lại Diệu Kế của đối phương?"
+                        : $"🛡️ Đối phương dùng [{rootScroll.cardName}]. Dùng [Diệu Kế Phá Mưu] hóa giải?";
+
+                    yield return PromptPlayerCounterScroll(rootScroll, title, (used) => playerUsed = used);
+
+                    if (playerUsed)
+                    {
+                        isCurrentlyCanceled = !isCurrentlyCanceled;
+                        yield return new WaitForSeconds(0.6f);
+                        continue;
+                    }
+                }
+                break;
+            }
+            else
+            {
+                var aiHand = GetHandOfGeneral(sideToAsk);
+                var aiCounter = aiHand.Find(c => c.subType == CardSubType.FlawlessDefense);
+
+                if (aiCounter != null && UnityEngine.Random.value < 0.65f)
+                {
+                    aiHand.Remove(aiCounter);
+                    deckManager.DiscardCard(aiCounter);
+                    UpdateHandCountsVisual();
+                    ShowCardAtCenter(aiCounter, sideToAsk, null, "Hóa giải mưu kế!");
+                    AudioManager.Instance.PlaySkill();
+                    SetLog($"🛡️ <b>{sideToAsk.GeneralName}</b> tung [Diệu Kế Phá Mưu] để hóa giải!");
+
+                    isCurrentlyCanceled = !isCurrentlyCanceled;
+                    yield return new WaitForSeconds(1.0f);
+                    continue;
+                }
+                break;
+            }
+        }
+
+        onResult?.Invoke(isCurrentlyCanceled);
+    }
+
+    private IEnumerator PromptPlayerCounterScroll(CardModel scrollCard, string promptTitle, Action<bool> onResolved)
+    {
+        var counterCard = playerHandCards.Find(c => c.subType == CardSubType.FlawlessDefense);
+        if (counterCard == null || battleFinished)
+        {
+            onResolved?.Invoke(false);
+            yield break;
+        }
+
+        bool decided = false;
+        bool used = false;
+        float promptTimer = 40.0f;
+
+        var panelGo = new GameObject("CounterPromptModal", typeof(RectTransform), typeof(Image));
+        panelGo.transform.SetParent(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, false);
+        panelGo.transform.SetAsLastSibling();
+
+        var pImg = panelGo.GetComponent<Image>();
+        var bgSpr = LotusHealthUI.LoadSpriteFromResources("UI/auth_card_bg");
+        if (bgSpr != null) { pImg.sprite = bgSpr; pImg.type = Image.Type.Sliced; }
+        pImg.color = new Color(0.06f, 0.09f, 0.18f, 0.98f);
+
+        var pRt = panelGo.GetComponent<RectTransform>();
+        pRt.anchorMin = pRt.anchorMax = pRt.pivot = new Vector2(0.5f, 0.5f);
+        pRt.sizeDelta = new Vector2(580f, 150f);
+        pRt.anchoredPosition = new Vector2(-80f, 120f);
+
+        var fGo = new GameObject("Frame", typeof(RectTransform), typeof(Image));
+        fGo.transform.SetParent(panelGo.transform, false);
+        var fImg = fGo.GetComponent<Image>();
+        var fSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+        if (fSpr != null) { fImg.sprite = fSpr; fImg.type = Image.Type.Sliced; }
+        fImg.color = new Color(1f, 0.85f, 0.35f, 1f);
+        Fill(fGo.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
+
+        var titleTxt = AddText(panelGo.transform, "Title", promptTitle, 13, new Color(1f, 0.9f, 0.4f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(titleTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(540f, 40f), new Vector2(0, -10f));
+
+        var timerTxt = AddText(panelGo.transform, "Timer", "⏳ 40s", 12, new Color(0.6f, 0.9f, 1f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(timerTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(200f, 22f), new Vector2(0, -46f));
+
+        var btnSpr = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
+
+        var useBtnGo = new GameObject("Btn_Use", typeof(RectTransform), typeof(Image), typeof(Button));
+        useBtnGo.transform.SetParent(panelGo.transform, false);
+        var uImg = useBtnGo.GetComponent<Image>();
+        if (btnSpr != null) { uImg.sprite = btnSpr; uImg.type = Image.Type.Sliced; }
+        uImg.color = new Color(0.2f, 0.75f, 0.35f, 1f);
+        var uRt = useBtnGo.GetComponent<RectTransform>();
+        SetRect(uRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(240f, 38f), new Vector2(-130f, 16f));
+
+        var uTxt = AddText(useBtnGo.transform, "Txt", "🛡️ DÙNG DIỆU KẾ PHÁ MƯU", 11, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        Fill(uTxt.rectTransform);
+
+        var passBtnGo = new GameObject("Btn_Pass", typeof(RectTransform), typeof(Image), typeof(Button));
+        passBtnGo.transform.SetParent(panelGo.transform, false);
+        var paImg = passBtnGo.GetComponent<Image>();
+        if (btnSpr != null) { paImg.sprite = btnSpr; paImg.type = Image.Type.Sliced; }
+        paImg.color = new Color(0.5f, 0.55f, 0.65f, 1f);
+        var paRt = passBtnGo.GetComponent<RectTransform>();
+        SetRect(paRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(200f, 38f), new Vector2(140f, 16f));
+
+        var paTxt = AddText(passBtnGo.transform, "Txt", "❌ BỎ QUA / KHÔNG DÙNG", 11, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        Fill(paTxt.rectTransform);
+
+        useBtnGo.GetComponent<Button>().onClick.AddListener(() =>
+        {
+            if (counterCard != null)
+            {
+                playerHandCards.Remove(counterCard);
+                playerHandUI.ClearHand();
+                playerHandUI.AddCards(playerHandCards);
+                deckManager.DiscardCard(counterCard);
+                UpdateHandCountsVisual();
+
+                ShowCardAtCenter(counterCard, playerCard, null, "Hóa giải mưu kế!");
+                AudioManager.Instance.PlaySkill();
+                SetLog($"🛡️ <color=#55FF55><b>[DIỆU KẾ PHÁ MƯU]</b></color>: Bạn đã tung Diệu Kế Phá Mưu để hóa giải mưu kế!");
+                used = true;
+                decided = true;
+            }
+        });
+
+        passBtnGo.GetComponent<Button>().onClick.AddListener(() =>
+        {
+            used = false;
+            decided = true;
+        });
+
+        while (!decided && promptTimer > 0f && !battleFinished)
+        {
+            promptTimer -= Time.deltaTime;
+            if (timerTxt != null) timerTxt.text = $"⏳ Còn {promptTimer:0.0}s để quyết định...";
+            yield return null;
+        }
+
+        if (panelGo != null) Destroy(panelGo);
+        onResolved?.Invoke(used);
+    }
+
+    private IEnumerator ResolveInstantScroll(CardModel card, GeneralCardUI caster, GeneralCardUI target)
+    {
+        bool isCanceled = false;
+        yield return ResolveNullificationChain(card, caster, target, res => isCanceled = res);
+        if (isCanceled)
+        {
+            SetLog($"🛡️ <color=#55FF55><b>[DIỆU KẾ PHÁ MƯU]</b></color> đã hóa giải mưu kế [{card.cardName}]!");
+            yield break;
+        }
+
+        switch (card.subType)
+        {
+            case CardSubType.ExNihilo:
+                ShowCardAtCenter(card, caster, null, "Rút 2 lá bài vào tay");
+                var d1 = deckManager.DrawCard();
+                var d2 = deckManager.DrawCard();
+                AddCardsToGeneral(caster, d1, d2);
+                UpdateHandCountsVisual();
+                AudioManager.Instance.PlayCardDraw();
+                SetLog($"📜 <b>{caster.GeneralName}</b> thi triển [Dụng Binh Như Thần] rút thêm 2 lá bài vào tay!");
+                break;
+
+            case CardSubType.Snatch:
+                if (target != null)
+                {
+                    ShowCardAtCenter(card, caster, target, "Cướp 1 lá bài");
+                    if (caster == playerCard)
+                    {
+                        bool chosen = false;
+                        ShowCardStealOrDestroyModal(target, true, "🌾 ĐỘT KÍCH TRỘM LƯƠNG: CHỌN 1 LÁ ĐỂ CƯỚP", (stolen) =>
+                        {
+                            playerHandCards.Add(stolen);
+                            playerHandUI.AddCard(stolen);
+                            UpdateHandCountsVisual();
+                            AudioManager.Instance.PlayCardDraw();
+                            SetLog($"🌾 [Đột Kích Trộm Lương]: Bạn đã cướp thành công lá [{stolen.cardName}] từ {target.GeneralName}!");
+                            chosen = true;
+                        });
+                        while (!chosen && !battleFinished) yield return null;
+                    }
+                    else
+                    {
+                        var options = BuildTargetCardOptions(target, true);
+                        if (options.Count > 0)
+                        {
+                            var opt = options[UnityEngine.Random.Range(0, options.Count)];
+                            if (TryRemoveTargetCardOption(target, opt))
+                            {
+                                AddCardsToGeneral(caster, opt.Card);
+                                UpdateHandCountsVisual();
+                                AudioManager.Instance.PlayCardDraw();
+                                SetLog($"🌾 <b>{caster.GeneralName}</b> dùng [Đột Kích Trộm Lương] cướp 1 lá bài từ <b>{target.GeneralName}</b>!");
+                            }
+                        }
+                    }
+                }
+                break;
+
+            case CardSubType.Dismantle:
+                if (target != null)
+                {
+                    ShowCardAtCenter(card, caster, target, "Phá hủy 1 lá bài");
+                    if (caster == playerCard)
+                    {
+                        bool chosen = false;
+                        ShowCardStealOrDestroyModal(target, false, "🏚️ VƯỜN KHÔNG NHÀ TRỐNG: CHỌN 1 LÁ ĐỂ PHÁ HỦY", (discarded) =>
+                        {
+                            deckManager.DiscardCard(discarded);
+                            ShowCardAtCenter(discarded, target, null, "Lá bài bị phá hủy");
+                            AudioManager.Instance.PlayCardDiscard();
+                            SetLog($"🏚️ [Vườn Không Nhà Trống]: Bạn đã phá hủy lá [{discarded.cardName}] của {target.GeneralName}!");
+                            chosen = true;
+                        });
+                        while (!chosen && !battleFinished) yield return null;
+                    }
+                    else
+                    {
+                        var options = BuildTargetCardOptions(target, false);
+                        if (options.Count > 0)
+                        {
+                            var opt = options[UnityEngine.Random.Range(0, options.Count)];
+                            if (TryRemoveTargetCardOption(target, opt))
+                            {
+                                deckManager.DiscardCard(opt.Card);
+                                UpdateHandCountsVisual();
+                                AudioManager.Instance.PlayCardDiscard();
+                                SetLog($"🏚️ <b>{caster.GeneralName}</b> dùng [Vườn Không Nhà Trống] phá hủy 1 lá bài của <b>{target.GeneralName}</b>!");
+                            }
+                        }
+                    }
+                }
+                break;
+
+            case CardSubType.Duel:
+                if (target != null)
+                {
+                    yield return ResolveDuel(caster, target);
+                }
+                break;
+
+            case CardSubType.FlawlessDefense:
+                if (target != null)
+                {
+                    ShowCardAtCenter(card, caster, target, "Diệu Kế Phá Mưu: Hủy 1 lá của đối phương");
+                    if (caster == playerCard)
+                    {
+                        bool chosen = false;
+                        ShowCardStealOrDestroyModal(target, false, "🛡️ DIỆU KẾ PHÁ MƯU: CHỌN 1 LÁ ĐỂ HỦY BỎ", (discarded) =>
+                        {
+                            deckManager.DiscardCard(discarded);
+                            ShowCardAtCenter(discarded, target, null, "Lá bài bị hủy");
+                            AudioManager.Instance.PlaySkill();
+                            SetLog($"🛡️ [Diệu Kế Phá Mưu]: Bạn đã thi triển Diệu Kế Phá Mưu, hủy lá [{discarded.cardName}] của {target.GeneralName}!");
+                            chosen = true;
+                        });
+                        while (!chosen && !battleFinished) yield return null;
+                    }
+                    else
+                    {
+                        var options = BuildTargetCardOptions(target, true);
+                        if (options.Count > 0)
+                        {
+                            var opt = options[UnityEngine.Random.Range(0, options.Count)];
+                            if (TryRemoveTargetCardOption(target, opt))
+                            {
+                                deckManager.DiscardCard(opt.Card);
+                                UpdateHandCountsVisual();
+                                AudioManager.Instance.PlaySkill();
+                                SetLog($"🛡️ <b>{caster.GeneralName}</b> dùng [Diệu Kế Phá Mưu] hủy lá [{opt.Card.cardName}] của <b>{target.GeneralName}</b>!");
+                            }
+                        }
+                    }
+                }
+                break;
+
+            case CardSubType.BarbarianInvasion:
+                ShowCardAtCenter(card, caster, null, "Bãi Cọc Ngầm: Toàn sân cần Trảm");
+                SetLog($"🏹 <b>{caster.GeneralName}</b> phát động [BÃI CỌC NGẦM]! Toàn bộ người chơi khác phải đánh 1 lá Trảm hoặc mất 1 Máu!");
+                {
+                    var aoeOrder = GetLivingGeneralsStartingRightOf(caster);
+                    foreach (var g in aoeOrder)
+                    {
+                        if (g != caster && g.CurrentHp > 0 && !battleFinished)
+                        {
+                            yield return ResolveAoERequirement(g, true, "Bãi Cọc Ngầm", "Trảm");
+                        }
+                    }
+                }
+                break;
+
+            case CardSubType.ArrowRain:
+                ShowCardAtCenter(card, caster, null, "Mưa Tên Liên Châu: Toàn sân cần Đỡ");
+                SetLog($"🏹 <b>{caster.GeneralName}</b> thi triển [MƯA TÊN LIÊN CHÂU]! Toàn bộ người chơi khác phải đánh 1 lá Đỡ hoặc mất 1 Máu!");
+                {
+                    var aoeOrder = GetLivingGeneralsStartingRightOf(caster);
+                    foreach (var g in aoeOrder)
+                    {
+                        if (g != caster && g.CurrentHp > 0 && !battleFinished)
+                        {
+                            yield return ResolveAoERequirement(g, false, "Mưa Tên Liên Châu", "Đỡ");
+                        }
+                    }
+                }
+                break;
+
+            case CardSubType.Harvest:
+                yield return ResolveHarvest(card, caster);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Mở Kho Cứu Tế: Hiển thị Modal lật N lá bài tương ứng số người còn sống, luân phiên từng người tự tay chọn 1 lá.
+    /// </summary>
+    private IEnumerator ResolveHarvest(CardModel harvestCard, GeneralCardUI caster)
+    {
+        ShowCardAtCenter(harvestCard, caster, null, "Mở Kho Cứu Tế: Chia đều bài công khai");
+        SetLog("🌾 [Mở Kho Cứu Tế]: Đang mở kho lương, lật bài công khai cho cả bàn đấu cùng chọn!");
+
+        var livingTurnOrder = new List<GeneralCardUI>();
+        int startIdx = turnOrderGenerals.IndexOf(caster);
+        for (int i = 0; i < turnOrderGenerals.Count; i++)
+        {
+            int gIdx = (startIdx + i) % turnOrderGenerals.Count;
+            if (turnOrderGenerals[gIdx].CurrentHp > 0)
+            {
+                livingTurnOrder.Add(turnOrderGenerals[gIdx]);
+            }
+        }
+
+        int totalCount = livingTurnOrder.Count;
+        var revealedCards = new List<CardModel>();
+        for (int i = 0; i < totalCount; i++)
+        {
+            var c = deckManager.DrawCard();
+            if (c != null) revealedCards.Add(c);
+        }
+
+        yield return new WaitForSeconds(0.6f);
+
+        var modalGo = new GameObject("HarvestModal", typeof(RectTransform), typeof(Image));
+        modalGo.transform.SetParent(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, false);
+        modalGo.transform.SetAsLastSibling();
+
+        var mImg = modalGo.GetComponent<Image>();
+        mImg.color = new Color(0.02f, 0.03f, 0.07f, 0.88f);
+        Fill(modalGo.GetComponent<RectTransform>());
+
+        var panelGo = new GameObject("Panel", typeof(RectTransform), typeof(Image));
+        panelGo.transform.SetParent(modalGo.transform, false);
+        var panelRt = panelGo.GetComponent<RectTransform>();
+        panelRt.anchorMin = panelRt.anchorMax = panelRt.pivot = new Vector2(0.5f, 0.5f);
+        panelRt.sizeDelta = new Vector2(740f, 400f);
+        panelRt.anchoredPosition = Vector2.zero;
+
+        var pImg = panelGo.GetComponent<Image>();
+        var slotSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
+        if (slotSpr != null) { pImg.sprite = slotSpr; pImg.type = Image.Type.Sliced; }
+        pImg.color = new Color(0.06f, 0.14f, 0.12f, 0.98f);
+
+        var borderGo = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        borderGo.transform.SetParent(panelGo.transform, false);
+        var bImg = borderGo.GetComponent<Image>();
+        var fSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+        if (fSpr != null) { bImg.sprite = fSpr; bImg.type = Image.Type.Sliced; }
+        bImg.color = new Color(0.35f, 0.9f, 0.45f, 0.98f);
+        Fill(borderGo.GetComponent<RectTransform>(), new Vector2(-4, -4), new Vector2(4, 4));
+
+        var headerGo = new GameObject("HeaderBanner", typeof(RectTransform), typeof(Image));
+        headerGo.transform.SetParent(panelGo.transform, false);
+        var hImg = headerGo.GetComponent<Image>();
+        var badgeSpr = LotusHealthUI.LoadSpriteFromResources("UI/badge_faction");
+        if (badgeSpr != null) { hImg.sprite = badgeSpr; hImg.type = Image.Type.Sliced; }
+        hImg.color = new Color(0.15f, 0.58f, 0.32f, 0.98f);
+        var hRt = headerGo.GetComponent<RectTransform>();
+        SetRect(hRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(680f, 48f), new Vector2(0, -12f));
+
+        var titleTxt = AddText(headerGo.transform, "Title", $"🍚 MỞ KHO CỨU TẾ - LẬT {revealedCards.Count} LÁ BÀI CÔNG KHAI", 16, new Color(1f, 0.95f, 0.6f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        Fill(titleTxt.rectTransform);
+
+        var subTxt = AddText(panelGo.transform, "SubTitle", "Đang chia bài...", 13, new Color(0.9f, 1f, 0.92f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(subTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(680f, 26f), new Vector2(0, -66f));
+
+        var cardsContainerGo = new GameObject("CardsContainer", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        cardsContainerGo.transform.SetParent(panelGo.transform, false);
+        var cRt = cardsContainerGo.GetComponent<RectTransform>();
+        SetRect(cRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(700f, 220f), new Vector2(0, -22f));
+        var hlg = cardsContainerGo.GetComponent<HorizontalLayoutGroup>();
+        hlg.spacing = 16f;
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+        hlg.childControlWidth = hlg.childControlHeight = false;
+
+        var cardUiMap = new Dictionary<CardModel, GameObject>();
+        foreach (var cData in revealedCards)
+        {
+            var cardUI = CardUI.Create(cardsContainerGo.transform, cData, new Vector2(118f, 162f));
+            cardUiMap[cData] = cardUI.gameObject;
+        }
+
+        foreach (var picker in livingTurnOrder)
+        {
+            if (battleFinished || cardUiMap.Count == 0) break;
+
+            if (picker == playerCard)
+            {
+                subTxt.text = $"👉 <color=#FFD700><b>LƯỢT CỦA BẠN:</b></color> Chạm chọn 1 lá bài công khai dưới đây vào tay!";
+                SetLog("👉 [Mở Kho Cứu Tế]: Đang tới lượt bạn chọn 1 lá bài...");
+
+                CardModel playerPicked = null;
+
+                foreach (var kvp in cardUiMap)
+                {
+                    var cData = kvp.Key;
+                    var cGo = kvp.Value;
+                    if (cGo == null) continue;
+
+                    var overlayBtn = new GameObject("ClickOverlay", typeof(RectTransform), typeof(Image), typeof(Button));
+                    overlayBtn.transform.SetParent(cGo.transform, false);
+                    overlayBtn.transform.SetAsLastSibling();
+                    var oImg = overlayBtn.GetComponent<Image>();
+                    oImg.color = new Color(1f, 1f, 1f, 0.001f);
+                    Fill(overlayBtn.GetComponent<RectTransform>());
+
+                    overlayBtn.GetComponent<Button>().onClick.AddListener(() =>
+                    {
+                        playerPicked = cData;
+                    });
+                }
+
+                while (playerPicked == null && !battleFinished)
+                {
+                    yield return null;
+                }
+
+                if (playerPicked != null)
+                {
+                    playerHandCards.Add(playerPicked);
+                    playerHandUI.AddCard(playerPicked);
+                    UpdateHandCountsVisual();
+
+                    if (cardUiMap.TryGetValue(playerPicked, out var pickedGo) && pickedGo != null)
+                    {
+                        Destroy(pickedGo);
+                    }
+                    cardUiMap.Remove(playerPicked);
+
+                    AudioManager.Instance.PlayCardDraw();
+                    SetLog($"🍚 Bạn đã chọn lá [{playerPicked.cardName}] từ Kho Cứu Tế!");
+                    yield return new WaitForSeconds(0.6f);
+                }
+            }
+            else
+            {
+                subTxt.text = $"⏳ <color=#55DDFF><b>[{picker.GeneralName}]</b></color> đang chọn 1 lá bài...";
+                yield return new WaitForSeconds(1.2f);
+
+                var remaining = new List<CardModel>(cardUiMap.Keys);
+                if (remaining.Count > 0)
+                {
+                    var aiPick = remaining[UnityEngine.Random.Range(0, remaining.Count)];
+                    AddCardsToGeneral(picker, aiPick);
+                    UpdateHandCountsVisual();
+
+                    if (cardUiMap.TryGetValue(aiPick, out var aiGo) && aiGo != null)
+                    {
+                        Destroy(aiGo);
+                    }
+                    cardUiMap.Remove(aiPick);
+
+                    AudioManager.Instance.PlayCardDraw();
+                    SetLog($"🍚 <b>{picker.GeneralName}</b> đã lấy lá [{aiPick.cardName}]!");
+                    yield return new WaitForSeconds(0.6f);
+                }
+            }
+        }
+
+        if (modalGo != null) Destroy(modalGo);
+    }
+
+    private List<GeneralCardUI> GetLivingGeneralsStartingRightOf(GeneralCardUI caster)
+    {
+        var list = new List<GeneralCardUI>();
+        int startIdx = turnOrderGenerals.IndexOf(caster);
+        if (startIdx < 0) startIdx = 0;
+
+        for (int i = 1; i <= turnOrderGenerals.Count; i++)
+        {
+            int idx = (startIdx + i) % turnOrderGenerals.Count;
+            var g = turnOrderGenerals[idx];
+            if (g != null && g.CurrentHp > 0 && g != caster)
+            {
+                list.Add(g);
+            }
+        }
+        return list;
+    }
+
+    private IEnumerator ResolveAoERequirement(GeneralCardUI victim, bool needSlash, string aoeName, string reqName)
+    {
+        if (victim == null || victim.CurrentHp <= 0 || battleFinished) yield break;
+
+        victim.SetAwaitingReaction(true); // Nhấp nháy avatar tướng đang cần ra bài né cẩm nang diện rộng
+        SetLog($"👉 <b>[{aoeName}]</b>: Đang kiểm tra <b>{victim.GeneralName}</b> (Cần đánh lá [{reqName}])...");
+
+        bool satisfied = false;
+
+        // Kiểm tra Khiên Mây Bện nếu cần Đỡ (Mưa Tên Liên Châu)
+        if (!needSlash && victim.HasEquipment(EquipmentType.Armor, "Khiên Mây"))
+        {
+            yield return TryKhienMayDefense(victim, aoeName, (success) =>
+            {
+                if (success) satisfied = true;
+            });
+        }
+
+        if (satisfied) yield break;
+
+        if (victim == playerCard)
+        {
+            // Bảng Phản Hồi Cho Người Chơi Chọn Ra Bài Hoặc Chịu Mất Máu
+            bool decided = false;
+            var reactionGo = new GameObject("AoEReactionPanel", typeof(RectTransform));
+            reactionGo.transform.SetParent(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, false);
+            var rRt = reactionGo.GetComponent<RectTransform>();
+            SetRect(rRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(680f, 48f), new Vector2(-70f, 238f));
+
+            var btnSpr = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
+
+            var respBtnGo = new GameObject("Btn_Respond", typeof(RectTransform), typeof(Image), typeof(Button));
+            respBtnGo.transform.SetParent(reactionGo.transform, false);
+            var dImg = respBtnGo.GetComponent<Image>();
+            if (btnSpr != null) { dImg.sprite = btnSpr; dImg.type = Image.Type.Sliced; }
+            var dRt = respBtnGo.GetComponent<RectTransform>();
+            SetRect(dRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(260f, 42f), new Vector2(-100f, 0));
+
+            string actionLabel = needSlash ? "⚔️ ĐÁNH [TRẢM] ĐỂ NÉ" : "🛡️ ĐÁNH [ĐỠ] ĐỂ NÉ";
+            var dTxt = AddText(respBtnGo.transform, "Txt", actionLabel, 13, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+            Fill(dTxt.rectTransform);
+
+            var dBtn = respBtnGo.GetComponent<Button>();
+            dBtn.interactable = false;
+            dImg.color = new Color(0.5f, 0.5f, 0.5f, 0.8f);
+
+            var noDodgeBtnGo = new GameObject("Btn_NoCard", typeof(RectTransform), typeof(Image), typeof(Button));
+            noDodgeBtnGo.transform.SetParent(reactionGo.transform, false);
+            var ndImg = noDodgeBtnGo.GetComponent<Image>();
+            if (btnSpr != null) { ndImg.sprite = btnSpr; ndImg.type = Image.Type.Sliced; }
+            ndImg.color = new Color(0.85f, 0.25f, 0.2f, 1f);
+            var ndRt = noDodgeBtnGo.GetComponent<RectTransform>();
+            SetRect(ndRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(210f, 42f), new Vector2(170f, 0));
+
+            var ndTxt = AddText(noDodgeBtnGo.transform, "Txt", "❌ KHÔNG RA BÀI (MẤT 1 MÁU)", 11, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+            Fill(ndTxt.rectTransform);
+
+            CardUI chosenCardUI = null;
+
+            Action<CardUI> onCardSelectedReaction = (cardUI) =>
+            {
+                bool match = (cardUI != null && cardUI.Data != null && (needSlash ? IsSlashCard(cardUI.Data) : cardUI.Data.subType == CardSubType.Dodge));
+                if (match)
+                {
+                    chosenCardUI = cardUI;
+                    dBtn.interactable = true;
+                    dImg.color = new Color(0.2f, 0.75f, 0.3f, 1f);
+                    SetLog($"🛡️ Đã chọn [{cardUI.Data.cardName}]. Nhấn nút [{actionLabel}]!");
+                }
+                else
+                {
+                    chosenCardUI = null;
+                    dBtn.interactable = false;
+                    dImg.color = new Color(0.5f, 0.5f, 0.5f, 0.8f);
+                }
+            };
+
+            playerHandUI.HighlightOnlyMatching(c => c != null && (needSlash ? IsSlashCard(c) : c.subType == CardSubType.Dodge));
+            playerHandUI.OnCardSelected += onCardSelectedReaction;
+
+            dBtn.onClick.AddListener(() =>
+            {
+                if (chosenCardUI != null)
+                {
+                    var cardData = chosenCardUI.Data;
+                    playerHandCards.Remove(cardData);
+                    playerHandUI.RemoveCard(chosenCardUI);
+                    deckManager.DiscardCard(cardData);
+                    UpdateHandCountsVisual();
+
+                    ShowCardAtCenter(cardData, playerCard, null, "Hóa giải diện rộng");
+                    AudioManager.Instance.PlayParry();
+                    SetLog($"🛡️ Bạn đã đánh ra [{cardData.cardName}] để hóa giải [{aoeName}]!");
+
+                    satisfied = true;
+                    decided = true;
+                }
+            });
+
+            noDodgeBtnGo.GetComponent<Button>().onClick.AddListener(() =>
+            {
+                satisfied = false;
+                decided = true;
+            });
+
+            while (!decided && !battleFinished)
+            {
+                yield return null;
+            }
+
+            playerHandUI.OnCardSelected -= onCardSelectedReaction;
+            playerHandUI.ClearHighlights();
+            if (reactionGo != null) Destroy(reactionGo);
+        }
+        else
+        {
+            // AI Xử lý lần lượt
+            yield return new WaitForSeconds(1.2f);
+            var hand = GetHandOfGeneral(victim);
+            var matched = hand.Find(c => needSlash ? IsSlashCard(c) : c.subType == CardSubType.Dodge);
+            if (matched != null)
+            {
+                hand.Remove(matched);
+                deckManager.DiscardCard(matched);
+                UpdateHandCountsVisual();
+                satisfied = true;
+                ShowCardAtCenter(matched, victim, null, "Hóa giải diện rộng");
+                AudioManager.Instance.PlayParry();
+                SetLog($"🛡️ <b>{victim.GeneralName}</b> đánh ra [{matched.cardName}] để hóa giải [{aoeName}]!");
+            }
+        }
+
+        if (!satisfied)
+        {
+            int aoeDamage = ApplyDamageMitigation(victim, 1, aoeName);
+            if (aoeDamage > 0)
+            {
+                victim.TakeDamage(aoeDamage);
+                AudioManager.Instance.PlayDamage();
+                StartCoroutine(ShakeCard(victim));
+                SetLog($"💥 <b>{victim.GeneralName}</b> không ra [{reqName}], bị mất {aoeDamage} đóa sen máu!");
+                yield return CheckNearDeath(victim, null);
+            }
+        }
+
+        victim.SetAwaitingReaction(false); // Dừng nhấp nháy khi đã xử lý xong
+        yield return new WaitForSeconds(0.6f);
+    }
+
+    /// <summary>
+    /// Thách Đấu: Người chơi tự tay chọn lá Trảm để đáp trả hoặc chấp nhận thua mất 1 máu.
+    /// </summary>
+    private IEnumerator ResolveDuel(GeneralCardUI caster, GeneralCardUI target)
+    {
+        ShowCardAtCenter(CardDatabase.CreateDeck(52).Find(c => c.subType == CardSubType.Duel), caster, target, "Đấu kiếm đối kháng");
+        SetLog($"⚔️ <b>THÁCH ĐẤU PHÁT ĐỘNG!</b> {caster.GeneralName} ⚔️ {target.GeneralName}");
+        yield return new WaitForSeconds(1.0f);
+
+        GeneralCardUI currentDuelist = target;
+        GeneralCardUI nextDuelist = caster;
+        bool duelEnded = false;
+
+        while (!duelEnded && !battleFinished)
+        {
+            bool playedSlash = false;
+            currentDuelist.SetAwaitingReaction(true); // Nhấp nháy avatar tướng đang đến lượt đáp trả trong Thách Đấu
+
+            if (currentDuelist == playerCard)
+            {
+                // Người chơi tự tay chọn Trảm
+                bool playerDecided = false;
+                SetLog("⚔️ <color=#FF5555><b>ĐẾN LƯỢT BẠN ĐÁP TRẢ TRẢM TRONG THÁCH ĐẤU!</b></color>");
+
+                var panelGo = new GameObject("DuelReactionPanel", typeof(RectTransform));
+                panelGo.transform.SetParent(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, false);
+                var rRt = panelGo.GetComponent<RectTransform>();
+                SetRect(rRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(680f, 48f), new Vector2(-70f, 238f));
+
+                var btnSpr = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
+
+                var slashBtnGo = new GameObject("Btn_Slash", typeof(RectTransform), typeof(Image), typeof(Button));
+                slashBtnGo.transform.SetParent(panelGo.transform, false);
+                var sImg = slashBtnGo.GetComponent<Image>();
+                if (btnSpr != null) { sImg.sprite = btnSpr; sImg.type = Image.Type.Sliced; }
+                var sRt = slashBtnGo.GetComponent<RectTransform>();
+                SetRect(sRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(260f, 42f), new Vector2(-100f, 0));
+
+                var sTxt = AddText(slashBtnGo.transform, "Txt", "⚔️ ĐÁP TRẢ BẰNG [TRẢM]", 13, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+                Fill(sTxt.rectTransform);
+
+                var sBtn = slashBtnGo.GetComponent<Button>();
+                sBtn.interactable = false;
+                sImg.color = new Color(0.5f, 0.5f, 0.5f, 0.8f);
+
+                var giveUpBtnGo = new GameObject("Btn_GiveUp", typeof(RectTransform), typeof(Image), typeof(Button));
+                giveUpBtnGo.transform.SetParent(panelGo.transform, false);
+                var gImg = giveUpBtnGo.GetComponent<Image>();
+                if (btnSpr != null) { gImg.sprite = btnSpr; gImg.type = Image.Type.Sliced; }
+                gImg.color = new Color(0.85f, 0.25f, 0.2f, 1f);
+                var gRt = giveUpBtnGo.GetComponent<RectTransform>();
+                SetRect(gRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(210f, 42f), new Vector2(170f, 0));
+
+                var gTxt = AddText(giveUpBtnGo.transform, "Txt", "❌ NHẬN THUA (MẤT 1 MÁU)", 13, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+                Fill(gTxt.rectTransform);
+
+                CardUI chosenSlashUI = null;
+
+                Action<CardUI> onDuelCardSelected = (cardUI) =>
+                {
+                    if (cardUI != null && cardUI.Data != null && IsSlashCard(cardUI.Data))
+                    {
+                        chosenSlashUI = cardUI;
+                        sBtn.interactable = true;
+                        sImg.color = new Color(0.2f, 0.75f, 0.3f, 1f);
+                        SetLog($"⚔️ Đã chọn [{cardUI.Data.cardName}]. Bấm nút [ĐÁP TRẢ BẰNG TRẢM]!");
+                    }
+                    else
+                    {
+                        chosenSlashUI = null;
+                        sBtn.interactable = false;
+                        sImg.color = new Color(0.5f, 0.5f, 0.5f, 0.8f);
+                    }
+                };
+
+                playerHandUI.HighlightOnlyMatching(IsSlashCard);
+                playerHandUI.OnCardSelected += onDuelCardSelected;
+
+                sBtn.onClick.AddListener(() =>
+                {
+                    if (chosenSlashUI != null)
+                    {
+                        var sData = chosenSlashUI.Data;
+                        playerHandCards.Remove(sData);
+                        playerHandUI.RemoveCard(chosenSlashUI);
+                        deckManager.DiscardCard(sData);
+                        UpdateHandCountsVisual();
+
+                        ShowCardAtCenter(sData, playerCard, null, "Đáp trả Thách Đấu");
+                        AudioManager.Instance.PlaySlash();
+                        SetLog($"⚔️ Bạn đáp trả 1 lá [{sData.cardName}]!");
+
+                        playedSlash = true;
+                        playerDecided = true;
+                    }
+                });
+
+                giveUpBtnGo.GetComponent<Button>().onClick.AddListener(() =>
+                {
+                    playedSlash = false;
+                    playerDecided = true;
+                });
+
+                while (!playerDecided && !battleFinished)
+                {
+                    yield return null;
+                }
+
+                playerHandUI.OnCardSelected -= onDuelCardSelected;
+                playerHandUI.ClearHighlights();
+                if (panelGo != null) Destroy(panelGo);
+            }
+            else
+            {
+                // AI đáp trả
+                yield return new WaitForSeconds(1.0f);
+                var hand = GetHandOfGeneral(currentDuelist);
+                var s = hand.Find(c => IsSlashCard(c));
+                if (s != null)
+                {
+                    hand.Remove(s);
+                    deckManager.DiscardCard(s);
+                    UpdateHandCountsVisual();
+                    playedSlash = true;
+                    ShowCardAtCenter(s, currentDuelist, null, "Đáp trả Thách Đấu");
+                    AudioManager.Instance.PlaySlash();
+                    SetLog($"⚔️ <b>{currentDuelist.GeneralName}</b> đáp trả 1 lá [Trảm]!");
+                }
+            }
+
+            yield return new WaitForSeconds(0.8f);
+
+            if (playedSlash)
+            {
+                var temp = currentDuelist;
+                currentDuelist = nextDuelist;
+                nextDuelist = temp;
+            }
+            else
+            {
+                duelEnded = true;
+                currentDuelist.TakeDamage(1);
+                AudioManager.Instance.PlayDamage();
+                StartCoroutine(ShakeCard(currentDuelist));
+                SetLog($"💥 <b>{currentDuelist.GeneralName}</b> hết Trảm đáp trả, thất bại trong Thách Đấu và mất 1 Máu!");
+                yield return CheckNearDeath(currentDuelist, nextDuelist);
+            }
+        }
+    }
+
+    private IEnumerator ResolveDelayedScrollPlacement(CardModel card, GeneralCardUI caster, GeneralCardUI target)
+    {
+        GeneralCardUI placeTarget = (card.subType == CardSubType.Lightning) ? caster : target;
+        if (placeTarget != null)
+        {
+            if (placeTarget.AddDelayedScroll(card))
+            {
+                ShowCardAtCenter(card, caster, placeTarget, "Gài vào vùng Phán Xét");
+                AudioManager.Instance.PlaySkill();
+                SetLog($"⏳ Đã gài [{card.cardName}] vào vùng Phán Xét của <b>{placeTarget.GeneralName}</b>!");
+            }
+        }
+        yield break;
+    }
+    #endregion
+
+    #region 9. MODAL CHỌN BÀI CƯỚP HOẶC PHÁ HỦY (HỖ TRỢ 100% TRANG BỊ & PHÁN XÉT)
+    private bool ShowCardStealOrDestroyModal(GeneralCardUI target, bool isSteal, string actionTitle, Action<CardModel> onCardSelected)
+    {
+        if (target == null) return false;
+
+        bool allowDelayed = isSteal;
+        var options = BuildTargetCardOptions(target, allowDelayed);
+        if (options.Count == 0)
+        {
+            SetLog($"ℹ️ {target.GeneralName} không có lá bài hợp lệ trong tay hoặc vùng trang bị.");
+            return false;
+        }
+
+        var modalGo = new GameObject("CardPickModal", typeof(RectTransform), typeof(CanvasGroup), typeof(Image));
+        modalGo.transform.SetParent(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, false);
+        modalGo.transform.SetAsLastSibling();
+        activeCardPickModal = modalGo;
+
+        var mImg = modalGo.GetComponent<Image>();
+        mImg.color = new Color(0.02f, 0.03f, 0.07f, 0.88f);
+        Fill(modalGo.GetComponent<RectTransform>());
+
+        var panelGo = new GameObject("Panel", typeof(RectTransform), typeof(Image));
+        panelGo.transform.SetParent(modalGo.transform, false);
+        var panelRt = panelGo.GetComponent<RectTransform>();
+        panelRt.anchorMin = panelRt.anchorMax = panelRt.pivot = new Vector2(0.5f, 0.5f);
+        panelRt.sizeDelta = new Vector2(760f, 450f);
+        panelRt.anchoredPosition = Vector2.zero;
+
+        var pImg = panelGo.GetComponent<Image>();
+        var slotSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
+        if (slotSpr != null) { pImg.sprite = slotSpr; pImg.type = Image.Type.Sliced; }
+        pImg.color = new Color(0.08f, 0.11f, 0.20f, 0.98f);
+
+        var headerGo = new GameObject("HeaderBanner", typeof(RectTransform), typeof(Image));
+        headerGo.transform.SetParent(panelGo.transform, false);
+        var hImg = headerGo.GetComponent<Image>();
+        var badgeSpr = LotusHealthUI.LoadSpriteFromResources("UI/badge_faction");
+        if (badgeSpr != null) { hImg.sprite = badgeSpr; hImg.type = Image.Type.Sliced; }
+        hImg.color = isSteal ? new Color(0.12f, 0.45f, 0.85f, 0.98f) : new Color(0.85f, 0.25f, 0.15f, 0.98f);
+        var hRt = headerGo.GetComponent<RectTransform>();
+        SetRect(hRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(700f, 48f), new Vector2(0, -12f));
+
+        var titleTxt = AddText(headerGo.transform, "Title", actionTitle, 16, new Color(1f, 0.94f, 0.55f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        Fill(titleTxt.rectTransform);
+
+        var subTxt = AddText(panelGo.transform, "SubTitle", $"💡 Chạm chọn 1 lá bài của tướng [{target.GeneralName}] ({options.Count} lựa chọn):", 12, new Color(0.9f, 0.93f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
+        SetRect(subTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(700f, 24f), new Vector2(0, -66f));
+
+        var viewportGo = new GameObject("CardsViewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D), typeof(ScrollRect));
+        viewportGo.transform.SetParent(panelGo.transform, false);
+        var viewportRt = viewportGo.GetComponent<RectTransform>();
+        SetRect(viewportRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(710f, 250f), new Vector2(0f, -42f));
+        var viewportImg = viewportGo.GetComponent<Image>();
+        viewportImg.color = new Color(0.02f, 0.04f, 0.09f, 0.35f);
+
+        var cardsContainerGo = new GameObject("CardsContainer", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        cardsContainerGo.transform.SetParent(viewportGo.transform, false);
+        var contentRt = cardsContainerGo.GetComponent<RectTransform>();
+        contentRt.anchorMin = new Vector2(0f, 0.5f);
+        contentRt.anchorMax = new Vector2(0f, 0.5f);
+        contentRt.pivot = new Vector2(0f, 0.5f);
+        contentRt.sizeDelta = new Vector2(Mathf.Max(710f, options.Count * 132f), 190f);
+        contentRt.anchoredPosition = new Vector2(10f, 0f);
+
+        var hlg = cardsContainerGo.GetComponent<HorizontalLayoutGroup>();
+        hlg.spacing = 14f;
+        hlg.padding = new RectOffset(4, 4, 12, 12);
+        hlg.childAlignment = TextAnchor.MiddleLeft;
+        hlg.childControlWidth = hlg.childControlHeight = false;
+
+        var scroll = viewportGo.GetComponent<ScrollRect>();
+        scroll.viewport = viewportRt;
+        scroll.content = contentRt;
+        scroll.horizontal = true;
+        scroll.vertical = false;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
+
+        int handIndex = 1;
+        foreach (var option in options)
+        {
+            if (option == null || option.Card == null) continue;
+            var selectedOption = option;
+            GameObject cardItemGo;
+
+            void HandleOptionClick()
+            {
+                if (!TryRemoveTargetCardOption(target, selectedOption))
+                {
+                    SetLog("⚠️ Lá bài này không còn ở vùng mục tiêu. Hãy chọn lá khác.");
+                    return;
+                }
+
+                AudioManager.Instance.PlayCardSelect();
+                if (activeCardPickModal == modalGo) activeCardPickModal = null;
+                Destroy(modalGo);
+                onCardSelected?.Invoke(selectedOption.Card);
+            }
+
+            if (selectedOption.Zone == TargetCardZone.Hand)
+            {
+                cardItemGo = CreateFaceDownCardItem(cardsContainerGo.transform, new Vector2(118f, 162f), $"LÁ BÀI #{handIndex}", font);
+                handIndex++;
+                var btn = cardItemGo.GetComponent<Button>();
+                if (btn != null) btn.onClick.AddListener(HandleOptionClick);
+            }
+            else
+            {
+                var cardUI = CardUI.Create(cardsContainerGo.transform, selectedOption.Card, new Vector2(118f, 162f));
+                cardItemGo = cardUI.gameObject;
+                cardUI.OnCardClicked += (c) => HandleOptionClick();
+
+                var overlayBtn = new GameObject("OverlayBtn", typeof(RectTransform), typeof(Image), typeof(Button));
+                overlayBtn.transform.SetParent(cardItemGo.transform, false);
+                overlayBtn.transform.SetAsLastSibling();
+                var oImg = overlayBtn.GetComponent<Image>();
+                oImg.color = new Color(1f, 1f, 1f, 0.001f);
+                Fill(overlayBtn.GetComponent<RectTransform>());
+                overlayBtn.GetComponent<Button>().onClick.AddListener(HandleOptionClick);
+            }
+
+            AddTargetZoneLabel(cardItemGo.transform, selectedOption.Label, font);
+        }
+
+        return true;
+    }
+
+    private GameObject CreateFaceDownCardItem(Transform parent, Vector2 size, string label, Font font)
+    {
+        var go = new GameObject("FaceDownCardItem", typeof(RectTransform), typeof(Image), typeof(Button));
+        go.transform.SetParent(parent, false);
+        var rt = go.GetComponent<RectTransform>();
+        rt.sizeDelta = size;
+
+        var img = go.GetComponent<Image>();
+        var backSprite = LotusHealthUI.LoadSpriteFromResources("UI/card_back");
+        if (backSprite != null) { img.sprite = backSprite; img.type = Image.Type.Sliced; }
+        else img.color = new Color(0.14f, 0.18f, 0.28f, 0.98f);
+
+        var borderGo = new GameObject("Frame", typeof(RectTransform), typeof(Image));
+        borderGo.transform.SetParent(go.transform, false);
+        var bImg = borderGo.GetComponent<Image>();
+        var frameSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+        if (frameSpr != null) { bImg.sprite = frameSpr; bImg.type = Image.Type.Sliced; }
+        bImg.color = new Color(0.95f, 0.8f, 0.3f, 0.9f);
+        bImg.raycastTarget = false;
+        Fill(borderGo.GetComponent<RectTransform>());
+
+        var txt = AddText(go.transform, "CenterText", $"🎴\n<size=12><color=#FFD700>{label}</color></size>", 15, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        txt.lineSpacing = 1.3f;
+        Fill(txt.rectTransform, new Vector2(6, 6), new Vector2(-6, -6));
+
+        return go;
+    }
+
+    private void AddTargetZoneLabel(Transform parent, string zoneLabel, Font font)
+    {
+        var labelGo = new GameObject("ZoneBadge", typeof(RectTransform), typeof(Image));
+        labelGo.transform.SetParent(parent, false);
+        labelGo.transform.SetAsLastSibling();
+        var img = labelGo.GetComponent<Image>();
+        var slotSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
+        if (slotSpr != null) { img.sprite = slotSpr; img.type = Image.Type.Sliced; }
+        img.color = new Color(0.04f, 0.07f, 0.14f, 0.95f);
+
+        var label = AddText(labelGo.transform, "Txt", zoneLabel, 9, new Color(1f, 0.85f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        var rt = labelGo.GetComponent<RectTransform>();
+        SetRect(rt, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 18f), new Vector2(0f, 2f));
+        Fill(label.rectTransform);
+    }
+
+    private List<TargetCardOption> BuildTargetCardOptions(GeneralCardUI target, bool allowDelayed)
+    {
+        var options = new List<TargetCardOption>();
+        var hand = GetHandOfGeneral(target);
+
+        foreach (var c in hand)
+        {
+            if (c == null) continue;
+            options.Add(new TargetCardOption
+            {
+                Card = c,
+                Zone = TargetCardZone.Hand,
+                Label = "TRÊN TAY"
+            });
+        }
+
+        foreach (EquipmentType eqType in Enum.GetValues(typeof(EquipmentType)))
+        {
+            var eq = target.GetEquippedCard(eqType);
+            if (eq != null)
+            {
+                string eqName = eqType switch
+                {
+                    EquipmentType.Weapon => "Vũ Khí",
+                    EquipmentType.Armor => "Áo Giáp",
+                    EquipmentType.OffensiveMount => "Ngựa Công",
+                    EquipmentType.DefensiveMount => "Ngựa Thủ",
+                    _ => "Trang Bị"
+                };
+
+                options.Add(new TargetCardOption
+                {
+                    Card = eq,
+                    Zone = TargetCardZone.Equipment,
+                    EquipmentType = eqType,
+                    Label = $"TRANG BỊ ({eqName})"
+                });
+            }
+        }
+
+        var delayTypes = new[] { CardSubType.SupplyShortage, CardSubType.Acedia, CardSubType.Lightning };
+        foreach (var dt in delayTypes)
+        {
+            var del = target.GetDelayedScroll(dt);
+            if (del != null)
+            {
+                options.Add(new TargetCardOption
+                {
+                    Card = del,
+                    Zone = TargetCardZone.Delayed,
+                    DelayedType = dt,
+                    Label = "PHÁN XÉT"
+                });
+            }
+        }
+
+        return options;
+    }
+
+    private bool TryRemoveTargetCardOption(GeneralCardUI target, TargetCardOption option)
+    {
+        if (target == null || option == null || option.Card == null) return false;
+
+        switch (option.Zone)
+        {
+            case TargetCardZone.Hand:
+                var hand = GetHandOfGeneral(target);
+                if (hand.Contains(option.Card))
+                {
+                    hand.Remove(option.Card);
+                    if (target == playerCard) { playerHandUI.ClearHand(); playerHandUI.AddCards(playerHandCards); }
+                    UpdateHandCountsVisual();
+                    return true;
+                }
+                return false;
+
+            case TargetCardZone.Equipment:
+                if (target.TryUnequip(option.EquipmentType, out _))
+                {
+                    return true;
+                }
+                return false;
+
+            case TargetCardZone.Delayed:
+                return target.RemoveDelayedScroll(option.DelayedType);
+
+            default:
+                return false;
+        }
+    }
+    #endregion
+
+    #region 10. GIAI ĐOẠN BỎ BÀI 40S
+    private IEnumerator StartDiscardPhase(GeneralCardUI g)
+    {
+        int handCount = GetHandCountOf(g);
+        int hp = g.CurrentHp;
+        int excess = handCount - hp;
+
+        if (excess <= 0 || hp <= 0 || battleFinished) yield break;
+
+        if (g == playerCard)
+        {
+            isDiscardPhaseActive = true;
+            discardExcessRequired = excess;
+            selectedDiscardCards.Clear();
+            turnTimer = 40.0f;
+            isTimerRunning = true;
+
+            discardConfirmBtn.gameObject.SetActive(true);
+            discardConfirmBtn.interactable = false;
+            discardConfirmBtnText.text = $"BỎ BÀI (0/{discardExcessRequired})";
+
+            SetLog($"⚠️ <b>Giai đoạn Bỏ Bài:</b> Bạn có {handCount} lá trên tay nhưng chỉ còn {hp} máu. Hãy chọn bỏ {excess} lá thừa (Thời gian: 40s)!");
+
+            while (isDiscardPhaseActive && !battleFinished)
+            {
+                yield return null;
+            }
+
+            isTimerRunning = false;
+            discardConfirmBtn.gameObject.SetActive(false);
+        }
+        else
+        {
+            turnTimer = 40.0f;
+            isTimerRunning = true;
+            SetLog($"📦 <b>{g.GeneralName}</b> đang bỏ {excess} lá bài thừa...");
+            yield return new WaitForSeconds(1.5f);
+            var hand = GetHandOfGeneral(g);
+            for (int i = 0; i < excess && hand.Count > 0; i++)
+            {
+                var discarded = hand[0];
+                hand.RemoveAt(0);
+                deckManager.DiscardCard(discarded);
+            }
+            UpdateHandCountsVisual();
+            isTimerRunning = false;
+        }
+    }
+
+    private void OnPlayerConfirmDiscardClicked()
+    {
+        if (!isDiscardPhaseActive || selectedDiscardCards.Count < discardExcessRequired) return;
+
+        foreach (var cardUI in selectedDiscardCards)
+        {
+            if (cardUI != null && cardUI.Data != null)
+            {
+                playerHandCards.Remove(cardUI.Data);
+                deckManager.DiscardCard(cardUI.Data);
+                playerHandUI.RemoveCard(cardUI);
+            }
+        }
+
+        selectedDiscardCards.Clear();
+        AudioManager.Instance.PlayCardDiscard();
+        UpdateHandCountsVisual();
+        isDiscardPhaseActive = false;
+    }
+
+    private void OnTimerExpired()
+    {
+        if (isDiscardPhaseActive)
+        {
+            SetLog("⏰ Hết 40s! Hệ thống tự động bỏ các lá bài thừa về đúng số máu.");
+            while (playerHandCards.Count > playerCard.CurrentHp)
+            {
+                var card = playerHandCards[playerHandCards.Count - 1];
+                playerHandCards.RemoveAt(playerHandCards.Count - 1);
+                deckManager.DiscardCard(card);
+            }
+            playerHandUI.ClearHand();
+            playerHandUI.AddCards(playerHandCards);
+            selectedDiscardCards.Clear();
+            AudioManager.Instance.PlayCardDiscard();
+            UpdateHandCountsVisual();
+            isDiscardPhaseActive = false;
+        }
+        else if (isPlayerTurnActive)
+        {
+            SetLog("⏰ Hết 40s suy nghĩ! Tự động kết thúc lượt ra bài.");
+            isPlayerTurnActive = false;
+        }
+    }
+    #endregion
+
+    #region 11. CỨU VIỆN CẬN TỬ & KẾT THÚC TRẬN ĐẤU (HỎI LẦN LƯỢT TỪNG NGƯỜI)
+    private IEnumerator CheckNearDeath(GeneralCardUI victim, GeneralCardUI killer)
+    {
+        if (victim.CurrentHp > 0) yield break;
+
+        SetLog($"💔 <color=#FF5555><b>{victim.GeneralName} ĐANG TRONG TRẠNG THÁI CẬN TỬ (0 MÁU)!</b></color>");
+
+        bool saved = false;
+
+        var askOrder = new List<GeneralCardUI>();
+        int startIdx = (killer != null) ? turnOrderGenerals.IndexOf(killer) : turnOrderGenerals.IndexOf(victim);
+        if (startIdx < 0) startIdx = 0;
+
+        for (int i = 0; i < turnOrderGenerals.Count; i++)
+        {
+            int idx = (startIdx + i) % turnOrderGenerals.Count;
+            var g = turnOrderGenerals[idx];
+            if (g.CurrentHp > 0 || g == victim)
+            {
+                askOrder.Add(g);
+            }
+        }
+
+        foreach (var asker in askOrder)
+        {
+            if (victim.CurrentHp > 0)
+            {
+                saved = true;
+                break;
+            }
+
+            if (asker == playerCard)
+            {
+                // Ưu tiên dùng Hủ Rượu nếu là tự cứu bản thân, hoặc Bánh Chưng
+                var rescueCard = playerHandCards.Find(c => (asker == victim && c.subType == CardSubType.Wine) || c.subType == CardSubType.Peach);
+                if (rescueCard != null)
+                {
+                    bool isSelfRescue = (victim == playerCard);
+                    bool isWine = (rescueCard.subType == CardSubType.Wine);
+
+                    bool decided = false;
+                    bool usedRescue = false;
+                    float timer = 40.0f;
+
+                    var rescueModalGo = new GameObject("RescuePromptModal", typeof(RectTransform), typeof(Image));
+                    rescueModalGo.transform.SetParent(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, false);
+                    rescueModalGo.transform.SetAsLastSibling();
+
+                    var pImg = rescueModalGo.GetComponent<Image>();
+                    var bgSpr = LotusHealthUI.LoadSpriteFromResources("UI/auth_card_bg");
+                    if (bgSpr != null) { pImg.sprite = bgSpr; pImg.type = Image.Type.Sliced; }
+                    pImg.color = new Color(0.08f, 0.04f, 0.06f, 0.98f);
+
+                    var pRt = rescueModalGo.GetComponent<RectTransform>();
+                    pRt.anchorMin = pRt.anchorMax = pRt.pivot = new Vector2(0.5f, 0.5f);
+                    pRt.sizeDelta = new Vector2(620f, 155f);
+                    pRt.anchoredPosition = new Vector2(-80f, 120f);
+
+                    var fGo = new GameObject("Frame", typeof(RectTransform), typeof(Image));
+                    fGo.transform.SetParent(rescueModalGo.transform, false);
+                    var fImg = fGo.GetComponent<Image>();
+                    var fSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+                    if (fSpr != null) { fImg.sprite = fSpr; fImg.type = Image.Type.Sliced; }
+                    fImg.color = isWine ? new Color(1f, 0.75f, 0.2f, 1f) : new Color(1f, 0.4f, 0.4f, 1f);
+                    Fill(fGo.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
+
+                    string titleStr = isWine
+                        ? "🍶 TỰ CỨU CẬN TỬ: Uống [Hủ Rượu] tự cứu bản thân?"
+                        : (isSelfRescue
+                            ? "💮 CỨU CẬN TỬ: Dùng [Bánh Chưng] tự cứu bản thân?"
+                            : $"💮 CỨU CẬN TỬ: Dùng [Bánh Chưng] cứu [{victim.GeneralName}]?");
+
+                    var titleTxt = AddText(rescueModalGo.transform, "Title", titleStr, 13, new Color(1f, 0.9f, 0.4f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+                    SetRect(titleTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(580f, 40f), new Vector2(0, -10f));
+
+                    var timerTxt = AddText(rescueModalGo.transform, "Timer", "⏳ 40s", 12, new Color(1f, 0.7f, 0.7f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+                    SetRect(timerTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(250f, 22f), new Vector2(0, -46f));
+
+                    var btnSpr = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
+
+                    var useBtnGo = new GameObject("Btn_Use", typeof(RectTransform), typeof(Image), typeof(Button));
+                    useBtnGo.transform.SetParent(rescueModalGo.transform, false);
+                    var uImg = useBtnGo.GetComponent<Image>();
+                    if (btnSpr != null) { uImg.sprite = btnSpr; uImg.type = Image.Type.Sliced; }
+                    uImg.color = isWine ? new Color(0.95f, 0.65f, 0.15f, 1f) : new Color(0.2f, 0.75f, 0.35f, 1f);
+                    var uRt = useBtnGo.GetComponent<RectTransform>();
+                    SetRect(uRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(260f, 38f), new Vector2(-135f, 16f));
+
+                    string btnLabel = isWine
+                        ? "🍶 UỐNG HỦ RƯỢU TỰ CỨU"
+                        : (isSelfRescue ? "💮 DÙNG BÁNH CHƯNG TỰ CỨU" : $"💮 DÙNG BÁNH CHƯNG CỨU");
+
+                    var uTxt = AddText(useBtnGo.transform, "Txt", btnLabel, 11, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+                    Fill(uTxt.rectTransform);
+
+                    var passBtnGo = new GameObject("Btn_Pass", typeof(RectTransform), typeof(Image), typeof(Button));
+                    passBtnGo.transform.SetParent(rescueModalGo.transform, false);
+                    var paImg = passBtnGo.GetComponent<Image>();
+                    if (btnSpr != null) { paImg.sprite = btnSpr; paImg.type = Image.Type.Sliced; }
+                    paImg.color = new Color(0.5f, 0.55f, 0.65f, 1f);
+                    var paRt = passBtnGo.GetComponent<RectTransform>();
+                    SetRect(paRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(200f, 38f), new Vector2(145f, 16f));
+
+                    string passLabel = isSelfRescue ? "❌ KHÔNG TỰ CỨU" : "❌ KHÔNG CỨU";
+                    var paTxt = AddText(passBtnGo.transform, "Txt", passLabel, 11, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+                    Fill(paTxt.rectTransform);
+
+                    useBtnGo.GetComponent<Button>().onClick.AddListener(() =>
+                    {
+                        usedRescue = true;
+                        decided = true;
+                    });
+
+                    passBtnGo.GetComponent<Button>().onClick.AddListener(() =>
+                    {
+                        usedRescue = false;
+                        decided = true;
+                    });
+
+                    while (!decided && timer > 0f && !battleFinished)
+                    {
+                        timer -= Time.deltaTime;
+                        string waitingLabel = isWine ? $"⏳ Còn {timer:0.0}s để uống Hủ Rượu tự cứu..." : $"⏳ Còn {timer:0.0}s để cứu...";
+                        if (timerTxt != null) timerTxt.text = waitingLabel;
+                        yield return null;
+                    }
+
+                    if (rescueModalGo != null) Destroy(rescueModalGo);
+
+                    if (usedRescue)
+                    {
+                        playerHandCards.Remove(rescueCard);
+                        playerHandUI.ClearHand();
+                        playerHandUI.AddCards(playerHandCards);
+                        deckManager.DiscardCard(rescueCard);
+                        UpdateHandCountsVisual();
+
+                        victim.Heal(1);
+                        saved = true;
+
+                        if (isWine)
+                        {
+                            ShowCardAtCenter(rescueCard, playerCard, victim, $"Bạn uống [{rescueCard.cardName}] tự cứu sống");
+                            AudioManager.Instance.PlayHeal();
+                            SetLog($"🍶 <b>Bạn</b> đã kịp thời uống [{rescueCard.cardName}] tự cứu sống bản thân!");
+                        }
+                        else
+                        {
+                            string centerTag = isSelfRescue ? $"Bạn dùng [{rescueCard.cardName}] tự cứu sống" : $"Bạn dùng [{rescueCard.cardName}] cứu sống";
+                            ShowCardAtCenter(rescueCard, playerCard, victim, centerTag);
+                            AudioManager.Instance.PlayHeal();
+                            string logMsg = isSelfRescue
+                                ? $"💮 <b>Bạn</b> đã kịp thời dùng [{rescueCard.cardName}] tự cứu sống bản thân!"
+                                : $"💮 <b>Bạn</b> đã kịp thời dùng [{rescueCard.cardName}] cứu sống {victim.GeneralName}!";
+                            SetLog(logMsg);
+                        }
+
+                        yield return new WaitForSeconds(1.0f);
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                if (asker.IsAlly == victim.IsAlly && asker.CurrentHp > 0)
+                {
+                    var hand = GetHandOfGeneral(asker);
+                    var rescueCard = hand.Find(c => (asker == victim && c.subType == CardSubType.Wine) || c.subType == CardSubType.Peach);
+                    if (rescueCard != null)
+                    {
+                        hand.Remove(rescueCard);
+                        deckManager.DiscardCard(rescueCard);
+                        UpdateHandCountsVisual();
+
+                        victim.Heal(1);
+                        saved = true;
+
+                        if (rescueCard.subType == CardSubType.Wine)
+                        {
+                            ShowCardAtCenter(rescueCard, asker, victim, $"{asker.GeneralName} uống [Hủ Rượu] tự cứu sống");
+                            AudioManager.Instance.PlayHeal();
+                            SetLog($"🍶 <b>{asker.GeneralName}</b> kịp thời uống [Hủ Rượu] tự cứu sống bản thân!");
+                        }
+                        else
+                        {
+                            string rescueDesc = (asker == victim)
+                                ? $"{asker.GeneralName} dùng [Bánh Chưng] tự cứu sống"
+                                : $"{asker.GeneralName} dùng [Bánh Chưng] cứu sống";
+                            ShowCardAtCenter(rescueCard, asker, victim, rescueDesc);
+                            AudioManager.Instance.PlayHeal();
+                            SetLog($"💮 <b>{asker.GeneralName}</b> kịp thời dùng [Bánh Chưng] cứu sống {victim.GeneralName}!");
+                        }
+
+                        yield return new WaitForSeconds(1.0f);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!saved && victim.CurrentHp <= 0)
+        {
+            SetLog($"☠️ <color=#FF3333><b>{victim.GeneralName} ĐÃ TỬ TRẬN!</b></color>");
+            victim.SetDeadVisual(true);
+
+            // Bỏ toàn bộ bài trên tay của nạn nhân
+            var vHand = GetHandOfGeneral(victim);
+            while (vHand.Count > 0)
+            {
+                var c = vHand[0];
+                vHand.RemoveAt(0);
+                deckManager.DiscardCard(c);
+            }
+            if (victim == playerCard) playerHandUI.ClearHand();
+            UpdateHandCountsVisual();
+
+            // YÊU CẦU 2: Khi đồng minh tử trận được bốc 1 lá
+            GeneralCardUI survivingAlly = null;
+            if (victim.IsAlly)
+            {
+                survivingAlly = (victim == playerCard) ? allyCard : playerCard;
+            }
+            else
+            {
+                survivingAlly = (victim == enemy1Card) ? enemy2Card : enemy1Card;
+            }
+
+            if (survivingAlly != null && survivingAlly.CurrentHp > 0)
+            {
+                var reinforcementCard = deckManager.DrawCard();
+                if (reinforcementCard != null)
+                {
+                    yield return AnimateDealtCard(survivingAlly);
+                    AddCardsToGeneral(survivingAlly, reinforcementCard);
+                    UpdateHandCountsVisual();
+                    SetLog($"💮 <color=#55FF55><b>[TIẾP VIỆN ĐỒNG MINH]</b></color>: Khi đồng minh <b>{victim.GeneralName}</b> tử trận, <b>{survivingAlly.GeneralName}</b> được rút <b>1 lá bài</b> tiếp viện!");
+                }
+            }
+
+            CheckGameOver();
+        }
+    }
+
+    private void CheckGameOver()
+    {
+        bool enemiesDead = enemy1Card.CurrentHp <= 0 && enemy2Card.CurrentHp <= 0;
+        bool alliesDead = playerCard.CurrentHp <= 0 && allyCard.CurrentHp <= 0;
+
+        if (enemiesDead)
+        {
+            battleFinished = true;
+            StartCoroutine(ShowVictoryModal());
+        }
+        else if (alliesDead)
+        {
+            battleFinished = true;
+            StartCoroutine(ShowDefeatModal());
+        }
+    }
+
+    private IEnumerator ShowVictoryModal()
+    {
+        yield return new WaitForSeconds(0.8f);
+        AudioManager.Instance.PlayVictory();
+
+        AuthUI.Current2v2Points += 25;
+        AuthUI.CurrentSilver += 150;
+        PlayerPrefs.SetInt("auth_rank2v2_points", AuthUI.Current2v2Points);
+        PlayerPrefs.SetInt("auth_silver", AuthUI.CurrentSilver);
+        PlayerPrefs.Save();
+        StartCoroutine(AuthUI.SaveUserProfileToAppwrite());
+
+        var tier = Ranked2v2System.GetTier(AuthUI.Current2v2Points);
+
+        var modal = CreateBaseModal("👑 ĐẠI THẮNG ĐẤU TRƯỜNG 2v2", new Vector2(620f, 380f));
+        var txt = AddText(modal.transform, "Content",
+            $"<b>CHÚC MỪNG CHIẾN THẮNG 2v2!</b>\n\n" +
+            $"Bạn và đồng đội đã xuất sắc quét sạch quân địch.\n\n" +
+            $"⭐ <b>Điểm Xếp Hạng 2v2:</b> <color=#55FF55>+25 RP</color> (Tổng: {AuthUI.Current2v2Points} RP)\n" +
+            $"🏆 <b>Bậc Rank 2v2 Hiện Tại:</b> <color={tier.ColorHex}>{tier.badge} {tier.name}</color> ({tier.subtitle})\n" +
+            $"🪙 <b>Chiến Lợi Phẩm:</b> <color=#FFD700>+150 Bạc</color>",
+            13, new Color(0.9f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
+        SetRect(txt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(540f, 180f), new Vector2(0f, 20f));
+
+        var retBtn = CreateButton(modal.transform, "ReturnBtn", "🏠 VỀ TRANG CHỦ", new Vector2(0f, -120f), new Vector2(200f, 40f), () =>
+        {
+            ConfirmExitBattle();
+        });
+    }
+
+    private IEnumerator ShowDefeatModal()
+    {
+        yield return new WaitForSeconds(0.8f);
+
+        AuthUI.Current2v2Points = Mathf.Max(0, AuthUI.Current2v2Points - 15);
+        PlayerPrefs.SetInt("auth_rank2v2_points", AuthUI.Current2v2Points);
+        PlayerPrefs.Save();
+        StartCoroutine(AuthUI.SaveUserProfileToAppwrite());
+
+        var tier = Ranked2v2System.GetTier(AuthUI.Current2v2Points);
+
+        var modal = CreateBaseModal("💔 THẤT BẠI TRẬN CHIẾN", new Vector2(620f, 380f));
+        var txt = AddText(modal.transform, "Content",
+            $"<b>TRẬN CHIẾN KẾT THÚC!</b>\n\n" +
+            $"Cả hai chiến tướng phe ta đã ngã xuống.\n\n" +
+            $"⭐ <b>Điểm Xếp Hạng 2v2:</b> <color=#FF5555>-15 RP</color> (Hiện tại: {AuthUI.Current2v2Points} RP)\n" +
+            $"🏆 <b>Bậc Rank:</b> <color={tier.ColorHex}>{tier.badge} {tier.name}</color>",
+            13, new Color(0.9f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
+        SetRect(txt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(540f, 180f), new Vector2(0f, 20f));
+
+        var retBtn = CreateButton(modal.transform, "ReturnBtn", "🏠 VỀ TRANG CHỦ", new Vector2(0f, -120f), new Vector2(200f, 40f), () =>
+        {
+            ConfirmExitBattle();
+        });
+    }
+
+    private void ConfirmExitBattle()
+    {
+        var callback = onExitCallback;
+        if (Instance == this) Instance = null;
+
+        if (canvasGo != null)
+        {
+            canvasGo.SetActive(false);
+            Destroy(canvasGo);
+        }
+
+        Destroy(gameObject);
+
+        if (callback != null)
+        {
+            callback.Invoke();
+        }
+        else if (HomeUI.Instance != null)
+        {
+            HomeUI.Instance.Show();
+        }
+        else
+        {
+            if (SceneUtility.GetBuildIndexByScenePath("Assets/Scenes/HomeScene.unity") >= 0 || SceneManager.GetSceneByName("HomeScene").isLoaded)
+            {
+                SceneManager.LoadScene("HomeScene");
+            }
+        }
+    }
+    #endregion
+
+    #region 12. HOẠT CẢNH & ANIMATIONS CHUẨN TUTORIAL
+    private IEnumerator AnimateSlashAttack(CardModel card, GeneralCardUI caster, GeneralCardUI target)
+    {
+        AudioManager.Instance.PlaySlash();
+        AudioManager.Instance.PlayCardVoice(card);
+
+        var cardUI = CardUI.Create(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, card, new Vector2(94, 130));
+        var rt = cardUI.GetComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+
+        Vector2 casterScreen = RectTransformUtility.WorldToScreenPoint(null, caster.transform.position);
+        var rootRt = canvasGo.GetComponent<RectTransform>();
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(rootRt, casterScreen, null, out var startPos);
+
+        rt.anchoredPosition = startPos;
+        cardUI.transform.localScale = Vector3.one * 0.5f;
+
+        float elapsed = 0f;
+        const float flyDuration = 0.25f;
+        while (elapsed < flyDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / flyDuration));
+            rt.anchoredPosition = Vector2.Lerp(startPos, new Vector2(-80f, 0f), t);
+            cardUI.transform.localScale = Vector3.one * Mathf.Lerp(0.5f, 1f, t);
+            yield return null;
+        }
+
+        // 🌟 BẮN TIA SÁNG TỪ LÁ TRẢM HƯỚNG ĐẾN TƯỚNG MỤC TIÊU (CHUẨN TUTORIAL)
+        if (target != null)
+        {
+            yield return AnimateAttackBeam(rt, target.GetComponent<RectTransform>(), card);
+        }
+
+        yield return new WaitForSeconds(0.2f);
+        if (cardUI != null) Destroy(cardUI.gameObject);
+    }
+
+    private IEnumerator ShakeCard(GeneralCardUI target)
+    {
+        if (target == null) yield break;
+        var rt = target.GetComponent<RectTransform>();
+        Vector2 originalPos = rt.anchoredPosition;
+
+        float elapsed = 0f;
+        const float duration = 0.35f;
+        const float magnitude = 7f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float xOffset = UnityEngine.Random.Range(-magnitude, magnitude);
+            float yOffset = UnityEngine.Random.Range(-magnitude, magnitude);
+            rt.anchoredPosition = originalPos + new Vector2(xOffset, yOffset);
+            yield return null;
+        }
+
+        rt.anchoredPosition = originalPos;
+    }
+
+    public void ShowCardAtCenter(CardModel card, GeneralCardUI caster, GeneralCardUI target = null, string customLabel = null)
+    {
+        if (card == null) return;
+        AudioManager.Instance.PlayCardVoice(card);
+
+        if (centerCardDismissCoroutine != null)
+        {
+            StopCoroutine(centerCardDismissCoroutine);
+            centerCardDismissCoroutine = null;
+        }
+
+        if (currentCenterCardGo != null)
+        {
+            Destroy(currentCenterCardGo);
+            currentCenterCardGo = null;
+        }
+
+        var centerContainer = new GameObject("CenterPlayedCard", typeof(RectTransform), typeof(CanvasGroup));
+        centerContainer.transform.SetParent(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, false);
+        centerContainer.transform.SetAsLastSibling();
+
+        var rt = centerContainer.GetComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(94, 130);
+        rt.anchoredPosition = new Vector2(-80f, 0f);
+
+        currentCenterCardGo = centerContainer;
+
+        var cardUI = CardUI.Create(centerContainer.transform, card, new Vector2(94, 130));
+        var cardRt = cardUI.GetComponent<RectTransform>();
+        cardRt.anchorMin = Vector2.zero; cardRt.anchorMax = Vector2.one;
+        cardRt.offsetMin = cardRt.offsetMax = Vector2.zero;
+
+        var haloGo = new GameObject("CenterGlow", typeof(RectTransform), typeof(Image));
+        haloGo.transform.SetParent(centerContainer.transform, false);
+        haloGo.transform.SetAsFirstSibling();
+        var haloImg = haloGo.GetComponent<Image>();
+        haloImg.sprite = LotusHealthUI.LoadSpriteFromResources("UI/lotus_halo");
+        haloImg.color = new Color(1f, 0.88f, 0.35f, 0.9f);
+        haloImg.raycastTarget = false;
+        var hRt = haloGo.GetComponent<RectTransform>();
+        Fill(hRt, new Vector2(-12, -12), new Vector2(12, 12));
+
+        if (!string.IsNullOrEmpty(customLabel))
+        {
+            var labelBoxGo = new GameObject("LabelBox", typeof(RectTransform), typeof(Image));
+            labelBoxGo.transform.SetParent(centerContainer.transform, false);
+            var lbImg = labelBoxGo.GetComponent<Image>();
+            var slotSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
+            if (slotSpr != null) { lbImg.sprite = slotSpr; lbImg.type = Image.Type.Sliced; }
+            lbImg.color = new Color(0.04f, 0.07f, 0.14f, 0.95f);
+            var lbRt = labelBoxGo.GetComponent<RectTransform>();
+            SetRect(lbRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(180f, 22f), new Vector2(0f, -26f));
+
+            var lbl = AddText(labelBoxGo.transform, "Txt", customLabel, 10, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+            Fill(lbl.rectTransform);
+        }
+
+        // 🌟 TIA SÁNG TỪ LÁ BÀI ĐI ĐẾN MỤC TIÊU (giống Tutorial)
+        if (target != null)
+        {
+            StartCoroutine(AnimateAttackBeam(rt, target.GetComponent<RectTransform>(), card));
+        }
+
+        centerCardDismissCoroutine = StartCoroutine(DismissCenterCardAfterDelay(centerContainer, 2.0f));
+    }
+
+    /// <summary>
+    /// Vẽ tia sáng từ lá bài ở giữa đi đến mục tiêu rồi mờ dần (giống Tutorial).
+    /// Màu tia thay đổi theo loại lá bài: Vàng (Trảm), Xanh (Đỡ), Đỏ (Thách Đấu), Xanh Lá (Hồi Máu).
+    /// </summary>
+    private IEnumerator AnimateAttackBeam(RectTransform source, RectTransform target, CardModel card = null)
+    {
+        if (source == null || target == null) yield break;
+
+        var beamGo = new GameObject("CardAttackBeam", typeof(RectTransform), typeof(Image));
+        var beamRoot = battleRootGo != null ? battleRootGo.transform : canvasGo.transform;
+        beamGo.transform.SetParent(beamRoot, false);
+        beamGo.transform.SetAsLastSibling();
+
+        var beam = beamGo.GetComponent<Image>();
+        var arrowSpr = ThemeUI.LoadSprite("UI/tutorial_arrow");
+        if (arrowSpr != null) { beam.sprite = arrowSpr; beam.type = Image.Type.Sliced; }
+        beam.raycastTarget = false;
+
+        // Màu tia theo loại lá bài
+        Color beamColor = card != null ? card.subType switch
+        {
+            CardSubType.Dodge             => new Color(0.35f, 0.85f, 1f,    0.95f), // Xanh lam - Đỡ
+            CardSubType.Peach             => new Color(0.35f, 1f,    0.55f, 0.95f), // Xanh lá  - Bánh Chưng
+            CardSubType.Duel              => new Color(1f,    0.25f, 0.25f, 0.95f), // Đỏ        - Thách Đấu
+            CardSubType.FlawlessDefense   => new Color(0.55f, 0.35f, 1f,    0.95f), // Tím       - Diệu Kế
+            CardSubType.Snatch            => new Color(1f,    0.65f, 0.2f,  0.95f), // Cam       - Đột Kích
+            CardSubType.Dismantle         => new Color(1f,    0.4f,  0.4f,  0.95f), // Đỏ nhạt  - Vườn Không
+            CardSubType.ArrowRain         => new Color(0.9f,  0.55f, 0.1f,  0.95f), // Cam đậm  - Mưa Tên
+            CardSubType.BarbarianInvasion => new Color(0.9f,  0.3f,  0.1f,  0.95f), // Đỏ cam   - Bãi Cọc
+            CardSubType.AttackFire        => new Color(1f,    0.4f,  0.1f,  0.95f), // Cam lửa  - Hỏa Trảm
+            CardSubType.AttackThunder     => new Color(0.7f,  0.4f,  1f,    0.95f), // Tím điện - Lôi Trảm
+            _                             => new Color(1f,    0.78f, 0.18f, 0.95f)  // Vàng HK  - mặc định
+        } : new Color(1f, 0.78f, 0.18f, 0.95f);
+
+        beam.color = beamColor;
+
+        var beamRt = beamGo.GetComponent<RectTransform>();
+        beamRt.anchorMin = beamRt.anchorMax = new Vector2(0.5f, 0.5f);
+        beamRt.pivot = new Vector2(0f, 0.5f);
+
+        var rootRt = beamRoot.GetComponent<RectTransform>();
+
+        // Điểm xuất phát: tâm lá bài ở giữa màn hình
+        Vector3 sourceWorld = source.position;
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(rootRt,
+            RectTransformUtility.WorldToScreenPoint(null, sourceWorld), null, out var start);
+
+        // Điểm đến: avatar của mục tiêu (offset 18% chiều cao từ dưới lên)
+        var targetAvatar = target.transform.Find("Avatar") as RectTransform;
+        Vector3 targetWorld = target.position;
+        if (targetAvatar != null)
+            targetWorld = targetAvatar.TransformPoint(new Vector3(0f, targetAvatar.rect.height * 0.18f, 0f));
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(rootRt,
+            RectTransformUtility.WorldToScreenPoint(null, targetWorld), null, out var end);
+
+        Vector2 delta = end - start;
+        beamRt.anchoredPosition = start;
+        beamRt.sizeDelta = new Vector2(0f, 30f);
+        beamRt.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
+
+        // Tia sáng vươn dài từ 0 đến độ dài đầy đủ trong 0.22s
+        float elapsed = 0f;
+        const float duration = 0.22f;
+        while (elapsed < duration && beamRt != null)
+        {
+            elapsed += Time.deltaTime;
+            beamRt.sizeDelta = new Vector2(delta.magnitude * Mathf.Clamp01(elapsed / duration), 30f);
+            yield return null;
+        }
+
+        // Giữ hiện thêm 0.12s
+        yield return new WaitForSeconds(0.12f);
+
+        // Mờ dần trong 0.15s
+        float fadeElapsed = 0f;
+        const float fadeDur = 0.15f;
+        while (fadeElapsed < fadeDur && beam != null)
+        {
+            fadeElapsed += Time.deltaTime;
+            var c = beamColor;
+            c.a = Mathf.Lerp(0.95f, 0f, fadeElapsed / fadeDur);
+            beam.color = c;
+            yield return null;
+        }
+
+        if (beamGo != null) Destroy(beamGo);
+    }
+
+    private IEnumerator DismissCenterCardAfterDelay(GameObject cardGo, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (cardGo != null) Destroy(cardGo);
+    }
+
+    private void OnGeneralTargetClicked(GeneralCardUI clicked)
+    {
+        if (clicked == null || clicked.CurrentHp <= 0) return;
+        currentSelectedTarget = clicked;
+        AudioManager.Instance.PlayCardSelect();
+
+        if (targetHighlightGo == null)
+        {
+            targetHighlightGo = new GameObject("TargetHighlight", typeof(RectTransform), typeof(Image));
+            var tImg = targetHighlightGo.GetComponent<Image>();
+            var spr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+            if (spr != null) { tImg.sprite = spr; tImg.type = Image.Type.Sliced; }
+            tImg.color = new Color(1f, 0.95f, 0.15f, 1f);
+            tImg.raycastTarget = false;
+
+            var tagGo = new GameObject("TargetTag", typeof(RectTransform), typeof(Image));
+            tagGo.transform.SetParent(targetHighlightGo.transform, false);
+            var tgImg = tagGo.GetComponent<Image>();
+            var sSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
+            if (sSpr != null) { tgImg.sprite = sSpr; tgImg.type = Image.Type.Sliced; }
+            tgImg.color = new Color(0.85f, 0.2f, 0.2f, 0.98f);
+            var tgRt = tagGo.GetComponent<RectTransform>();
+            SetRect(tgRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(140f, 22f), new Vector2(0f, 14f));
+
+            var tagTxt = AddText(tagGo.transform, "Txt", "🎯 MỤC TIÊU ĐANG CHỌN", 9, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+            Fill(tagTxt.rectTransform);
+        }
+
+        targetHighlightGo.transform.SetParent(clicked.transform, false);
+        targetHighlightGo.transform.SetAsLastSibling();
+        var hRt = targetHighlightGo.GetComponent<RectTransform>();
+        hRt.anchorMin = Vector2.zero; hRt.anchorMax = Vector2.one;
+        hRt.offsetMin = new Vector2(-8, -8); hRt.offsetMax = new Vector2(8, 8);
+        targetHighlightGo.SetActive(true);
+
+        SetLog($"🎯 Đã chọn mục tiêu: <b>{clicked.GeneralName}</b> ({clicked.FactionName}) - Cự ly từ bạn: <b>{CalculateDistance(playerCard, clicked)}</b>");
+        UpdateActionButtonState();
+    }
+
+    private void OnPlayerSkillClicked()
+    {
+        string pName = playerCard != null ? playerCard.GeneralName : "";
+
+        if (pName.Contains("Cao Lỗ"))
+        {
+            OnPlayerSkillCheNoClicked();
+        }
+        else if (pName.Contains("Đào Hãn"))
+        {
+            AudioManager.Instance.PlaySkill();
+            SetLog("🏹 <color=#FFD700><b>[ĐÀO HÃN - XẠ THUẪN]</b></color>: Nội tại giúp Đào Hãn luôn được giảm 2 cự ly khi tung đòn Trảm lên mọi đối thủ!");
+        }
+        else
+        {
+            OnPlayerSkillTienThoaiClicked();
+        }
+    }
+
+    private void OnPlayerSkillCheNoClicked()
+    {
+        if (battleFinished) return;
+
+        // 1. Chỉ dùng được trong lượt của người chơi (Giai đoạn Ra bài)
+        if (!isPlayerTurnActive || playerPlayPhaseLocked || actionInProgress)
+        {
+            AudioManager.Instance.PlayError();
+            SetLog("⏳ <color=#FF5555><b>[CAO LỖ - CHẾ NỎ]</b></color>: Kỹ năng [Chế Nỏ] chỉ có thể sử dụng trong Giai đoạn Ra bài trong lượt của bạn!");
+            return;
+        }
+
+        // 2. Chuyển hóa / Khôi phục lá bài chất Bích trên tay
+        string impactedName = playerHandUI.ToggleSpadeToNoThan(out bool isNoThan);
+
+        if (!string.IsNullOrEmpty(impactedName))
+        {
+            AudioManager.Instance.PlaySkill();
+            if (isNoThan)
+            {
+                AudioManager.Instance.PlayCardVoice("Nỏ Thần Kim Quy");
+                SetLog($"🏹 <color=#FFD700><b>[CAO LỖ - CHẾ NỎ]</b></color>: Đã chuyển hóa lá bài chất <b>Bích (♠)</b> trên tay thành <b>[Nỏ Thần Kim Quy]</b>! Hãy chọn lá bài và bấm <b>[TRANG BỊ]</b> để mang vào người.");
+            }
+            else
+            {
+                SetLog($"↩️ <color=#55DDFF><b>[CAO LỖ - CHẾ NỎ]</b></color>: Đã khôi phục lá [Nỏ Thần Kim Quy] về trạng thái bài gốc <b>[{impactedName}]</b>!");
+            }
+            UpdateActionButtonState();
+        }
+        else
+        {
+            AudioManager.Instance.PlayError();
+            SetLog("❌ <color=#FF5555><b>[CAO LỖ - CHẾ NỎ]</b></color>: Trên tay bạn không có lá bài chất <b>Bích (♠)</b> nào để chuyển hóa!");
+        }
+    }
+
+    private void OnPlayerSkillTienThoaiClicked()
+    {
+        AudioManager.Instance.PlaySkill();
+        AudioManager.Instance.PlayCardVoice("Tiến Thoái");
+        int transformed = playerHandUI.TransformSlashAndDodge();
+        SetLog($"✨ <color=#FFD700><b>LÝ THƯỜNG KIỆT THI TRIỂN [TIẾN THOÁI]!</b></color> Đã hoán chuyển {transformed} lá Trảm ⟷ Đỡ trên tay!");
+    }
+
+    private void SetLog(string msg)
+    {
+        if (string.IsNullOrEmpty(msg)) return;
+
+        battleLogHistory.Add(msg);
+        if (battleLogHistory.Count > 60)
+        {
+            battleLogHistory.RemoveAt(0);
+        }
+
+        if (historyContentText != null)
+        {
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < battleLogHistory.Count; i++)
+            {
+                if (i > 0) sb.AppendLine();
+                bool isLatest = (i == battleLogHistory.Count - 1);
+                if (isLatest)
+                {
+                    sb.Append("<color=#FFD700><b>[").Append(i + 1).Append("]</b></color> <color=#FFFFFF>▶ ").Append(battleLogHistory[i]).Append("</color>");
+                }
+                else
+                {
+                    sb.Append("<color=#64748B>[").Append(i + 1).Append("]</color> <color=#CBD5E1>• ").Append(battleLogHistory[i]).Append("</color>");
+                }
+            }
+            historyContentText.text = sb.ToString();
+        }
+    }
+
+    private List<CardModel> GetHandOfGeneral(GeneralCardUI g)
+    {
+        if (g == playerCard) return playerHandCards;
+        if (g == allyCard) return allyHandCards;
+        if (g == enemy1Card) return enemy1HandCards;
+        return enemy2HandCards;
+    }
+
+    private int GetHandCountOf(GeneralCardUI g)
+    {
+        return GetHandOfGeneral(g).Count;
+    }
+
+    private static bool IsSlashCard(CardModel c)
+    {
+        return c != null && (c.subType == CardSubType.AttackNormal || c.subType == CardSubType.AttackThunder || c.subType == CardSubType.AttackFire);
+    }
+
+    private static bool RequiresTarget(CardModel c)
+    {
+        if (c == null) return false;
+        return IsSlashCard(c) || c.subType == CardSubType.Duel || c.subType == CardSubType.Snatch || c.subType == CardSubType.Dismantle || c.subType == CardSubType.SupplyShortage || c.subType == CardSubType.Acedia || c.subType == CardSubType.FlawlessDefense;
+    }
+
+    private GameObject CreateBaseModal(string title, Vector2 size)
+    {
+        var modalRoot = new GameObject("Modal_" + title, typeof(RectTransform), typeof(Image));
+        modalRoot.transform.SetParent(canvasGo.transform, false);
+        modalRoot.transform.SetAsLastSibling();
+
+        var bgImg = modalRoot.GetComponent<Image>();
+        bgImg.color = new Color(0.02f, 0.04f, 0.08f, 0.85f);
+        Fill(modalRoot.GetComponent<RectTransform>());
+
+        var boxGo = new GameObject("Box", typeof(RectTransform), typeof(Image));
+        boxGo.transform.SetParent(modalRoot.transform, false);
+        var bImg = boxGo.GetComponent<Image>();
+        var bgSprite = LotusHealthUI.LoadSpriteFromResources("UI/auth_card_bg");
+        if (bgSprite != null) { bImg.sprite = bgSprite; bImg.type = Image.Type.Sliced; }
+        bImg.color = new Color(0.08f, 0.12f, 0.22f, 0.98f);
+
+        var boxRt = boxGo.GetComponent<RectTransform>();
+        boxRt.anchorMin = boxRt.anchorMax = boxRt.pivot = new Vector2(0.5f, 0.5f);
+        boxRt.sizeDelta = size;
+        boxRt.anchoredPosition = Vector2.zero;
+
+        var titleTxt = AddText(boxGo.transform, "Title", title, 16, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(titleTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(size.x - 40f, 36f), new Vector2(0, -14));
+
+        return boxGo;
+    }
+
+    private Button CreateButton(Transform parent, string name, string label, Vector2 pos, Vector2 size, Action onClick)
+    {
+        var btnGo = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+        btnGo.transform.SetParent(parent, false);
+        var img = btnGo.GetComponent<Image>();
+        var btnSpr = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
+        if (btnSpr != null) { img.sprite = btnSpr; img.type = Image.Type.Sliced; }
+        img.color = new Color(0.9f, 0.65f, 0.15f, 1f);
+
+        var rt = btnGo.GetComponent<RectTransform>();
+        SetRect(rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, pos);
+
+        var txt = AddText(btnGo.transform, "Txt", label, 12, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        Fill(txt.rectTransform);
+
+        var btn = btnGo.GetComponent<Button>();
+        btn.onClick.AddListener(() =>
+        {
+            AudioManager.Instance.PlayCardSelect();
+            onClick?.Invoke();
+        });
+        return btn;
+    }
+
+    private Text AddText(Transform parent, string name, string content, int fontSize, Color color, FontStyle style, TextAnchor align)
+    {
+        int scaledSize = Mathf.Max(ThemeUI.SizeMicro, fontSize);
+        var t = ThemeUI.CreateText(parent, name, content, scaledSize, color, style, align, true);
+        return t;
+    }
+
+    private static void Fill(RectTransform rt, Vector2? minOffset = null, Vector2? maxOffset = null)
+    {
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.offsetMin = minOffset ?? Vector2.zero;
+        rt.offsetMax = maxOffset ?? Vector2.zero;
+    }
+
+    private static void SetRect(RectTransform rt, Vector2 aMin, Vector2 aMax, Vector2 pivot, Vector2 size, Vector2 pos)
+    {
+        rt.anchorMin = aMin;
+        rt.anchorMax = aMax;
+        rt.pivot = pivot;
+        rt.sizeDelta = size;
+        rt.anchoredPosition = pos;
+    }
+    #endregion
+}

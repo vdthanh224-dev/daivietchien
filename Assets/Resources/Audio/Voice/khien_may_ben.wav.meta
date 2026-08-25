@@ -1,0 +1,30 @@
+fileFormatVersion: 2
+guid: 6a7b8c9d0e1f2a3b4c5d6e7f8a9b006f
+AudioImporter:
+  externalObjects: {}
+  serializedVersion: 6
+  defaultBitsPerSample: 16
+  defaultSampleRate: 44100
+  defaultSampleCount: 0
+  defaultSampleRateValue: 44100
+  defaultIsMono: 1
+  defaultCompressionFormat: 0
+  defaultQuality: 1
+  defaultConversionMode: 0
+  defaultChannelMode: 0
+  defaultAudioFormat: 0
+  defaultOverride: 0
+  defaultLoadType: 0
+  defaultPreloadAudioData: 1
+  defaultLoadInBackground: 0
+  defaultAmbisonic: 0
+  default3D: 0
+  forceToMono: 0
+  normalize: 1
+  preloadAudioData: 1
+  loadInBackground: 0
+  ambisonic: 0
+  3D: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
