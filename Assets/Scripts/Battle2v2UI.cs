@@ -592,12 +592,7 @@ public class Battle2v2UI : MonoBehaviour
         }
         else if (!string.IsNullOrEmpty(state.phase))
         {
-            if (state.version != lastHandledPhaseVersion || state.waitingTargetSeat != lastHandledWaitingSeat)
-            {
-                lastHandledPhaseVersion = state.version;
-                lastHandledWaitingSeat = state.waitingTargetSeat;
-                HandleServerPhasePrompt(state);
-            }
+            HandleServerPhasePrompt(state);
         }
     }
 
@@ -621,24 +616,27 @@ public class Battle2v2UI : MonoBehaviour
                         var orphanWait = GameObject.Find("CounterWaitingModal");
                         if (orphanWait != null) Destroy(orphanWait);
 
-                        var oldPrompt = GameObject.Find("CounterPromptModal");
-                        if (oldPrompt != null) Destroy(oldPrompt);
-
-                        if (activeCounterPromptCoroutine != null) StopCoroutine(activeCounterPromptCoroutine);
-
-                        var counterCard = playerHandCards.Find(c => c != null && c.subType == CardSubType.FlawlessDefense);
-                        activeCounterPromptCoroutine = StartCoroutine(PromptPlayerCounterScroll(rootCard, qText, counterCard, (didUse, chosenCard) =>
+                        var existingPrompt = GameObject.Find("CounterPromptModal");
+                        if (existingPrompt == null || lastHandledWaitingSeat != state.waitingTargetSeat)
                         {
-                            activeCounterPromptCoroutine = null;
-                            DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
+                            lastHandledWaitingSeat = state.waitingTargetSeat;
+                            if (existingPrompt != null) Destroy(existingPrompt);
+                            if (activeCounterPromptCoroutine != null) StopCoroutine(activeCounterPromptCoroutine);
+
+                            var counterCard = playerHandCards.Find(c => c != null && c.subType == CardSubType.FlawlessDefense);
+                            activeCounterPromptCoroutine = StartCoroutine(PromptPlayerCounterScroll(rootCard, qText, counterCard, (didUse, chosenCard) =>
                             {
-                                action = "RESPOND_ACTION",
-                                roomId = currentRoomId,
-                                seat = playerCard.SeatNumber,
-                                accepted = didUse,
-                                cardId = chosenCard != null ? chosenCard.id : ""
-                            }, (s) => { if (s != null) ApplyServerGameState(s); });
-                        }));
+                                activeCounterPromptCoroutine = null;
+                                DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
+                                {
+                                    action = "RESPOND_ACTION",
+                                    roomId = currentRoomId,
+                                    seat = playerCard.SeatNumber,
+                                    accepted = didUse,
+                                    cardId = chosenCard != null ? chosenCard.id : ""
+                                }, (s) => { if (s != null) ApplyServerGameState(s); });
+                            }));
+                        }
                     }
                     else
                     {
@@ -649,32 +647,41 @@ public class Battle2v2UI : MonoBehaviour
                         var queriedGen = GetGeneralBySeat(state.waitingTargetSeat);
                         if (queriedGen != null)
                         {
-                            ShowWaitingCounterScrollModal(queriedGen, qText);
+                            var existingWait = GameObject.Find("CounterWaitingModal");
+                            if (existingWait == null || lastHandledWaitingSeat != state.waitingTargetSeat)
+                            {
+                                lastHandledWaitingSeat = state.waitingTargetSeat;
+                                ShowWaitingCounterScrollModal(queriedGen, qText);
+                            }
                         }
                     }
                 }
                 break;
 
             case "AWAIT_HARVEST":
-                var oldHarvest = GameObject.Find("HarvestModal");
-                if (oldHarvest != null) Destroy(oldHarvest);
-
-                var poolCards = new List<CardModel>();
-                if (state.harvestPool != null)
+                var existingHarvest = GameObject.Find("HarvestModal");
+                if (existingHarvest == null || lastHandledWaitingSeat != state.waitingTargetSeat)
                 {
-                    foreach (var c in state.harvestPool)
+                    lastHandledWaitingSeat = state.waitingTargetSeat;
+                    if (existingHarvest != null) Destroy(existingHarvest);
+
+                    var poolCards = new List<CardModel>();
+                    if (state.harvestPool != null)
                     {
-                        var cm = CardDatabase.GetCardById(c.id);
-                        if (cm == null)
+                        foreach (var c in state.harvestPool)
                         {
-                            CardSuit s = CardSuit.Heart;
-                            Enum.TryParse(c.suit, out s);
-                            cm = new CardModel { id = c.id, cardName = c.name, suit = s, rank = (CardRank)c.rank };
+                            var cm = CardDatabase.GetCardById(c.id);
+                            if (cm == null)
+                            {
+                                CardSuit s = CardSuit.Heart;
+                                Enum.TryParse(c.suit, out s);
+                                cm = new CardModel { id = c.id, cardName = c.name, suit = s, rank = (CardRank)c.rank };
+                            }
+                            poolCards.Add(cm);
                         }
-                        poolCards.Add(cm);
                     }
+                    ShowServerHarvestModal(poolCards, state.waitingTargetSeat == playerCard.SeatNumber, state.waitingTargetSeat);
                 }
-                ShowServerHarvestModal(poolCards, state.waitingTargetSeat == playerCard.SeatNumber, state.waitingTargetSeat);
                 break;
 
             case "AWAIT_SLASH_DEFENSE":
