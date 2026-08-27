@@ -3323,6 +3323,18 @@ public class Battle2v2UI : MonoBehaviour
 
     private IEnumerator ExecuteRemoteCardPlay(CardModel card, GeneralCardUI caster, GeneralCardUI target, int explicitDamage = 0)
     {
+        // Khi Deno WebSocket kết nối, server xử lý toàn bộ logic - client chỉ hiển thị animation
+        if (DenoGameClient.IsConnected)
+        {
+            // Chỉ chạy visual/animation, không chạy ResolveFullCardEffect offline
+            ShowCardAtCenter(card, caster, target);
+            AudioManager.Instance.PlayCardSelect();
+            yield return new WaitForSeconds(0.6f);
+            actionInProgress = false;
+            ResumeTurnTimer();
+            yield break;
+        }
+
         actionInProgress = true;
         if (card.category != CardCategory.Equipment && card.category != CardCategory.DelayedScroll)
         {
