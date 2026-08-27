@@ -1,5 +1,25 @@
 import { createDeck52, isSlash, isDodge, isPeach, isWine, CARD_CATEGORIES, CARD_SUBTYPES } from './deck.js';
 
+// Cache bộ bài chuẩn để tra cứu subType theo ID
+let _deckCache = null;
+function getDeckCache() {
+  if (!_deckCache) {
+    _deckCache = {};
+    for (const c of createDeck52()) {
+      _deckCache[c.id] = c;
+    }
+  }
+  return _deckCache;
+}
+
+/**
+ * Tìm lá bài trong bộ bài chuẩn theo ID để lấy subType (dùng khi ID client/server không khớp)
+ */
+function findCardByIdInDeck(cardId) {
+  if (!cardId) return null;
+  return getDeckCache()[cardId] || null;
+}
+
 /**
  * Xáo bài Fisher-Yates chuẩn
  */
@@ -191,7 +211,17 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
   const caster = state.players.find(x => x.seat === casterSeat);
   if (!caster || caster.hp <= 0) return { error: "Người chơi không hợp lệ" };
 
-  const cardIndex = caster.hand.findIndex(c => c.id === cardId || (c.subType !== undefined && c.id === cardId));
+  // Tìm lá bài: ưu tiên ID chính xác, fallback sang subType khi ID client và server khác nhau (do bộ bài độc lập)
+  let cardIndex = caster.hand.findIndex(c => c.id === cardId);
+  if (cardIndex < 0 && cardId) {
+    // Lấy subType từ card cùng ID trong bộ bài chuẩn dựa trên suffix ID
+    // Ví dụ: client gửi "D1_S_3" -> subType 11 (Dismantle/Vườn Không Nhà Trống)
+    // Tìm lá bài cùng subType trên server hand
+    const refCard = findCardByIdInDeck(cardId);
+    if (refCard !== null) {
+      cardIndex = caster.hand.findIndex(c => c.subType === refCard.subType);
+    }
+  }
   if (cardIndex < 0) return { error: "Không tìm thấy lá bài trên tay" };
 
   const card = caster.hand.splice(cardIndex, 1)[0];
@@ -555,7 +585,12 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId) {
     const rootCard = chain.rootCard;
 
     if (accepted && cardId) {
-      const idx = respondent.hand.findIndex(c => c.id === cardId && (c.subType === CARD_SUBTYPES.FLAWLESS_DEFENSE || (c.name && c.name.includes("Diệu Kế"))));
+      // Tìm Diệu Kế: ưu tiên ID chính xác, fallback sang subType
+      let idx = respondent.hand.findIndex(c => c.id === cardId && (c.subType === CARD_SUBTYPES.FLAWLESS_DEFENSE || (c.name && c.name.includes("Diệu Kế"))));
+      if (idx < 0) {
+        // Fallback: tìm bất kỳ Diệu Kế trên tay (subType FLAWLESS_DEFENSE = 10)
+        idx = respondent.hand.findIndex(c => c.subType === CARD_SUBTYPES.FLAWLESS_DEFENSE || (c.name && c.name.includes("Diệu Kế")));
+      }
       if (idx >= 0) {
         const nullifyCard = respondent.hand.splice(idx, 1)[0];
         state._discard.push(nullifyCard);
