@@ -467,6 +467,32 @@ public class Battle2v2UI : MonoBehaviour
         }
     }
 
+    private CardModel ConvertGameStateCardToCardModel(AppwriteMatchmaking.GameStateCard sc)
+    {
+        if (sc == null || sc.id == "HIDDEN") return null;
+        var cm = CardDatabase.GetCardById(sc.id);
+        if (cm != null) return cm;
+
+        CardSuit suit = CardSuit.Spade;
+        if (!string.IsNullOrEmpty(sc.suit))
+        {
+            Enum.TryParse(sc.suit, true, out suit);
+        }
+
+        return CardDatabase.CreateCard(
+            sc.id,
+            sc.name,
+            suit,
+            (CardRank)sc.rank,
+            1,
+            (CardCategory)sc.category,
+            (CardSubType)sc.subType,
+            "",
+            "",
+            1
+        );
+    }
+
     private void ApplyServerGameState(AppwriteMatchmaking.ServerGameState state)
     {
         if (state == null) return;
@@ -490,7 +516,46 @@ public class Battle2v2UI : MonoBehaviour
             CheckGameOver();
         }
 
-        // 2. Đồng bộ số lượng bài trên tay của các đối thủ
+        // 2. Đồng bộ Danh sách Bài Thật trên tay của chính mình từ Server (Authoritative Hand)
+        if (state.players != null && playerCard != null)
+        {
+            var myServerData = state.players.Find(p => p.seat == playerCard.SeatNumber);
+            if (myServerData != null && myServerData.hand != null)
+            {
+                bool handChanged = playerHandCards.Count != myServerData.hand.Count;
+                if (!handChanged)
+                {
+                    for (int i = 0; i < playerHandCards.Count; i++)
+                    {
+                        if (i < myServerData.hand.Count && playerHandCards[i].id != myServerData.hand[i].id)
+                        {
+                            handChanged = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (handChanged)
+                {
+                    playerHandCards.Clear();
+                    foreach (var sc in myServerData.hand)
+                    {
+                        if (sc != null && sc.id != "HIDDEN")
+                        {
+                            var cm = ConvertGameStateCardToCardModel(sc);
+                            if (cm != null) playerHandCards.Add(cm);
+                        }
+                    }
+                    if (playerHandUI != null)
+                    {
+                        playerHandUI.ClearHand();
+                        playerHandUI.AddCards(playerHandCards);
+                    }
+                }
+            }
+        }
+
+        // 3. Đồng bộ số lượng bài trên tay của các đối thủ (Card Backs)
         if (state.players != null)
         {
             foreach (var p in state.players)
@@ -506,7 +571,7 @@ public class Battle2v2UI : MonoBehaviour
             UpdateHandCountsVisual();
         }
 
-        // 3. Đồng bộ Lượt đánh Authoritative và Bộ đếm thời gian từ Server
+        // 4. Đồng bộ Lượt đánh Authoritative, Vòng sáng Tướng và Bộ đếm thời gian từ Server
         if (state.waitingTargetSeat > 0)
         {
             var targetGen = GetGeneralBySeat(state.waitingTargetSeat);
@@ -514,10 +579,13 @@ public class Battle2v2UI : MonoBehaviour
             {
                 targetGen.ShowHeadTimer(state.waitingTimer > 0 ? state.waitingTimer : 40);
             }
-            var casterGen = GetGeneralBySeat(state.turnSeat);
-            if (casterGen != null && casterGen != targetGen)
+            for (int s = 1; s <= 4; s++)
             {
-                casterGen.HideHeadTimer();
+                if (s != state.waitingTargetSeat)
+                {
+                    var other = GetGeneralBySeat(s);
+                    if (other != null) other.HideHeadTimer();
+                }
             }
         }
         else if (state.turnSeat > 0 && !battleFinished)
@@ -536,32 +604,22 @@ public class Battle2v2UI : MonoBehaviour
                 }
             }
 
-            // Đồng bộ chuyển lượt Authoritative từ Server nếu máy này đang chạy lệch
-            if (turnOrderGenerals != null && turnOrderGenerals.Count > 0)
+            if (allGenerals != null)
             {
-                int targetTurnIndex = turnOrderGenerals.FindIndex(g => g.SeatNumber == state.turnSeat);
-                if (targetTurnIndex >= 0)
+                foreach (var g in allGenerals)
                 {
-                    if (targetTurnIndex != currentTurnIndex && !actionInProgress)
-                    {
-                        currentTurnIndex = targetTurnIndex;
-                        if (currentTurnCoroutine != null) StopCoroutine(currentTurnCoroutine);
-                        currentTurnCoroutine = StartCoroutine(ExecuteCurrentTurn());
-                    }
-
-                    // Đồng bộ lại thời gian giây nếu lệch quá 1.5s
-                    if (state.turnTimer > 0 && isTimerRunning)
-                    {
-                        if (Mathf.Abs(turnTimer - state.turnTimer) > 1.5f)
-                        {
-                            turnTimer = state.turnTimer;
-                        }
-                    }
+                    if (g != null) g.SetTurnActive(g.SeatNumber == state.turnSeat);
                 }
+            }
+
+            if (turnGen != null && globalTurnText != null)
+            {
+                string teamLabel = turnGen.IsAlly ? "<color=#55DDFF>[ĐỒNG MINH]</color>" : "<color=#FF5555>[ĐỐI THỦ]</color>";
+                globalTurnText.text = $"LƯỢT #{turnGen.SeatNumber}: {teamLabel} {turnGen.GeneralName}";
             }
         }
 
-        // 4. Đồng bộ Nhật ký trận đấu
+        // 5. Đồng bộ Nhật ký trận đấu
         if (state.lastAction != null && state.lastAction.timestamp > lastAppliedActionTimestamp)
         {
             lastAppliedActionTimestamp = state.lastAction.timestamp;
@@ -570,8 +628,8 @@ public class Battle2v2UI : MonoBehaviour
                 SetLog(state.lastAction.description);
             }
         }
-    
-        // 5. Đồng bộ Phase chờ phản hồi từ Server (Server-Phase Synchronization)
+
+        // 6. Đồng bộ Phase chờ phản hồi từ Server (Server-Phase Synchronization)
         if (state.phase == "PLAY" || state.phase == "FINISHED")
         {
             isAwaitingSlashDefense = false;
@@ -589,12 +647,36 @@ public class Battle2v2UI : MonoBehaviour
             if (orphanHarvest != null) Destroy(orphanHarvest);
             lastHandledPhaseVersion = -1;
             lastHandledWaitingSeat = -1;
+
+            // Bật/tắt tương tác lượt của người chơi theo Server
+            if (playerCard != null)
+            {
+                bool isMyTurn = (state.turnSeat == playerCard.SeatNumber && state.status == "PLAYING");
+                isPlayerTurnActive = isMyTurn;
+                if (endTurnBtn != null)
+                {
+                    endTurnBtn.gameObject.SetActive(isMyTurn);
+                    endTurnBtn.interactable = isMyTurn;
+                }
+                if (!isMyTurn)
+                {
+                    if (actionBtnGo != null) actionBtnGo.SetActive(false);
+                    ClearSelectedTarget();
+                }
+            }
         }
         else if (!string.IsNullOrEmpty(state.phase))
         {
+            if (playerCard != null && state.turnSeat != playerCard.SeatNumber)
+            {
+                isPlayerTurnActive = false;
+                if (endTurnBtn != null) endTurnBtn.gameObject.SetActive(false);
+                if (actionBtnGo != null) actionBtnGo.SetActive(false);
+            }
             HandleServerPhasePrompt(state);
         }
     }
+
 
     private void HandleServerPhasePrompt(AppwriteMatchmaking.ServerGameState state)
     {
@@ -2580,6 +2662,11 @@ public class Battle2v2UI : MonoBehaviour
     private IEnumerator ExecuteCurrentTurn()
     {
         if (battleFinished) yield break;
+        if (!string.IsNullOrEmpty(currentRoomId) || DenoGameClient.IsConnected)
+        {
+            // Trong chế độ Online: Server chịu trách nhiệm 100% về vòng lặp lượt, phán xét và rút bài
+            yield break;
+        }
 
         var currentGeneral = turnOrderGenerals[currentTurnIndex];
 

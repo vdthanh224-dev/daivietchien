@@ -11,6 +11,7 @@ import {
   handleDiscardCards,
   handleAIStep,
   handleAIReaction,
+  tickGameState,
   sanitizeGameStateForClient,
 } from "./functions/game-engine/src/gameEngine.js";
 
@@ -31,6 +32,30 @@ const rooms = new Map<string, RoomData>();
 const startTime = Date.now();
 
 console.log("🎮 [Deno Server] Đại Việt Chiến 2v2 Unified Game Server is running!");
+
+// Authoritative 1-second server tick loop for all active rooms on RAM
+setInterval(() => {
+  for (const [roomId, room] of rooms.entries()) {
+    if (room && room.state && room.state.status === "PLAYING") {
+      try {
+        const changed = tickGameState(room.state);
+        if (changed) {
+          room.lastActivity = Date.now();
+          broadcastRoom(room, {
+            type: "STATE_UPDATE",
+            state: room.state,
+            delta: room.state.lastDelta || null,
+            version: room.state.version,
+            action: "SERVER_TICK"
+          });
+        }
+      } catch (err) {
+        console.error(`[Tick Error room ${roomId}]:`, err);
+      }
+    }
+  }
+}, 1000);
+
 
 async function loadStateFromDatabase(roomId: string) {
   const docId = `gs_${roomId.replace(/[^a-zA-Z0-9_-]/g, '')}`.substring(0, 36);

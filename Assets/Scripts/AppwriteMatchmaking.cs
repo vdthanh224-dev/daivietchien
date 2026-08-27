@@ -140,6 +140,7 @@ public static class AppwriteMatchmaking
         public int handCount;
         public List<GameStateCard> hand = new List<GameStateCard>();
         public List<GameStateCard> equipments = new List<GameStateCard>();
+        public List<GameStateCard> judgements = new List<GameStateCard>();
     }
 
     [Serializable]
