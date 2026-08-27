@@ -19,6 +19,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler
     [Header("UI Components")]
     [SerializeField] private Image cardBackground;
     [SerializeField] private Text cardNameText;
+    [SerializeField] private Image suitIconImg;
     [SerializeField] private Text suitRankText;
     [SerializeField] private Text categoryText;
     [SerializeField] private Image artworkIcon;
@@ -203,7 +204,7 @@ public class CardUI : MonoBehaviour, IPointerClickHandler
     {
         rectTransform = GetComponent<RectTransform>();
         rectTransform.sizeDelta = size;
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         // Đảm bảo Root GameObject có Image để bắt click qua IPointerClickHandler
         var rootImg = GetComponent<Image>();
@@ -284,25 +285,39 @@ public class CardUI : MonoBehaviour, IPointerClickHandler
         shRt.pivot = new Vector2(0.5f, 0.5f);
         shRt.offsetMin = shRt.offsetMax = Vector2.zero;
 
-        // Số & Chất (bên trái SubHeader)
+        // Icon Chất bài (Spade / Heart / Club / Diamond)
+        var suitIconGo = new GameObject("SuitIcon", typeof(RectTransform), typeof(Image));
+        suitIconGo.transform.SetParent(subHeaderGo.transform, false);
+        suitIconImg = suitIconGo.GetComponent<Image>();
+        suitIconImg.preserveAspect = true;
+        suitIconImg.raycastTarget = false;
+        var siRt = suitIconGo.GetComponent<RectTransform>();
+        siRt.anchorMin = new Vector2(0f, 0.5f);
+        siRt.anchorMax = new Vector2(0f, 0.5f);
+        siRt.pivot = new Vector2(0f, 0.5f);
+        siRt.sizeDelta = new Vector2(16f, 16f);
+        siRt.anchoredPosition = new Vector2(2f, 0f);
+
+        // Tên Chất & Rank (bên cạnh Icon chất)
         var suitRankGo = new GameObject("SuitRankText", typeof(RectTransform), typeof(Text));
         suitRankGo.transform.SetParent(subHeaderGo.transform, false);
         suitRankText = suitRankGo.GetComponent<Text>();
         suitRankText.font = font;
-        suitRankText.fontSize = 24;
+        suitRankText.fontSize = 13;
         suitRankText.fontStyle = FontStyle.Bold;
         suitRankText.alignment = TextAnchor.MiddleLeft;
         suitRankText.resizeTextForBestFit = true;
-        suitRankText.resizeTextMinSize = 12;
-        suitRankText.resizeTextMaxSize = 24;
+        suitRankText.resizeTextMinSize = 9;
+        suitRankText.resizeTextMaxSize = 14;
         suitRankText.raycastTarget = false;
         var srRt = suitRankGo.GetComponent<RectTransform>();
         srRt.anchorMin = new Vector2(0f, 0f);
-        srRt.anchorMax = new Vector2(0.48f, 1f);
+        srRt.anchorMax = new Vector2(0.52f, 1f);
         srRt.pivot = new Vector2(0f, 0.5f);
-        srRt.offsetMin = srRt.offsetMax = Vector2.zero;
+        srRt.offsetMin = new Vector2(20f, 0f);
+        srRt.offsetMax = Vector2.zero;
         var srShadow = suitRankGo.AddComponent<Shadow>();
-        srShadow.effectColor = new Color(1, 1, 1, 0.4f);
+        srShadow.effectColor = new Color(1, 1, 1, 0.5f);
         srShadow.effectDistance = new Vector2(0.5f, -0.5f);
 
         // Phân loại (bên phải SubHeader)

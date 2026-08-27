@@ -89,8 +89,9 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
             {
                 skillButton.onClick.RemoveAllListeners();
                 if (onClick != null) skillButton.onClick.AddListener(() => onClick());
+                skillButton.interactable = true;
             }
-            SetSkillState(false);
+            SetSkillState(true);
         }
     }
 
@@ -109,12 +110,12 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
         }
         else
         {
-            // TỐI MÀU KHI KHÔNG DÙNG ĐƯỢC
+            // TỐI MÀU KHI KHÔNG DÙNG ĐƯỢC (Vẫn cho phép bấm để hiển thị thông báo)
             if (skillBtnImg != null) skillBtnImg.color = new Color(0.08f, 0.10f, 0.14f, 0.65f);
             if (skillBorderImg != null) skillBorderImg.color = new Color(0.25f, 0.30f, 0.38f, 0.45f);
             if (skillButtonText != null) skillButtonText.color = new Color(0.42f, 0.48f, 0.55f, 0.7f);
             if (skillHaloGo != null) skillHaloGo.SetActive(false);
-            if (skillButton != null) skillButton.interactable = false;
+            if (skillButton != null) skillButton.interactable = true;
         }
     }
 
@@ -276,15 +277,22 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
         if (lotusHealthUI != null) lotusHealthUI.SetCurrentHp(currentHp);
     }
 
+    public void SetHpDirectly(int hp)
+    {
+        currentHp = Mathf.Clamp(hp, 0, maxHp);
+        if (lotusHealthUI != null) lotusHealthUI.SetCurrentHp(currentHp);
+    }
+
     [Header("2v2 Team & Seat Properties")]
     public int SeatNumber { get; set; } = 1;
     public bool IsAlly { get; set; } = true;
+    public bool IsPlayer { get; set; } = false;
+    public bool IsAI { get; set; } = true;
+    public string UserId { get; set; } = "";
+    public bool IsWineBuffActive { get; set; } = false;
     private GameObject seatBadgeGo;
     private Text seatBadgeText;
     private GameObject turnHaloGo;
-    private GameObject timerBarGo;
-    private RectTransform timerBarFillRt;
-    private Text timerText;
 
     /// <summary>
     /// Đổi màu viền khung thẻ bài.
@@ -305,7 +313,7 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
         SeatNumber = seat;
         if (seatBadgeGo == null)
         {
-            var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            var font = ThemeUI.FontMain;
             seatBadgeGo = new GameObject("SeatBadge", typeof(RectTransform), typeof(Image));
             seatBadgeGo.transform.SetParent(transform, false);
             var bImg = seatBadgeGo.GetComponent<Image>();
@@ -356,12 +364,12 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
         IsAlly = ally;
         if (ally)
         {
-            SetFaction("ĐỒNG MINH", new Color(0.12f, 0.45f, 0.85f, 0.95f));
+            SetFaction("PHE RỒNG", new Color(0.12f, 0.45f, 0.85f, 0.95f));
             SetFrameColor(new Color(0.25f, 0.72f, 1f, 1f));
         }
         else
         {
-            SetFaction("ĐỐI THỦ", new Color(0.85f, 0.22f, 0.22f, 0.95f));
+            SetFaction("PHE PHƯỢNG", new Color(0.85f, 0.22f, 0.22f, 0.95f));
             SetFrameColor(new Color(1f, 0.38f, 0.38f, 1f));
         }
     }
@@ -515,7 +523,7 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
     }
 
     /// <summary>
-    /// Hiển thị huy hiệu đếm ngược thời gian ngay trên đầu avatar tướng (40, 39, ..., 1).
+    /// Hiển thị huy hiệu đếm ngược thời gian ở bên trái avatar tướng (40s, 39s, ..., 1s).
     /// </summary>
     public void ShowHeadTimer(int seconds)
     {
@@ -531,11 +539,11 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
             bgImg.color = new Color(0.04f, 0.08f, 0.16f, 0.98f);
 
             var rt = headTimerBadgeGo.GetComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0.5f, 1f);
-            rt.anchorMax = new Vector2(0.5f, 1f);
-            rt.pivot = new Vector2(0.5f, 0f);
-            rt.sizeDelta = new Vector2(74f, 32f);
-            rt.anchoredPosition = new Vector2(0f, 6f); // Nổi ngay trên đầu avatar!
+            rt.anchorMin = new Vector2(0f, 0.5f);
+            rt.anchorMax = new Vector2(0f, 0.5f);
+            rt.pivot = new Vector2(1f, 0.5f);
+            rt.sizeDelta = new Vector2(68f, 28f);
+            rt.anchoredPosition = new Vector2(-6f, 62f); // Nằm bên trái avatar, phía trên máu hoa sen
 
             var frameGo = new GameObject("Frame", typeof(RectTransform), typeof(Image));
             frameGo.transform.SetParent(headTimerBadgeGo.transform, false);
@@ -550,8 +558,8 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
             var txtGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
             txtGo.transform.SetParent(headTimerBadgeGo.transform, false);
             headTimerText = txtGo.GetComponent<Text>();
-            headTimerText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            headTimerText.fontSize = 17;
+            headTimerText.font = ThemeUI.FontMain;
+            headTimerText.fontSize = 15;
             headTimerText.fontStyle = FontStyle.Bold;
             headTimerText.alignment = TextAnchor.MiddleCenter;
             headTimerText.color = new Color(1f, 0.9f, 0.35f, 1f);
@@ -568,7 +576,7 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
     {
         if (headTimerText == null || headTimerBadgeGo == null || !headTimerBadgeGo.activeSelf) return;
 
-        headTimerText.text = $"⏳ {seconds}";
+        headTimerText.text = $"⏳ {seconds}s";
         if (seconds <= 10)
         {
             headTimerText.color = new Color(1f, 0.35f, 0.35f, 1f);
@@ -591,6 +599,72 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
     /// <summary>
     /// Hiển thị trạng thái tử trận: Toàn bộ vị trí thẻ tướng bị xám tối và phủ bia tử trận.
     /// </summary>
+    /// <summary>
+    /// Hiển thị hiệu ứng kích hoạt kỹ năng tướng phát sáng hào quang và hiện banner kỹ năng
+    /// </summary>
+    public void AnimateSkillTrigger(string skillName)
+    {
+        StartCoroutine(AnimateSkillTriggerCoroutine(skillName));
+    }
+
+    private IEnumerator AnimateSkillTriggerCoroutine(string skillName)
+    {
+        if (transform == null) yield break;
+
+        var bannerGo = new GameObject("SkillTriggerBanner", typeof(RectTransform), typeof(Image));
+        bannerGo.transform.SetParent(transform, false);
+        bannerGo.transform.SetAsLastSibling();
+
+        var bImg = bannerGo.GetComponent<Image>();
+        var bgSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
+        if (bgSpr != null) { bImg.sprite = bgSpr; bImg.type = Image.Type.Sliced; }
+        bImg.color = new Color(0.95f, 0.65f, 0.12f, 0.95f);
+
+        var bRt = bannerGo.GetComponent<RectTransform>();
+        bRt.anchorMin = bRt.anchorMax = bRt.pivot = new Vector2(0.5f, 0.5f);
+        bRt.sizeDelta = new Vector2(160f, 32f);
+        bRt.anchoredPosition = new Vector2(0f, 20f);
+
+        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var txtGo = new GameObject("Txt", typeof(RectTransform), typeof(Text));
+        txtGo.transform.SetParent(bannerGo.transform, false);
+        var txt = txtGo.GetComponent<Text>();
+        txt.font = font;
+        txt.fontSize = 12;
+        txt.fontStyle = FontStyle.Bold;
+        txt.alignment = TextAnchor.MiddleCenter;
+        txt.text = $"✨ {skillName} ✨";
+        txt.color = Color.white;
+        FillRect(txtGo.GetComponent<RectTransform>());
+
+        var shadow = txtGo.AddComponent<Shadow>();
+        shadow.effectColor = new Color(0, 0, 0, 0.9f);
+        shadow.effectDistance = new Vector2(1, -1);
+
+        float elapsed = 0f;
+        float dur = 1.2f;
+        Vector3 initialScale = Vector3.one * 0.7f;
+        Vector3 targetScale = Vector3.one * 1.15f;
+
+        while (elapsed < dur)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / dur;
+            if (bannerGo == null) yield break;
+            bannerGo.transform.localScale = Vector3.Lerp(initialScale, targetScale, Mathf.SmoothStep(0f, 1f, t));
+            bRt.anchoredPosition = new Vector2(0f, Mathf.Lerp(15f, 45f, t));
+            if (t > 0.6f)
+            {
+                float a = Mathf.Lerp(1f, 0f, (t - 0.6f) / 0.4f);
+                bImg.color = new Color(0.95f, 0.65f, 0.12f, a * 0.95f);
+                txt.color = new Color(1f, 1f, 1f, a);
+            }
+            yield return null;
+        }
+
+        if (bannerGo != null) Destroy(bannerGo);
+    }
+
     public void SetAwaitingReaction(bool awaiting)
     {
         if (reactionBlinkCoroutine != null)
@@ -666,7 +740,7 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
             var txtGo = new GameObject("DeadText", typeof(RectTransform), typeof(Text));
             txtGo.transform.SetParent(deadOverlayGo.transform, false);
             var txt = txtGo.GetComponent<Text>();
-            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            txt.font = ThemeUI.FontMain;
             txt.fontSize = 14;
             txt.fontStyle = FontStyle.Bold;
             txt.alignment = TextAnchor.MiddleCenter;
@@ -692,62 +766,17 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
     }
 
     /// <summary>
-    /// Cập nhật thanh đếm ngược thời gian suy nghĩ / hành động.
+    /// Cập nhật thời gian đếm ngược (đồng bộ trên huy hiệu bên trái avatar, không dùng cột vàng).
     /// </summary>
     public void SetTimerVisual(float remaining, float max = 40f, bool visible = true)
     {
-        if (timerBarGo == null && visible)
+        if (visible && remaining > 0f)
         {
-            var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            timerBarGo = new GameObject("TimerContainer", typeof(RectTransform), typeof(Image));
-            timerBarGo.transform.SetParent(transform, false);
-            var bgImg = timerBarGo.GetComponent<Image>();
-            bgImg.color = new Color(0.04f, 0.07f, 0.14f, 0.95f);
-            var tRt = timerBarGo.GetComponent<RectTransform>();
-            tRt.anchorMin = new Vector2(0.5f, 1f);
-            tRt.anchorMax = new Vector2(0.5f, 1f);
-            tRt.pivot = new Vector2(0.5f, 0f);
-            tRt.sizeDelta = new Vector2(120f, 18f);
-            tRt.anchoredPosition = new Vector2(0f, 4f);
-
-            var fillGo = new GameObject("Fill", typeof(RectTransform), typeof(Image));
-            fillGo.transform.SetParent(timerBarGo.transform, false);
-            var fImg = fillGo.GetComponent<Image>();
-            fImg.color = new Color(1f, 0.82f, 0.25f, 1f);
-            timerBarFillRt = fillGo.GetComponent<RectTransform>();
-            timerBarFillRt.anchorMin = Vector2.zero;
-            timerBarFillRt.anchorMax = Vector2.one;
-            timerBarFillRt.pivot = new Vector2(0f, 0.5f);
-            timerBarFillRt.offsetMin = timerBarFillRt.offsetMax = Vector2.zero;
-
-            var txtGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
-            txtGo.transform.SetParent(timerBarGo.transform, false);
-            timerText = txtGo.GetComponent<Text>();
-            timerText.font = font;
-            timerText.fontSize = 11;
-            timerText.fontStyle = FontStyle.Bold;
-            timerText.alignment = TextAnchor.MiddleCenter;
-            timerText.color = Color.white;
-            var txtRt = txtGo.GetComponent<RectTransform>();
-            txtRt.anchorMin = Vector2.zero; txtRt.anchorMax = Vector2.one;
-            txtRt.offsetMin = txtRt.offsetMax = Vector2.zero;
+            ShowHeadTimer(Mathf.CeilToInt(remaining));
         }
-
-        if (timerBarGo != null)
+        else
         {
-            timerBarGo.SetActive(visible);
-            if (visible)
-            {
-                float ratio = Mathf.Clamp01(remaining / max);
-                if (timerBarFillRt != null)
-                {
-                    timerBarFillRt.anchorMax = new Vector2(ratio, 1f);
-                }
-                if (timerText != null)
-                {
-                    timerText.text = $"{Mathf.CeilToInt(remaining)}s";
-                }
-            }
+            HideHeadTimer();
         }
     }
 
@@ -1055,7 +1084,7 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
             Destroy(child.gameObject);
         }
 
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         foreach (var scroll in delayedScrolls)
         {
@@ -1149,7 +1178,7 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
     public void BuildHierarchy(Vector2 cardSize)
     {
         var rootTransform = transform;
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         var rootImg = GetComponent<Image>();
         if (rootImg == null) rootImg = gameObject.AddComponent<Image>();
@@ -1311,7 +1340,7 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
         healthRt.anchorMin = new Vector2(0f, 0.5f);
         healthRt.anchorMax = new Vector2(0f, 0.5f);
         healthRt.pivot = new Vector2(1f, 0.5f);
-        healthRt.anchoredPosition = new Vector2(-6f, 32f);
+        healthRt.anchoredPosition = new Vector2(-6f, 2f); // Hạ thấp máu xuống để cân đối và thoáng mắt
 
         // 5.5 Nút Kỹ Năng Tướng (Bên trái avatar, ngay dưới cột máu hoa sen)
         skillButtonGo = new GameObject("SkillButton", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -1327,7 +1356,7 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
         sRt.anchorMax = new Vector2(0f, 0.5f);
         sRt.pivot = new Vector2(1f, 0.5f);
         sRt.sizeDelta = new Vector2(80f, 34f);
-        sRt.anchoredPosition = new Vector2(-6f, -60f);
+        sRt.anchoredPosition = new Vector2(-6f, -65f);
 
         // Hào quang phát sáng khi dùng được
         skillHaloGo = new GameObject("SkillHalo", typeof(RectTransform), typeof(Image));
@@ -1540,7 +1569,7 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
         var canvas = GetComponentInParent<Canvas>();
         if (canvas == null) return;
 
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         // Modal Root
         var modalRoot = new GameObject("GeneralInfoModal", typeof(RectTransform), typeof(Image));

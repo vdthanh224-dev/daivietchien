@@ -1,0 +1,10 @@
+{
+  "tasks": {
+    "dev": "deno run --allow-env --allow-net --watch main.ts",
+    "deploy": "deployctl deploy --project=dai-viet-chien --entrypoint=main.ts"
+  },
+  "imports": {},
+  "compilerOptions": {
+    "lib": ["deno.window", "dom"]
+  }
+}

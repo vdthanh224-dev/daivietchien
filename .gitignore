@@ -8,6 +8,22 @@
 [Uu]ser[Ss]ettings/
 [Mm]emoryCaptures/
 [Rr]ecordings/
+.utmp/
+.dotnet-cli/
+
+# Build outputs & Backups
+*.apk
+*.aab
+*.log
+*BackUpThisFolder*
+*BurstDebugInformation*
+buildweb/
+web/
+
+# Temp scripts
+*.py
+scratch_*.ps1
+.tmp_*
 
 # Visual Studio / VS Code
 .vs/

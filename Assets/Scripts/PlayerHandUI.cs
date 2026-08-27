@@ -252,7 +252,13 @@ public class PlayerHandUI : MonoBehaviour
     /// </summary>
     public int TransformSlashAndDodge()
     {
+        return TransformSlashAndDodge(out _);
+    }
+
+    public int TransformSlashAndDodge(out string resultingName)
+    {
         int count = 0;
+        resultingName = "";
         foreach (var cardUI in handCards)
         {
             if (cardUI == null || cardUI.Data == null) continue;
@@ -287,6 +293,7 @@ public class PlayerHandUI : MonoBehaviour
                         d.iconPath = "UI/icon_dodge";
                     }
 
+                    resultingName = d.cardName;
                     cardUI.RefreshVisuals();
                     StartCoroutine(AnimateCardTransform(cardUI.transform));
                     count++;
@@ -318,6 +325,7 @@ public class PlayerHandUI : MonoBehaviour
                         d.iconPath = "UI/icon_slash";
                     }
 
+                    resultingName = d.cardName;
                     cardUI.RefreshVisuals();
                     StartCoroutine(AnimateCardTransform(cardUI.transform));
                     count++;
@@ -329,6 +337,12 @@ public class PlayerHandUI : MonoBehaviour
         {
             OnCardSelected?.Invoke(SelectedCard);
             OnSelectionChanged?.Invoke(new List<CardUI>(selectedCards));
+        }
+
+        // Đọc tên lá bài vừa chuyển hóa thành
+        if (!string.IsNullOrEmpty(resultingName))
+        {
+            AudioManager.Instance.PlayCardVoice(resultingName);
         }
 
         return count;
@@ -404,6 +418,12 @@ public class PlayerHandUI : MonoBehaviour
         {
             OnCardSelected?.Invoke(SelectedCard);
             OnSelectionChanged?.Invoke(new List<CardUI>(selectedCards));
+        }
+
+        // Đọc tên lá bài vừa chuyển hóa thành
+        if (!string.IsNullOrEmpty(resultName))
+        {
+            AudioManager.Instance.PlayCardVoice(resultName);
         }
 
         return resultName;

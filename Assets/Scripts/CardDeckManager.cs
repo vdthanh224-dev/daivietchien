@@ -37,18 +37,21 @@ public class CardDeckManager : MonoBehaviour
     /// <summary>
     /// Khởi tạo kho bài: Nạp danh sách bài và xáo bài lần đầu tiên.
     /// </summary>
-    public void InitializeDeck(int mode = 52)
+    private int currentDeckSeed = 0;
+
+    public void InitializeDeck(int mode = 52, int seed = 0)
     {
         deckMode = mode;
+        currentDeckSeed = seed;
         drawPile.Clear();
         discardPile.Clear();
 
         var masterDeck = CardDatabase.CreateDeck(deckMode);
         drawPile.AddRange(masterDeck);
 
-        // Xáo bộ bài 1 lần lúc bắt đầu
-        ShuffleList(drawPile);
-        Debug.Log($"[CardDeckManager] Đã khởi tạo kho bài {deckMode} lá và xáo bài lần đầu.");
+        // Xáo bộ bài 1 lần lúc bắt đầu với seed đồng bộ
+        ShuffleList(drawPile, currentDeckSeed);
+        Debug.Log($"[CardDeckManager] Đã khởi tạo kho bài {deckMode} lá và xáo bài lần đầu (Seed: {currentDeckSeed}).");
 
         NotifyCounts();
     }
@@ -185,7 +188,8 @@ public class CardDeckManager : MonoBehaviour
         drawPile.AddRange(discardPile);
         discardPile.Clear();
 
-        ShuffleList(drawPile);
+        currentDeckSeed = (currentDeckSeed != 0) ? currentDeckSeed + 1337 : 0;
+        ShuffleList(drawPile, currentDeckSeed);
         OnDeckReshuffled?.Invoke();
         NotifyCounts();
     }
@@ -193,9 +197,9 @@ public class CardDeckManager : MonoBehaviour
     /// <summary>
     /// Thuật toán xáo bài ngẫu nhiên Fisher-Yates.
     /// </summary>
-    public static void ShuffleList<T>(List<T> list)
+    public static void ShuffleList<T>(List<T> list, int seed = 0)
     {
-        var rng = new System.Random();
+        var rng = (seed != 0) ? new System.Random(seed) : new System.Random();
         int n = list.Count;
         while (n > 1)
         {

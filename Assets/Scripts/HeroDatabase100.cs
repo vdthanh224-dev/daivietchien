@@ -132,11 +132,15 @@ public static class HeroDatabase100
                 return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
             }
         }
+        var defSpr = Resources.Load<Sprite>("UI/ly_thuong_kiet");
+        if (defSpr != null) return defSpr;
         var defTex = Resources.Load<Texture2D>("UI/ly_thuong_kiet");
         if (defTex != null)
         {
             return Sprite.Create(defTex, new Rect(0, 0, defTex.width, defTex.height), new Vector2(0.5f, 0.5f), 100f);
         }
+        var altSpr = Resources.Load<Sprite>("UI/game_avatar");
+        if (altSpr != null) return altSpr;
         return null;
     }
 
@@ -146,7 +150,7 @@ public static class HeroDatabase100
         allHeroesList.Clear();
 
         AddHero(1, "Cao Lỗ", "Âu Lạc", 4, "Chế Nỏ", "Bạn có thể dùng bất kỳ lá bài chất Bích (♠) như lá trang bị Nỏ Thần Kim Quy.", "UI/cao_lo");
-        AddHero(2, "Đào Hãn", "Âu Lạc", 4, "Xạ Thuẫn", "Khoảng cách khi bạn dùng Trảm lên mục tiêu luôn được giảm 2.", "UI/dao_han");
+        AddHero(2, "Nồi Hầu", "Âu Lạc", 4, "Xạ Thuẫn", "Khoảng cách khi bạn dùng Trảm lên mục tiêu luôn được giảm 1.", "UI/noi_hau");
         AddHero(3, "Thi Sách", "Thời Trưng Vương", 4, "Hịch Nghĩa", "Khi bạn rơi vào trạng thái Cận Tử và được cứu sống, bạn lập tức rút 2 lá bài.", "UI/thi_sach");
         AddHero(4, "Lê Chân", "Thời Trưng Vương", 3, "Hải Tần", "Trong Giai đoạn Ra bài, giới hạn 1 lần, bạn có thể sử dụng 1 lá bài Đen trên tay để xem như vừa sử dụng 1 lá Đột Kích Trộm Lương.", "UI/le_chan");
         AddHero(5, "Thánh Thiên", "Thời Trưng Vương", 4, "Dũng Nữ", "Đòn Trảm của bạn khiến mục tiêu phải đánh ra 2 lá Đỡ mới có thể triệt tiêu nếu mục tiêu có lượng Máu hiện tại nhiều hơn bạn.", "UI/thanh_thien");

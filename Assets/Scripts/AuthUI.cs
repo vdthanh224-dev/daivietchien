@@ -39,6 +39,7 @@ public sealed class AuthUI : MonoBehaviour
     private bool registerMode = false;
     private string signedInEmail;
     private string sessionCookie;
+    private string sessionSecret;
     private bool activeSessionError;
     private bool restoringSession;
 
@@ -68,6 +69,7 @@ public sealed class AuthUI : MonoBehaviour
 
     private void Awake()
     {
+        Application.runInBackground = true;
         if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
@@ -80,6 +82,7 @@ public sealed class AuthUI : MonoBehaviour
     {
         EnsureEventSystem();
         sessionCookie = PlayerPrefs.GetString("auth_session_cookie", "");
+        sessionSecret = PlayerPrefs.GetString("auth_session_secret", "");
         signedInEmail = PlayerPrefs.GetString("auth_last_email", "");
         CurrentUserName = PlayerPrefs.GetString("auth_user_name", "Đại Tướng Quân");
         CurrentMilitaryPoints = PlayerPrefs.GetInt("auth_military_points", 0);
@@ -190,7 +193,7 @@ public sealed class AuthUI : MonoBehaviour
         }
         cardBg.color = Color.white;
 
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         // 1. Tab Bar: [ ĐĂNG NHẬP ] | [ ĐĂNG KÝ ]
         var tabBarGo = new GameObject("TabBar", typeof(RectTransform));
@@ -462,7 +465,7 @@ public sealed class AuthUI : MonoBehaviour
         var modalRt = modalBox.rectTransform;
         SetRect(modalRt, Center(), Center(), Center(), new Vector2(740, 480), Vector2.zero);
 
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         // Tiêu đề Modal
         var title = AddText(modalBox.transform, "Title", "CHÀO MỪNG TÂN CHIẾN TƯỚNG", 24, GameTheme.GoldBright, FontStyle.Bold, TextAnchor.MiddleCenter);
@@ -577,7 +580,7 @@ public sealed class AuthUI : MonoBehaviour
             return;
         }
 
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         var rewardModalGo = new GameObject("RewardModalRoot", typeof(RectTransform), typeof(CanvasGroup), typeof(Image));
         rewardModalGo.transform.SetParent(canvas != null ? canvas.transform : transform, false);
@@ -955,6 +958,7 @@ public sealed class AuthUI : MonoBehaviour
             Debug.Log($"[Auth] Account loaded: {CurrentUserName} ({CurrentUserEmail}) - Labels: [{string.Join(", ", CurrentUserLabels)}] - IsAdmin: {IsAdmin}");
 
             SaveSessionState();
+            if (HomeUI.Instance != null) HomeUI.Instance.RefreshUserData();
             var shouldAsk = !string.IsNullOrWhiteSpace(signedInEmail) && PlayerPrefs.GetInt(OnboardingKey(signedInEmail), 0) != 2;
             yield return ResolveOnboardingAndShow(shouldAsk, true);
             restoringSession = false;
@@ -992,6 +996,7 @@ public sealed class AuthUI : MonoBehaviour
             if (request.result == UnityWebRequest.Result.Success)
             {
                 SaveSessionState();
+            if (HomeUI.Instance != null) HomeUI.Instance.RefreshUserData();
                 if (path == "/account/sessions/email")
                     yield return ResolveOnboardingAndShow(showOnboarding, false);
                 else
@@ -1023,6 +1028,7 @@ public sealed class AuthUI : MonoBehaviour
                         if (retryReq.result == UnityWebRequest.Result.Success)
                         {
                             SaveSessionState();
+            if (HomeUI.Instance != null) HomeUI.Instance.RefreshUserData();
                             yield return ResolveOnboardingAndShow(showOnboarding, false);
                             completed?.Invoke(true);
                             yield break;
@@ -1158,7 +1164,17 @@ public sealed class AuthUI : MonoBehaviour
         {
             return;
         }
-        if (!string.IsNullOrEmpty(sessionCookie)) request.SetRequestHeader("Cookie", sessionCookie);
+        string secret = PlayerPrefs.GetString("auth_session_secret", sessionSecret);
+        if (!string.IsNullOrEmpty(secret))
+        {
+            request.SetRequestHeader("X-Appwrite-Session", secret);
+        }
+        if (!string.IsNullOrEmpty(sessionCookie))
+        {
+#if !UNITY_WEBGL || UNITY_EDITOR
+            request.SetRequestHeader("Cookie", sessionCookie);
+#endif
+        }
     }
 
     public static IEnumerator SaveUserProfileToAppwrite(Action onComplete = null)
@@ -1182,8 +1198,15 @@ public sealed class AuthUI : MonoBehaviour
             request.downloadHandler = new DownloadHandlerBuffer();
             request.SetRequestHeader("Content-Type", "application/json");
             request.SetRequestHeader("X-Appwrite-Project", ProjectId);
+            string secret = PlayerPrefs.GetString("auth_session_secret", "");
+            if (!string.IsNullOrEmpty(secret)) request.SetRequestHeader("X-Appwrite-Session", secret);
             string cookie = PlayerPrefs.GetString("auth_session_cookie", "");
-            if (!string.IsNullOrEmpty(cookie)) request.SetRequestHeader("Cookie", cookie);
+            if (!string.IsNullOrEmpty(cookie))
+            {
+#if !UNITY_WEBGL || UNITY_EDITOR
+                request.SetRequestHeader("Cookie", cookie);
+#endif
+            }
             yield return request.SendWebRequest();
             if (request.result == UnityWebRequest.Result.Success)
             {
@@ -1201,25 +1224,46 @@ public sealed class AuthUI : MonoBehaviour
     private void CaptureSessionCookie(UnityWebRequest request)
     {
         var headers = request.GetResponseHeaders();
-        if (headers == null) return;
-        string cookie = null;
-        foreach (var header in headers)
+        if (headers != null)
         {
-            if (string.Equals(header.Key, "Set-Cookie", StringComparison.OrdinalIgnoreCase))
+            string cookie = null;
+            foreach (var header in headers)
             {
-                cookie = header.Value;
-                break;
+                if (string.Equals(header.Key, "Set-Cookie", StringComparison.OrdinalIgnoreCase))
+                {
+                    cookie = header.Value;
+                    break;
+                }
+            }
+            if (!string.IsNullOrEmpty(cookie))
+            {
+                var end = cookie.IndexOf(';');
+                sessionCookie = end >= 0 ? cookie.Substring(0, end) : cookie;
             }
         }
-        if (string.IsNullOrEmpty(cookie)) return;
-        var end = cookie.IndexOf(';');
-        sessionCookie = end >= 0 ? cookie.Substring(0, end) : cookie;
+
+        if (request.downloadHandler != null && !string.IsNullOrEmpty(request.downloadHandler.text))
+        {
+            string text = request.downloadHandler.text;
+            int secretIdx = text.IndexOf("\"secret\":\"", StringComparison.OrdinalIgnoreCase);
+            if (secretIdx >= 0)
+            {
+                int start = secretIdx + 10;
+                int end = text.IndexOf("\"", start);
+                if (end > start)
+                {
+                    sessionSecret = text.Substring(start, end - start);
+                }
+            }
+        }
+
         SaveSessionState();
     }
 
     private void SaveSessionState()
     {
         PlayerPrefs.SetString("auth_session_cookie", sessionCookie);
+        if (!string.IsNullOrEmpty(sessionSecret)) PlayerPrefs.SetString("auth_session_secret", sessionSecret);
         if (!string.IsNullOrWhiteSpace(signedInEmail)) PlayerPrefs.SetString("auth_last_email", signedInEmail);
         PlayerPrefs.Save();
     }
@@ -1241,7 +1285,7 @@ public sealed class AuthUI : MonoBehaviour
         var go = new GameObject(objectName, typeof(Text));
         go.transform.SetParent(parent, false);
         var text = go.GetComponent<Text>();
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.font = ThemeUI.FontMain;
         text.text = value;
         text.fontSize = size;
         text.color = color;

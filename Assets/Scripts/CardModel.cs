@@ -129,6 +129,42 @@ public class CardModel
         };
     }
 
+    public string GetSuitShortName()
+    {
+        return suit switch
+        {
+            CardSuit.Spade => "Bích",
+            CardSuit.Club => "Chuồn",
+            CardSuit.Heart => "Cơ",
+            CardSuit.Diamond => "Rô",
+            _ => "?"
+        };
+    }
+
+    public string GetSuitFullName()
+    {
+        return suit switch
+        {
+            CardSuit.Spade => "Bích ♠",
+            CardSuit.Club => "Chuồn ♣",
+            CardSuit.Heart => "Cơ ♥",
+            CardSuit.Diamond => "Rô ♦",
+            _ => "?"
+        };
+    }
+
+    public string GetSuitIconPath()
+    {
+        return suit switch
+        {
+            CardSuit.Spade => "UI/suit_spade",
+            CardSuit.Club => "UI/suit_club",
+            CardSuit.Heart => "UI/suit_heart",
+            CardSuit.Diamond => "UI/suit_diamond",
+            _ => "UI/suit_spade"
+        };
+    }
+
     public Color GetSuitColor()
     {
         return IsRed ? new Color(0.85f, 0.15f, 0.15f, 1f) : new Color(0.12f, 0.14f, 0.18f, 1f);

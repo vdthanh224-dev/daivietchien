@@ -302,7 +302,7 @@ public class TutorialBattleUI : MonoBehaviour
     #region 1. BATTLEFIELD SETUP
     private void BuildBattlefield()
     {
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         // 1. Nền chiến trường
         var bgGo = new GameObject("BattleBackground", typeof(RectTransform), typeof(RawImage));
@@ -351,7 +351,7 @@ public class TutorialBattleUI : MonoBehaviour
 
     private void BuildDeckStatusHUD()
     {
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         deckHudGo = new GameObject("DeckStatusHUD", typeof(RectTransform));
         deckHudGo.transform.SetParent(transform, false);
@@ -472,7 +472,7 @@ public class TutorialBattleUI : MonoBehaviour
 
     private void BuildCardDescBar()
     {
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         var barGo = new GameObject("CardDescBar", typeof(RectTransform), typeof(Image));
         barGo.transform.SetParent(transform, false);
@@ -532,7 +532,7 @@ public class TutorialBattleUI : MonoBehaviour
         }
         else if (currentStep == TutorialStep.BossTurnAndDodge)
         {
-            if (cardUI != null && IsDodgeCard(cardUI.Data))
+            if (cardUI != null && CanActAsDodge(playerCard, cardUI.Data))
             {
                 ActivateDodgeButton();
             }
@@ -585,7 +585,7 @@ public class TutorialBattleUI : MonoBehaviour
     #region 2. BƯỚC 1: HƯỚNG DẪN MÁU HOA SEN
     private void BuildHealthSpotlightTutorial()
     {
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         spotlightOverlay = new GameObject("HealthSpotlightOverlay", typeof(RectTransform));
         spotlightOverlay.transform.SetParent(transform, false);
@@ -1129,28 +1129,35 @@ public class TutorialBattleUI : MonoBehaviour
         if (gameFinished || playerRescuePending || playerTurnStartResolving)
             return;
 
-        // In player's own turn, check if play phase is locked
-        if (isPlayerTurn && playerPlayPhaseLocked)
+        // Trong bước hướng dẫn kỹ năng hoặc khi đang chiến đấu tự do, luôn kích hoạt mượt mà
+        if (currentStep == TutorialStep.SkillTienThoaiLesson)
         {
-            SetLog("🕸️ [Trầm Ảo Sa Bẫy]: Không thể dùng kỹ năng trong lượt bị bỏ qua Giai đoạn Ra bài.");
-            return;
+            // Được phép thực thi ngay!
+        }
+        else
+        {
+            if (isPlayerTurn && playerPlayPhaseLocked)
+            {
+                SetLog("🕸️ [Trầm Ảo Sa Bẫy]: Không thể dùng kỹ năng trong lượt bị bỏ qua Giai đoạn Ra bài.");
+                return;
+            }
+
+            bool isDefending = isAwaitingDodge || slashDefenseActive || duelResponseActive || globalDefenseActive;
+
+            if (!isPlayerTurn && !isDefending && currentStep < TutorialStep.FreeBattleUnlocked)
+            {
+                SetLog("⏳ Chưa tới lượt của bạn hoặc không trong tình huống cần xuất chiêu.");
+                return;
+            }
+
+            if (playerActionResolving && !isDefending)
+            {
+                return;
+            }
         }
 
-        bool isDefending = isAwaitingDodge || slashDefenseActive || duelResponseActive || globalDefenseActive;
-
-        if (!isPlayerTurn && !isDefending)
-        {
-            SetLog("⏳ Chưa tới lượt của bạn hoặc không trong tình huống cần xuất chiêu.");
-            return;
-        }
-
-        if (playerActionResolving && !isDefending)
-        {
-            return;
-        }
-
+        playerCard.AnimateSkillTrigger("TIẾN THOÁI");
         AudioManager.Instance.PlaySkill();
-        AudioManager.Instance.PlayCardVoice("Tiến Thoái");
         int transformed = playerHandUI.TransformSlashAndDodge();
         SetLog($"✨ <color=#FFD700><b>LÝ THƯỜNG KIỆT THI TRIỂN [TIẾN THOÁI]!</b></color> Đã hoán chuyển {transformed} lá Trảm ⟷ Đỡ trên tay!");
 
@@ -1581,7 +1588,7 @@ public class TutorialBattleUI : MonoBehaviour
                 }
 
                 // Mở thanh nút lệnh tự do
-                var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                var font = ThemeUI.FontMain;
                 BuildActionControls(font);
                 // Đầu lượt mới: Rút 2 lá bài
                 StartCoroutine(PlayerTurnStartFreePlay());
@@ -1945,7 +1952,7 @@ public class TutorialBattleUI : MonoBehaviour
     {
         if (attacker == null || target == null) return false;
         int distance = CalculateDistance(attacker, target);
-        if (attacker.GeneralName.Contains("Đào Hãn") && (card == null || IsSlashCard(card)))
+        if ((attacker.GeneralName.Contains("Đào Hãn") || attacker.GeneralName.Contains("Nồi Hầu")) && (card == null || IsSlashCard(card)))
         {
             distance = Mathf.Max(1, distance - 2); // Kỹ năng Xạ Thuẫn: Giảm 2 cự ly khi dùng Trảm
         }
@@ -2088,8 +2095,11 @@ public class TutorialBattleUI : MonoBehaviour
 
         if (card.subType == CardSubType.Dodge)
         {
-            SetLog("🛡️ [Đỡ]: Lá này là bài phản ứng, chỉ dùng khi bạn bị đối phương tấn công (hoặc bấm kỹ năng [⚡ TIẾN THOÁI] để đổi thành Trảm)!");
-            return;
+            if (!CanActAsSlash(playerCard, card))
+            {
+                SetLog("🛡️ [Đỡ]: Lá này là bài phản ứng, chỉ dùng khi bạn bị đối phương tấn công (hoặc bấm kỹ năng [⚡ TIẾN THOÁI] để đổi thành Trảm)!");
+                return;
+            }
         }
 
         if (card.subType == CardSubType.Peach && playerCard.CurrentHp >= playerCard.MaxHp)
@@ -2167,7 +2177,7 @@ public class TutorialBattleUI : MonoBehaviour
         switch (card.category)
         {
             case CardCategory.Basic:
-                if (IsSlashCard(card))
+                if (CanActAsSlash(playerCard, card))
                 {
                     int dmg = isWineBuffActive ? 2 : 1;
                     string wineLog = isWineBuffActive ? " (kèm hiệu ứng Hủ Rượu: +1 Sát thương!)" : "";
@@ -2395,7 +2405,7 @@ public class TutorialBattleUI : MonoBehaviour
             return false;
         }
 
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
         var modalGo = new GameObject("CardPickModal", typeof(RectTransform), typeof(CanvasGroup), typeof(Image));
         modalGo.transform.SetParent(transform, false);
         modalGo.transform.SetAsLastSibling();
@@ -2965,7 +2975,7 @@ public class TutorialBattleUI : MonoBehaviour
         rRt.sizeDelta = new Vector2(680f, 48f);
         rRt.anchoredPosition = new Vector2(-70f, 238f);
 
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         // Nút kích hoạt
         var triggerBtnGo = new GameObject("Btn_Trigger", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -3088,7 +3098,7 @@ public class TutorialBattleUI : MonoBehaviour
         panelRt.sizeDelta = new Vector2(680f, 48f);
         panelRt.anchoredPosition = new Vector2(-70f, 238f);
 
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         var triggerGo = new GameObject("Btn_Trigger", typeof(RectTransform), typeof(Image), typeof(Button));
         triggerGo.transform.SetParent(panelGo.transform, false);
@@ -3208,7 +3218,7 @@ public class TutorialBattleUI : MonoBehaviour
         rRt.sizeDelta = new Vector2(680f, 48f);
         rRt.anchoredPosition = new Vector2(-70f, 238f);
 
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         // Nút Né Đòn
         var dodgeBtnGo = new GameObject("Btn_Dodge", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -3261,7 +3271,7 @@ public class TutorialBattleUI : MonoBehaviour
 
         Action<CardUI> onCardSelectedDuringReaction = (cardUI) =>
         {
-            if (cardUI != null && IsDodgeCard(cardUI.Data))
+            if (cardUI != null && CanActAsDodge(playerCard, cardUI.Data))
             {
                 // Kiểm tra nếu Boss có Súng Thần Công Hồ Triều: Cấm tuyệt đối Đỡ cùng chất với Trảm
                 if (bossHasCannon && cardUI.Data.suit == slashCard.suit)
@@ -3290,7 +3300,7 @@ public class TutorialBattleUI : MonoBehaviour
 
         slashDefenseActive = true;
         onCurrentReactionCardSelected = onCardSelectedDuringReaction;
-        playerHandUI.HighlightOnlyMatching(c => c != null && IsDodgeCard(c) && (!bossHasCannon || c.suit != slashCard.suit));
+        playerHandUI.HighlightOnlyMatching(c => c != null && CanActAsDodge(playerCard, c) && (!bossHasCannon || c.suit != slashCard.suit));
 
         playerHandUI.OnCardSelected += onCardSelectedDuringReaction;
 
@@ -3408,7 +3418,7 @@ public class TutorialBattleUI : MonoBehaviour
         panelRt.sizeDelta = new Vector2(680f, 48f);
         panelRt.anchoredPosition = new Vector2(-70f, 238f);
 
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
         var slashGo = new GameObject("Btn_Slash", typeof(RectTransform), typeof(Image), typeof(Button));
         slashGo.transform.SetParent(panelGo.transform, false);
         slashGo.GetComponent<Image>().color = new Color(0.5f, 0.5f, 0.5f, 0.9f);
@@ -3553,7 +3563,7 @@ public class TutorialBattleUI : MonoBehaviour
         SetLog($"🍚 [{caster.GeneralName}] mở kho cứu tế! Lật {revealedCards.Count} lá bài công khai cho cả bàn đấu cùng xem.");
 
         // 3. Khởi tạo Modal Mở Kho Cứu Tế
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
         var modalGo = new GameObject("HarvestModal", typeof(RectTransform), typeof(CanvasGroup), typeof(Image));
         modalGo.transform.SetParent(transform, false);
         modalGo.transform.SetAsLastSibling();
@@ -3829,7 +3839,7 @@ public class TutorialBattleUI : MonoBehaviour
         tbRt.sizeDelta = new Vector2(240f, 28f);
         tbRt.anchoredPosition = new Vector2(0f, 6f);
 
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
         var titleTxt = titleBoxGo.AddComponent<Text>();
         titleTxt.font = font;
         titleTxt.fontSize = 11;
@@ -3967,7 +3977,7 @@ public class TutorialBattleUI : MonoBehaviour
         rRt.sizeDelta = new Vector2(680f, 48f);
         rRt.anchoredPosition = new Vector2(-70f, 238f);
 
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         // Nút Đánh Trảm
         var slashBtnGo = new GameObject("Btn_Slash", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -4095,7 +4105,7 @@ public class TutorialBattleUI : MonoBehaviour
         rRt.sizeDelta = new Vector2(680f, 48f);
         rRt.anchoredPosition = new Vector2(-70f, 238f);
 
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         // Nút Đánh Đỡ
         var dodgeBtnGo = new GameObject("Btn_Dodge", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -4146,7 +4156,7 @@ public class TutorialBattleUI : MonoBehaviour
 
         Action<CardUI> onCardSelected = (cardUI) =>
         {
-            if (cardUI != null && IsDodgeCard(cardUI.Data))
+            if (cardUI != null && CanActAsDodge(playerCard, cardUI.Data))
             {
                 chosenDodgeUI = cardUI;
                 dBtn.interactable = true;
@@ -4314,7 +4324,7 @@ public class TutorialBattleUI : MonoBehaviour
         panelRt.sizeDelta = new Vector2(560f, 150f);
         panelRt.anchoredPosition = new Vector2(-70f, 120f);
 
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
         var titleGo = new GameObject("Title", typeof(RectTransform), typeof(Text));
         titleGo.transform.SetParent(panelGo.transform, false);
         var title = titleGo.GetComponent<Text>();
@@ -4414,7 +4424,7 @@ public class TutorialBattleUI : MonoBehaviour
         boxRt.sizeDelta = new Vector2(580f, 320f);
         boxRt.anchoredPosition = Vector2.zero;
 
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         // Tiêu đề chiến thắng
         var titleGo = new GameObject("Title", typeof(RectTransform), typeof(Text));
@@ -5325,7 +5335,7 @@ public class TutorialBattleUI : MonoBehaviour
 
         bool decided = false;
         bool canceled = false;
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
         var panelGo = new GameObject("CounterScrollPrompt", typeof(RectTransform), typeof(Image));
         panelGo.transform.SetParent(transform, false);
         panelGo.transform.SetAsLastSibling();
@@ -5423,7 +5433,7 @@ public class TutorialBattleUI : MonoBehaviour
     {
         if (tutorialStepOverlay != null) return;
 
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         tutorialStepOverlay = new GameObject("TutorialStepOverlay", typeof(RectTransform));
         tutorialStepOverlay.transform.SetParent(transform, false);
@@ -5437,6 +5447,7 @@ public class TutorialBattleUI : MonoBehaviour
         var bgSprite = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
         if (bgSprite != null) { pImg.sprite = bgSprite; pImg.type = Image.Type.Sliced; }
         pImg.color = new Color(0.08f, 0.12f, 0.22f, 0.96f);
+        pImg.raycastTarget = false;
 
         var promptBoxRt = promptGo.GetComponent<RectTransform>();
         promptBoxRt.anchorMin = promptBoxRt.anchorMax = promptBoxRt.pivot = new Vector2(0.5f, 0.5f);
@@ -5613,7 +5624,7 @@ public class TutorialBattleUI : MonoBehaviour
         judgeCardGo.transform.localScale = Vector3.one * 1.12f;
 
         // 2. Banner biểu tượng kết quả (TICK ✔ nếu bị giam / trúng sấm, X ✖ nếu thoát bẫy / an toàn)
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         var badgeGo = new GameObject("JudgementBadge", typeof(RectTransform), typeof(Image));
         badgeGo.transform.SetParent(judgeCardGo.transform, false);
@@ -5715,6 +5726,22 @@ public class TutorialBattleUI : MonoBehaviour
         }
 
         yield return new WaitForSeconds(0.3f);
+    }
+
+    private bool CanActAsSlash(GeneralCardUI g, CardModel c)
+    {
+        if (c == null) return false;
+        if (IsSlashCard(c)) return true;
+        if (g != null && g.GeneralName.Contains("Lý Thường Kiệt") && c.subType == CardSubType.Dodge) return true;
+        return false;
+    }
+
+    private bool CanActAsDodge(GeneralCardUI g, CardModel c)
+    {
+        if (c == null) return false;
+        if (c.subType == CardSubType.Dodge) return true;
+        if (g != null && g.GeneralName.Contains("Lý Thường Kiệt") && IsSlashCard(c)) return true;
+        return false;
     }
 
     private static bool IsSlashCard(CardModel card)
@@ -6129,7 +6156,7 @@ public class TutorialBattleUI : MonoBehaviour
         // Nhãn người vừa sử dụng hoặc thông báo bài bị hủy ở phía dưới
         if (!string.IsNullOrEmpty(customTag) || caster != null)
         {
-            var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            var font = ThemeUI.FontMain;
             var tagGo = new GameObject("CasterTag", typeof(RectTransform), typeof(Image));
             tagGo.transform.SetParent(centerContainer.transform, false);
             var tImg = tagGo.GetComponent<Image>();

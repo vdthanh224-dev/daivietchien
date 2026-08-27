@@ -1,0 +1,9 @@
+{
+  "name": "dai-viet-chien",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "deno run --allow-net --allow-env server.js"
+  }
+}

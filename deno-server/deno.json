@@ -1,0 +1,15 @@
+{
+  "name": "dai-viet-chien",
+  "version": "1.0.0",
+  "exports": "./main.js",
+  "tasks": {
+    "start": "deno run --allow-net --allow-env main.js",
+    "dev": "deno run --watch --allow-net --allow-env main.js"
+  },
+  "deploy": {
+    "org": "vdthanh",
+    "app": "dai-viet-chien-server"
+  }
+}
+
+

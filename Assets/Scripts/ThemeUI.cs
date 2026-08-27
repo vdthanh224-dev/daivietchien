@@ -29,42 +29,44 @@ public static class ThemeUI
         {
             if (cachedFont == null)
             {
-                cachedFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                if (cachedFont == null) cachedFont = Resources.Load<Font>("Fonts/LegacyRuntime");
+                cachedFont = Resources.Load<Font>("Fonts/GameFont");
+                if (cachedFont == null) cachedFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                if (cachedFont == null) cachedFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
             }
             return cachedFont;
         }
     }
     #endregion
 
-    #region 2. BẢNG MÀU HOÀNG GIA ĐẠI VIỆT
-    // Vàng Hoàng Kim
-    public static readonly Color GoldPrimary   = new Color(1.00f, 0.84f, 0.00f, 1.0f); // #FFD700
-    public static readonly Color GoldHighlight = new Color(1.00f, 0.94f, 0.45f, 1.0f); // #FFF073
-    public static readonly Color GoldDeep      = new Color(0.78f, 0.55f, 0.12f, 1.0f); // #C68C1E
+    #region 2. BẢNG MÀU HOÀNG GIA ĐẠI VIỆT (IMPECCABLE COLOR TOKENS)
+    // Vàng Hoàng Kim (Imperial Gold)
+    public static readonly Color GoldPrimary   = new Color(1.00f, 0.82f, 0.40f, 1.0f); // #FFD166
+    public static readonly Color GoldHighlight = new Color(1.00f, 0.94f, 0.60f, 1.0f); // #FFF073
+    public static readonly Color GoldDeep      = new Color(0.83f, 0.62f, 0.22f, 1.0f); // #D4AF37
 
-    // Lam Ngọc & Đồng Minh
-    public static readonly Color CyanPrimary   = new Color(0.33f, 0.87f, 1.00f, 1.0f); // #55DDFF
-    public static readonly Color AllyBlue      = new Color(0.22f, 0.74f, 0.97f, 1.0f); // #38BDF8
-    public static readonly Color AllyBorder    = new Color(0.25f, 0.75f, 1.00f, 0.95f);
+    // Lam Long & Đồng Minh (Azure Dragon & Ally)
+    public static readonly Color CyanPrimary   = new Color(0.33f, 0.75f, 1.00f, 1.0f); // #55DDFF
+    public static readonly Color AllyBlue      = new Color(0.23f, 0.51f, 0.96f, 1.0f); // #3B82F6
+    public static readonly Color AllyBorder    = new Color(0.35f, 0.75f, 1.00f, 0.95f);
 
-    // Huyết Đỏ & Đối Thủ
-    public static readonly Color CrimsonRed    = new Color(0.95f, 0.28f, 0.28f, 1.0f); // #F24747
-    public static readonly Color EnemyRed      = new Color(0.97f, 0.44f, 0.44f, 1.0f); // #F87171
-    public static readonly Color EnemyBorder   = new Color(1.00f, 0.38f, 0.38f, 0.95f);
+    // Huyết Đỏ & Đối Thủ (Blood Crimson & Enemy)
+    public static readonly Color CrimsonRed    = new Color(0.90f, 0.22f, 0.27f, 1.0f); // #E63946
+    public static readonly Color EnemyRed      = new Color(0.94f, 0.27f, 0.27f, 1.0f); // #EF4444
+    public static readonly Color EnemyBorder   = new Color(1.00f, 0.40f, 0.40f, 0.95f);
 
-    // Lục Bảo & Cứu Trợ
-    public static readonly Color JadeGreen     = new Color(0.15f, 0.78f, 0.40f, 1.0f); // #26C766
+    // Ngọc Bích & Cứu Trợ (Lotus Jade & Relief)
+    public static readonly Color JadeGreen     = new Color(0.16f, 0.62f, 0.56f, 1.0f); // #2A9D8F
+    public static readonly Color JadeBright    = new Color(0.33f, 1.00f, 0.33f, 1.0f); // #55FF55
 
-    // Màu Chữ & Tương Phản
-    public static readonly Color TextWhite     = new Color(0.98f, 0.99f, 1.00f, 1.0f);
-    public static readonly Color TextMuted     = new Color(0.80f, 0.85f, 0.92f, 0.9f);
-    public static readonly Color TextDark      = new Color(0.08f, 0.06f, 0.04f, 1.0f);
+    // Màu Chữ & Tương Phản (Typography Contrast)
+    public static readonly Color TextWhite     = new Color(0.97f, 0.98f, 0.99f, 1.0f); // #F8FAFC
+    public static readonly Color TextMuted     = new Color(0.88f, 0.85f, 0.72f, 0.95f); // #E2D9B8
+    public static readonly Color TextDark      = new Color(0.06f, 0.08f, 0.12f, 1.0f);
 
-    // Nền Bảng & Panel
-    public static readonly Color BgDeepNavy    = new Color(0.04f, 0.07f, 0.14f, 0.98f);
-    public static readonly Color BgCardDark    = new Color(0.06f, 0.09f, 0.18f, 0.98f);
-    public static readonly Color BgModalDark   = new Color(0.03f, 0.05f, 0.09f, 0.92f);
+    // Nền Bảng & Panel (Obsidian Dark)
+    public static readonly Color BgDeepNavy    = new Color(0.02f, 0.04f, 0.07f, 0.98f); // #060912
+    public static readonly Color BgCardDark    = new Color(0.04f, 0.06f, 0.12f, 0.98f); // #0A1020
+    public static readonly Color BgModalDark   = new Color(0.02f, 0.03f, 0.07f, 0.95f);
     public static readonly Color BgOverlay     = new Color(0.02f, 0.03f, 0.07f, 0.88f);
     #endregion
 

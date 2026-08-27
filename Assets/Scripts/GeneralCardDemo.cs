@@ -71,7 +71,7 @@ public class GeneralCardDemo : MonoBehaviour
         rt.sizeDelta = new Vector2(340, 460);
         rt.anchoredPosition = new Vector2(200, 0);
 
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         // Tiêu đề
         var titleGo = new GameObject("Title", typeof(RectTransform), typeof(Text));

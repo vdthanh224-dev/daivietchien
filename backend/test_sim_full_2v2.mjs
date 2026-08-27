@@ -1,0 +1,98 @@
+import { initGame, handlePlayCard, handleRespondAction, handleEndTurn, handleDiscardCards, handleAIStep } from './functions/game-engine/src/gameEngine.js';
+import { isSlash, isDodge, isPeach, isWine } from './functions/game-engine/src/deck.js';
+
+const state = initGame('test-room', [
+    {userId:'u1',generalName:'P1',maxHp:4,isAI:true},
+    {userId:'u2',generalName:'P2',maxHp:4,isAI:true},
+    {userId:'u3',generalName:'P3',maxHp:4,isAI:true},
+    {userId:'u4',generalName:'P4',maxHp:4,isAI:true}
+]);
+
+let steps = 0;
+const MAX_STEPS = 5000;
+
+function autoRespond(st) {
+    if (st.status === 'FINISHED') return;
+
+    if (st.phase === 'AWAIT_SLASH_DEFENSE') {
+        const target = st.players.find(p => p.seat === st.waitingTargetSeat);
+        if (!target || target.hp <= 0) { handleRespondAction(st, st.waitingTargetSeat, false, null); return; }
+        const dodge = target.hand.find(c => isDodge(c));
+        handleRespondAction(st, target.seat, !!dodge, dodge ? dodge.id : null);
+    } else if (st.phase === 'AWAIT_AOE') {
+        const target = st.players.find(p => p.seat === st.waitingTargetSeat);
+        if (!target || target.hp <= 0) { handleRespondAction(st, st.waitingTargetSeat, false, null); return; }
+        const req = st.waitingReactionType;
+        let card = null;
+        if (req === 'DODGE') card = target.hand.find(c => isDodge(c));
+        else if (req === 'SLASH') card = target.hand.find(c => isSlash(c));
+        handleRespondAction(st, target.seat, !!card, card ? card.id : null);
+    } else if (st.phase === 'AWAIT_DUEL') {
+        const target = st.players.find(p => p.seat === st.waitingTargetSeat);
+        if (!target || target.hp <= 0) { handleRespondAction(st, st.waitingTargetSeat, false, null); return; }
+        const slash = target.hand.find(c => isSlash(c));
+        handleRespondAction(st, target.seat, !!slash, slash ? slash.id : null);
+    } else if (st.phase === 'AWAIT_NEAR_DEATH') {
+        const victim = st.players.find(p => p.seat === st.nearDeathVictimSeat);
+        const asker = st.players.find(p => p.seat === st.waitingTargetSeat);
+        if (!asker || asker.hp <= 0) { handleRespondAction(st, st.waitingTargetSeat, false, null); return; }
+        const isSelf = asker.seat === victim.seat;
+        let saveCard = asker.hand.find(c => isPeach(c));
+        if (!saveCard && isSelf) saveCard = asker.hand.find(c => isWine(c));
+        const willSave = saveCard && (isSelf || asker.isAlly === victim.isAlly);
+        handleRespondAction(st, asker.seat, willSave, willSave ? saveCard.id : null);
+    } else if (st.phase === 'AWAIT_NULLIFY') {
+        handleRespondAction(st, st.waitingTargetSeat, false, null);
+    } else if (st.phase === 'AWAIT_HARVEST') {
+        const picker = st.players.find(p => p.seat === st.waitingTargetSeat);
+        if (st.harvestPool && st.harvestPool.length > 0) {
+            handleRespondAction(st, picker.seat, true, st.harvestPool[0].id);
+        } else {
+            handleRespondAction(st, picker.seat, false, null);
+        }
+    } else if (st.phase === 'AWAIT_NAM_SON_FOLLOW_UP') {
+        const caster = st.players.find(p => p.seat === st.waitingTargetSeat);
+        if (!caster || caster.hp <= 0) { handleRespondAction(st, st.waitingTargetSeat, false, null); return; }
+        const slash = caster.hand.find(c => isSlash(c));
+        handleRespondAction(st, caster.seat, !!slash, slash ? slash.id : null);
+    } else if (st.phase === 'DISCARD') {
+        const p = st.players.find(pl => pl.seat === st.waitingTargetSeat);
+        const excess = p.hand.length - p.hp;
+        if (excess > 0) {
+            const ids = p.hand.slice(0, excess).map(c => c.id);
+            handleDiscardCards(st, p.seat, ids);
+        } else {
+            handleEndTurn(st, p.seat);
+        }
+    } else if (st.phase === 'PLAY') {
+        const turnPlayer = st.players.find(p => p.seat === st.turnSeat);
+        if (!turnPlayer || turnPlayer.hp <= 0) {
+            handleEndTurn(st, st.turnSeat);
+            return;
+        }
+        if (turnPlayer.isAI) {
+            const res = handleAIStep(st, turnPlayer.seat);
+            if (res && res.error) {
+                handleEndTurn(st, turnPlayer.seat);
+            }
+        }
+    }
+}
+
+while (state.status !== 'FINISHED' && steps < MAX_STEPS) {
+    steps++;
+    autoRespond(state);
+}
+
+console.log(`Game finished in ${steps} steps.`);
+console.log(`Status: ${state.status}`);
+state.players.forEach(p => {
+    console.log(`${p.generalName} (Seat ${p.seat}): HP ${p.hp}/${p.maxHp}, Ally: ${p.isAlly}`);
+});
+if (steps >= MAX_STEPS) {
+    console.log('INFINITE LOOP DETECTED!');
+    console.log('Current Phase:', state.phase);
+    console.log('Waiting Target:', state.waitingTargetSeat);
+    console.log('Turn Seat:', state.turnSeat);
+    console.log('Active Card:', state.activeCard);
+}

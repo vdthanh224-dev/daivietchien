@@ -146,6 +146,31 @@ public static class CardDatabase
     }
     #endregion
 
+    private static Dictionary<string, CardModel> _cardCache = null;
+
+    public static CardModel GetCardById(string cardId)
+    {
+        if (string.IsNullOrEmpty(cardId)) return null;
+        if (_cardCache == null)
+        {
+            _cardCache = new Dictionary<string, CardModel>();
+            var all = CreateDeck(104);
+            foreach (var c in all)
+            {
+                if (c != null && !string.IsNullOrEmpty(c.id) && !_cardCache.ContainsKey(c.id))
+                {
+                    _cardCache[c.id] = c;
+                }
+            }
+        }
+
+        if (_cardCache.TryGetValue(cardId, out var card))
+        {
+            return card;
+        }
+        return null;
+    }
+
     public static CardModel CreateCard(string id, string name, CardSuit suit, CardRank rank, int deckNum, CardCategory category, CardSubType subType, string desc, string icon, int range = 1, int distMod = 0)
     {
         return new CardModel
