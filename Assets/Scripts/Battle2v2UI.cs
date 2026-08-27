@@ -693,12 +693,14 @@ public class Battle2v2UI : MonoBehaviour
                 break;
 
             case "AWAIT_SLASH_DEFENSE":
+                Debug.Log($"[SlashDefense] waitingSeat={state.waitingTargetSeat} mySeat={playerCard.SeatNumber} isAwaitingSlashDefense={isAwaitingSlashDefense} activeCard={state.activeCard?.cardId}");
                 if (state.waitingTargetSeat == playerCard.SeatNumber && state.activeCard != null && !isAwaitingSlashDefense)
                 {
                     var slashCard = CardDatabase.GetCardById(state.activeCard.cardId);
                     if (slashCard == null) slashCard = new CardModel { id = state.activeCard.cardId, cardName = state.activeCard.cardName, subType = CardSubType.AttackNormal };
                     int dmg = state.activeCard.damage > 0 ? state.activeCard.damage : 1;
                     bool hasHolyCannon = playerCard.HasEquipment(EquipmentType.Weapon, "Nỏ Thần");
+                    Debug.Log($"[SlashDefense] → Gọi AwaitForPlayerSlashDefense dmg={dmg}");
                     StartCoroutine(AwaitForPlayerSlashDefense(slashCard, dmg, hasHolyCannon, (res) => {}));
                 }
                 break;
