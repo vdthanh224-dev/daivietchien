@@ -611,8 +611,11 @@ public class Battle2v2UI : MonoBehaviour
                     string targetDesc = targetGen != null ? $" lên #{targetGen.SeatNumber} ({targetGen.GeneralName})" : "";
                     string qText = $"Có dùng Diệu Kế Phá Mưu để ngăn chặn thực thi [{rootCard.cardName}]{targetDesc} không?";
 
+                    Debug.Log($"[NullifyPrompt] Phase={state.phase} waitingTargetSeat={state.waitingTargetSeat} mySeat={playerCard.SeatNumber} lastHandledWaitingSeat={lastHandledWaitingSeat} ver={state.version}");
+
                     if (state.waitingTargetSeat == playerCard.SeatNumber)
                     {
+                        // Xóa modal chờ cũ (nếu có)
                         var orphanWait = GameObject.Find("CounterWaitingModal");
                         if (orphanWait != null) Destroy(orphanWait);
 
@@ -623,6 +626,7 @@ public class Battle2v2UI : MonoBehaviour
                             if (existingPrompt != null) Destroy(existingPrompt);
                             if (activeCounterPromptCoroutine != null) StopCoroutine(activeCounterPromptCoroutine);
 
+                            Debug.Log($"[NullifyPrompt] Tạo CounterPromptModal cho ghế {playerCard.SeatNumber}");
                             var counterCard = playerHandCards.Find(c => c != null && c.subType == CardSubType.FlawlessDefense);
                             activeCounterPromptCoroutine = StartCoroutine(PromptPlayerCounterScroll(rootCard, qText, counterCard, (didUse, chosenCard) =>
                             {
@@ -640,6 +644,7 @@ public class Battle2v2UI : MonoBehaviour
                     }
                     else
                     {
+                        // Xóa CounterPromptModal (nếu có - trường hợp lượt hỏi đã chuyển sang người khác)
                         var orphanPrompt = GameObject.Find("CounterPromptModal");
                         if (orphanPrompt != null) Destroy(orphanPrompt);
                         if (activeCounterPromptCoroutine != null) { StopCoroutine(activeCounterPromptCoroutine); activeCounterPromptCoroutine = null; }
@@ -647,10 +652,13 @@ public class Battle2v2UI : MonoBehaviour
                         var queriedGen = GetGeneralBySeat(state.waitingTargetSeat);
                         if (queriedGen != null)
                         {
-                            var existingWait = GameObject.Find("CounterWaitingModal");
-                            if (existingWait == null || lastHandledWaitingSeat != state.waitingTargetSeat)
+                            if (lastHandledWaitingSeat != state.waitingTargetSeat)
                             {
                                 lastHandledWaitingSeat = state.waitingTargetSeat;
+                                // Xóa modal chờ cũ trước khi tạo mới
+                                var oldWait = GameObject.Find("CounterWaitingModal");
+                                if (oldWait != null) Destroy(oldWait);
+                                Debug.Log($"[NullifyPrompt] Tạo CounterWaitingModal cho ghế {playerCard.SeatNumber} - đang chờ ghế {state.waitingTargetSeat}");
                                 ShowWaitingCounterScrollModal(queriedGen, qText);
                             }
                         }
