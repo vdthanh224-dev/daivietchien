@@ -478,17 +478,119 @@ public class Battle2v2UI : MonoBehaviour
         }
     }
 
+    public static string GetDefaultCardDescription(CardSubType subType, string cardName = "")
+    {
+        switch (subType)
+        {
+            case CardSubType.AttackNormal:
+                return "Tấn công 1 mục tiêu trong tầm đánh. Đối phương phải Đỡ hoặc mất 1 máu.";
+            case CardSubType.AttackFire:
+                return "Tấn công 1 sát thương Hỏa. Lan truyền khi mục tiêu bị Xích Liên Hoàn.";
+            case CardSubType.AttackThunder:
+                return "Tấn công gây 1 sát thương Lôi trong tầm đánh.";
+            case CardSubType.Dodge:
+                return "Hóa giải hoàn toàn 1 đòn Trảm đánh vào bản thân.";
+            case CardSubType.Peach:
+                return "Hồi phục 1 Máu cho bản thân HOẶC cứu đồng minh vừa rơi vào trạng thái Cận Tử.";
+            case CardSubType.Wine:
+                return "Dùng trước khi Trảm: Trúng đòn gây +1 sát thương HOẶC tự cứu khi 0 máu.";
+            case CardSubType.FlawlessDefense:
+                return "Vô hiệu hóa 1 Cẩm Nang bất kỳ vừa đánh ra HOẶC hủy 1 lá bài bất kỳ.";
+            case CardSubType.Dismantle:
+                return "Người tấn công chọn 1 mục tiêu, rồi chọn 1 lá trên tay hoặc 1 trang bị của mục tiêu để hủy.";
+            case CardSubType.Snatch:
+                return "Cướp 1 lá bài trên tay, vùng trang bị hoặc vùng trì hoãn của mục tiêu cự ly 1.";
+            case CardSubType.ExNihilo:
+                return "Đánh ra để rút ngay 2 lá bài từ kho bài rút.";
+            case CardSubType.Duel:
+                return "Quyết đấu với 1 người. Luân phiên ra Trảm, bên nào không ra được chịu 1 sát thương.";
+            case CardSubType.Harvest:
+                return "Lật số lá bằng số người còn sống, mỗi người luân phiên chọn lấy 1 lá.";
+            case CardSubType.BarbarianInvasion:
+                return "Diện rộng. Từng người chơi khác trên bàn (trừ người dùng) phải đánh ra 1 Trảm HOẶC chịu 1 sát thương.";
+            case CardSubType.ArrowRain:
+                return "Diện rộng. Từng người chơi khác trên bàn (trừ người dùng) phải đánh ra 1 Đỡ HOẶC chịu 1 sát thương.";
+            case CardSubType.Lightning:
+                return "Gài vào vùng phán xét. Đến lượt người đang giữ, lật bài: Bích 2-9 chịu 3 sát thương Lôi; ngược lại chuyển sang người kế tiếp.";
+            case CardSubType.SupplyShortage:
+                return "Chỉ gài mục tiêu cự ly 1. Trì hoãn: nếu phán xét KHÔNG PHẢI Chuồn (♣) -> Bỏ qua Giai đoạn Rút bài.";
+            case CardSubType.Acedia:
+                return "Trì hoãn. Kiểm tra: nếu KHÔNG PHẢI Cơ (♥) -> Bỏ qua Giai đoạn Ra bài.";
+            case CardSubType.Weapon:
+                if (!string.IsNullOrEmpty(cardName) && cardName.Contains("Nỏ Thần")) return "Tầm 1. Bỏ giới hạn lượt: Có thể ra không giới hạn số lá Trảm trong cùng một lượt.";
+                if (!string.IsNullOrEmpty(cardName) && cardName.Contains("Kiếm Thuận Thiên")) return "Tầm 2. Thanh bảo kiếm hộ quốc của Bình Định Vương.";
+                if (!string.IsNullOrEmpty(cardName) && cardName.Contains("Song Cung")) return "Tầm 2. Khi Trảm bị Đỡ, có thể bỏ 2 bài trên tay ép mục tiêu mất 1 máu.";
+                if (!string.IsNullOrEmpty(cardName) && cardName.Contains("Trường Đao")) return "Tầm 3. Khi Trảm bị Đỡ, có thể bỏ thêm 1 Trảm ép đối phương phải Đỡ thêm lần nữa.";
+                if (!string.IsNullOrEmpty(cardName) && cardName.Contains("Súng Thần Công")) return "Tầm 5. Mục tiêu không được dùng Đỡ có cùng chất với Trảm của bạn.";
+                return "Trang bị vũ khí tăng tầm đánh và kích hoạt kỹ năng đặc biệt.";
+            case CardSubType.Armor:
+                if (!string.IsNullOrEmpty(cardName) && cardName.Contains("Giáp Đồng")) return "Áo giáp. Vô hiệu hóa toàn bộ Trảm Thường (không mang thuộc tính Hỏa/Lôi).";
+                if (!string.IsNullOrEmpty(cardName) && cardName.Contains("Khiên Mây")) return "Áo giáp (Bát Quái). Khi cần Đỡ, lật bài phán xét: nếu chất ĐỎ (♥, ♦) coi như đã Đỡ.";
+                return "Trang bị phòng thủ giảm hoặc vô hiệu hóa sát thương.";
+            case CardSubType.OffensiveHorse:
+                return "Giảm -1 khoảng cách từ bạn tới tất cả người chơi khác (Ngựa công).";
+            case CardSubType.DefensiveHorse:
+                return "Tăng +1 khoảng cách từ người khác tới bạn (Ngựa thủ phòng ngự).";
+            default:
+                return "Thẻ bài trong Đại Việt Chiến.";
+        }
+    }
+
+    public static string GetDefaultIconPath(CardSubType subType)
+    {
+        switch (subType)
+        {
+            case CardSubType.AttackNormal: return "UI/icon_slash";
+            case CardSubType.AttackFire: return "UI/icon_slash_fire";
+            case CardSubType.AttackThunder: return "UI/icon_slash_thunder";
+            case CardSubType.Dodge: return "UI/icon_dodge";
+            case CardSubType.Peach: return "UI/icon_banh_chung";
+            case CardSubType.Wine: return "UI/icon_wine";
+            case CardSubType.FlawlessDefense: return "UI/icon_flawless";
+            case CardSubType.Dismantle: return "UI/icon_dismantle";
+            case CardSubType.Snatch: return "UI/icon_snatch";
+            case CardSubType.ExNihilo: return "UI/icon_ex_nihilo";
+            case CardSubType.Duel: return "UI/icon_duel";
+            case CardSubType.Harvest: return "UI/icon_harvest";
+            case CardSubType.BarbarianInvasion: return "UI/icon_barbarian";
+            case CardSubType.ArrowRain: return "UI/icon_arrow_rain";
+            case CardSubType.Lightning: return "UI/icon_lightning";
+            case CardSubType.SupplyShortage: return "UI/icon_supply_shortage";
+            case CardSubType.Acedia: return "UI/icon_acedia";
+            case CardSubType.Weapon: return "UI/icon_weapon";
+            case CardSubType.Armor: return "UI/icon_armor";
+            case CardSubType.OffensiveHorse: return "UI/icon_mount_offense";
+            case CardSubType.DefensiveHorse: return "UI/icon_mount_defense";
+            default: return "";
+        }
+    }
+
     private CardModel ConvertGameStateCardToCardModel(AppwriteMatchmaking.GameStateCard sc)
     {
         if (sc == null || sc.id == "HIDDEN") return null;
         var cm = CardDatabase.GetCardById(sc.id);
-        if (cm != null) return cm;
+        if (cm != null)
+        {
+            if (string.IsNullOrEmpty(cm.description))
+            {
+                cm.description = !string.IsNullOrEmpty(sc.desc) ? sc.desc : GetDefaultCardDescription(cm.subType, cm.cardName);
+            }
+            if (string.IsNullOrEmpty(cm.iconPath))
+            {
+                cm.iconPath = GetDefaultIconPath(cm.subType);
+            }
+            return cm;
+        }
 
         CardSuit suit = CardSuit.Spade;
         if (!string.IsNullOrEmpty(sc.suit))
         {
             Enum.TryParse(sc.suit, true, out suit);
         }
+
+        var subType = (CardSubType)sc.subType;
+        string desc = !string.IsNullOrEmpty(sc.desc) ? sc.desc : GetDefaultCardDescription(subType, sc.name);
+        string icon = GetDefaultIconPath(subType);
 
         return CardDatabase.CreateCard(
             sc.id,
@@ -497,9 +599,9 @@ public class Battle2v2UI : MonoBehaviour
             (CardRank)sc.rank,
             1,
             (CardCategory)sc.category,
-            (CardSubType)sc.subType,
-            sc.desc ?? "",
-            "",
+            subType,
+            desc,
+            icon,
             sc.attackRange > 0 ? sc.attackRange : (sc.range > 0 ? sc.range : 1),
             sc.distMod
         );
@@ -3081,8 +3183,13 @@ public class Battle2v2UI : MonoBehaviour
             _ => ((int)card.rank).ToString()
         };
 
-        return $"🎴 <b><color=#FFD700>[{card.cardName.ToUpper()}]</color></b> <color=#55DDFF>({catStr} • {suitSymbol} {rankStr})</color>\n<color=#E2E8F0>{card.description}</color>";
+        string desc = !string.IsNullOrEmpty(card.description)
+            ? card.description
+            : GetDefaultCardDescription(card.subType, card.cardName);
+
+        return $"🎴 <b><color=#FFD700>[{card.cardName.ToUpper()}]</color></b> <color=#55DDFF>({catStr} • {suitSymbol} {rankStr})</color>\n<color=#E2E8F0>{desc}</color>";
     }
+
 
     private void ShowCardDescription(CardModel card)
     {
@@ -3106,6 +3213,9 @@ public class Battle2v2UI : MonoBehaviour
             return;
         }
 
+        // Luôn hiển thị bảng mô tả chi tiết tác dụng của lá bài khi người chơi chạm/click vào bài
+        ShowCardDescription(cardUI.Data);
+
         if (isDiscardPhaseActive)
         {
             if (selectedDiscardCards.Contains(cardUI))
@@ -3127,7 +3237,7 @@ public class Battle2v2UI : MonoBehaviour
         if (!isPlayerTurnActive || actionInProgress || battleFinished)
         {
             if (actionBtnGo != null) actionBtnGo.SetActive(false);
-            HideCardDescription();
+            // Không ẩn mô tả để người chơi vẫn đọc được tác dụng của lá bài
             return;
         }
 
@@ -3135,14 +3245,12 @@ public class Battle2v2UI : MonoBehaviour
         {
             SetLog("🕸️ [Trầm Ảo Sa Bẫy]: Bạn đã bị bỏ qua Giai đoạn Ra bài trong lượt này.");
             if (actionBtnGo != null) actionBtnGo.SetActive(false);
-            HideCardDescription();
             return;
         }
 
         // Mỗi lần chọn lá bài mới -> Xóa mục tiêu cũ đã chọn trước đó
         ClearSelectedTarget();
         currentSelectedCardUI = cardUI;
-        ShowCardDescription(cardUI.Data);
         UpdateActionButtonState();
     }
 
