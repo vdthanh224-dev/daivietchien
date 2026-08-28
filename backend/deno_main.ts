@@ -16,8 +16,48 @@ const DATABASE_ID = Deno.env.get("DATABASE_ID") || "game";
 const COLLECTION_ID = Deno.env.get("COLLECTION_ID") || "matchmaking_queue";
 
 const liveGames = new Map();
+const STATE_ENCODING_PREFIX = "GZIP1:";
+const MAX_PERSISTED_STATE_CHARS = 8000;
 
-async function loadStateFromDatabase(roomId) {
+async function encodePersistedState(value: unknown): Promise<string> {
+  const stream = new CompressionStream("gzip");
+  const output = new Response(stream.readable).arrayBuffer();
+  const writer = stream.writable.getWriter();
+  await writer.write(new TextEncoder().encode(JSON.stringify(value)));
+  await writer.close();
+  const bytes = new Uint8Array(await output);
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  const encoded = STATE_ENCODING_PREFIX + btoa(binary);
+  if (encoded.length > MAX_PERSISTED_STATE_CHARS) {
+    throw new Error(`Serialized GameState exceeds Appwrite limit (${encoded.length} chars)`);
+  }
+  return encoded;
+}
+
+async function decodePersistedState(value: string): Promise<any | null> {
+  if (!value) return null;
+  if (!value.startsWith(STATE_ENCODING_PREFIX)) {
+    try { return JSON.parse(value); } catch { return null; }
+  }
+  try {
+    const binary = atob(value.slice(STATE_ENCODING_PREFIX.length));
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    const stream = new DecompressionStream("gzip");
+    const output = new Response(stream.readable).text();
+    const writer = stream.writable.getWriter();
+    await writer.write(bytes);
+    await writer.close();
+    return JSON.parse(await output);
+  } catch (err) {
+    console.error("DB Decode Error:", err);
+    return null;
+  }
+}
+
+async function loadStateFromDatabase(roomId: string): Promise<any | null> {
   const docId = `gs_${roomId.replace(/[^a-zA-Z0-9_-]/g, '')}`.substring(0, 36);
   try {
     const res = await fetch(`${APPWRITE_ENDPOINT}/databases/${DATABASE_ID}/collections/${COLLECTION_ID}/documents/${docId}`, {
@@ -30,7 +70,7 @@ async function loadStateFromDatabase(roomId) {
     if (res.ok) {
       const doc = await res.json();
       if (doc && doc.userName) {
-        return JSON.parse(doc.userName);
+        return await decodePersistedState(doc.userName);
       }
     }
   } catch (err) {
@@ -39,25 +79,17 @@ async function loadStateFromDatabase(roomId) {
   return null;
 }
 
-async function saveStateToDatabase(roomId, state) {
-  const docId = `gs_${roomId.replace(/[^a-zA-Z0-9_-]/g, '')}`.substring(0, 36);
-  const sanitized = sanitizeGameStateForClient(state, 0);
-  const stateJson = JSON.stringify({
-    ...sanitized,
-    _deck: state._deck,
-    _discard: state._discard,
-  });
-
-  const docData = {
-    userId: "GAME_STATE",
-    userName: stateJson.substring(0, 8100),
-    rankPoints: state.turnSeat,
-    timestamp: Date.now(),
-  };
-
-  const permissions = ["read(\"any\")", "update(\"any\")", "delete(\"any\")"];
-
+async function saveStateToDatabase(roomId: string, state: any): Promise<void> {
   try {
+    const docId = `gs_${roomId.replace(/[^a-zA-Z0-9_-]/g, '')}`.substring(0, 36);
+    const stateJson = await encodePersistedState(state);
+    const docData = {
+      userId: "GAME_STATE",
+      userName: stateJson,
+      rankPoints: state.turnSeat,
+      timestamp: Date.now(),
+    };
+    const permissions = ["read(\"any\")", "update(\"any\")", "delete(\"any\")"];
     const res = await fetch(`${APPWRITE_ENDPOINT}/databases/${DATABASE_ID}/collections/${COLLECTION_ID}/documents/${docId}`, {
       method: "PATCH",
       headers: {
@@ -128,7 +160,7 @@ Deno.serve(async (req) => {
       }), { status: 409 });
     }
 
-    let result;
+    let result: any;
     if (action === "GET_STATE") {
       return new Response(JSON.stringify({ success: true, state: sanitizeGameStateForClient(state, seat) }), {
         headers: { "Content-Type": "application/json" },
@@ -158,7 +190,7 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json" },
     });
 
-  } catch (err) {
+  } catch (err: any) {
     console.error("Server Error:", err);
     return new Response(JSON.stringify({ success: false, error: err.message }), { status: 500 });
   }

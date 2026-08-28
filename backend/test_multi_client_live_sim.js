@@ -51,6 +51,11 @@ function log(state) {
 function assert(cond, msg) {
   if (!cond) { console.error(`\n❌ ASSERT THẤT BẠI: ${msg}`); process.exit(1); }
 }
+function resolveNullify(state) {
+  while (state.phase === "AWAIT_NULLIFY") {
+    handleRespondAction(state, state.waitingTargetSeat, false, null);
+  }
+}
 // Tạo lá bài nhanh
 const C = (id, name, suit, rank, cat, sub) => ({id,name,suit,rank,category:cat,subType:sub});
 const SLASH  = (id) => C(id, "Trảm Thường", "Club", 9, 0, CARD_SUBTYPES.ATTACK_NORMAL);
@@ -110,6 +115,14 @@ p2.hand = [C("ar2", "Mưa Tên Liên Châu", "Heart", 1, 2, CARD_SUBTYPES.ARROW_
 step("G2 tung [MƯA TÊN LIÊN CHÂU] — Toàn bộ người chơi khác phải Đỡ hoặc mất máu");
 handlePlayCard(state, 2, "ar2", 0);
 log(state);
+
+// Resolve the nullify chain before the area-of-effect response queue.
+while (state.phase === "AWAIT_NULLIFY") {
+  const who = state.waitingTargetSeat;
+  step(`G${who} kiểm tra Diệu Kế Phá Mưu → bỏ qua`);
+  handleRespondAction(state, who, false, null);
+  log(state);
+}
 assert(state.phase === "AWAIT_AOE", "Phase: AWAIT_AOE");
 console.log(`       Hỏi AOE theo thứ tự: G${state.waitingTargetSeat} đầu tiên...`);
 
@@ -136,6 +149,7 @@ console.log("       ✅ Đã giải quyết xong MƯA TÊN LIÊN CHÂU hoàn to�
 step("G2 dùng [Dụng Binh Như Thần] rút thêm 2 lá");
 handlePlayCard(state, 2, "ex2", 0);
 log(state);
+resolveNullify(state);
 
 step("G2 kết thúc lượt");
 handleEndTurn(state, 2);
@@ -153,6 +167,7 @@ step("G3 phát động [Thách Đấu] nhắm G4 (AI) — G4 không có Trảm")
 p4.hand = [DODGE("d4b")]; // AI chỉ có Đỡ, không có Trảm → thua Thách Đấu
 handlePlayCard(state, 3, "duel3b", 4);
 log(state);
+resolveNullify(state);
 assert(state.phase === "AWAIT_DUEL", "Phase: AWAIT_DUEL");
 
 step("G4 (AI Quang Trung) không có Trảm → từ chối → mất 1 máu");
@@ -222,13 +237,14 @@ while (state.status !== "FINISHED" && autoRound < 25) {
     }
   }
 
-  // Xử lý các phase chờ
-  if (state.phase === "AWAIT_SLASH_DEFENSE") {
-    handleRespondAction(state, state.waitingTargetSeat, false, null);
-  }
-  if (state.phase === "AWAIT_NEAR_DEATH") {
-    while (state.phase === "AWAIT_NEAR_DEATH") {
+  // Resolve server reaction windows before advancing the scripted turn.
+  while (state.phase !== "PLAY" && state.status !== "FINISHED") {
+    if (state.phase === "AWAIT_NULLIFY" || state.phase === "AWAIT_SLASH_DEFENSE"
+      || state.phase === "AWAIT_AOE" || state.phase === "AWAIT_DUEL"
+      || state.phase === "AWAIT_NAM_SON_FOLLOW_UP" || state.phase === "AWAIT_NEAR_DEATH") {
       handleRespondAction(state, state.waitingTargetSeat, false, null);
+    } else {
+      break;
     }
   }
   if (state.status === "FINISHED") break;

@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -350,6 +352,14 @@ public class Battle2v2UI : MonoBehaviour
 
     private void HandleDenoGameStateUpdated(AppwriteMatchmaking.ServerGameState state, AppwriteMatchmaking.GameStateDelta delta)
     {
+        // A cancelled reconnect can still deliver one queued snapshot from
+        // the previous room. Never let that packet mutate this battle UI.
+        if (state != null && !string.IsNullOrEmpty(currentRoomId)
+            && !string.Equals(state.roomId, currentRoomId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
         if (state != null && state.version >= lastAppliedStateVersion)
         {
             ApplyServerGameState(state);
@@ -376,6 +386,7 @@ public class Battle2v2UI : MonoBehaviour
     private void ApplyServerStateDelta(AppwriteMatchmaking.GameStateDelta delta)
     {
         if (delta == null) return;
+        if (delta.version < lastAppliedStateVersion) return;
         lastAppliedStateVersion = delta.version;
 
         // 1. Cập nhật vi phân Máu, Wine Buff & Số bài trên tay
@@ -487,15 +498,97 @@ public class Battle2v2UI : MonoBehaviour
             1,
             (CardCategory)sc.category,
             (CardSubType)sc.subType,
+            sc.desc ?? "",
             "",
-            "",
-            1
+            sc.attackRange > 0 ? sc.attackRange : (sc.range > 0 ? sc.range : 1),
+            sc.distMod
         );
+    }
+
+    // The Unity catalogue uses numeric hero IDs, while the authoritative
+    // Deno engine addresses its supported heroes by stable string slugs.
+    private static string NormalizeHeroKey(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+
+        string decomposed = value.Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(decomposed.Length);
+        foreach (char c in decomposed)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                builder.Append(c);
+        }
+
+        return builder.ToString()
+            .Normalize(NormalizationForm.FormC)
+            .ToUpperInvariant()
+            .Replace('Đ', 'D')
+            .Replace('Ð', 'D')
+            .Replace('_', ' ');
+    }
+
+    private static string ToDenoHeroSlug(HeroDatabase100.HeroData hero)
+    {
+        if (hero == null) return string.Empty;
+
+        switch (hero.id)
+        {
+            case 47: return "LY_THUONG_KIET";
+            case 53: return "TRAN_HUNG_DAO"; // Unity catalogue alias for Trần Hưng Đạo
+            case 56: return "TRAN_QUOC_TOAN";
+            case 86: return "LE_LOI";
+            case 87: return "NGUYEN_TRAI";
+        }
+
+        string avatar = NormalizeHeroKey(hero.avatarPath);
+        if (avatar.Contains("NGUYEN HUE")) return "NGUYEN_HUE";
+        if (avatar.Contains("TRAN HUNG DAO")) return "TRAN_HUNG_DAO";
+        if (avatar.Contains("LY THUONG KIET")) return "LY_THUONG_KIET";
+        if (avatar.Contains("LE LOI")) return "LE_LOI";
+        return string.Empty;
+    }
+
+    private static string GetDenoHeroId(string generalName)
+    {
+        string key = NormalizeHeroKey(generalName);
+        if (key.Contains("NGUYEN HUE")) return "NGUYEN_HUE";
+        if (key.Contains("TRAN HUNG DAO") || key.Contains("TRAN QUOC TUAN")) return "TRAN_HUNG_DAO";
+        if (key.Contains("LY THUONG KIET")) return "LY_THUONG_KIET";
+        if (key.Contains("TRAN QUOC TOAN")) return "TRAN_QUOC_TOAN";
+        if (key.Contains("LE LOI")) return "LE_LOI";
+        if (key.Contains("NGUYEN TRAI")) return "NGUYEN_TRAI";
+
+        // Resolve catalogue aliases only after checking the explicit server
+        // names, and verify the returned name. GetHeroByName intentionally
+        // falls back to a default hero for misses, so never trust that
+        // fallback as an implicit match.
+        var resolved = string.IsNullOrWhiteSpace(generalName)
+            ? null
+            : HeroDatabase100.GetHeroByName(generalName);
+        if (resolved != null && key.Contains(NormalizeHeroKey(resolved.name)))
+            return ToDenoHeroSlug(resolved);
+
+        // As a final catalogue fallback, match only an entry that is present
+        // in the supplied display name; this avoids accidental defaulting.
+        foreach (var candidate in HeroDatabase100.AllHeroes)
+        {
+            if (candidate == null) continue;
+            string candidateKey = NormalizeHeroKey(candidate.name);
+            if (!string.IsNullOrEmpty(candidateKey) && key.Contains(candidateKey))
+                return ToDenoHeroSlug(candidate);
+        }
+
+        // An empty value makes the server apply its explicit default instead
+        // of misinterpreting a Unity-only numeric ID as a different hero.
+        return string.Empty;
     }
 
     private void ApplyServerGameState(AppwriteMatchmaking.ServerGameState state)
     {
         if (state == null) return;
+        if (!string.IsNullOrEmpty(currentRoomId)
+            && !string.Equals(state.roomId, currentRoomId, StringComparison.Ordinal)) return;
+        if (state.version < lastAppliedStateVersion) return;
         lastAppliedStateVersion = state.version;
 
         // 1. Đồng bộ Máu 4 Tướng & Trạng thái sống/chết tuyệt đối
@@ -2390,6 +2483,7 @@ public class Battle2v2UI : MonoBehaviour
                     {
                         seat = s,
                         userId = g.UserId,
+                        heroId = GetDenoHeroId(g.GeneralName),
                         generalName = g.GeneralName,
                         maxHp = g.MaxHp,
                         hp = g.MaxHp,

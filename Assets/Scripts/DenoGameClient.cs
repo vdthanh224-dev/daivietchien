@@ -26,10 +26,14 @@ public class DenoGameClient : MonoBehaviour
     private ClientWebSocket wsClient;
     private CancellationTokenSource cts;
     private readonly ConcurrentQueue<Action> mainThreadQueue = new ConcurrentQueue<Action>();
+    // ClientWebSocket permits only one concurrent send. UI clicks and the
+    // heartbeat can arrive on different threads, so serialize writes.
+    private readonly SemaphoreSlim sendGate = new SemaphoreSlim(1, 1);
     private bool isRunning = false;
     private float lastHeartbeatTime = 0f;
     private string activeRoomId = "";
     private int activeSeat = 1;
+    private int lastServerVersion = 0;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void AutoInitialize()
@@ -51,13 +55,18 @@ public class DenoGameClient : MonoBehaviour
 
     public void ConnectToServer(string roomId, int seat, List<AppwriteMatchmaking.GameStatePlayer> initialPlayers = null)
     {
+        if (!string.Equals(activeRoomId, roomId, StringComparison.Ordinal))
+        {
+            lastServerVersion = 0;
+        }
         activeRoomId = roomId;
         activeSeat = seat;
         if (isRunning) StopConnection();
 
         isRunning = true;
-        cts = new CancellationTokenSource();
-        Task.Run(() => ConnectAndLoop(cts.Token, initialPlayers));
+        var connectionCts = new CancellationTokenSource();
+        cts = connectionCts;
+        Task.Run(() => ConnectAndLoop(connectionCts.Token, initialPlayers));
     }
 
     public void StopConnection()
@@ -69,8 +78,20 @@ public class DenoGameClient : MonoBehaviour
     public void SendGameAction(AppwriteMatchmaking.GameActionPayload actionPayload)
     {
         if (!IsConnected || actionPayload == null) return;
+        // Keep the WebSocket path consistent with the REST optimistic-locking
+        // path. Handshake/read-only messages intentionally omit the version.
+        if (actionPayload.expectedVersion <= 0 && lastServerVersion > 0 && !IsVersionExempt(actionPayload.action))
+        {
+            actionPayload.expectedVersion = lastServerVersion;
+        }
+
         string json = JsonUtility.ToJson(actionPayload);
         SendRawMessageAsync(json);
+    }
+
+    private static bool IsVersionExempt(string action)
+    {
+        return action == "JOIN_ROOM" || action == "INIT_GAME" || action == "GET_STATE" || action == "PING";
     }
 
     private void Update()
@@ -83,7 +104,15 @@ public class DenoGameClient : MonoBehaviour
         if (IsConnected && Time.unscaledTime - lastHeartbeatTime > 15.0f)
         {
             lastHeartbeatTime = Time.unscaledTime;
-            SendRawMessageAsync("{\"action\":\"PING\"}");
+            // The server validates roomId before handling PING. Include the
+            // current identity so a heartbeat is not reported as an error.
+            var ping = new AppwriteMatchmaking.GameActionPayload
+            {
+                action = "PING",
+                roomId = activeRoomId,
+                seat = activeSeat
+            };
+            SendRawMessageAsync(JsonUtility.ToJson(ping));
         }
     }
 
@@ -91,8 +120,10 @@ public class DenoGameClient : MonoBehaviour
     {
         try
         {
-            System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Tls12 | System.Net.SecurityProtocolType.Tls11 | System.Net.SecurityProtocolType.Tls;
-            System.Net.ServicePointManager.ServerCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
+            // Use modern TLS without disabling certificate validation. The
+            // previous global callback accepted any certificate for every
+            // Unity HTTPS request, making man-in-the-middle attacks possible.
+            System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Tls12;
         }
         catch { }
     }
@@ -102,12 +133,14 @@ public class DenoGameClient : MonoBehaviour
         float reconnectDelay = 2.0f;
         while (isRunning && !token.IsCancellationRequested)
         {
+            ClientWebSocket connectionSocket = null;
             try
             {
-                wsClient = new ClientWebSocket();
-                wsClient.Options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+                connectionSocket = new ClientWebSocket();
+                connectionSocket.Options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+                wsClient = connectionSocket;
                 var uri = new Uri(ServerEndpoint);
-                await wsClient.ConnectAsync(uri, token);
+                await connectionSocket.ConnectAsync(uri, token);
 
                 mainThreadQueue.Enqueue(() =>
                 {
@@ -125,17 +158,17 @@ public class DenoGameClient : MonoBehaviour
                     seat = activeSeat,
                     players = initialPlayers
                 };
-                await SendRawDirectAsync(JsonUtility.ToJson(joinPayload));
+                await SendRawDirectAsync(JsonUtility.ToJson(joinPayload), token);
 
                 var buffer = new byte[16384];
                 var messageBuilder = new StringBuilder();
 
-                while (wsClient.State == WebSocketState.Open && !token.IsCancellationRequested)
+                while (connectionSocket.State == WebSocketState.Open && !token.IsCancellationRequested)
                 {
-                    var result = await wsClient.ReceiveAsync(new ArraySegment<byte>(buffer), token);
+                    var result = await connectionSocket.ReceiveAsync(new ArraySegment<byte>(buffer), token);
                     if (result.MessageType == WebSocketMessageType.Close)
                     {
-                        await wsClient.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", token);
+                        await connectionSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", token);
                         break;
                     }
 
@@ -155,20 +188,26 @@ public class DenoGameClient : MonoBehaviour
                     mainThreadQueue.Enqueue(() =>
                     {
                         Debug.LogWarning($"[DenoGameClient] Đang kết nối lại Deno Server sau {reconnectDelay}s ({ex.Message})");
-                        OnConnectionStateChanged?.Invoke(false);
                     });
                 }
             }
             finally
             {
-                wsClient?.Dispose();
-                wsClient = null;
+                // A cancelled loop can finish after a replacement connection
+                // has already been installed. Only clear/dispose our own
+                // socket so an old reconnect attempt cannot kill the new one.
+                if (ReferenceEquals(wsClient, connectionSocket)) wsClient = null;
+                connectionSocket?.Dispose();
+                if (isRunning && !token.IsCancellationRequested)
+                {
+                    mainThreadQueue.Enqueue(() => OnConnectionStateChanged?.Invoke(false));
+                }
             }
 
             if (isRunning && !token.IsCancellationRequested)
             {
                 try { await Task.Delay((int)(reconnectDelay * 1000), token); } catch { break; }
-                reconnectDelay = Mathf.Min(reconnectDelay * 1.5f, 10.0f);
+                reconnectDelay = Math.Min(reconnectDelay * 1.5f, 10.0f);
             }
         }
     }
@@ -181,14 +220,27 @@ public class DenoGameClient : MonoBehaviour
             var msg = JsonUtility.FromJson<DenoServerMessageWrapper>(rawJson);
             if (msg != null)
             {
-                if (msg.type == "STATE_UPDATE" || msg.type == "STATE_SNAPSHOT" || msg.type == "CONFLICT")
+                if (msg.state != null)
                 {
-                    if (msg.state != null)
+                    // Ignore delayed snapshots that would roll the local UI
+                    // back to an older hand/phase. Equal versions are still
+                    // delivered because a rejected action may carry the same
+                    // authoritative snapshot.
+                    bool isCurrentOrNewer = msg.state.version >= lastServerVersion;
+                    if (isCurrentOrNewer && msg.state.version > lastServerVersion)
+                    {
+                        lastServerVersion = msg.state.version;
+                    }
+                    // ACTION_REJECTED and CONFLICT include an authoritative
+                    // snapshot; applying it prevents the client from staying
+                    // on a stale hand/phase after a rejected action.
+                    if (isCurrentOrNewer && (msg.type == "STATE_UPDATE" || msg.type == "STATE_SNAPSHOT" || msg.type == "CONFLICT" || msg.type == "ACTION_REJECTED"))
                     {
                         mainThreadQueue.Enqueue(() => OnGameStateUpdated?.Invoke(msg.state, msg.delta));
                     }
                 }
-                else if (msg.type == "ERROR" || msg.type == "ACTION_REJECTED")
+
+                if (msg.type == "ERROR" || msg.type == "ACTION_REJECTED" || msg.type == "CONFLICT")
                 {
                     mainThreadQueue.Enqueue(() => OnErrorMessage?.Invoke(msg.error));
                 }
@@ -204,7 +256,7 @@ public class DenoGameClient : MonoBehaviour
     {
         try
         {
-            await SendRawDirectAsync(json);
+            await SendRawDirectAsync(json, cts != null ? cts.Token : CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -212,12 +264,22 @@ public class DenoGameClient : MonoBehaviour
         }
     }
 
-    private async Task SendRawDirectAsync(string json)
+    private async Task SendRawDirectAsync(string json, CancellationToken token)
     {
-        if (wsClient != null && wsClient.State == WebSocketState.Open)
+        var socket = wsClient;
+        if (socket != null && socket.State == WebSocketState.Open)
         {
-            var bytes = Encoding.UTF8.GetBytes(json);
-            await wsClient.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
+            await sendGate.WaitAsync(token);
+            try
+            {
+                if (!ReferenceEquals(wsClient, socket) || socket.State != WebSocketState.Open) return;
+                var bytes = Encoding.UTF8.GetBytes(json ?? string.Empty);
+                await socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, token);
+            }
+            finally
+            {
+                sendGate.Release();
+            }
         }
     }
 

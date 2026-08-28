@@ -2,6 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
@@ -124,6 +126,14 @@ public static class AppwriteMatchmaking
         public int rank;
         public int category;
         public int subType;
+        // Optional fields emitted by the authoritative Deno deck. Keeping
+        // them here lets clients render cards that are not in CardDatabase.
+        public string desc;
+        // Deno's WebSocket sanitizer uses `attackRange`; the REST fallback
+        // historically used `range`, so both names are intentionally kept.
+        public int attackRange;
+        public int range;
+        public int distMod;
     }
 
     [Serializable]
@@ -131,6 +141,7 @@ public static class AppwriteMatchmaking
     {
         public int seat;
         public string userId;
+        public string heroId;
         public string generalName;
         public int maxHp;
         public int hp;
@@ -141,6 +152,7 @@ public static class AppwriteMatchmaking
         public List<GameStateCard> hand = new List<GameStateCard>();
         public List<GameStateCard> equipments = new List<GameStateCard>();
         public List<GameStateCard> judgements = new List<GameStateCard>();
+        public List<string> skills = new List<string>();
     }
 
     [Serializable]
@@ -152,6 +164,8 @@ public static class AppwriteMatchmaking
         public int targetSeat;
         public int damage;
         public bool isWineBuff;
+        public string reqType;
+        public string reqName;
     }
 
     [Serializable]
@@ -1309,9 +1323,17 @@ public static class AppwriteMatchmaking
                 {
                     try
                     {
-                        var state = JsonUtility.FromJson<ServerGameState>(doc.userName);
-                        onState?.Invoke(state);
-                        yield break;
+                        // The authoritative server stores large snapshots as
+                        // GZIP1:<base64>, while older documents remain plain JSON.
+                        string stateJson = DecodePersistedGameState(doc.userName);
+                        var state = string.IsNullOrEmpty(stateJson)
+                            ? null
+                            : JsonUtility.FromJson<ServerGameState>(stateJson);
+                        if (state != null)
+                        {
+                            onState?.Invoke(state);
+                            yield break;
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -1321,6 +1343,25 @@ public static class AppwriteMatchmaking
             }
         }
         onState?.Invoke(null);
+    }
+
+    private const string PersistedGameStatePrefix = "GZIP1:";
+
+    /// <summary>
+    /// Decode server snapshots without breaking legacy plain-JSON documents.
+    /// </summary>
+    private static string DecodePersistedGameState(string value)
+    {
+        if (string.IsNullOrEmpty(value) || !value.StartsWith(PersistedGameStatePrefix, StringComparison.Ordinal))
+            return value;
+
+        byte[] compressed = Convert.FromBase64String(value.Substring(PersistedGameStatePrefix.Length));
+        using (var input = new MemoryStream(compressed, writable: false))
+        using (var gzip = new GZipStream(input, CompressionMode.Decompress))
+        using (var reader = new StreamReader(gzip, Encoding.UTF8))
+        {
+            return reader.ReadToEnd();
+        }
     }
 
     public static int currentServerStateVersion = 0;

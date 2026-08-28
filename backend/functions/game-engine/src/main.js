@@ -1,4 +1,6 @@
 import { Client, Databases, Query, ID } from 'node-appwrite';
+import { gzip, gunzip } from 'node:zlib';
+import { promisify } from 'node:util';
 import {
   initGame,
   checkVersion,
@@ -19,6 +21,34 @@ const COLLECTION_ID = process.env.COLLECTION_ID || "matchmaking_queue";
 
 // In-memory cache cho các trận đấu đang diễn ra để phản hồi siêu tốc (<15ms)
 const liveGames = new Map();
+const gzipAsync = promisify(gzip);
+const gunzipAsync = promisify(gunzip);
+const STATE_ENCODING_PREFIX = 'GZIP1:';
+const MAX_PERSISTED_STATE_CHARS = 8000;
+
+async function encodePersistedState(value) {
+  const compressed = await gzipAsync(Buffer.from(JSON.stringify(value), 'utf8'));
+  const encoded = STATE_ENCODING_PREFIX + compressed.toString('base64');
+  if (encoded.length > MAX_PERSISTED_STATE_CHARS) {
+    throw new Error(`Serialized GameState exceeds Appwrite limit (${encoded.length} chars)`);
+  }
+  return encoded;
+}
+
+async function decodePersistedState(value) {
+  if (!value) return null;
+  if (!value.startsWith(STATE_ENCODING_PREFIX)) {
+    try { return JSON.parse(value); } catch { return null; }
+  }
+  try {
+    const compressed = Buffer.from(value.slice(STATE_ENCODING_PREFIX.length), 'base64');
+    const json = await gunzipAsync(compressed);
+    return JSON.parse(json.toString('utf8'));
+  } catch (err) {
+    console.error('[GameEngine DB Decode Error]:', err);
+    return null;
+  }
+}
 
 export default async ({ req, res, log, error }) => {
   try {
@@ -149,17 +179,13 @@ async function saveStateToDatabase(roomId, state, log, error) {
     const db = new Databases(client);
 
     const docId = `gs_${roomId.replace(/[^a-zA-Z0-9_-]/g, '')}`.substring(0, 36);
-    const sanitized = sanitizeGameStateForClient(state, 0);
-    // Serialize state thành chuỗi JSON nén
-    const stateJson = JSON.stringify({
-      ...sanitized,
-      _deck: state._deck,
-      _discard: state._discard
-    });
+    // Persist the complete authoritative state so restart recovery retains
+    // reaction queues, delayed judgements, and duel/near-death bookkeeping.
+    const stateJson = await encodePersistedState(state);
 
     const docData = {
       userId: "GAME_STATE",
-      userName: stateJson.substring(0, 8100), // An toàn trong giới hạn 8192 ký tự của Appwrite
+      userName: stateJson,
       rankPoints: state.turnSeat,
       timestamp: Date.now()
     };
@@ -194,7 +220,7 @@ async function loadStateFromDatabase(roomId, log, error) {
     const docId = `gs_${roomId.replace(/[^a-zA-Z0-9_-]/g, '')}`.substring(0, 36);
     const doc = await db.getDocument(DATABASE_ID, COLLECTION_ID, docId);
     if (doc && doc.userName) {
-      return JSON.parse(doc.userName);
+      return await decodePersistedState(doc.userName);
     }
   } catch (err) {
     log(`[GameEngine DB] Chưa tìm thấy GameState trong DB cho phòng ${roomId}`);

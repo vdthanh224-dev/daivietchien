@@ -1,11 +1,12 @@
-import { createDeck52, isSlash, isDodge, isPeach, isWine, CARD_CATEGORIES, CARD_SUBTYPES } from './deck.js';
+import { createFullDeck104, isSlash, isDodge, isPeach, isWine, CARD_CATEGORIES, CARD_SUBTYPES } from './deck.js';
+import { getHeroById, normalizeHeroId } from './heroes.js';
 
 // Cache bộ bài chuẩn để tra cứu subType theo ID
 let _deckCache = null;
 function getDeckCache() {
   if (!_deckCache) {
     _deckCache = {};
-    for (const c of createDeck52()) {
+    for (const c of createFullDeck104()) {
       _deckCache[c.id] = c;
     }
   }
@@ -18,6 +19,105 @@ function getDeckCache() {
 function findCardByIdInDeck(cardId) {
   if (!cardId) return null;
   return getDeckCache()[cardId] || null;
+}
+
+function hydrateCard(card) {
+  const id = typeof card === "string" ? card : card?.id;
+  const canonical = id ? findCardByIdInDeck(id) : null;
+  if (canonical) return { ...canonical, ...(typeof card === "object" ? card : {}) };
+  if (card && typeof card === "object") return { ...card };
+  return null;
+}
+
+function hydrateCardList(cards) {
+  return Array.isArray(cards) ? cards.map(hydrateCard).filter(Boolean) : [];
+}
+
+/**
+ * Restore a persisted JSON snapshot into the shape expected by the engine.
+ * This accepts both current raw snapshots and older sanitized snapshots,
+ * including card arrays serialized as either card objects or card IDs.
+ */
+export function hydrateGameState(rawState, roomId = "") {
+  if (!rawState || typeof rawState !== "object") return null;
+  const state = rawState;
+  if (!Array.isArray(state.players) || state.players.length !== 4) return null;
+
+  const seenSeats = new Set();
+  state.players = state.players.map((rawPlayer, index) => {
+    if (!rawPlayer || typeof rawPlayer !== "object") return null;
+    const seat = Number(rawPlayer.seat);
+    if (!Number.isInteger(seat) || seat < 1 || seat > 4 || seenSeats.has(seat)) return null;
+    seenSeats.add(seat);
+    const maxHp = Number(rawPlayer.maxHp);
+    const hp = Number(rawPlayer.hp);
+    return {
+      ...rawPlayer,
+      seat,
+      userId: rawPlayer.userId || `user_${index + 1}`,
+      generalName: rawPlayer.generalName || `Tướng Ghế ${seat}`,
+      maxHp: Number.isFinite(maxHp) && maxHp > 0 ? maxHp : 4,
+      hp: Number.isFinite(hp) ? Math.max(0, Math.min(hp, Number.isFinite(maxHp) && maxHp > 0 ? maxHp : 4)) : 0,
+      isAlly: typeof rawPlayer.isAlly === "boolean" ? rawPlayer.isAlly : (seat === 1 || seat === 3),
+      isAI: !!rawPlayer.isAI,
+      isWineBuffActive: !!rawPlayer.isWineBuffActive,
+      hand: hydrateCardList(rawPlayer.hand),
+      equipments: hydrateCardList(rawPlayer.equipments),
+      judgements: hydrateCardList(rawPlayer.judgements),
+      skills: Array.isArray(rawPlayer.skills) ? rawPlayer.skills : []
+    };
+  });
+  if (state.players.some((player) => !player)) return null;
+
+  const version = Number(state.version);
+  if (!Number.isInteger(version) || version < 1) return null;
+  state.version = version;
+  state.roomId = roomId || state.roomId || "";
+  state.status = state.status === "FINISHED" ? "FINISHED" : "PLAYING";
+  state.turnSeat = Number.isInteger(Number(state.turnSeat)) && Number(state.turnSeat) >= 1 && Number(state.turnSeat) <= 4
+    ? Number(state.turnSeat) : 1;
+  state.phase = typeof state.phase === "string" && state.phase.length > 0 ? state.phase : "PLAY";
+  state.turnTimer = Math.max(0, Number(state.turnTimer) || 0);
+  state.waitingTargetSeat = Math.max(0, Number(state.waitingTargetSeat) || 0);
+  state.waitingReactionType = state.waitingReactionType || "NONE";
+  state.waitingTimer = Math.max(0, Number(state.waitingTimer) || 0);
+  state.aoeVictimsQueue = Array.isArray(state.aoeVictimsQueue)
+    ? state.aoeVictimsQueue.map(Number).filter((seat) => Number.isInteger(seat) && seat >= 1 && seat <= 4)
+    : [];
+  state.harvestPool = hydrateCardList(state.harvestPool);
+  state.harvestPickers = Array.isArray(state.harvestPickers)
+    ? state.harvestPickers.map(Number).filter((seat) => Number.isInteger(seat) && seat >= 1 && seat <= 4)
+    : [];
+  state.nearDeathAskerQueue = Array.isArray(state.nearDeathAskerQueue)
+    ? state.nearDeathAskerQueue.map(Number).filter((seat) => Number.isInteger(seat) && seat >= 1 && seat <= 4)
+    : [];
+  state.duelCasterSeat = Math.max(0, Number(state.duelCasterSeat) || 0);
+  state.duelTargetSeat = Math.max(0, Number(state.duelTargetSeat) || 0);
+  state.nearDeathVictimSeat = Math.max(0, Number(state.nearDeathVictimSeat) || 0);
+  state.slashesUsedThisTurn = Math.max(0, Number(state.slashesUsedThisTurn) || 0);
+  state.isWineBuffActive = !!state.isWineBuffActive;
+  state.actionSeq = Math.max(1, Number(state.actionSeq) || Number(state.lastAction?.seq) || 1);
+  state.actionHistory = Array.isArray(state.actionHistory) ? state.actionHistory : [];
+  state.lastDelta = state.lastDelta || state.delta || null;
+  state._deck = hydrateCardList(state._deck);
+  state._discard = hydrateCardList(state._discard);
+  state.discardTop = hydrateCard(state.discardTop);
+  if (state.nullifyChain && typeof state.nullifyChain === "object") {
+    state.nullifyChain = {
+      ...state.nullifyChain,
+      rootCard: hydrateCard(state.nullifyChain.rootCard),
+      querySeats: Array.isArray(state.nullifyChain.querySeats)
+        ? state.nullifyChain.querySeats.map(Number).filter((seat) => Number.isInteger(seat) && seat >= 1 && seat <= 4)
+        : [],
+      currentIdx: Math.max(0, Number(state.nullifyChain.currentIdx) || 0),
+      whoUsedLast: Number(state.nullifyChain.whoUsedLast) || 0
+    };
+  } else {
+    state.nullifyChain = null;
+  }
+  state.deckCount = state._deck.length;
+  state.discardCount = state._discard.length;
+  return state;
 }
 
 /**
@@ -36,10 +136,19 @@ export function shuffle(array) {
  * Khởi tạo trận đấu mới (4 người chơi, mỗi người 4 lá, 4 máu)
  */
 export function initGame(roomId, playersInput) {
-  const deck = shuffle(createDeck52());
+  const deck = shuffle(createFullDeck104());
   const discard = [];
 
   const players = playersInput.map((p, index) => {
+    p = p || {};
+    // Keep the wire protocol backwards compatible: older Unity clients send
+    // only generalName/maxHp, while newer clients send a string heroId.
+    const heroId = normalizeHeroId(p.heroId, p.generalName);
+    const hero = getHeroById(heroId);
+    const requestedMaxHp = Number(p.maxHp);
+    const maxHp = Number.isFinite(requestedMaxHp) && requestedMaxHp > 0
+      ? requestedMaxHp
+      : (hero?.maxHp || 4);
     const hand = [];
     for (let i = 0; i < 4; i++) {
       if (deck.length > 0) hand.push(deck.pop());
@@ -47,15 +156,17 @@ export function initGame(roomId, playersInput) {
     return {
       seat: index + 1,
       userId: p.userId || `user_${index + 1}`,
-      generalName: p.generalName || `Tướng Ghế ${index + 1}`,
-      maxHp: p.maxHp || 4,
-      hp: p.maxHp || 4,
+      heroId,
+      generalName: p.generalName || hero?.name || `Tướng Ghế ${index + 1}`,
+      maxHp,
+      hp: maxHp,
       isAlly: (index === 0 || index === 2), // Ghế 1 & 3 là Đội 1; Ghế 2 & 4 là Đội 2
       isAI: !!p.isAI,
       isWineBuffActive: false,
       hand: hand,
       equipments: [],
-      judgements: []
+      judgements: [],
+      skills: hero?.skills || []
     };
   });
 
@@ -199,12 +310,68 @@ export function drawCards(state, seat, count = 2) {
   return drawn;
 }
 
+function getDistance(state, fromSeat, toSeat) {
+  if (fromSeat === toSeat) return 0;
+  let distance = Math.abs(fromSeat - toSeat);
+  if (distance > 2) distance = 4 - distance;
+  const from = state.players.find((player) => player.seat === fromSeat);
+  const to = state.players.find((player) => player.seat === toSeat);
+  if (!from || !to) return Number.POSITIVE_INFINITY;
+  if ((from.equipments || []).some((equipment) => equipment.subType === CARD_SUBTYPES.OFFENSIVE_HORSE)) distance--;
+  if ((to.equipments || []).some((equipment) => equipment.subType === CARD_SUBTYPES.DEFENSIVE_HORSE)) distance++;
+  if ((from.skills || []).includes("DAN_TRAN")) distance--;
+  return Math.max(1, distance);
+}
+
+function hasWeaponRange(state, fromSeat, toSeat) {
+  const from = state.players.find((player) => player.seat === fromSeat);
+  if (!from) return false;
+  const weapon = (from.equipments || []).find((equipment) => equipment.subType === CARD_SUBTYPES.WEAPON);
+  const range = weapon && Number.isFinite(Number(weapon.range)) ? Number(weapon.range) : 1;
+  return getDistance(state, fromSeat, toSeat) <= range;
+}
+
+function requiresTarget(card) {
+  return isSlash(card) || [
+    CARD_SUBTYPES.DUEL,
+    CARD_SUBTYPES.SNATCH,
+    CARD_SUBTYPES.DISMANTLE,
+    CARD_SUBTYPES.SUPPLY_SHORTAGE,
+    CARD_SUBTYPES.ACEDIA,
+    CARD_SUBTYPES.FLAWLESS_DEFENSE,
+  ].includes(card?.subType);
+}
+
+function validateTarget(state, casterSeat, targetSeat, card) {
+  if (!requiresTarget(card)) return null;
+  const normalizedTarget = Number(targetSeat);
+  if (!Number.isInteger(normalizedTarget) || normalizedTarget < 1 || normalizedTarget > 4) {
+    return { error: "Cần chọn mục tiêu" };
+  }
+  if (normalizedTarget === casterSeat) return { error: "Không thể chọn chính mình" };
+  const target = state.players.find((player) => player.seat === normalizedTarget);
+  if (!target || target.hp <= 0) return { error: "Mục tiêu không hợp lệ" };
+  if (isSlash(card) && !hasWeaponRange(state, casterSeat, normalizedTarget)) {
+    return { error: "Mục tiêu ngoài tầm đánh" };
+  }
+  if ([CARD_SUBTYPES.SNATCH, CARD_SUBTYPES.SUPPLY_SHORTAGE, CARD_SUBTYPES.ACEDIA].includes(card.subType)
+      && getDistance(state, casterSeat, normalizedTarget) > 1) {
+    return { error: "Mục tiêu ngoài tầm" };
+  }
+  return null;
+}
+
 /**
  * Xử lý khi một người chơi đánh ra 1 lá bài từ tay
  */
 export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
   if (state.status === "FINISHED") return { error: "Trận đấu đã kết thúc" };
-  if (state.turnSeat !== casterSeat && state.phase === "PLAY") {
+  casterSeat = Number(casterSeat);
+  if (targetSeat !== undefined && targetSeat !== null && targetSeat !== "") {
+    const parsedTarget = Number(targetSeat);
+    targetSeat = Number.isFinite(parsedTarget) ? parsedTarget : targetSeat;
+  }
+  if (state.phase !== "PLAY" || state.turnSeat !== casterSeat) {
     return { error: "Chưa tới lượt của bạn" };
   }
 
@@ -223,6 +390,14 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
     }
   }
   if (cardIndex < 0) return { error: "Không tìm thấy lá bài trên tay" };
+
+  const targetValidation = validateTarget(state, casterSeat, targetSeat, caster.hand[cardIndex]);
+  if (targetValidation) return targetValidation;
+  if (isSlash(caster.hand[cardIndex])
+      && state.slashesUsedThisTurn > 0
+      && !caster.equipments.some(e => e.name && e.name.includes("Nỏ Thần"))) {
+    return { error: "Đã dùng hết lượt Trảm" };
+  }
 
   const card = caster.hand.splice(cardIndex, 1)[0];
   state._discard.push(card);
@@ -499,8 +674,6 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0) {
   // 6. CÁC LÁ CẨM NANG ĐƠN MỤC TIÊU (Vườn Không Nhà Trống, Đột Kích Trộm Lương...)
   if (target && target.hand.length > 0) {
     const removedCard = target.hand.pop();
-    state._discard.push(removedCard);
-    state.discardTop = { id: removedCard.id, name: removedCard.name };
     if (card.subType === CARD_SUBTYPES.SNATCH) {
       if (caster) caster.hand.push(removedCard);
       recordAction(state, {
@@ -512,6 +685,8 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0) {
         description: `🌾 <b>${caster ? caster.generalName : 'Người chơi'}</b> dùng [${card.name}] cướp 1 lá bài từ <b>${target.generalName}</b>!`
       });
     } else {
+      state._discard.push(removedCard);
+      state.discardTop = { id: removedCard.id, name: removedCard.name };
       recordAction(state, {
         type: "PLAY_DISMANTLE",
         casterSeat,
@@ -555,18 +730,17 @@ function resolveNearDeathResume(state) {
     if (state.aoeVictimsQueue && state.aoeVictimsQueue.length > 0) {
         const nextVictim = state.aoeVictimsQueue.shift();
         state.phase = "AWAIT_AOE";
+        state.waitingReactionType = state.activeCard?.reqType || "DODGE";
         state.waitingTargetSeat = nextVictim;
         state.waitingTimer = 40;
         return { success: true, state };
     }
     
     // Náº¿u Ä‘ang dá»Ÿ dang ThÃ¡ch Ä‘áº¥u, xá»a tráº¡ng thÃ¡i (vÃ¬ ngÆ°á»i bá»‹ thÆ°Æ¡ng Ä‘Ã£ thua cuá»™c Ä‘áº¥u)
-    if (state.duelCasterSeat > 0 && state.duelTargetSeat > 0) {
-        state.duelCasterSeat = 0;
-        state.duelTargetSeat = 0;
-    }
-    
+    state.duelCasterSeat = 0;
+    state.duelTargetSeat = 0;
     state.phase = "PLAY";
+    state.waitingReactionType = "NONE";
     return { success: true, state };
 }
 
@@ -859,6 +1033,10 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId) {
 
     // Không ra Trảm -> Nhận thua Thách Đấu và mất 1 Máu
     applyDamageToPlayer(state, respondentSeat, 1, "Thách Đấu");
+    if (state.phase !== "AWAIT_NEAR_DEATH") {
+      state.duelCasterSeat = 0;
+      state.duelTargetSeat = 0;
+    }
     checkGameOver(state);
     return { success: true, state };
   }
@@ -883,7 +1061,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId) {
           targetSeat: victim.seat,
           description: `💮 <b>${respondent.generalName}</b> đã dùng [${rescueCard.name}] cứu sống <b>${victim.generalName}</b> (${victim.hp}/${victim.maxHp})!`
         });
-        return { success: true, state };
+        return resolveNearDeathResume(state);
       }
     }
 
@@ -905,6 +1083,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId) {
         description: `☠️ Không ai cứu viện! <b>${victim ? victim.generalName : 'Người chơi'}</b> đã tử trận!`
       });
       checkGameOver(state);
+      if (state.status !== "FINISHED") return resolveNearDeathResume(state);
       return { success: true, state };
     }
   }
@@ -1463,12 +1642,14 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
     players: state.players.map(p => ({
       seat: p.seat,
       userId: p.userId,
+      heroId: p.heroId,
       generalName: p.generalName,
       maxHp: p.maxHp,
       hp: p.hp,
       isAlly: p.isAlly,
       isAI: p.isAI,
       isWineBuffActive: !!p.isWineBuffActive,
+      skills: p.skills || [],
       handCount: p.hand ? p.hand.length : 0,
       hand: (requestingSeat === 0 || requestingSeat === p.seat)
         ? (p.hand || []).map(c => ({
@@ -1504,4 +1685,3 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
     delta: state.lastDelta || null
   };
 }
-
