@@ -1150,8 +1150,7 @@ public class Battle2v2UI : MonoBehaviour
                                     roomId = currentRoomId,
                                     seat = playerCard.SeatNumber,
                                     accepted = didUse,
-                                    cardId = chosenCard != null ? chosenCard.id : "",
-                                    expectedVersion = (int)lastAppliedStateVersion
+                                    cardId = chosenCard != null ? chosenCard.id : ""
                                 }, (s) => { if (s != null) ApplyServerGameState(s); });
                             }));
                         }
@@ -1432,8 +1431,7 @@ public class Battle2v2UI : MonoBehaviour
                     roomId = currentRoomId,
                     seat = playerCard.SeatNumber,
                     accepted = true,
-                    targetCardId = selectedOption.token,
-                    expectedVersion = (int)lastAppliedStateVersion
+                    targetCardId = selectedOption.token
                 }, (s) =>
                 {
                     serverTargetCardSelectionInFlight = false;
@@ -1478,8 +1476,7 @@ public class Battle2v2UI : MonoBehaviour
                 roomId = currentRoomId,
                 seat = playerCard.SeatNumber,
                 accepted = false,
-                cardId = "",
-                expectedVersion = (int)lastAppliedStateVersion
+                cardId = ""
             }, (s) => { if (s != null) ApplyServerGameState(s); });
             isAwaitingServerNearDeath = false;
             yield break;
@@ -1554,8 +1551,7 @@ public class Battle2v2UI : MonoBehaviour
                 roomId = currentRoomId,
                 seat = playerCard.SeatNumber,
                 accepted = useRescue,
-                cardId = useRescue ? rescueCard.id : "",
-                expectedVersion = (int)lastAppliedStateVersion
+                cardId = useRescue ? rescueCard.id : ""
             }, (s) => { if (s != null) ApplyServerGameState(s); });
         }
         isAwaitingServerNearDeath = false;
@@ -1662,8 +1658,7 @@ public class Battle2v2UI : MonoBehaviour
                 roomId = currentRoomId,
                 seat = playerCard.SeatNumber,
                 accepted = accepted,
-                cardIds = accepted ? new List<string>(selectedIds) : new List<string>(),
-                expectedVersion = (int)lastAppliedStateVersion
+                cardIds = accepted ? new List<string>(selectedIds) : new List<string>()
             }, (s) => { if (s != null) ApplyServerGameState(s); });
         }
         isAwaitingServerSongCung = false;
@@ -1686,8 +1681,7 @@ public class Battle2v2UI : MonoBehaviour
                 action = "RESPOND_ACTION",
                 roomId = currentRoomId,
                 seat = playerCard.SeatNumber,
-                accepted = false,
-                expectedVersion = (int)lastAppliedStateVersion
+                accepted = false
             }, (s) => { if (s != null) ApplyServerGameState(s); });
             isAwaitingServerNamSon = false;
             yield break;
@@ -1787,8 +1781,7 @@ public class Battle2v2UI : MonoBehaviour
                 roomId = currentRoomId,
                 seat = playerCard.SeatNumber,
                 accepted = accepted,
-                cardId = accepted && selectedCard != null ? selectedCard.Data.id : "",
-                expectedVersion = (int)lastAppliedStateVersion
+                cardId = accepted && selectedCard != null ? selectedCard.Data.id : ""
             }, (s) => { if (s != null) ApplyServerGameState(s); });
         }
     }
@@ -1873,8 +1866,7 @@ public class Battle2v2UI : MonoBehaviour
                 roomId = currentRoomId,
                 seat = playerCard.SeatNumber,
                 accepted = accepted,
-                cardId = accepted && selectedCard != null ? selectedCard.Data.id : "",
-                expectedVersion = (int)lastAppliedStateVersion
+                cardId = accepted && selectedCard != null ? selectedCard.Data.id : ""
             }, (s) => { if (s != null) ApplyServerGameState(s); });
         }
     }
@@ -1962,8 +1954,7 @@ public class Battle2v2UI : MonoBehaviour
                         roomId = currentRoomId,
                         seat = playerCard.SeatNumber,
                         accepted = true,
-                        cardId = cData.id,
-                        expectedVersion = (int)lastAppliedStateVersion
+                        cardId = cData.id
                     });
                 });
             }
@@ -3989,8 +3980,7 @@ public class Battle2v2UI : MonoBehaviour
             {
                 action = "END_TURN",
                 roomId = currentRoomId,
-                seat = playerCard.SeatNumber,
-                expectedVersion = (int)lastAppliedStateVersion
+                seat = playerCard.SeatNumber
             }, (s) => { if (s != null) ApplyServerGameState(s); });
         }
         else
@@ -4283,8 +4273,7 @@ public class Battle2v2UI : MonoBehaviour
                 roomId = currentRoomId,
                 seat = playerCard.SeatNumber,
                 cardId = card.id,
-                targetSeat = target != null ? target.SeatNumber : 0,
-                expectedVersion = (int)lastAppliedStateVersion
+                targetSeat = target != null ? target.SeatNumber : 0
             }, (s) => { if (s != null) ApplyServerGameState(s); });
 
             currentSelectedCardUI = null;
@@ -5375,8 +5364,7 @@ public class Battle2v2UI : MonoBehaviour
                 seat = playerCard.SeatNumber,
                 accepted = (result == SlashDefenseResult.Dodged),
                 cardId = result == SlashDefenseResult.Dodged && chosenDodgeUI != null && chosenDodgeUI.Data != null
-                    ? chosenDodgeUI.Data.id : "",
-                expectedVersion = (int)lastAppliedStateVersion
+                    ? chosenDodgeUI.Data.id : ""
             }, (s) => { if (s != null) ApplyServerGameState(s); });
         }
 
@@ -5462,8 +5450,7 @@ public class Battle2v2UI : MonoBehaviour
                             roomId = currentRoomId,
                             seat = playerCard.SeatNumber,
                             accepted = usedCard,
-                            cardId = usedCounterCard != null ? usedCounterCard.id : "",
-                            expectedVersion = (int)lastAppliedStateVersion
+                            cardId = usedCounterCard != null ? usedCounterCard.id : ""
                         }, (s) => { if (s != null) ApplyServerGameState(s); });
                     }
                 }
@@ -5524,8 +5511,7 @@ public class Battle2v2UI : MonoBehaviour
                             roomId = currentRoomId,
                             seat = currentGen.SeatNumber,
                             accepted = usedCard,
-                            cardId = usedCounterCard != null ? usedCounterCard.id : "",
-                            expectedVersion = (int)lastAppliedStateVersion
+                            cardId = usedCounterCard != null ? usedCounterCard.id : ""
                         }, (s) => { if (s != null) ApplyServerGameState(s); });
                     }
 
@@ -5799,8 +5785,7 @@ public class Battle2v2UI : MonoBehaviour
                 roomId = currentRoomId,
                 seat = playerCard.SeatNumber,
                 accepted = wantsFollowUp,
-                cardId = wantsFollowUp && chosenSlash != null ? chosenSlash.id : "",
-                expectedVersion = (int)lastAppliedStateVersion
+                cardId = wantsFollowUp && chosenSlash != null ? chosenSlash.id : ""
             }, (s) => { if (s != null) ApplyServerGameState(s); });
         }
 
@@ -6509,8 +6494,7 @@ public class Battle2v2UI : MonoBehaviour
                     roomId = currentRoomId,
                     seat = playerCard.SeatNumber,
                     accepted = satisfied,
-                    cardId = (chosenCardUI != null && chosenCardUI.Data != null) ? chosenCardUI.Data.id : "",
-                    expectedVersion = (int)lastAppliedStateVersion
+                    cardId = (chosenCardUI != null && chosenCardUI.Data != null) ? chosenCardUI.Data.id : ""
                 }, (s) => { if (s != null) ApplyServerGameState(s); });
 
                 victim.HideHeadTimer();
@@ -6733,8 +6717,7 @@ public class Battle2v2UI : MonoBehaviour
                         roomId = currentRoomId,
                         seat = playerCard.SeatNumber,
                         accepted = playedSlash,
-                        cardId = (chosenSlashUI != null && chosenSlashUI.Data != null) ? chosenSlashUI.Data.id : "",
-                        expectedVersion = (int)lastAppliedStateVersion
+                        cardId = (chosenSlashUI != null && chosenSlashUI.Data != null) ? chosenSlashUI.Data.id : ""
                     }, (s) => { if (s != null) ApplyServerGameState(s); });
 
                     yield break;
@@ -7237,8 +7220,7 @@ public class Battle2v2UI : MonoBehaviour
                 action = "DISCARD_CARDS",
                 roomId = currentRoomId,
                 seat = playerCard.SeatNumber,
-                cardIds = discardedCardIds,
-                expectedVersion = (int)lastAppliedStateVersion
+                cardIds = discardedCardIds
             }, (s) => { if (s != null) ApplyServerGameState(s); });
         }
 
@@ -7430,8 +7412,7 @@ public class Battle2v2UI : MonoBehaviour
                             seat = playerCard.SeatNumber,
                             targetSeat = victim.SeatNumber,
                             accepted = usedRescue,
-                            cardId = (rescueCard != null) ? rescueCard.id : "",
-                            expectedVersion = (int)lastAppliedStateVersion
+                            cardId = (rescueCard != null) ? rescueCard.id : ""
                         }, (s) => { if (s != null) ApplyServerGameState(s); });
                     }
 
