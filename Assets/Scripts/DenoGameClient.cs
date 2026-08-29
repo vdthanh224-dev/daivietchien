@@ -26,6 +26,7 @@ public class DenoGameClient : MonoBehaviour
     private ClientWebSocket wsClient;
     private CancellationTokenSource cts;
     private readonly ConcurrentQueue<Action> mainThreadQueue = new ConcurrentQueue<Action>();
+    private readonly ConcurrentQueue<string> pendingMessages = new ConcurrentQueue<string>();
     // ClientWebSocket permits only one concurrent send. UI clicks and the
     // heartbeat can arrive on different threads, so serialize writes.
     private readonly SemaphoreSlim sendGate = new SemaphoreSlim(1, 1);
@@ -58,10 +59,15 @@ public class DenoGameClient : MonoBehaviour
         if (!string.Equals(activeRoomId, roomId, StringComparison.Ordinal))
         {
             lastServerVersion = 0;
+            while (pendingMessages.TryDequeue(out _)) { }
         }
         activeRoomId = roomId;
         activeSeat = seat;
-        if (isRunning) StopConnection();
+        if (isRunning)
+        {
+            StopConnection();
+            while (pendingMessages.TryDequeue(out _)) { }
+        }
 
         isRunning = true;
         var connectionCts = new CancellationTokenSource();
@@ -72,12 +78,13 @@ public class DenoGameClient : MonoBehaviour
     public void StopConnection()
     {
         isRunning = false;
+        while (pendingMessages.TryDequeue(out _)) { }
         try { cts?.Cancel(); wsClient?.Abort(); wsClient?.Dispose(); wsClient = null; } catch { }
     }
 
     public void SendGameAction(AppwriteMatchmaking.GameActionPayload actionPayload)
     {
-        if (!IsConnected || actionPayload == null) return;
+        if (actionPayload == null) return;
         // Keep the WebSocket path consistent with the REST optimistic-locking
         // path. Handshake/read-only messages intentionally omit the version.
         if (actionPayload.expectedVersion <= 0 && lastServerVersion > 0 && !IsVersionExempt(actionPayload.action))
@@ -86,6 +93,11 @@ public class DenoGameClient : MonoBehaviour
         }
 
         string json = JsonUtility.ToJson(actionPayload);
+        if (!IsConnected)
+        {
+            pendingMessages.Enqueue(json);
+            return;
+        }
         SendRawMessageAsync(json);
     }
 
@@ -159,6 +171,10 @@ public class DenoGameClient : MonoBehaviour
                     players = initialPlayers
                 };
                 await SendRawDirectAsync(JsonUtility.ToJson(joinPayload), token);
+                while (pendingMessages.TryDequeue(out var pendingJson))
+                {
+                    await SendRawDirectAsync(pendingJson, token);
+                }
 
                 var buffer = new byte[16384];
                 var messageBuilder = new StringBuilder();

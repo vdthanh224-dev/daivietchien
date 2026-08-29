@@ -236,12 +236,23 @@ public class Battle2v2UI : MonoBehaviour
     {
         AppwriteRealtimeClient.OnServerGameStateReceived += HandleRealtimeServerGameState;
         DenoGameClient.OnGameStateUpdated += HandleDenoGameStateUpdated;
+        DenoGameClient.OnErrorMessage += HandleDenoErrorMessage;
     }
 
     private void OnDisable()
     {
         AppwriteRealtimeClient.OnServerGameStateReceived -= HandleRealtimeServerGameState;
         DenoGameClient.OnGameStateUpdated -= HandleDenoGameStateUpdated;
+        DenoGameClient.OnErrorMessage -= HandleDenoErrorMessage;
+    }
+
+    private void HandleDenoErrorMessage(string message)
+    {
+        if (string.IsNullOrEmpty(message)) return;
+        serverTargetCardSelectionInFlight = false;
+        EnableServerTargetCardButtons(true);
+        Debug.LogWarning($"[DenoGameClient] Server rejected action: {message}");
+        SetLog($"⚠️ Máy chủ: {message}");
     }
 
     private void Start()
@@ -252,7 +263,7 @@ public class Battle2v2UI : MonoBehaviour
 
         deckManager = gameObject.AddComponent<CardDeckManager>();
         int roomSeed = string.IsNullOrEmpty(currentRoomId) ? 0 : AppwriteMatchmaking.GetDeterministicHashCode(currentRoomId);
-        deckManager.InitializeDeck(104, roomSeed);
+        deckManager.InitializeDeck(52, roomSeed);
 
         BuildMainCanvas();
         StartCoroutine(StartDraftPhaseSequence());
@@ -328,6 +339,12 @@ public class Battle2v2UI : MonoBehaviour
     private int lastHandledWaitingSeat = -1;
     private Coroutine gameStateSyncCoroutine = null;
     private Coroutine activeCounterPromptCoroutine = null;
+    private bool isAwaitingServerAoE = false;
+    private bool isAwaitingServerDuel = false;
+    private bool isAwaitingServerNearDeath = false;
+    private GameObject activeServerTargetCardModal = null;
+    private long lastServerTargetCardPromptVersion = -1;
+    private bool serverTargetCardSelectionInFlight = false;
 
     private void StartGameStateSync()
     {
@@ -373,9 +390,16 @@ public class Battle2v2UI : MonoBehaviour
     private void DispatchGameEngineAction(AppwriteMatchmaking.GameActionPayload actionPayload, Action<AppwriteMatchmaking.ServerGameState> onFallbackResult = null)
     {
         if (actionPayload == null) return;
-        if (DenoGameClient.IsConnected)
+        if (!string.IsNullOrEmpty(currentRoomId))
         {
-            DenoGameClient.Instance.SendGameAction(actionPayload);
+            if (DenoGameClient.Instance != null)
+            {
+                DenoGameClient.Instance.SendGameAction(actionPayload);
+            }
+            else
+            {
+                Debug.LogWarning("[Battle2v2UI] DenoGameClient chưa sẵn sàng; action online bị từ chối để giữ server authoritative.");
+            }
         }
         else
         {
@@ -706,6 +730,7 @@ public class Battle2v2UI : MonoBehaviour
                         g.SetHpDirectly(p.hp);
                     }
                     g.IsWineBuffActive = p.isWineBuffActive;
+                    ApplyServerLoadout(g, p);
                 }
             }
             CheckGameOver();
@@ -748,6 +773,11 @@ public class Battle2v2UI : MonoBehaviour
                     }
                 }
             }
+        }
+
+        if (state.deckCount >= 0)
+        {
+            UpdateDeckHUD(state.deckCount, state.discardCount);
         }
 
         // 3. Đồng bộ số lượng bài trên tay của các đối thủ (Card Backs)
@@ -840,8 +870,11 @@ public class Battle2v2UI : MonoBehaviour
             if (orphanCounterWait != null) Destroy(orphanCounterWait);
             var orphanHarvest = GameObject.Find("HarvestModal");
             if (orphanHarvest != null) Destroy(orphanHarvest);
+            CloseServerTargetCardModal();
             lastHandledPhaseVersion = -1;
             lastHandledWaitingSeat = -1;
+            lastServerTargetCardPromptVersion = -1;
+            serverTargetCardSelectionInFlight = false;
 
             // Bật/tắt tương tác lượt của người chơi theo Server
             if (playerCard != null)
@@ -862,13 +895,39 @@ public class Battle2v2UI : MonoBehaviour
         }
         else if (!string.IsNullOrEmpty(state.phase))
         {
+            isPlayerTurnActive = false;
+            if (endTurnBtn != null) endTurnBtn.gameObject.SetActive(false);
+            if (actionBtnGo != null) actionBtnGo.SetActive(false);
             if (playerCard != null && state.turnSeat != playerCard.SeatNumber)
             {
-                isPlayerTurnActive = false;
-                if (endTurnBtn != null) endTurnBtn.gameObject.SetActive(false);
-                if (actionBtnGo != null) actionBtnGo.SetActive(false);
+                ClearSelectedTarget();
             }
             HandleServerPhasePrompt(state);
+        }
+    }
+
+    private void ApplyServerLoadout(GeneralCardUI general, AppwriteMatchmaking.GameStatePlayer serverPlayer)
+    {
+        if (general == null || serverPlayer == null) return;
+
+        general.ClearAllEquipment();
+        if (serverPlayer.equipments != null)
+        {
+            foreach (var serverCard in serverPlayer.equipments)
+            {
+                var equipment = ConvertGameStateCardToCardModel(serverCard);
+                if (equipment != null) general.Equip(equipment);
+            }
+        }
+
+        general.ClearDelayedScrolls();
+        if (serverPlayer.judgements != null)
+        {
+            foreach (var serverCard in serverPlayer.judgements)
+            {
+                var judgement = ConvertGameStateCardToCardModel(serverCard);
+                if (judgement != null) general.AddDelayedScroll(judgement);
+            }
         }
     }
 
@@ -969,6 +1028,10 @@ public class Battle2v2UI : MonoBehaviour
                 }
                 break;
 
+            case "AWAIT_TARGET_CARD":
+                HandleServerTargetCardPrompt(state);
+                break;
+
             case "AWAIT_SLASH_DEFENSE":
                 Debug.Log($"[SlashDefense] waitingSeat={state.waitingTargetSeat} mySeat={playerCard.SeatNumber} isAwaitingSlashDefense={isAwaitingSlashDefense} activeCard={state.activeCard?.cardId}");
                 if (state.waitingTargetSeat == playerCard.SeatNumber && state.activeCard != null && !isAwaitingSlashDefense)
@@ -983,28 +1046,27 @@ public class Battle2v2UI : MonoBehaviour
                 break;
 
             case "AWAIT_AOE":
-                if (state.waitingTargetSeat == playerCard.SeatNumber && state.activeCard != null)
+                if (state.waitingTargetSeat == playerCard.SeatNumber && state.activeCard != null && !isAwaitingServerAoE)
                 {
                     bool needSlash = state.waitingReactionType == "SLASH";
                     string aoeName = state.activeCard.cardName;
                     string reqName = needSlash ? "Trảm" : "Né";
-                    StartCoroutine(ResolveAoERequirement(playerCard, needSlash, aoeName, reqName));
+                    StartCoroutine(ResolveServerAoERequirement(needSlash, aoeName, reqName));
                 }
                 break;
 
             case "AWAIT_DUEL":
-                if (state.waitingTargetSeat == playerCard.SeatNumber && state.activeCard != null)
+                if (state.waitingTargetSeat == playerCard.SeatNumber && state.activeCard != null && !isAwaitingServerDuel)
                 {
                     var caster = GetGeneralBySeat(state.activeCard.casterSeat);
-                    if (caster != null) StartCoroutine(ResolveDuel(caster, playerCard));
+                    if (caster != null) StartCoroutine(ResolveServerDuel(caster, playerCard));
                 }
                 break;
 
             case "AWAIT_NEAR_DEATH":
-                if (state.waitingTargetSeat == playerCard.SeatNumber)
+                if (state.waitingTargetSeat == playerCard.SeatNumber && !isAwaitingServerNearDeath)
                 {
-                    var killer = state.activeCard != null ? GetGeneralBySeat(state.activeCard.casterSeat) : null;
-                    StartCoroutine(CheckNearDeath(playerCard, killer));
+                    StartCoroutine(ResolveServerNearDeath(state));
                 }
                 break;
 
@@ -1015,6 +1077,283 @@ public class Battle2v2UI : MonoBehaviour
                 }
                 break;
         }
+    }
+
+    private void HandleServerTargetCardPrompt(AppwriteMatchmaking.ServerGameState state)
+    {
+        var selection = state != null ? state.targetCardSelection : null;
+        if (selection == null || playerCard == null || state.waitingTargetSeat != playerCard.SeatNumber)
+        {
+            CloseServerTargetCardModal();
+            serverTargetCardSelectionInFlight = false;
+            return;
+        }
+
+        var target = GetGeneralBySeat(selection.targetSeat);
+        if (target == null || selection.options == null || selection.options.Count == 0)
+        {
+            CloseServerTargetCardModal();
+            return;
+        }
+
+        if (activeServerTargetCardModal != null && lastServerTargetCardPromptVersion == state.version)
+            return;
+
+        CloseServerTargetCardModal();
+        lastServerTargetCardPromptVersion = state.version;
+        serverTargetCardSelectionInFlight = false;
+        ShowServerTargetCardModal(selection, target, state.waitingTimer);
+    }
+
+    private void CloseServerTargetCardModal()
+    {
+        if (activeServerTargetCardModal != null)
+        {
+            Destroy(activeServerTargetCardModal);
+            activeServerTargetCardModal = null;
+        }
+
+        var orphan = GameObject.Find("ServerTargetCardModal");
+        if (orphan != null) Destroy(orphan);
+    }
+
+    private void EnableServerTargetCardButtons(bool enabled)
+    {
+        if (activeServerTargetCardModal == null) return;
+        foreach (var button in activeServerTargetCardModal.GetComponentsInChildren<Button>(true))
+        {
+            if (button != null) button.interactable = enabled;
+        }
+    }
+
+    private void ShowServerTargetCardModal(
+        AppwriteMatchmaking.GameStateTargetCardSelection selection,
+        GeneralCardUI target,
+        int waitingTimer)
+    {
+        var modalGo = new GameObject("ServerTargetCardModal", typeof(RectTransform), typeof(CanvasGroup), typeof(Image));
+        modalGo.transform.SetParent(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, false);
+        modalGo.transform.SetAsLastSibling();
+        activeServerTargetCardModal = modalGo;
+
+        var modalImage = modalGo.GetComponent<Image>();
+        modalImage.color = new Color(0.02f, 0.03f, 0.07f, 0.9f);
+        Fill(modalGo.GetComponent<RectTransform>());
+
+        var panelGo = new GameObject("Panel", typeof(RectTransform), typeof(Image));
+        panelGo.transform.SetParent(modalGo.transform, false);
+        var panelRt = panelGo.GetComponent<RectTransform>();
+        panelRt.anchorMin = panelRt.anchorMax = panelRt.pivot = new Vector2(0.5f, 0.5f);
+        panelRt.sizeDelta = new Vector2(780f, 455f);
+
+        var panelImage = panelGo.GetComponent<Image>();
+        var panelSprite = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
+        if (panelSprite != null) { panelImage.sprite = panelSprite; panelImage.type = Image.Type.Sliced; }
+        panelImage.color = new Color(0.08f, 0.11f, 0.2f, 0.99f);
+
+        string operationText = selection.operation == "STEAL" ? "CƯỚP" : "HỦY";
+        string icon = selection.operation == "STEAL" ? "🌾" : "🏚️";
+        var title = AddText(panelGo.transform, "Title",
+            $"{icon} {operationText} 1 LÁ CỦA {target.GeneralName.ToUpper()}",
+            16, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(740f, 34f), new Vector2(0f, -12f));
+
+        var timer = AddText(panelGo.transform, "Timer",
+            $"⏳ Chọn bài trong {Mathf.Max(0, waitingTimer)}s · Lá trên tay được úp",
+            11, ThemeUI.CyanPrimary, FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(timer.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(720f, 24f), new Vector2(0f, -45f));
+
+        var targetText = AddText(panelGo.transform, "Target",
+            $"Mục tiêu: <b>{target.GeneralName}</b> · Chạm chọn lá cần {operationText.ToLowerInvariant()}",
+            11, ThemeUI.TextMuted, FontStyle.Normal, TextAnchor.MiddleCenter);
+        SetRect(targetText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(720f, 24f), new Vector2(0f, -70f));
+
+        var viewportGo = new GameObject("CardsViewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D), typeof(ScrollRect));
+        viewportGo.transform.SetParent(panelGo.transform, false);
+        var viewportRt = viewportGo.GetComponent<RectTransform>();
+        SetRect(viewportRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(735f, 265f), new Vector2(0f, -35f));
+        viewportGo.GetComponent<Image>().color = new Color(0.02f, 0.04f, 0.09f, 0.35f);
+
+        var cardsContainerGo = new GameObject("CardsContainer", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        cardsContainerGo.transform.SetParent(viewportGo.transform, false);
+        var contentRt = cardsContainerGo.GetComponent<RectTransform>();
+        contentRt.anchorMin = new Vector2(0f, 0.5f);
+        contentRt.anchorMax = new Vector2(0f, 0.5f);
+        contentRt.pivot = new Vector2(0f, 0.5f);
+        contentRt.sizeDelta = new Vector2(Mathf.Max(735f, selection.options.Count * 132f), 195f);
+        contentRt.anchoredPosition = new Vector2(10f, 0f);
+
+        var layout = cardsContainerGo.GetComponent<HorizontalLayoutGroup>();
+        layout.spacing = 14f;
+        layout.padding = new RectOffset(4, 4, 12, 12);
+        layout.childAlignment = TextAnchor.MiddleLeft;
+        layout.childControlWidth = layout.childControlHeight = false;
+
+        var scroll = viewportGo.GetComponent<ScrollRect>();
+        scroll.viewport = viewportRt;
+        scroll.content = contentRt;
+        scroll.horizontal = true;
+        scroll.vertical = false;
+        scroll.movementType = ScrollRect.MovementType.Clamped;
+
+        int handIndex = 1;
+        foreach (var option in selection.options)
+        {
+            if (option == null || string.IsNullOrEmpty(option.token)) continue;
+            var selectedOption = option;
+            GameObject cardItemGo;
+            if (string.Equals(option.zone, "HAND", StringComparison.OrdinalIgnoreCase))
+            {
+                cardItemGo = CreateFaceDownCardItem(cardsContainerGo.transform, new Vector2(118f, 162f), $"LÁ ÚP #{handIndex++}", font);
+            }
+            else
+            {
+                var cardModel = ConvertGameStateCardToCardModel(option.card);
+                cardItemGo = cardModel != null
+                    ? CardUI.Create(cardsContainerGo.transform, cardModel, new Vector2(118f, 162f)).gameObject
+                    : CreateFaceDownCardItem(cardsContainerGo.transform, new Vector2(118f, 162f), "LÁ BÀI", font);
+            }
+
+            var button = cardItemGo.GetComponent<Button>();
+            if (button == null)
+            {
+                var overlay = new GameObject("OverlayBtn", typeof(RectTransform), typeof(Image), typeof(Button));
+                overlay.transform.SetParent(cardItemGo.transform, false);
+                overlay.transform.SetAsLastSibling();
+                overlay.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.001f);
+                Fill(overlay.GetComponent<RectTransform>());
+                button = overlay.GetComponent<Button>();
+            }
+
+            button.onClick.AddListener(() =>
+            {
+                if (serverTargetCardSelectionInFlight) return;
+                serverTargetCardSelectionInFlight = true;
+                EnableServerTargetCardButtons(false);
+                AudioManager.Instance.PlayCardSelect();
+                DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
+                {
+                    action = "RESPOND_ACTION",
+                    roomId = currentRoomId,
+                    seat = playerCard.SeatNumber,
+                    accepted = true,
+                    targetCardId = selectedOption.token
+                }, (s) =>
+                {
+                    serverTargetCardSelectionInFlight = false;
+                    if (s != null) ApplyServerGameState(s);
+                });
+            });
+            AddTargetZoneLabel(cardItemGo.transform, option.label, font);
+        }
+    }
+
+    private IEnumerator ResolveServerAoERequirement(bool needSlash, string aoeName, string reqName)
+    {
+        isAwaitingServerAoE = true;
+        yield return ResolveAoERequirement(playerCard, needSlash, aoeName, reqName);
+        isAwaitingServerAoE = false;
+    }
+
+    private IEnumerator ResolveServerDuel(GeneralCardUI caster, GeneralCardUI target)
+    {
+        isAwaitingServerDuel = true;
+        yield return ResolveDuel(caster, target);
+        isAwaitingServerDuel = false;
+    }
+
+    private IEnumerator ResolveServerNearDeath(AppwriteMatchmaking.ServerGameState state)
+    {
+        isAwaitingServerNearDeath = true;
+        var victim = GetGeneralBySeat(state.nearDeathVictimSeat);
+        var rescueCard = playerHandCards.Find(card =>
+            card != null && (card.subType == CardSubType.Peach
+                || (card.subType == CardSubType.Wine && victim == playerCard)));
+
+        if (victim == null || rescueCard == null)
+        {
+            SetLog(rescueCard == null
+                ? "🆘 Bạn không có Bánh Chưng/Hủ Rượu hợp lệ để cứu."
+                : "🆘 Không xác định được người đang Cận Tử.");
+            DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
+            {
+                action = "RESPOND_ACTION",
+                roomId = currentRoomId,
+                seat = playerCard.SeatNumber,
+                accepted = false,
+                cardId = ""
+            }, (s) => { if (s != null) ApplyServerGameState(s); });
+            isAwaitingServerNearDeath = false;
+            yield break;
+        }
+
+        bool decided = false;
+        bool useRescue = false;
+        float timer = 40f;
+        var modal = new GameObject("ServerRescuePromptModal", typeof(RectTransform), typeof(Image));
+        modal.transform.SetParent(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, false);
+        modal.transform.SetAsLastSibling();
+        var modalImage = modal.GetComponent<Image>();
+        var bgSprite = LotusHealthUI.LoadSpriteFromResources("UI/auth_card_bg");
+        if (bgSprite != null) { modalImage.sprite = bgSprite; modalImage.type = Image.Type.Sliced; }
+        modalImage.color = new Color(0.08f, 0.04f, 0.06f, 0.98f);
+        var modalRect = modal.GetComponent<RectTransform>();
+        modalRect.anchorMin = modalRect.anchorMax = modalRect.pivot = new Vector2(0.5f, 0.5f);
+        modalRect.sizeDelta = new Vector2(620f, 155f);
+        modalRect.anchoredPosition = new Vector2(-80f, 120f);
+
+        var title = AddText(modal.transform, "Title",
+            rescueCard.subType == CardSubType.Wine
+                ? "🍶 UỐNG HỦ RƯỢU TỰ CỨU CẬN TỬ?"
+                : $"💮 DÙNG BÁNH CHƯNG CỨU {victim.GeneralName}?",
+            13, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(580f, 38f), new Vector2(0, -10f));
+        var timerText = AddText(modal.transform, "Timer", "⏳ Còn 40s", 12, ThemeUI.CyanPrimary, FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(timerText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(250f, 22f), new Vector2(0, -46f));
+
+        var buttonSprite = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
+        var useButtonGo = new GameObject("Btn_Use", typeof(RectTransform), typeof(Image), typeof(Button));
+        useButtonGo.transform.SetParent(modal.transform, false);
+        var useImage = useButtonGo.GetComponent<Image>();
+        if (buttonSprite != null) { useImage.sprite = buttonSprite; useImage.type = Image.Type.Sliced; }
+        useImage.color = new Color(0.2f, 0.75f, 0.35f, 1f);
+        SetRect(useButtonGo.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(270f, 38f), new Vector2(-135f, 16f));
+        var useText = AddText(useButtonGo.transform, "Txt",
+            rescueCard.subType == CardSubType.Wine ? "🍶 UỐNG HỦ RƯỢU TỰ CỨU" : "💮 DÙNG BÁNH CHƯNG CỨU",
+            11, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        Fill(useText.rectTransform);
+
+        var passButtonGo = new GameObject("Btn_Pass", typeof(RectTransform), typeof(Image), typeof(Button));
+        passButtonGo.transform.SetParent(modal.transform, false);
+        var passImage = passButtonGo.GetComponent<Image>();
+        if (buttonSprite != null) { passImage.sprite = buttonSprite; passImage.type = Image.Type.Sliced; }
+        passImage.color = new Color(0.5f, 0.55f, 0.65f, 1f);
+        SetRect(passButtonGo.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(200f, 38f), new Vector2(145f, 16f));
+        var passText = AddText(passButtonGo.transform, "Txt", "❌ KHÔNG CỨU", 11, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        Fill(passText.rectTransform);
+
+        useButtonGo.GetComponent<Button>().onClick.AddListener(() => { useRescue = true; decided = true; });
+        passButtonGo.GetComponent<Button>().onClick.AddListener(() => { useRescue = false; decided = true; });
+        playerCard.ShowHeadTimer(40);
+        while (!decided && timer > 0f && !battleFinished)
+        {
+            timer -= Time.unscaledDeltaTime;
+            playerCard.UpdateHeadTimer(Mathf.Max(0, Mathf.CeilToInt(timer)));
+            if (timerText != null) timerText.text = $"⏳ Còn {Mathf.CeilToInt(timer)}s";
+            yield return null;
+        }
+
+        playerCard.HideHeadTimer();
+        if (modal != null) Destroy(modal);
+        DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
+        {
+            action = "RESPOND_ACTION",
+            roomId = currentRoomId,
+            seat = playerCard.SeatNumber,
+            accepted = useRescue,
+            cardId = useRescue ? rescueCard.id : ""
+        }, (s) => { if (s != null) ApplyServerGameState(s); });
+        isAwaitingServerNearDeath = false;
     }
 
     private void ShowServerHarvestModal(List<CardModel> revealedCards, bool isMyTurn, int pickerSeat)
@@ -2531,6 +2870,32 @@ public class Battle2v2UI : MonoBehaviour
         }
 
         isFirstTurnOfMatch = true;
+
+        // Online matches are dealt and advanced only by the authoritative
+        // server. The local deck is reserved for offline/tutorial battles.
+        if (!string.IsNullOrEmpty(currentRoomId))
+        {
+            SetLog("🎴 Đang chờ máy chủ chia bài và mở lượt đầu tiên...");
+            var initPlayers = BuildInitialServerPlayers();
+            DenoGameClient.Instance.ConnectToServer(currentRoomId, playerCard != null ? playerCard.SeatNumber : 1, initPlayers);
+
+            if (IsAIController())
+            {
+                DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
+                {
+                    action = "INIT_GAME",
+                    roomId = currentRoomId,
+                    seat = playerCard != null ? playerCard.SeatNumber : 1,
+                    players = initPlayers
+                }, (initState) => { if (initState != null) ApplyServerGameState(initState); });
+            }
+
+            currentTurnIndex = 0;
+            if (currentTurnCoroutine != null) StopCoroutine(currentTurnCoroutine);
+            currentTurnCoroutine = StartCoroutine(ExecuteCurrentTurn());
+            yield break;
+        }
+
         SetLog("🎴 Phát 4 lá bài ban đầu cho toàn thể chiến tướng...");
         AudioManager.Instance.PlayCardDraw();
 
@@ -2620,6 +2985,31 @@ public class Battle2v2UI : MonoBehaviour
         currentTurnIndex = 0;
         if (currentTurnCoroutine != null) StopCoroutine(currentTurnCoroutine);
         currentTurnCoroutine = StartCoroutine(ExecuteCurrentTurn());
+    }
+
+    private List<AppwriteMatchmaking.GameStatePlayer> BuildInitialServerPlayers()
+    {
+        var players = new List<AppwriteMatchmaking.GameStatePlayer>();
+        for (int seat = 1; seat <= 4; seat++)
+        {
+            var g = GetGeneralBySeat(seat);
+            if (g == null) continue;
+
+            players.Add(new AppwriteMatchmaking.GameStatePlayer
+            {
+                seat = seat,
+                userId = g.UserId,
+                heroId = GetDenoHeroId(g.GeneralName),
+                generalName = g.GeneralName,
+                maxHp = g.MaxHp,
+                hp = g.MaxHp,
+                isAlly = g.IsAlly,
+                isAI = g.IsAI,
+                handCount = 0,
+                hand = new List<AppwriteMatchmaking.GameStateCard>()
+            });
+        }
+        return players;
     }
 
     private bool IsAIController()
@@ -5604,7 +5994,7 @@ public class Battle2v2UI : MonoBehaviour
         bool satisfied = false;
 
         // Kiểm tra Khiên Mây Bện nếu cần Đỡ (Mưa Tên Liên Châu)
-        if (!needSlash && victim.HasEquipment(EquipmentType.Armor, "Khiên Mây"))
+        if (string.IsNullOrEmpty(currentRoomId) && !needSlash && victim.HasEquipment(EquipmentType.Armor, "Khiên Mây"))
         {
             yield return TryKhienMayDefense(victim, aoeName, (success) =>
             {
@@ -5745,6 +6135,10 @@ public class Battle2v2UI : MonoBehaviour
                     accepted = satisfied,
                     cardId = (chosenCardUI != null && chosenCardUI.Data != null) ? chosenCardUI.Data.id : ""
                 }, (s) => { if (s != null) ApplyServerGameState(s); });
+
+                victim.HideHeadTimer();
+                victim.SetAwaitingReaction(false);
+                yield break;
             }
         }
         else if (!victim.IsAI && !string.IsNullOrEmpty(currentRoomId))
@@ -5971,6 +6365,8 @@ public class Battle2v2UI : MonoBehaviour
                         accepted = playedSlash,
                         cardId = (chosenSlashUI != null && chosenSlashUI.Data != null) ? chosenSlashUI.Data.id : ""
                     }, (s) => { if (s != null) ApplyServerGameState(s); });
+
+                    yield break;
                 }
             }
             else if (!currentDuelist.IsAI && !string.IsNullOrEmpty(currentRoomId))

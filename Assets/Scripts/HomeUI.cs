@@ -353,25 +353,25 @@ public sealed class HomeUI : MonoBehaviour
         var hImg = headerGo.GetComponent<Image>();
         var slotSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
         if (slotSpr != null) { hImg.sprite = slotSpr; hImg.type = Image.Type.Sliced; }
-        hImg.color = new Color(0.05f, 0.08f, 0.15f, 0.95f);
+        hImg.color = new Color(0.04f, 0.07f, 0.14f, 0.98f);
 
         var hRt = headerGo.GetComponent<RectTransform>();
         hRt.anchorMin = new Vector2(0f, 1f);
         hRt.anchorMax = new Vector2(1f, 1f);
         hRt.pivot = new Vector2(0.5f, 1f);
-        hRt.sizeDelta = new Vector2(0f, 68f);
+        hRt.sizeDelta = new Vector2(0f, 74f);
         hRt.anchoredPosition = Vector2.zero;
 
         // Viền vàng dưới header
         var lineGo = new GameObject("GoldLine", typeof(RectTransform), typeof(Image));
         lineGo.transform.SetParent(headerGo.transform, false);
         var lineImg = lineGo.GetComponent<Image>();
-        lineImg.color = new Color(0.92f, 0.78f, 0.32f, 0.9f);
+        lineImg.color = new Color(0.92f, 0.78f, 0.32f, 0.95f);
         var lRt = lineGo.GetComponent<RectTransform>();
         lRt.anchorMin = new Vector2(0f, 0f);
         lRt.anchorMax = new Vector2(1f, 0f);
         lRt.pivot = new Vector2(0.5f, 0f);
-        lRt.sizeDelta = new Vector2(0f, 2f);
+        lRt.sizeDelta = new Vector2(0f, 3f);
         lRt.anchoredPosition = Vector2.zero;
 
         // --- GÓC TRÁI: THÔNG TIN NGƯỜI CHƠI (TÊN, CẤP, EXP LIÊN KẾT APPWRITE) ---
@@ -381,10 +381,10 @@ public sealed class HomeUI : MonoBehaviour
         ppRt.anchorMin = new Vector2(0f, 0.5f);
         ppRt.anchorMax = new Vector2(0f, 0.5f);
         ppRt.pivot = new Vector2(0f, 0.5f);
-        ppRt.sizeDelta = new Vector2(340f, 58f);
+        ppRt.sizeDelta = new Vector2(380f, 64f);
         ppRt.anchoredPosition = new Vector2(18f, 0f);
 
-        // Avatar khung tròn & Nút bấm
+        // Avatar khung tròn & Nút bấm lớn (56x56)
         var avatarGo = new GameObject("Avatar", typeof(RectTransform), typeof(Image), typeof(Button));
         avatarGo.transform.SetParent(playerProfileGo.transform, false);
         var avImg = avatarGo.GetComponent<Image>();
@@ -392,7 +392,7 @@ public sealed class HomeUI : MonoBehaviour
         if (avSprite != null) avImg.sprite = avSprite;
         var avRt = avatarGo.GetComponent<RectTransform>();
         avRt.anchorMin = avRt.anchorMax = avRt.pivot = new Vector2(0f, 0.5f);
-        avRt.sizeDelta = new Vector2(50f, 50f);
+        avRt.sizeDelta = new Vector2(56f, 56f);
         avRt.anchoredPosition = new Vector2(4f, 0f);
 
         // Khung viền avatar vàng
@@ -404,40 +404,39 @@ public sealed class HomeUI : MonoBehaviour
         bImg.color = new Color(1f, 0.85f, 0.35f, 1f);
         Fill(avBorder.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
 
-// Avatar viền vàng sạch đẹp (không có chấm than)
-
         avatarGo.GetComponent<Button>().onClick.AddListener(() =>
         {
             AudioManager.Instance.PlayCardSelect();
             ShowHeroDetailModal();
         });
 
-        // Tên người chơi từ Appwrite
+        // Tên người chơi lớn (26pt Bold)
         var nameGo = new GameObject("PlayerName", typeof(RectTransform), typeof(Text));
         nameGo.transform.SetParent(playerProfileGo.transform, false);
         playerNameText = nameGo.GetComponent<Text>();
         playerNameText.font = font;
-        playerNameText.fontSize = 22;
+        playerNameText.fontSize = 26;
         playerNameText.horizontalOverflow = HorizontalWrapMode.Overflow;
         playerNameText.fontStyle = FontStyle.Bold;
         playerNameText.color = new Color(1f, 0.95f, 0.75f, 1f);
         var nameRt = nameGo.GetComponent<RectTransform>();
         nameRt.anchorMin = nameRt.anchorMax = nameRt.pivot = new Vector2(0f, 1f);
-        nameRt.sizeDelta = new Vector2(420f, 28f);
-        nameRt.anchoredPosition = new Vector2(64f, -6f);
+        nameRt.sizeDelta = new Vector2(440f, 32f);
+        nameRt.anchoredPosition = new Vector2(70f, -4f);
+        AddShadow(nameGo);
 
-        // Quân hàm & Cấp độ từ Appwrite
+        // Quân hàm & Cấp độ lớn (22pt Bold)
         var rankGo = new GameObject("PlayerRank", typeof(RectTransform), typeof(Text));
         rankGo.transform.SetParent(playerProfileGo.transform, false);
         playerRankText = rankGo.GetComponent<Text>();
         playerRankText.font = font;
-        playerRankText.fontSize = 18;
+        playerRankText.fontSize = 22;
         playerRankText.color = new Color(0.6f, 0.88f, 1f, 1f);
         playerRankText.text = "⭐ Chánh Tướng • Cấp 1";
         var rankRt = rankGo.GetComponent<RectTransform>();
         rankRt.anchorMin = rankRt.anchorMax = rankRt.pivot = new Vector2(0f, 1f);
-        rankRt.sizeDelta = new Vector2(420f, 22f);
-        rankRt.anchoredPosition = new Vector2(64f, -27f);
+        rankRt.sizeDelta = new Vector2(440f, 26f);
+        rankRt.anchoredPosition = new Vector2(70f, -32f);
 
         // Thanh tiến độ EXP từ Appwrite
         var expBgGo = new GameObject("ExpBarBg", typeof(RectTransform), typeof(Image));
@@ -446,8 +445,8 @@ public sealed class HomeUI : MonoBehaviour
         expBgImg.color = new Color(0.1f, 0.14f, 0.22f, 0.95f);
         var expBgRt = expBgGo.GetComponent<RectTransform>();
         expBgRt.anchorMin = expBgRt.anchorMax = expBgRt.pivot = new Vector2(0f, 0f);
-        expBgRt.sizeDelta = new Vector2(170f, 10f);
-        expBgRt.anchoredPosition = new Vector2(64f, 6f);
+        expBgRt.sizeDelta = new Vector2(180f, 10f);
+        expBgRt.anchoredPosition = new Vector2(70f, 4f);
 
         var expFillGo = new GameObject("Fill", typeof(RectTransform), typeof(Image));
         expFillGo.transform.SetParent(expBgGo.transform, false);
@@ -463,54 +462,55 @@ public sealed class HomeUI : MonoBehaviour
         expTxtGo.transform.SetParent(playerProfileGo.transform, false);
         playerExpText = expTxtGo.GetComponent<Text>();
         playerExpText.font = font;
-        playerExpText.fontSize = 16;
-        playerExpText.color = new Color(0.85f, 0.95f, 1f, 0.9f);
+        playerExpText.fontSize = 18;
+        playerExpText.fontStyle = FontStyle.Bold;
+        playerExpText.color = new Color(0.85f, 0.95f, 1f, 0.95f);
         playerExpText.text = "EXP: 0/1.000";
         var etRt = expTxtGo.GetComponent<RectTransform>();
         etRt.anchorMin = etRt.anchorMax = etRt.pivot = new Vector2(0f, 0f);
-        etRt.sizeDelta = new Vector2(80f, 12f);
-        etRt.anchoredPosition = new Vector2(240f, 5f);
+        etRt.sizeDelta = new Vector2(120f, 16f);
+        etRt.anchoredPosition = new Vector2(258f, 2f);
 
-        // --- TRUNG TÂM: QUỐC HIỆU ---
+        // --- TRUNG TÂM: QUỐC HIỆU LỚN (36pt Bold) ---
         var titleGo = new GameObject("GameTitle", typeof(RectTransform), typeof(Text));
         titleGo.transform.SetParent(headerGo.transform, false);
         var titleTxt = titleGo.GetComponent<Text>();
         titleTxt.font = font;
-        titleTxt.fontSize = 32;
+        titleTxt.fontSize = 36;
         titleTxt.fontStyle = FontStyle.Bold;
         titleTxt.alignment = TextAnchor.MiddleCenter;
-        titleTxt.color = new Color(1f, 0.85f, 0.28f, 1f);
+        titleTxt.color = new Color(1f, 0.88f, 0.32f, 1f);
         titleTxt.text = "👑 ĐẠI VIỆT CHIẾN";
         var titleRt = titleGo.GetComponent<RectTransform>();
         titleRt.anchorMin = titleRt.anchorMax = titleRt.pivot = new Vector2(0.5f, 0.5f);
-        titleRt.sizeDelta = new Vector2(280f, 34f);
+        titleRt.sizeDelta = new Vector2(340f, 42f);
         titleRt.anchoredPosition = Vector2.zero;
         AddShadow(titleGo);
 
-        // --- GÓC PHẢI: KHỐ TÀI NGUYÊN (BẠC, VÀNG) & NÚT THƯ LỚN HƠN & CÀI ĐẶT ---
+        // --- GÓC PHẢI: KHỐ TÀI NGUYÊN (BẠC, VÀNG) & NÚT THƯ LỚN & CÀI ĐẶT ---
         var rightGroupGo = new GameObject("RightGroup", typeof(RectTransform), typeof(HorizontalLayoutGroup));
         rightGroupGo.transform.SetParent(headerGo.transform, false);
         var rgRt = rightGroupGo.GetComponent<RectTransform>();
         rgRt.anchorMin = rgRt.anchorMax = rgRt.pivot = new Vector2(1f, 0.5f);
-        rgRt.sizeDelta = new Vector2(460f, 52f);
+        rgRt.sizeDelta = new Vector2(520f, 56f);
         rgRt.anchoredPosition = new Vector2(-16f, 0f);
         var rHlg = rightGroupGo.GetComponent<HorizontalLayoutGroup>();
-        rHlg.spacing = 12f;
+        rHlg.spacing = 14f;
         rHlg.childAlignment = TextAnchor.MiddleRight;
         rHlg.childControlWidth = false;
         rHlg.childControlHeight = false;
 
-        // 1. Khối Bạc từ Appwrite
-        CreateResourceBadge(rightGroupGo.transform, "SilverBadge", "🪙", $"{AuthUI.CurrentSilver:N0} Bạc", new Color(0.88f, 0.92f, 1f, 1f), font, out silverText, () => ShowShopModal());
+        // 1. Khối Bạc lớn (155 x 44)
+        CreateResourceBadge(rightGroupGo.transform, "SilverBadge", "🪙", $"{AuthUI.CurrentSilver:N0} Bạc", new Color(0.90f, 0.94f, 1f, 1f), font, out silverText, () => ShowShopModal());
 
-        // 2. Khối Vàng từ Appwrite (Mặc định 0 Vàng)
-        CreateResourceBadge(rightGroupGo.transform, "GoldBadge", "💎", $"{AuthUI.CurrentGold:N0} Vàng", new Color(1f, 0.85f, 0.35f, 1f), font, out goldText, () => ShowShopModal());
+        // 2. Khối Vàng lớn (155 x 44)
+        CreateResourceBadge(rightGroupGo.transform, "GoldBadge", "💎", $"{AuthUI.CurrentGold:N0} Vàng", new Color(1f, 0.88f, 0.35f, 1f), font, out goldText, () => ShowShopModal());
 
-        // 3. Nút Lá Thư lớn hơn (48x48) với Chấm Đỏ thông báo
+        // 3. Nút Lá Thư lớn (52x52) với Chấm Đỏ thông báo
         CreateProminentMailButton(rightGroupGo.transform, font, () => ShowMailModal());
 
-        // 4. Nút Cài Đặt (44x44)
-        CreateIconButton(rightGroupGo.transform, "BtnSettings", "⚙️", new Vector2(44, 44), 18, font, () => ShowSettingsModal());
+        // 4. Nút Cài Đặt lớn (48x48)
+        CreateIconButton(rightGroupGo.transform, "BtnSettings", "⚙️", new Vector2(48, 48), 24, font, () => ShowSettingsModal());
     }
 
     private void CreateResourceBadge(Transform parent, string name, string icon, string value, Color valColor, Font font, out Text outText, Action onAddClicked)
@@ -520,28 +520,37 @@ public sealed class HomeUI : MonoBehaviour
         var img = go.GetComponent<Image>();
         var slotSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
         if (slotSpr != null) { img.sprite = slotSpr; img.type = Image.Type.Sliced; }
-        img.color = new Color(0.04f, 0.07f, 0.13f, 0.95f);
+        img.color = new Color(0.04f, 0.07f, 0.13f, 0.98f);
 
         var rt = go.GetComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(130f, 38f);
+        rt.sizeDelta = new Vector2(155f, 44f);
+
+        // Viền badge
+        var borderGo = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        borderGo.transform.SetParent(go.transform, false);
+        var bImg = borderGo.GetComponent<Image>();
+        var frameSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+        if (frameSpr != null) { bImg.sprite = frameSpr; bImg.type = Image.Type.Sliced; }
+        bImg.color = new Color(0.85f, 0.72f, 0.35f, 0.8f);
+        Fill(borderGo.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
 
         var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(Text));
         iconGo.transform.SetParent(go.transform, false);
         var iconTxt = iconGo.GetComponent<Text>();
         iconTxt.font = font;
-        iconTxt.fontSize = 16;
+        iconTxt.fontSize = 22;
         iconTxt.alignment = TextAnchor.MiddleCenter;
         iconTxt.text = icon;
         var iRt = iconGo.GetComponent<RectTransform>();
         iRt.anchorMin = iRt.anchorMax = iRt.pivot = new Vector2(0f, 0.5f);
-        iRt.sizeDelta = new Vector2(30f, 30f);
-        iRt.anchoredPosition = new Vector2(4f, 0f);
+        iRt.sizeDelta = new Vector2(34f, 34f);
+        iRt.anchoredPosition = new Vector2(6f, 0f);
 
         var valGo = new GameObject("Val", typeof(RectTransform), typeof(Text));
         valGo.transform.SetParent(go.transform, false);
         outText = valGo.GetComponent<Text>();
         outText.font = font;
-        outText.fontSize = 12;
+        outText.fontSize = 18;
         outText.fontStyle = FontStyle.Bold;
         outText.alignment = TextAnchor.MiddleLeft;
         outText.color = valColor;
@@ -550,8 +559,8 @@ public sealed class HomeUI : MonoBehaviour
         vRt.anchorMin = new Vector2(0f, 0f);
         vRt.anchorMax = new Vector2(1f, 1f);
         vRt.pivot = new Vector2(0f, 0.5f);
-        vRt.offsetMin = new Vector2(34f, 0f);
-        vRt.offsetMax = new Vector2(-22f, 0f);
+        vRt.offsetMin = new Vector2(42f, 0f);
+        vRt.offsetMax = new Vector2(-28f, 0f);
 
         if (onAddClicked != null)
         {
@@ -559,15 +568,15 @@ public sealed class HomeUI : MonoBehaviour
             addBtnGo.transform.SetParent(go.transform, false);
             var aTxt = addBtnGo.GetComponent<Text>();
             aTxt.font = font;
-            aTxt.fontSize = 15;
+            aTxt.fontSize = 20;
             aTxt.fontStyle = FontStyle.Bold;
-            aTxt.color = new Color(1f, 0.85f, 0.35f, 1f);
+            aTxt.color = new Color(1f, 0.88f, 0.35f, 1f);
             aTxt.alignment = TextAnchor.MiddleCenter;
             aTxt.text = "+";
             var aRt = addBtnGo.GetComponent<RectTransform>();
             aRt.anchorMin = aRt.anchorMax = aRt.pivot = new Vector2(1f, 0.5f);
-            aRt.sizeDelta = new Vector2(20f, 20f);
-            aRt.anchoredPosition = new Vector2(-4f, 0f);
+            aRt.sizeDelta = new Vector2(24f, 24f);
+            aRt.anchoredPosition = new Vector2(-6f, 0f);
             addBtnGo.GetComponent<Button>().onClick.AddListener(() => onAddClicked());
         }
     }
@@ -582,7 +591,7 @@ public sealed class HomeUI : MonoBehaviour
         img.color = new Color(0.18f, 0.24f, 0.38f, 0.98f);
 
         var rt = go.GetComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(48f, 48f);
+        rt.sizeDelta = new Vector2(52f, 52f);
 
         // Viền vàng nút thư
         var borderGo = new GameObject("Border", typeof(RectTransform), typeof(Image));
@@ -590,14 +599,14 @@ public sealed class HomeUI : MonoBehaviour
         var bImg = borderGo.GetComponent<Image>();
         var frameSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
         if (frameSpr != null) { bImg.sprite = frameSpr; bImg.type = Image.Type.Sliced; }
-        bImg.color = new Color(1f, 0.85f, 0.35f, 0.9f);
+        bImg.color = new Color(1f, 0.85f, 0.35f, 0.95f);
         Fill(borderGo.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
 
         var txtGo = new GameObject("Icon", typeof(RectTransform), typeof(Text));
         txtGo.transform.SetParent(go.transform, false);
         var txt = txtGo.GetComponent<Text>();
         txt.font = font;
-        txt.fontSize = 22;
+        txt.fontSize = 26;
         txt.alignment = TextAnchor.MiddleCenter;
         txt.text = "✉️";
         txt.color = Color.white;
@@ -610,8 +619,8 @@ public sealed class HomeUI : MonoBehaviour
         rdImg.color = new Color(1f, 0.25f, 0.25f, 1f);
         var rdRt = redDotGo.GetComponent<RectTransform>();
         rdRt.anchorMin = rdRt.anchorMax = rdRt.pivot = new Vector2(1f, 1f);
-        rdRt.sizeDelta = new Vector2(12f, 12f);
-        rdRt.anchoredPosition = new Vector2(-3f, -3f);
+        rdRt.sizeDelta = new Vector2(14f, 14f);
+        rdRt.anchoredPosition = new Vector2(-4f, -4f);
 
         go.GetComponent<Button>().onClick.AddListener(() =>
         {
@@ -627,16 +636,25 @@ public sealed class HomeUI : MonoBehaviour
         var img = go.GetComponent<Image>();
         var slotSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
         if (slotSpr != null) { img.sprite = slotSpr; img.type = Image.Type.Sliced; }
-        img.color = new Color(0.14f, 0.18f, 0.28f, 0.95f);
+        img.color = new Color(0.14f, 0.18f, 0.28f, 0.98f);
 
         var rt = go.GetComponent<RectTransform>();
         rt.sizeDelta = size;
+
+        // Viền nút
+        var borderGo = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        borderGo.transform.SetParent(go.transform, false);
+        var bImg = borderGo.GetComponent<Image>();
+        var frameSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+        if (frameSpr != null) { bImg.sprite = frameSpr; bImg.type = Image.Type.Sliced; }
+        bImg.color = new Color(0.85f, 0.72f, 0.35f, 0.85f);
+        Fill(borderGo.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
 
         var txtGo = new GameObject("Icon", typeof(RectTransform), typeof(Text));
         txtGo.transform.SetParent(go.transform, false);
         var txt = txtGo.GetComponent<Text>();
         txt.font = font;
-        txt.fontSize = Mathf.RoundToInt(fontSize * 1.5f);
+        txt.fontSize = fontSize;
         txt.alignment = TextAnchor.MiddleCenter;
         txt.text = icon;
         txt.color = Color.white;
@@ -659,39 +677,40 @@ public sealed class HomeUI : MonoBehaviour
         mcRt.anchorMin = new Vector2(0.5f, 0.5f);
         mcRt.anchorMax = new Vector2(0.5f, 0.5f);
         mcRt.pivot = new Vector2(0.5f, 0.5f);
-        mcRt.sizeDelta = new Vector2(1200f, 480f);
-        mcRt.anchoredPosition = new Vector2(0f, 6f);
+        mcRt.sizeDelta = new Vector2(1220f, 490f);
+        mcRt.anchoredPosition = new Vector2(0f, 4f);
 
-        // Nút phụ trên góc phải: Luyện tập với AI
+        // Nút phụ trên góc phải: Luyện tập với AI lớn (270x44)
         var practiceBtnGo = new GameObject("PracticeBtn", typeof(RectTransform), typeof(Image), typeof(Button));
         practiceBtnGo.transform.SetParent(modesContainerGo.transform, false);
         var pbImg = practiceBtnGo.GetComponent<Image>();
         var choiceBg = LotusHealthUI.LoadSpriteFromResources("UI/choice_card_bg");
         if (choiceBg != null) { pbImg.sprite = choiceBg; pbImg.type = Image.Type.Sliced; }
-        pbImg.color = new Color(0.08f, 0.16f, 0.12f, 0.95f);
+        pbImg.color = new Color(0.08f, 0.16f, 0.12f, 0.98f);
 
         var pbRt = practiceBtnGo.GetComponent<RectTransform>();
         pbRt.anchorMin = pbRt.anchorMax = pbRt.pivot = new Vector2(1f, 1f);
-        pbRt.sizeDelta = new Vector2(230f, 38f);
-        pbRt.anchoredPosition = new Vector2(-16f, -4f);
+        pbRt.sizeDelta = new Vector2(270f, 44f);
+        pbRt.anchoredPosition = new Vector2(-16f, -2f);
 
         var pbBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
         pbBorder.transform.SetParent(practiceBtnGo.transform, false);
         var pbbImg = pbBorder.GetComponent<Image>();
         var frameSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
         if (frameSpr != null) { pbbImg.sprite = frameSpr; pbbImg.type = Image.Type.Sliced; }
-        pbbImg.color = new Color(0.3f, 0.85f, 0.45f, 0.9f);
+        pbbImg.color = new Color(0.3f, 0.85f, 0.45f, 0.95f);
         Fill(pbBorder.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
 
-        var pbTxt = AddText(practiceBtnGo.transform, "Label", "🏹 ĐẤU TẬP VỚI SƠN TẶC (AI)", 11, new Color(0.7f, 1f, 0.8f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        var pbTxt = AddText(practiceBtnGo.transform, "Label", "🏹 ĐẤU TẬP VỚI SƠN TẶC (AI)", 16, new Color(0.7f, 1f, 0.8f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(pbTxt.rectTransform);
+        AddShadow(pbTxt.gameObject);
 
         practiceBtnGo.GetComponent<Button>().onClick.AddListener(() => StartPracticeTutorial());
 
-        // 3 THẺ CHẾ ĐỘ CHƠI HOÀNG GIA ĐẶT NGANG NHAU (Cực đẹp, rộng rãi và cân xứng)
-        float cardWidth = 365f;
-        float cardHeight = 390f;
-        float spacingX = 390f;
+        // 3 THẺ CHẾ ĐỘ CHƠI HOÀNG GIA ĐẶT NGANG NHAU (Lớn 380 x 420, chữ to rõ ràng)
+        float cardWidth = 380f;
+        float cardHeight = 415f;
+        float spacingX = 395f;
 
         // 1. 👑 VƯƠNG TRIỀU
         CreateMajorModeCard(
@@ -703,7 +722,7 @@ public sealed class HomeUI : MonoBehaviour
             "Đấu trường cung đình tối cao. Khẳng định tài mưu lược quân thần, tranh đoạt ngọc tỷ và vương miện hoàng triều Đại Việt.",
             "👑 VÀO VƯƠNG TRIỀU ➜",
             new Color(0.95f, 0.65f, 0.15f, 1f),
-            new Color(0.18f, 0.12f, 0.05f, 0.96f),
+            new Color(0.18f, 0.12f, 0.05f, 0.98f),
             font,
             () => StartDynastyMode()
         );
@@ -718,7 +737,7 @@ public sealed class HomeUI : MonoBehaviour
             "Bang hội phân tranh lãnh thổ 4 cõi. Chiếm cứ thành trì hiểm yếu, mở rộng non sông gấm vóc và xưng bá thiên hạ.",
             "⚔️ VÀO QUỐC CHIẾN ➜",
             new Color(0.85f, 0.28f, 0.22f, 1f),
-            new Color(0.18f, 0.06f, 0.06f, 0.96f),
+            new Color(0.18f, 0.06f, 0.06f, 0.98f),
             font,
             () => StartNationalWarMode()
         );
@@ -731,10 +750,10 @@ public sealed class HomeUI : MonoBehaviour
             new Vector2(cardWidth, cardHeight),
             "🛡️ ĐẤU 2v2 XẾP HẠNG",
             $"⭐ RANK: {r2v2.badge} {r2v2.name.ToUpper()}",
-            $"Hiệp lực đồng đội 2v2 leo bảng phong thần Đại Việt.\n\n<b>Bậc hiện tại:</b> <color={r2v2.ColorHex}>{r2v2.badge} {r2v2.name}</color> ({AuthUI.Current2v2Points} RP • {r2v2.subtitle})\n<i>(+25 RP khi thắng, -15 RP khi thua)</i>",
+            $"Hiệp lực đồng đội 2v2 leo bảng phong thần Đại Việt.\n\n<b>Bậc hiện tại:</b> <color={r2v2.ColorHex}>{r2v2.badge} {r2v2.name}</color> ({AuthUI.Current2v2Points} RP)\n<i>(+25 RP khi thắng, -15 RP khi thua)</i>",
             "🛡️ VÀO ĐẤU 2v2 ➜",
             new Color(0.2f, 0.65f, 0.95f, 1f),
-            new Color(0.06f, 0.12f, 0.2f, 0.96f),
+            new Color(0.06f, 0.12f, 0.2f, 0.98f),
             font,
             () => ShowRanked2v2Modal()
         );
@@ -783,28 +802,28 @@ public sealed class HomeUI : MonoBehaviour
         hImg.color = new Color(themeColor.r, themeColor.g, themeColor.b, 0.35f);
         hImg.raycastTarget = false;
         var hRt = haloGo.GetComponent<RectTransform>();
-        hRt.anchorMin = hRt.anchorMax = hRt.pivot = new Vector2(0.5f, 0.72f);
-        hRt.sizeDelta = new Vector2(220f, 220f);
+        hRt.anchorMin = hRt.anchorMax = hRt.pivot = new Vector2(0.5f, 0.74f);
+        hRt.sizeDelta = new Vector2(240f, 240f);
 
-        // Biểu tượng trung tâm lớn
+        // Biểu tượng trung tâm lớn (80pt)
         var iconGo = new GameObject("BigIcon", typeof(RectTransform), typeof(Text));
         iconGo.transform.SetParent(cardGo.transform, false);
         var icTxt = iconGo.GetComponent<Text>();
         icTxt.font = font;
-        icTxt.fontSize = 72;
+        icTxt.fontSize = 80;
         icTxt.alignment = TextAnchor.MiddleCenter;
         icTxt.text = title.Split(' ')[0]; // lấy icon đầu tiên
         var icRt = iconGo.GetComponent<RectTransform>();
-        icRt.anchorMin = icRt.anchorMax = icRt.pivot = new Vector2(0.5f, 0.72f);
-        icRt.sizeDelta = new Vector2(100f, 100f);
+        icRt.anchorMin = icRt.anchorMax = icRt.pivot = new Vector2(0.5f, 0.74f);
+        icRt.sizeDelta = new Vector2(110f, 110f);
 
-        // Tag danh hiệu nhỏ
-        var tagTxt = AddText(cardGo.transform, "Tag", tag, 11, themeColor, FontStyle.Bold, TextAnchor.MiddleCenter);
-        SetRect(tagTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(size.x - 30f, 22f), new Vector2(0, -18));
+        // Tag danh hiệu nhỏ lớn (16pt Bold)
+        var tagTxt = AddText(cardGo.transform, "Tag", tag, 16, themeColor, FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(tagTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(size.x - 30f, 26f), new Vector2(0, -16));
 
-        // Tiêu đề chế độ
-        var titleTxt = AddText(cardGo.transform, "Title", title, 20, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
-        SetRect(titleTxt.rectTransform, new Vector2(0.5f, 0.45f), new Vector2(0.5f, 0.45f), new Vector2(0.5f, 0.5f), new Vector2(size.x - 30f, 30f), Vector2.zero);
+        // Tiêu đề chế độ lớn (26pt Bold)
+        var titleTxt = AddText(cardGo.transform, "Title", title, 26, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(titleTxt.rectTransform, new Vector2(0.5f, 0.46f), new Vector2(0.5f, 0.46f), new Vector2(0.5f, 0.5f), new Vector2(size.x - 30f, 36f), Vector2.zero);
         AddShadow(titleTxt.gameObject);
 
         // Đường kẻ ngăn cách vàng
@@ -815,15 +834,15 @@ public sealed class HomeUI : MonoBehaviour
         if (divSpr != null) divImg.sprite = divSpr;
         divImg.color = themeColor;
         var dRt = divGo.GetComponent<RectTransform>();
-        dRt.anchorMin = dRt.anchorMax = dRt.pivot = new Vector2(0.5f, 0.38f);
-        dRt.sizeDelta = new Vector2(220f, 10f);
+        dRt.anchorMin = dRt.anchorMax = dRt.pivot = new Vector2(0.5f, 0.39f);
+        dRt.sizeDelta = new Vector2(240f, 12f);
 
-        // Mô tả chi tiết
-        var descTxt = AddText(cardGo.transform, "Desc", desc, 12, new Color(0.86f, 0.92f, 0.98f, 0.95f), FontStyle.Normal, TextAnchor.MiddleCenter);
-        descTxt.lineSpacing = 1.3f;
-        SetRect(descTxt.rectTransform, new Vector2(0.5f, 0.23f), new Vector2(0.5f, 0.23f), new Vector2(0.5f, 0.5f), new Vector2(size.x - 40f, 66f), Vector2.zero);
+        // Mô tả chi tiết lớn (18pt, line spacing 1.35)
+        var descTxt = AddText(cardGo.transform, "Desc", desc, 18, new Color(0.88f, 0.94f, 1f, 0.98f), FontStyle.Normal, TextAnchor.MiddleCenter);
+        descTxt.lineSpacing = 1.35f;
+        SetRect(descTxt.rectTransform, new Vector2(0.5f, 0.24f), new Vector2(0.5f, 0.24f), new Vector2(0.5f, 0.5f), new Vector2(size.x - 40f, 75f), Vector2.zero);
 
-        // Nút hành động lớn bên dưới
+        // Nút hành động lớn bên dưới (330 x 54, chữ 22pt Bold)
         var btnGo = new GameObject("ActionBtn", typeof(RectTransform), typeof(Image), typeof(Button));
         btnGo.transform.SetParent(cardGo.transform, false);
         var bImage = btnGo.GetComponent<Image>();
@@ -833,10 +852,17 @@ public sealed class HomeUI : MonoBehaviour
 
         var bRt = btnGo.GetComponent<RectTransform>();
         bRt.anchorMin = bRt.anchorMax = bRt.pivot = new Vector2(0.5f, 0f);
-        bRt.sizeDelta = new Vector2(size.x - 50f, 48f);
+        bRt.sizeDelta = new Vector2(size.x - 50f, 54f);
         bRt.anchoredPosition = new Vector2(0f, 20f);
 
-        var btnText = AddText(btnGo.transform, "Label", btnLabel, 14, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var btnBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        btnBorder.transform.SetParent(btnGo.transform, false);
+        var bnbImg = btnBorder.GetComponent<Image>();
+        if (frameSpr != null) { bnbImg.sprite = frameSpr; bnbImg.type = Image.Type.Sliced; }
+        bnbImg.color = new Color(1f, 0.95f, 0.6f, 0.95f);
+        Fill(btnBorder.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
+
+        var btnText = AddText(btnGo.transform, "Label", btnLabel, 22, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(btnText.rectTransform);
         AddShadow(btnText.gameObject);
 
@@ -862,24 +888,24 @@ public sealed class HomeUI : MonoBehaviour
         nRt.anchorMin = new Vector2(0f, 0f);
         nRt.anchorMax = new Vector2(1f, 0f);
         nRt.pivot = new Vector2(0.5f, 0f);
-        nRt.sizeDelta = new Vector2(0f, 62f);
+        nRt.sizeDelta = new Vector2(0f, 70f);
         nRt.anchoredPosition = Vector2.zero;
 
         // Viền vàng trên thanh Bottom Nav
         var lineGo = new GameObject("GoldLine", typeof(RectTransform), typeof(Image));
         lineGo.transform.SetParent(navGo.transform, false);
         var lineImg = lineGo.GetComponent<Image>();
-        lineImg.color = new Color(0.92f, 0.78f, 0.32f, 0.9f);
+        lineImg.color = new Color(0.92f, 0.78f, 0.32f, 0.95f);
         var lRt = lineGo.GetComponent<RectTransform>();
         lRt.anchorMin = new Vector2(0f, 1f);
         lRt.anchorMax = new Vector2(1f, 1f);
         lRt.pivot = new Vector2(0.5f, 1f);
-        lRt.sizeDelta = new Vector2(0f, 2f);
+        lRt.sizeDelta = new Vector2(0f, 3f);
         lRt.anchoredPosition = Vector2.zero;
 
         var hlgGo = new GameObject("ButtonsHlg", typeof(RectTransform), typeof(HorizontalLayoutGroup));
         hlgGo.transform.SetParent(navGo.transform, false);
-        Fill(hlgGo.GetComponent<RectTransform>(), new Vector2(20, 4), new Vector2(-20, -4));
+        Fill(hlgGo.GetComponent<RectTransform>(), new Vector2(20, 6), new Vector2(-20, -6));
         var hlg = hlgGo.GetComponent<HorizontalLayoutGroup>();
         hlg.spacing = 16f;
         hlg.childAlignment = TextAnchor.MiddleCenter;
@@ -903,18 +929,19 @@ public sealed class HomeUI : MonoBehaviour
         var img = go.GetComponent<Image>();
         var choiceBg = LotusHealthUI.LoadSpriteFromResources("UI/choice_card_bg");
         if (choiceBg != null) { img.sprite = choiceBg; img.type = Image.Type.Sliced; }
-        img.color = isActive ? new Color(0.24f, 0.18f, 0.06f, 0.98f) : new Color(0.08f, 0.12f, 0.2f, 0.7f);
+        img.color = isActive ? new Color(0.24f, 0.18f, 0.06f, 0.98f) : new Color(0.08f, 0.12f, 0.2f, 0.85f);
 
         var txtGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
         txtGo.transform.SetParent(go.transform, false);
         var txt = txtGo.GetComponent<Text>();
         txt.font = font;
-        txt.fontSize = 12;
+        txt.fontSize = 18;
         txt.fontStyle = FontStyle.Bold;
         txt.alignment = TextAnchor.MiddleCenter;
-        txt.color = isActive ? new Color(1f, 0.88f, 0.35f, 1f) : new Color(0.82f, 0.88f, 0.95f, 0.9f);
+        txt.color = isActive ? new Color(1f, 0.88f, 0.35f, 1f) : new Color(0.85f, 0.90f, 0.98f, 0.95f);
         txt.text = $"{icon} {label}";
         Fill(txtGo.GetComponent<RectTransform>());
+        AddShadow(txtGo);
 
         if (isActive)
         {
@@ -924,7 +951,7 @@ public sealed class HomeUI : MonoBehaviour
             var hImg = haloGo.GetComponent<Image>();
             var frameSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
             if (frameSpr != null) { hImg.sprite = frameSpr; hImg.type = Image.Type.Sliced; }
-            hImg.color = new Color(1f, 0.85f, 0.35f, 0.85f);
+            hImg.color = new Color(1f, 0.85f, 0.35f, 0.95f);
             Fill(haloGo.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
         }
 
@@ -935,6 +962,7 @@ public sealed class HomeUI : MonoBehaviour
         });
     }
     #endregion
+
 
     #region Action Handlers & Game Modes
     private void StartPracticeTutorial()
@@ -984,20 +1012,20 @@ public sealed class HomeUI : MonoBehaviour
     private void ShowRanked2v2Modal()
     {
         var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        var box = CreateBaseModal("🛡️ ĐẤU TRƯỜNG 2v2 XẾP HẠNG", new Vector2(980f, 620f), font);
+        var box = CreateBaseModal("🛡️ ĐẤU TRƯỜNG 2v2 XẾP HẠNG", new Vector2(1060f, 650f), font);
 
         var r2v2 = Ranked2v2System.GetTier(AuthUI.Current2v2Points);
         var nextTier = Ranked2v2System.GetNextTier(AuthUI.Current2v2Points);
         float progress = Ranked2v2System.GetProgress(AuthUI.Current2v2Points);
 
-        // --- CỘT TRÁI (380px): BẬC RANK HIỆN TẠI & NÚT TÌM TRẬN ---
+        // --- CỘT TRÁI (410px): BẬC RANK HIỆN TẠI & NÚT TÌM TRẬN ---
         var leftCol = new GameObject("LeftCol", typeof(RectTransform));
         leftCol.transform.SetParent(box.transform, false);
         var lcRt = leftCol.GetComponent<RectTransform>();
         lcRt.anchorMin = new Vector2(0f, 0f);
         lcRt.anchorMax = new Vector2(0.40f, 1f);
         lcRt.offsetMin = new Vector2(25f, 25f);
-        lcRt.offsetMax = new Vector2(0f, -60f);
+        lcRt.offsetMax = new Vector2(0f, -65f);
 
         // Card Rank Hiện Tại
         var rankCard = new GameObject("RankCard", typeof(RectTransform), typeof(Image));
@@ -1005,9 +1033,9 @@ public sealed class HomeUI : MonoBehaviour
         var rcImg = rankCard.GetComponent<Image>();
         var choiceBg = LotusHealthUI.LoadSpriteFromResources("UI/choice_card_bg");
         if (choiceBg != null) { rcImg.sprite = choiceBg; rcImg.type = Image.Type.Sliced; }
-        rcImg.color = new Color(0.08f, 0.14f, 0.24f, 0.95f);
+        rcImg.color = new Color(0.08f, 0.14f, 0.24f, 0.98f);
         var rcRt = rankCard.GetComponent<RectTransform>();
-        SetRect(rcRt, new Vector2(0f, 0.20f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+        SetRect(rcRt, new Vector2(0f, 0.18f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
 
         // Viền hoàng kim
         var rcBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
@@ -1018,17 +1046,17 @@ public sealed class HomeUI : MonoBehaviour
         rcbImg.color = r2v2.color;
         Fill(rcBorder.GetComponent<RectTransform>(), new Vector2(-3, -3), new Vector2(3, 3));
 
-        // Huy hiệu lớn (2x: 64pt)
-        var badgeTxt = ThemeUI.CreateText(rankCard.transform, "Badge", r2v2.badge, 64, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter, true);
-        SetRect(badgeTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(160f, 75f), new Vector2(0f, -10f));
+        // Huy hiệu lớn (76pt)
+        var badgeTxt = ThemeUI.CreateText(rankCard.transform, "Badge", r2v2.badge, 76, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter, true);
+        SetRect(badgeTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(180f, 85f), new Vector2(0f, -8f));
 
-        // Tên Rank (2x: 30pt)
-        var nameTxt = ThemeUI.CreateText(rankCard.transform, "Name", r2v2.name, 30, r2v2.color, FontStyle.Bold, TextAnchor.MiddleCenter, true);
-        SetRect(nameTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(350f, 38f), new Vector2(0f, -85f));
+        // Tên Rank lớn (34pt Bold)
+        var nameTxt = ThemeUI.CreateText(rankCard.transform, "Name", r2v2.name, 34, r2v2.color, FontStyle.Bold, TextAnchor.MiddleCenter, true);
+        SetRect(nameTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(380f, 42f), new Vector2(0f, -95f));
 
-        // Subtitle & Điểm (2x: 26pt)
+        // Subtitle & Điểm lớn (26pt Bold)
         var subTxt = ThemeUI.CreateText(rankCard.transform, "Sub", $"<b>{r2v2.subtitle}</b> • <color=#FFD700>{AuthUI.Current2v2Points} RP</color>", 26, new Color(0.9f, 0.94f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter, true);
-        SetRect(subTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(350f, 34f), new Vector2(0f, -125f));
+        SetRect(subTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(380f, 36f), new Vector2(0f, -140f));
 
         // Thanh tiến độ Rank 2v2
         var barBg = new GameObject("BarBg", typeof(RectTransform), typeof(Image));
@@ -1036,7 +1064,7 @@ public sealed class HomeUI : MonoBehaviour
         var bbImg = barBg.GetComponent<Image>();
         bbImg.color = new Color(0.04f, 0.07f, 0.12f, 0.95f);
         var bbRt = barBg.GetComponent<RectTransform>();
-        SetRect(bbRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(300f, 18f), new Vector2(0f, -165f));
+        SetRect(bbRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(320f, 20f), new Vector2(0f, -182f));
 
         var barFill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
         barFill.transform.SetParent(barBg.transform, false);
@@ -1049,15 +1077,15 @@ public sealed class HomeUI : MonoBehaviour
         bfRt.offsetMin = bfRt.offsetMax = Vector2.zero;
 
         string progLabel = r2v2.tierIndex >= 12 ? "ĐÃ ĐẠT BẬC TỐI CAO" : $"{AuthUI.Current2v2Points} / {nextTier.minPoints} RP";
-        var progTxt = ThemeUI.CreateText(rankCard.transform, "ProgTxt", progLabel, 20, new Color(1f, 1f, 1f, 0.95f), FontStyle.Bold, TextAnchor.MiddleCenter, true);
-        SetRect(progTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(320f, 26f), new Vector2(0f, -190f));
+        var progTxt = ThemeUI.CreateText(rankCard.transform, "ProgTxt", progLabel, 22, new Color(1f, 1f, 1f, 0.95f), FontStyle.Bold, TextAnchor.MiddleCenter, true);
+        SetRect(progTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(350f, 28f), new Vector2(0f, -210f));
 
-        // Mô tả bậc (2x: 22pt)
+        // Mô tả bậc lớn (22pt Italic)
         var descTxt = ThemeUI.CreateText(rankCard.transform, "Desc", r2v2.description, 22, new Color(0.85f, 0.92f, 1f, 0.95f), FontStyle.Italic, TextAnchor.MiddleCenter, true);
-        descTxt.lineSpacing = 1.25f;
-        SetRect(descTxt.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(340f, 80f), new Vector2(0f, 15f));
+        descTxt.lineSpacing = 1.3f;
+        SetRect(descTxt.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(360f, 85f), new Vector2(0f, 15f));
 
-        // Nút Tìm Trận Ghép Đội 2v2 (LỚN HƠN & THIẾT KẾ ĐẸP HOÀNG GIA)
+        // Nút Tìm Trận Ghép Đội 2v2 lớn (360 x 66, chữ 26pt Bold)
         var matchBtnGo = new GameObject("MatchmakingBtn", typeof(RectTransform), typeof(Image), typeof(Button));
         matchBtnGo.transform.SetParent(leftCol.transform, false);
         var mbImg = matchBtnGo.GetComponent<Image>();
@@ -1065,7 +1093,7 @@ public sealed class HomeUI : MonoBehaviour
         if (btnSpr != null) { mbImg.sprite = btnSpr; mbImg.type = Image.Type.Sliced; }
         mbImg.color = new Color(0.95f, 0.72f, 0.18f, 1.0f);
         var mbRt = matchBtnGo.GetComponent<RectTransform>();
-        SetRect(mbRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(340f, 62f), new Vector2(0f, 8f));
+        SetRect(mbRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(360f, 66f), new Vector2(0f, 6f));
 
         // Viền phát sáng cho nút Tìm trận
         var mbBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
@@ -1076,7 +1104,7 @@ public sealed class HomeUI : MonoBehaviour
         mbbImg.raycastTarget = false;
         Fill(mbBorder.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
 
-        var mbTxt = ThemeUI.CreateText(matchBtnGo.transform, "Label", "⚔️ BẮT ĐẦU TÌM TRẬN 2v2", 22, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter, true);
+        var mbTxt = ThemeUI.CreateText(matchBtnGo.transform, "Label", "⚔️ BẮT ĐẦU TÌM TRẬN 2v2", 26, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter, true);
         Fill(mbTxt.rectTransform);
 
         matchBtnGo.GetComponent<Button>().onClick.AddListener(() =>
@@ -1085,22 +1113,22 @@ public sealed class HomeUI : MonoBehaviour
             StartCoroutine(SimulateMatchmaking(mbTxt, matchBtnGo.GetComponent<Button>()));
         });
 
-        // --- CỘT PHẢI (540px): BẢNG LỘ TRÌNH 12 BẬC RANK 2v2 ---
+        // --- CỘT PHẢI (580px): BẢNG LỘ TRÌNH 12 BẬC RANK 2v2 ---
         var rightCol = new GameObject("RightCol", typeof(RectTransform));
         rightCol.transform.SetParent(box.transform, false);
         var rrcRt = rightCol.GetComponent<RectTransform>();
         rrcRt.anchorMin = new Vector2(0.40f, 0f);
         rrcRt.anchorMax = new Vector2(1f, 1f);
         rrcRt.offsetMin = new Vector2(20f, 20f);
-        rrcRt.offsetMax = new Vector2(-25f, -60f);
+        rrcRt.offsetMax = new Vector2(-25f, -65f);
 
-        var rTitle = ThemeUI.CreateText(rightCol.transform, "Title", "🏆 LỘ TRÌNH 12 BẬC RANK 2v2 ĐỒNG ĐỘI", 26, new Color(0.55f, 0.85f, 1f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft, true);
-        SetRect(rTitle.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(0f, 32f), new Vector2(5f, -2f));
+        var rTitle = ThemeUI.CreateText(rightCol.transform, "Title", "🏆 LỘ TRÌNH 12 BẬC RANK 2v2 ĐỒNG ĐỘI", 28, new Color(0.55f, 0.85f, 1f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft, true);
+        SetRect(rTitle.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(0f, 34f), new Vector2(5f, -2f));
 
-        // Grid of 12 tiers
-        float startY = -36f;
-        float rowH = 38f;
-        float spacing = 3f;
+        // Grid of 12 tiers (Row Height 40px, Spacing 2px)
+        float startY = -40f;
+        float rowH = 40f;
+        float spacing = 2f;
 
         for (int i = Ranked2v2System.Tiers.Length - 1; i >= 0; i--)
         {
@@ -1130,17 +1158,17 @@ public sealed class HomeUI : MonoBehaviour
                 Fill(curBorder.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
             }
 
-            // Badge & Name (2x: 22pt)
+            // Badge & Name (22pt Bold)
             string currentTag = isCurrent ? " <color=#FFD700>[BẬC BẠN]</color>" : "";
             var rowName = ThemeUI.CreateText(rowGo.transform, "Name", $"{tier.badge} <color={tier.ColorHex}>{tier.name}</color>{currentTag}", 22, Color.white, isCurrent ? FontStyle.Bold : FontStyle.Normal, TextAnchor.MiddleLeft, true);
             SetRect(rowName.rectTransform, new Vector2(0f, 0f), new Vector2(0.68f, 1f), new Vector2(0f, 0.5f), Vector2.zero, Vector2.zero);
-            rowName.rectTransform.offsetMin = new Vector2(12f, 0f);
+            rowName.rectTransform.offsetMin = new Vector2(14f, 0f);
 
-            // Points Range (2x: 20pt)
+            // Points Range (20pt Bold)
             string ptRange = tier.tierIndex >= 12 ? $"{tier.minPoints}+ RP" : $"{tier.minPoints} - {tier.maxPoints} RP";
             var rowPts = ThemeUI.CreateText(rowGo.transform, "Pts", ptRange, 20, isCurrent ? new Color(1f, 0.88f, 0.35f, 1f) : new Color(0.75f, 0.85f, 0.95f, 0.9f), FontStyle.Normal, TextAnchor.MiddleRight, true);
             SetRect(rowPts.rectTransform, new Vector2(0.68f, 0f), new Vector2(1f, 1f), new Vector2(1f, 0.5f), Vector2.zero, Vector2.zero);
-            rowPts.rectTransform.offsetMax = new Vector2(-12f, 0f);
+            rowPts.rectTransform.offsetMax = new Vector2(-14f, 0f);
         }
     }
 
@@ -1157,14 +1185,14 @@ public sealed class HomeUI : MonoBehaviour
         int myRankPoints = AuthUI.Current2v2Points;
         var font = ThemeUI.FontMain;
 
-        // Tạo Modal Tìm Trận Hiện Đại
+        // Tạo Modal Tìm Trận Lớn, Sang Trọng (680 x 530)
         var modalRoot = new GameObject("Modal_Matchmaking2v2", typeof(RectTransform), typeof(Image));
         modalRoot.transform.SetParent(homeCanvasGo.transform, false);
         modalRoot.transform.SetAsLastSibling();
         currentActiveModal = modalRoot;
 
         var bgImg = modalRoot.GetComponent<Image>();
-        bgImg.color = new Color(0.02f, 0.04f, 0.08f, 0.88f);
+        bgImg.color = new Color(0.02f, 0.04f, 0.08f, 0.90f);
         Fill(modalRoot.GetComponent<RectTransform>());
 
         var boxGo = new GameObject("Box", typeof(RectTransform), typeof(Image));
@@ -1176,7 +1204,7 @@ public sealed class HomeUI : MonoBehaviour
 
         var boxRt = boxGo.GetComponent<RectTransform>();
         boxRt.anchorMin = boxRt.anchorMax = boxRt.pivot = new Vector2(0.5f, 0.5f);
-        boxRt.sizeDelta = new Vector2(580f, 440f);
+        boxRt.sizeDelta = new Vector2(680f, 530f);
         boxRt.anchoredPosition = Vector2.zero;
 
         // Viền Hoàng Kim
@@ -1188,30 +1216,37 @@ public sealed class HomeUI : MonoBehaviour
         borImg.color = new Color(1f, 0.85f, 0.35f, 0.95f);
         Fill(borderGo.GetComponent<RectTransform>(), new Vector2(-4, -4), new Vector2(4, 4));
 
-        // Tiêu Đề
-        var titleTxt = ThemeUI.CreateText(boxGo.transform, "Title", "⚔️ ĐANG TÌM TRẬN ĐẤU XẾP HẠNG 2v2", 18, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter, true);
-        SetRect(titleTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(520f, 36f), new Vector2(0f, -14f));
+        // Tiêu Đề lớn (24pt Bold)
+        var titleTxt = ThemeUI.CreateText(boxGo.transform, "Title", "⚔️ ĐANG TÌM TRẬN ĐẤU XẾP HẠNG 2v2", 24, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter, true);
+        SetRect(titleTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(620f, 40f), new Vector2(0f, -16f));
 
-        // Đồng Hồ Đếm Thời Gian Tăng Dần (1s, 2s, 3s, ...)
+        // Đồng Hồ Đếm Thời Gian Tăng Dần lớn (200x44, chữ 26pt)
         var timerBoxGo = new GameObject("TimerBox", typeof(RectTransform), typeof(Image));
         timerBoxGo.transform.SetParent(boxGo.transform, false);
         var tbImg = timerBoxGo.GetComponent<Image>();
-        tbImg.color = new Color(0.04f, 0.08f, 0.16f, 0.9f);
+        tbImg.color = new Color(0.04f, 0.08f, 0.16f, 0.95f);
         var tbRt = timerBoxGo.GetComponent<RectTransform>();
-        SetRect(tbRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(160f, 34f), new Vector2(0f, -54f));
+        SetRect(tbRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(200f, 44f), new Vector2(0f, -58f));
 
-        var timerTxt = ThemeUI.CreateText(timerBoxGo.transform, "TimerTxt", "⏳ 0s", 16, new Color(1f, 0.8f, 0.2f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter, false);
+        var tbBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        tbBorder.transform.SetParent(timerBoxGo.transform, false);
+        var tbbImg = tbBorder.GetComponent<Image>();
+        if (frameSpr != null) { tbbImg.sprite = frameSpr; tbbImg.type = Image.Type.Sliced; }
+        tbbImg.color = new Color(1f, 0.85f, 0.35f, 0.75f);
+        Fill(tbBorder.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
+
+        var timerTxt = ThemeUI.CreateText(timerBoxGo.transform, "TimerTxt", "⏳ 0s", 26, new Color(1f, 0.82f, 0.2f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter, true);
         Fill(timerTxt.rectTransform);
 
-        // Trạng Thái Tìm Kiếm
-        var statusTxt = ThemeUI.CreateText(boxGo.transform, "StatusTxt", "🌐 Đang quét tìm các phòng đấu có sẵn trên máy chủ...", 13, new Color(0.6f, 0.85f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter, true);
-        SetRect(statusTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(500f, 26f), new Vector2(0f, -92f));
+        // Trạng Thái Tìm Kiếm lớn (20pt Bold)
+        var statusTxt = ThemeUI.CreateText(boxGo.transform, "StatusTxt", "🌐 Đang quét tìm các phòng đấu có sẵn trên máy chủ...", 20, new Color(0.6f, 0.88f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter, true);
+        SetRect(statusTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(620f, 30f), new Vector2(0f, -108f));
 
-        // Khung 4 Ghế Người Chơi
+        // Khung 4 Ghế Người Chơi (Spacious: Height 52px each, chữ 20pt)
         var slotsContainer = new GameObject("Slots", typeof(RectTransform));
         slotsContainer.transform.SetParent(boxGo.transform, false);
         var scRt = slotsContainer.GetComponent<RectTransform>();
-        SetRect(scRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(520f, 190f), new Vector2(0f, -18f));
+        SetRect(scRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(620f, 240f), new Vector2(0f, -15f));
 
         Image[] slotImgs = new Image[4];
         Text[] slotTexts = new Text[4];
@@ -1221,20 +1256,29 @@ public sealed class HomeUI : MonoBehaviour
             var sGo = new GameObject("Slot_" + (i + 1), typeof(RectTransform), typeof(Image));
             sGo.transform.SetParent(slotsContainer.transform, false);
             var sImg = sGo.GetComponent<Image>();
-            sImg.color = new Color(0.05f, 0.09f, 0.18f, 0.9f);
+            var slotSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
+            if (slotSpr != null) { sImg.sprite = slotSpr; sImg.type = Image.Type.Sliced; }
+            sImg.color = new Color(0.05f, 0.09f, 0.18f, 0.95f);
             slotImgs[i] = sImg;
 
             var sRt = sGo.GetComponent<RectTransform>();
-            float yPos = 65f - (i * 45f);
-            SetRect(sRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(500f, 38f), new Vector2(0f, yPos));
+            float yPos = 85f - (i * 56f);
+            SetRect(sRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(600f, 50f), new Vector2(0f, yPos));
 
-            var sTxt = ThemeUI.CreateText(sGo.transform, "Txt", $"⏳ Đang chờ người chơi ghế #{i + 1}...", 13, new Color(0.6f, 0.7f, 0.85f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft, true);
+            var sBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
+            sBorder.transform.SetParent(sGo.transform, false);
+            var sbImg = sBorder.GetComponent<Image>();
+            if (frameSpr != null) { sbImg.sprite = frameSpr; sbImg.type = Image.Type.Sliced; }
+            sbImg.color = new Color(0.4f, 0.6f, 0.85f, 0.45f);
+            Fill(sBorder.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
+
+            var sTxt = ThemeUI.CreateText(sGo.transform, "Txt", $"⏳ Đang chờ người chơi ghế #{i + 1}...", 20, new Color(0.7f, 0.8f, 0.95f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft, true);
             Fill(sTxt.rectTransform);
-            sTxt.rectTransform.offsetMin = new Vector2(16f, 0f);
+            sTxt.rectTransform.offsetMin = new Vector2(18f, 0f);
             slotTexts[i] = sTxt;
         }
 
-        // Nút Hủy Tìm Trận
+        // Nút Hủy Tìm Trận lớn (280 x 52, chữ 22pt)
         bool cancelled = false;
         string activeRoomId = "";
         bool isHost = false;
@@ -1244,11 +1288,18 @@ public sealed class HomeUI : MonoBehaviour
         var cbImg = cancelBtnGo.GetComponent<Image>();
         var btnSpr = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
         if (btnSpr != null) { cbImg.sprite = btnSpr; cbImg.type = Image.Type.Sliced; }
-        cbImg.color = new Color(0.85f, 0.25f, 0.25f, 1f);
+        cbImg.color = new Color(0.88f, 0.25f, 0.22f, 1f);
         var cbRt = cancelBtnGo.GetComponent<RectTransform>();
-        SetRect(cbRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(240f, 44f), new Vector2(0f, 18f));
+        SetRect(cbRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(280f, 52f), new Vector2(0f, 18f));
 
-        var cbTxt = ThemeUI.CreateText(cancelBtnGo.transform, "Txt", "❌ HỦY TÌM TRẬN", 16, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter, true);
+        var cbBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        cbBorder.transform.SetParent(cancelBtnGo.transform, false);
+        var cbbImg = cbBorder.GetComponent<Image>();
+        if (frameSpr != null) { cbbImg.sprite = frameSpr; cbbImg.type = Image.Type.Sliced; }
+        cbbImg.color = new Color(1f, 0.85f, 0.35f, 0.95f);
+        Fill(cbBorder.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
+
+        var cbTxt = ThemeUI.CreateText(cancelBtnGo.transform, "Txt", "❌ HỦY TÌM TRẬN", 22, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter, true);
         Fill(cbTxt.rectTransform);
 
         cancelBtnGo.GetComponent<Button>().onClick.AddListener(() =>
@@ -1605,30 +1656,30 @@ public sealed class HomeUI : MonoBehaviour
             if (s.isEmpty)
             {
                 slotTexts[i].text = $"⏳ Đang tìm {(s.isDragon ? "đồng đội Phe Rồng" : "đối thủ Phe Phượng")}...";
-                slotTexts[i].color = new Color(0.6f, 0.7f, 0.85f, 1f);
-                slotImgs[i].color = new Color(0.05f, 0.09f, 0.18f, 0.9f);
+                slotTexts[i].color = new Color(0.65f, 0.75f, 0.9f, 1f);
+                slotImgs[i].color = new Color(0.05f, 0.09f, 0.18f, 0.95f);
             }
             else
             {
                 bool isMe = (s.userId == myUserId);
                 string factionName = s.isDragon ? "PHE RỒNG" : "PHE PHƯỢNG";
-                string roleTag = isMe ? " (BẠN)" : (s.isAI ? " (AI)" : "");
-                slotTexts[i].text = $"👤 {s.userName}{roleTag} - {factionName} ({s.rankPoints} RP) ✅";
+                string roleTag = isMe ? " <color=#FFD700>[BẠN]</color>" : (s.isAI ? " [AI]" : "");
+                slotTexts[i].text = $"👤 <b>{s.userName}</b>{roleTag} • <color={(s.isDragon ? "#55DDFF" : "#FF6666")}>{factionName}</color> ({s.rankPoints} RP) ✅";
 
                 if (isMe)
                 {
-                    slotTexts[i].color = new Color(0.45f, 0.95f, 1f, 1f);
-                    slotImgs[i].color = new Color(0.12f, 0.28f, 0.45f, 0.95f);
+                    slotTexts[i].color = new Color(0.95f, 0.98f, 1f, 1f);
+                    slotImgs[i].color = new Color(0.14f, 0.32f, 0.52f, 0.98f);
                 }
                 else if (s.isDragon)
                 {
-                    slotTexts[i].color = new Color(0.5f, 0.85f, 1f, 1f);
-                    slotImgs[i].color = new Color(0.08f, 0.2f, 0.35f, 0.95f);
+                    slotTexts[i].color = new Color(0.85f, 0.95f, 1f, 1f);
+                    slotImgs[i].color = new Color(0.08f, 0.22f, 0.38f, 0.95f);
                 }
                 else
                 {
-                    slotTexts[i].color = new Color(1f, 0.5f, 0.5f, 1f);
-                    slotImgs[i].color = new Color(0.35f, 0.1f, 0.1f, 0.95f);
+                    slotTexts[i].color = new Color(1f, 0.85f, 0.85f, 1f);
+                    slotImgs[i].color = new Color(0.38f, 0.12f, 0.12f, 0.95f);
                 }
             }
         }
@@ -1644,7 +1695,7 @@ public sealed class HomeUI : MonoBehaviour
         currentActiveModal = modalRoot;
 
         var bgImg = modalRoot.GetComponent<Image>();
-        bgImg.color = new Color(0.02f, 0.04f, 0.08f, 0.85f);
+        bgImg.color = new Color(0.02f, 0.04f, 0.08f, 0.88f);
         Fill(modalRoot.GetComponent<RectTransform>());
 
         var boxGo = new GameObject("Box", typeof(RectTransform), typeof(Image));
@@ -1668,25 +1719,32 @@ public sealed class HomeUI : MonoBehaviour
         borImg.color = new Color(1f, 0.85f, 0.35f, 0.95f);
         Fill(borderGo.GetComponent<RectTransform>(), new Vector2(-4, -4), new Vector2(4, 4));
 
-        // Header Title
-        var titleTxt = AddText(boxGo.transform, "Title", title, 18, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
-        SetRect(titleTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(size.x - 80f, 36f), new Vector2(0, -16));
+        // Header Title lớn (26pt Bold)
+        var titleTxt = AddText(boxGo.transform, "Title", title, 26, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(titleTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(size.x - 90f, 42f), new Vector2(0, -14));
         AddShadow(titleTxt.gameObject);
 
-        // Nút đóng [X]
+        // Nút đóng [X] lớn (40x40)
         var closeBtnGo = new GameObject("CloseBtn", typeof(RectTransform), typeof(Image), typeof(Button));
         closeBtnGo.transform.SetParent(boxGo.transform, false);
         var cImg = closeBtnGo.GetComponent<Image>();
         var slotSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
         if (slotSpr != null) { cImg.sprite = slotSpr; cImg.type = Image.Type.Sliced; }
-        cImg.color = new Color(0.6f, 0.15f, 0.15f, 0.95f);
+        cImg.color = new Color(0.7f, 0.18f, 0.18f, 0.98f);
 
         var cRt = closeBtnGo.GetComponent<RectTransform>();
         cRt.anchorMin = cRt.anchorMax = cRt.pivot = new Vector2(1f, 1f);
-        cRt.sizeDelta = new Vector2(34f, 34f);
+        cRt.sizeDelta = new Vector2(40f, 40f);
         cRt.anchoredPosition = new Vector2(-12f, -12f);
 
-        var xTxt = AddText(closeBtnGo.transform, "X", "✕", 14, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var cBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        cBorder.transform.SetParent(closeBtnGo.transform, false);
+        var cbImg = cBorder.GetComponent<Image>();
+        if (frameSpr != null) { cbImg.sprite = frameSpr; cbImg.type = Image.Type.Sliced; }
+        cbImg.color = new Color(1f, 0.85f, 0.35f, 0.85f);
+        Fill(cBorder.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
+
+        var xTxt = AddText(closeBtnGo.transform, "X", "✕", 20, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(xTxt.rectTransform);
         closeBtnGo.GetComponent<Button>().onClick.AddListener(() =>
         {
@@ -1697,10 +1755,11 @@ public sealed class HomeUI : MonoBehaviour
         return boxGo;
     }
 
+
     private void ShowHeroDetailModal()
     {
         var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        var box = CreateBaseModal("🎖️ THÔNG TIN DANH TƯỚNG ĐẠI VIỆT", new Vector2(760f, 480f), font);
+        var box = CreateBaseModal("🎖️ THÔNG TIN DANH TƯỚNG ĐẠI VIỆT", new Vector2(840f, 520f), font);
 
         string activeHeroName = "Lý Thường Kiệt";
         if (!string.IsNullOrEmpty(AuthUI.CurrentGenerals))
@@ -1722,16 +1781,24 @@ public sealed class HomeUI : MonoBehaviour
         if (spr != null) avImg.sprite = spr;
         avImg.preserveAspect = true;
         var avRt = avGo.GetComponent<RectTransform>();
-        SetRect(avRt, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(230f, 310f), new Vector2(28f, -10f));
+        SetRect(avRt, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(250f, 340f), new Vector2(28f, -10f));
 
-        // Thông tin bên phải
+        var avBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        avBorder.transform.SetParent(avGo.transform, false);
+        var bImg = avBorder.GetComponent<Image>();
+        var frameSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+        if (frameSpr != null) { bImg.sprite = frameSpr; bImg.type = Image.Type.Sliced; }
+        bImg.color = new Color(1f, 0.85f, 0.35f, 0.95f);
+        Fill(avBorder.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
+
+        // Thông tin bên phải lớn (18pt, line spacing 1.4)
         var infoGo = new GameObject("InfoPanel", typeof(RectTransform), typeof(Text));
         infoGo.transform.SetParent(box.transform, false);
         var infoTxt = infoGo.GetComponent<Text>();
         infoTxt.font = font;
-        infoTxt.fontSize = 13;
-        infoTxt.color = new Color(0.9f, 0.94f, 1f, 1f);
-        infoTxt.lineSpacing = 1.35f;
+        infoTxt.fontSize = 18;
+        infoTxt.color = new Color(0.92f, 0.95f, 1f, 1f);
+        infoTxt.lineSpacing = 1.4f;
 
         var milTier = MilitaryRankSystem.GetTier(AuthUI.CurrentMilitaryPoints);
         var r2v2 = Ranked2v2System.GetTier(AuthUI.Current2v2Points);
@@ -1747,17 +1814,17 @@ public sealed class HomeUI : MonoBehaviour
 
         var iRt = infoGo.GetComponent<RectTransform>();
         SetRect(iRt, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-        iRt.offsetMin = new Vector2(275f, 30f);
-        iRt.offsetMax = new Vector2(-28f, -60f);
+        iRt.offsetMin = new Vector2(295f, 30f);
+        iRt.offsetMax = new Vector2(-28f, -65f);
     }
 
     private void ShowInventoryModal()
     {
         var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        var box = CreateBaseModal("🎒 BINH KHÍ KHỐ (TÚI ĐỒ & TRANG BỊ)", new Vector2(760f, 490f), font);
+        var box = CreateBaseModal("🎒 BINH KHÍ KHỐ (TÚI ĐỒ & TRANG BỊ)", new Vector2(840f, 540f), font);
 
-        var subTxt = AddText(box.transform, "Sub", "Danh sách các trang bị và bảo vật đã mở khóa trong kho:", 12, new Color(0.85f, 0.92f, 1f, 0.9f), FontStyle.Normal, TextAnchor.MiddleLeft);
-        SetRect(subTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(-60f, 20f), new Vector2(30f, -54f));
+        var subTxt = AddText(box.transform, "Sub", "Danh sách các trang bị và bảo vật đã mở khóa trong kho:", 18, new Color(0.88f, 0.94f, 1f, 0.95f), FontStyle.Normal, TextAnchor.MiddleLeft);
+        SetRect(subTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(-60f, 26f), new Vector2(35f, -60f));
 
         var items = new[]
         {
@@ -1769,26 +1836,35 @@ public sealed class HomeUI : MonoBehaviour
             ("UI/icon_mount_defense", "♥K Phi Lực (+1)", "Ngựa Phòng Thủ\nTăng cự ly kẻ địch nhắm vào bản thân thêm 1 khoảng cách.")
         };
 
-        float startY = -85f;
+        float startY = -95f;
         for (int i = 0; i < items.Length; i++)
         {
             var it = items[i];
-            float colX = (i % 2 == 0) ? -175f : 175f;
-            float rowY = startY - (i / 2) * 110f;
+            float colX = (i % 2 == 0) ? -195f : 195f;
+            float rowY = startY - (i / 2) * 125f;
 
             var cardGo = new GameObject("ItemCard_" + i, typeof(RectTransform), typeof(Image));
             cardGo.transform.SetParent(box.transform, false);
             var cImg = cardGo.GetComponent<Image>();
             var slotSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
             if (slotSpr != null) { cImg.sprite = slotSpr; cImg.type = Image.Type.Sliced; }
-            cImg.color = new Color(0.05f, 0.08f, 0.16f, 0.9f);
+            cImg.color = new Color(0.05f, 0.08f, 0.16f, 0.95f);
 
             var cRt = cardGo.GetComponent<RectTransform>();
             cRt.anchorMin = cRt.anchorMax = cRt.pivot = new Vector2(0.5f, 1f);
-            cRt.sizeDelta = new Vector2(330f, 96f);
+            cRt.sizeDelta = new Vector2(370f, 112f);
             cRt.anchoredPosition = new Vector2(colX, rowY);
 
-            // Icon
+            // Viền card
+            var cBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
+            cBorder.transform.SetParent(cardGo.transform, false);
+            var cbImg = cBorder.GetComponent<Image>();
+            var frameSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+            if (frameSpr != null) { cbImg.sprite = frameSpr; cbImg.type = Image.Type.Sliced; }
+            cbImg.color = new Color(0.4f, 0.6f, 0.85f, 0.45f);
+            Fill(cBorder.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
+
+            // Icon lớn (56x56)
             var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(Image));
             iconGo.transform.SetParent(cardGo.transform, false);
             var icImg = iconGo.GetComponent<Image>();
@@ -1797,24 +1873,24 @@ public sealed class HomeUI : MonoBehaviour
             icImg.preserveAspect = true;
             var icRt = iconGo.GetComponent<RectTransform>();
             icRt.anchorMin = icRt.anchorMax = icRt.pivot = new Vector2(0f, 0.5f);
-            icRt.sizeDelta = new Vector2(48f, 48f);
-            icRt.anchoredPosition = new Vector2(10f, 0f);
+            icRt.sizeDelta = new Vector2(56f, 56f);
+            icRt.anchoredPosition = new Vector2(12f, 0f);
 
-            // Tên
-            var nTxt = AddText(cardGo.transform, "Name", it.Item2, 12, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft);
-            SetRect(nTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(-70f, 22f), new Vector2(66f, -6f));
+            // Tên lớn (18pt Bold)
+            var nTxt = AddText(cardGo.transform, "Name", it.Item2, 18, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft);
+            SetRect(nTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(-80f, 26f), new Vector2(76f, -8f));
 
-            // Mô tả
-            var dTxt = AddText(cardGo.transform, "Desc", it.Item3, 10, new Color(0.85f, 0.92f, 1f, 0.9f), FontStyle.Normal, TextAnchor.MiddleLeft);
-            dTxt.lineSpacing = 1.2f;
-            SetRect(dTxt.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(-70f, -32f), new Vector2(66f, 6f));
+            // Mô tả lớn (15pt)
+            var dTxt = AddText(cardGo.transform, "Desc", it.Item3, 15, new Color(0.85f, 0.92f, 1f, 0.95f), FontStyle.Normal, TextAnchor.MiddleLeft);
+            dTxt.lineSpacing = 1.25f;
+            SetRect(dTxt.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(-80f, -36f), new Vector2(76f, 8f));
         }
     }
 
     private void ShowQuestModal()
     {
         var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        var box = CreateBaseModal("📜 NHIỆM VỤ CHIẾN TƯỚNG", new Vector2(680f, 420f), font);
+        var box = CreateBaseModal("📜 NHIỆM VỤ CHIẾN TƯỚNG", new Vector2(760f, 480f), font);
 
         var questTxt = AddText(box.transform, "Content",
             "<b>Nhiệm Vụ Hàng Ngày:</b>\n\n" +
@@ -1822,11 +1898,11 @@ public sealed class HomeUI : MonoBehaviour
             "⏳ <b>Bách Chiến Bách Thắng:</b> Tham gia 3 trận đấu luyện tập với AI. (Tiến độ: 1/3)\n\n" +
             "⏳ <b>Thần Xạ Thủ:</b> Kích hoạt thành công kỹ năng Song Cung Mường Nhạ 1 lần. (Tiến độ: 0/1)\n\n" +
             "⏳ <b>Tuyệt Kỹ Biến Ảo:</b> Dùng kỹ năng [Tiến Thoái] 2 lần trong một ván đấu. (Tiến độ: 0/2)",
-            13, new Color(0.9f, 0.94f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleLeft);
-        questTxt.lineSpacing = 1.35f;
+            18, new Color(0.92f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleLeft);
+        questTxt.lineSpacing = 1.4f;
         SetRect(questTxt.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-        questTxt.rectTransform.offsetMin = new Vector2(36f, 30f);
-        questTxt.rectTransform.offsetMax = new Vector2(-36f, -60f);
+        questTxt.rectTransform.offsetMin = new Vector2(40f, 30f);
+        questTxt.rectTransform.offsetMax = new Vector2(-40f, -65f);
     }
 
     private int currentLeaderboardTab = 0; // 0 = Military Rank, 1 = 2v2 Rank
@@ -1834,21 +1910,21 @@ public sealed class HomeUI : MonoBehaviour
     private void ShowLeaderboardModal()
     {
         var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        var box = CreateBaseModal("🏆 BẢNG VÀNG QUÂN CÔNG & XẾP HẠNG (12 BẬC)", new Vector2(740f, 490f), font);
+        var box = CreateBaseModal("🏆 BẢNG VÀNG QUÂN CÔNG & XẾP HẠNG (12 BẬC)", new Vector2(820f, 540f), font);
 
         // Tab Switcher
         var tabContainer = new GameObject("TabContainer", typeof(RectTransform));
         tabContainer.transform.SetParent(box.transform, false);
         var tcRt = tabContainer.GetComponent<RectTransform>();
-        SetRect(tcRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(660f, 38f), new Vector2(0f, -54f));
+        SetRect(tcRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(740f, 44f), new Vector2(0f, -58f));
 
-        var tabMilBtn = CreateTabButton(tabContainer.transform, "TabMil", "🎖️ BẢNG QUÂN CÔNG TOÀN QUỐC", new Vector2(-165f, 0f), currentLeaderboardTab == 0, font, () =>
+        var tabMilBtn = CreateTabButton(tabContainer.transform, "TabMil", "🎖️ BẢNG QUÂN CÔNG TOÀN QUỐC", new Vector2(-185f, 0f), currentLeaderboardTab == 0, font, () =>
         {
             currentLeaderboardTab = 0;
             ShowLeaderboardModal();
         });
 
-        var tab2v2Btn = CreateTabButton(tabContainer.transform, "Tab2v2", "🛡️ BẢNG XẾP HẠNG 2v2 ĐỒNG ĐỘI", new Vector2(165f, 0f), currentLeaderboardTab == 1, font, () =>
+        var tab2v2Btn = CreateTabButton(tabContainer.transform, "Tab2v2", "🛡️ BẢNG XẾP HẠNG 2v2 ĐỒNG ĐỘI", new Vector2(185f, 0f), currentLeaderboardTab == 1, font, () =>
         {
             currentLeaderboardTab = 1;
             ShowLeaderboardModal();
@@ -1859,8 +1935,8 @@ public sealed class HomeUI : MonoBehaviour
         contentGo.transform.SetParent(box.transform, false);
         var caRt = contentGo.GetComponent<RectTransform>();
         SetRect(caRt, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-        caRt.offsetMin = new Vector2(35f, 25f);
-        caRt.offsetMax = new Vector2(-35f, -102f);
+        caRt.offsetMin = new Vector2(40f, 25f);
+        caRt.offsetMax = new Vector2(-40f, -112f);
 
         string userName = string.IsNullOrEmpty(AuthUI.CurrentUserName) ? "Lý Thường Kiệt" : AuthUI.CurrentUserName;
 
@@ -1875,8 +1951,8 @@ public sealed class HomeUI : MonoBehaviour
                 "   <b>4. Lý Thường Kiệt</b> — 6.400đ Quân Công  [👑 Trung Tướng • Bậc 10/12]\n" +
                 "   <b>5. Triệu Quang Phục</b> — 5.100đ Quân Công  [🌟 Thiếu Tướng • Bậc 9/12]\n\n" +
                 $"⭐ <b>VỊ TRÍ CỦA BẠN:</b> <color=#FFD700>{userName}</color> — <b>{AuthUI.CurrentMilitaryPoints}đ Quân Công</b>  [{milTier.badge} {milTier.name} • {milTier.subtitle}]",
-                12, new Color(0.9f, 0.94f, 1f, 1f), FontStyle.Normal, TextAnchor.UpperLeft);
-            leadTxt.lineSpacing = 1.35f;
+                17, new Color(0.92f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.UpperLeft);
+            leadTxt.lineSpacing = 1.4f;
             Fill(leadTxt.rectTransform);
         }
         else
@@ -1890,8 +1966,8 @@ public sealed class HomeUI : MonoBehaviour
                 "   <b>4. Tương Trợ Song Sư: Trần Khánh Dư & Yết Kiêu</b> — 4.600 RP  [👑 Vương Giả • Bậc 10/12]\n" +
                 "   <b>5. Hùng Sư Trấn Quốc: Đinh Bộ Lĩnh & Đinh Điền</b> — 3.800 RP  [🏆 Hùng Sư • Bậc 9/12]\n\n" +
                 $"⭐ <b>VỊ TRÍ CỦA BẠN:</b> <color=#55FF55>{userName}</color> — <b>{AuthUI.Current2v2Points} RP</b>  [{r2v2.badge} {r2v2.name} • {r2v2.subtitle}]",
-                12, new Color(0.9f, 0.94f, 1f, 1f), FontStyle.Normal, TextAnchor.UpperLeft);
-            leadTxt.lineSpacing = 1.35f;
+                17, new Color(0.92f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.UpperLeft);
+            leadTxt.lineSpacing = 1.4f;
             Fill(leadTxt.rectTransform);
         }
     }
@@ -1906,7 +1982,7 @@ public sealed class HomeUI : MonoBehaviour
         img.color = active ? new Color(0.24f, 0.18f, 0.06f, 0.98f) : new Color(0.07f, 0.1f, 0.18f, 0.85f);
 
         var rt = go.GetComponent<RectTransform>();
-        SetRect(rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(310f, 36f), pos);
+        SetRect(rt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(350f, 42f), pos);
 
         if (active)
         {
@@ -1923,12 +1999,13 @@ public sealed class HomeUI : MonoBehaviour
         tGo.transform.SetParent(go.transform, false);
         var txt = tGo.GetComponent<Text>();
         txt.font = font;
-        txt.fontSize = 12;
+        txt.fontSize = 17;
         txt.fontStyle = FontStyle.Bold;
         txt.alignment = TextAnchor.MiddleCenter;
-        txt.color = active ? new Color(1f, 0.88f, 0.35f, 1f) : new Color(0.75f, 0.82f, 0.92f, 0.85f);
+        txt.color = active ? new Color(1f, 0.88f, 0.35f, 1f) : new Color(0.80f, 0.88f, 0.96f, 0.88f);
         txt.text = label;
         Fill(tGo.GetComponent<RectTransform>());
+        AddShadow(tGo);
 
         go.GetComponent<Button>().onClick.AddListener(() =>
         {
@@ -1942,7 +2019,7 @@ public sealed class HomeUI : MonoBehaviour
     private void ShowShopModal()
     {
         var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        var box = CreateBaseModal("🛒 TRÂN BẢO CÁC (CỬA HÀNG)", new Vector2(680f, 420f), font);
+        var box = CreateBaseModal("🛒 TRÂN BẢO CÁC (CỬA HÀNG)", new Vector2(760f, 480f), font);
 
         var shopTxt = AddText(box.transform, "Content",
             "<b>TRÂN BẢO CÁC ĐẠI VIỆT CHIẾN:</b>\n\n" +
@@ -1950,52 +2027,61 @@ public sealed class HomeUI : MonoBehaviour
             "🪙 <b>Rương 2.000 Bạc:</b> Đổi bằng 180 Vàng.\n" +
             "🎁 <b>Gói Tướng Tân Thủ:</b> Sở hữu trọn bộ thẻ tướng & trang bị độc quyền.\n\n" +
             "<i>(Tính năng giao thương đang tiếp tục được cập nhật ở phiên bản tiếp theo!)</i>",
-            13, new Color(0.9f, 0.94f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleLeft);
-        shopTxt.lineSpacing = 1.4f;
+            18, new Color(0.92f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleLeft);
+        shopTxt.lineSpacing = 1.45f;
         SetRect(shopTxt.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-        shopTxt.rectTransform.offsetMin = new Vector2(36f, 30f);
-        shopTxt.rectTransform.offsetMax = new Vector2(-36f, -60f);
+        shopTxt.rectTransform.offsetMin = new Vector2(40f, 30f);
+        shopTxt.rectTransform.offsetMax = new Vector2(-40f, -65f);
     }
 
     private void ShowMailModal()
     {
         var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        var box = CreateBaseModal("✉️ THƯ TÍN QUÂN ĐOÀN", new Vector2(680f, 420f), font);
+        var box = CreateBaseModal("✉️ THƯ TÍN QUÂN ĐOÀN", new Vector2(760f, 480f), font);
 
         var mailTxt = AddText(box.transform, "Content",
             "<b>HÒM THƯ QUÂN ĐOÀN ĐẠI VIỆT:</b>\n\n" +
             "📩 <b>[Quà Khai Môn Tân Thủ]:</b> Chúc mừng chiến tướng đã gia nhập Đại Việt Chiến! Phần thưởng <b>1.000 Bạc</b> và <b>Tướng Lý Thường Kiệt</b> đã được đồng bộ trực tiếp vào tài khoản Appwrite của bạn.\n\n" +
             "📩 <b>[Hịch Tướng Sĩ]:</b> Sẵn sàng tham gia 3 đại chiến trường: <b>Vương Triều</b>, <b>Quốc Chiến</b> và <b>Đấu 2v2 Xếp Hạng</b>!",
-            13, new Color(0.9f, 0.94f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleLeft);
-        mailTxt.lineSpacing = 1.35f;
+            18, new Color(0.92f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleLeft);
+        mailTxt.lineSpacing = 1.4f;
         SetRect(mailTxt.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-        mailTxt.rectTransform.offsetMin = new Vector2(36f, 30f);
-        mailTxt.rectTransform.offsetMax = new Vector2(-36f, -60f);
+        mailTxt.rectTransform.offsetMin = new Vector2(40f, 30f);
+        mailTxt.rectTransform.offsetMax = new Vector2(-40f, -65f);
     }
 
     private void ShowSettingsModal()
     {
         var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        var box = CreateBaseModal("⚙️ CÀI ĐẶT TRÒ CHƠI", new Vector2(560f, 360f), font);
+        var box = CreateBaseModal("⚙️ CÀI ĐẶT TRÒ CHƠI", new Vector2(640f, 400f), font);
 
-        var desc = AddText(box.transform, "Desc", "Âm thanh & Tùy chọn tài khoản:", 13, new Color(0.85f, 0.92f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleLeft);
-        SetRect(desc.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(480, 24), new Vector2(0, -60));
+        var desc = AddText(box.transform, "Desc", "Âm thanh & Tùy chọn tài khoản:", 18, new Color(0.88f, 0.94f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleLeft);
+        SetRect(desc.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(540, 30), new Vector2(0, -70));
 
-        // Nút Đăng Xuất
+        // Nút Đăng Xuất lớn (280 x 52, chữ 20pt Bold)
         var logoutBtnGo = new GameObject("LogoutBtn", typeof(RectTransform), typeof(Image), typeof(Button));
         logoutBtnGo.transform.SetParent(box.transform, false);
         var lImg = logoutBtnGo.GetComponent<Image>();
         var btnSpr = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
         if (btnSpr != null) { lImg.sprite = btnSpr; lImg.type = Image.Type.Sliced; }
-        lImg.color = new Color(0.85f, 0.25f, 0.18f, 1f);
+        lImg.color = new Color(0.88f, 0.25f, 0.18f, 1f);
 
         var lRt = logoutBtnGo.GetComponent<RectTransform>();
         lRt.anchorMin = lRt.anchorMax = lRt.pivot = new Vector2(0.5f, 0f);
-        lRt.sizeDelta = new Vector2(240f, 44f);
-        lRt.anchoredPosition = new Vector2(0f, 30f);
+        lRt.sizeDelta = new Vector2(280f, 52f);
+        lRt.anchoredPosition = new Vector2(0f, 35f);
 
-        var lTxt = AddText(logoutBtnGo.transform, "Label", "🚪 ĐĂNG XUẤT", 14, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var lBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        lBorder.transform.SetParent(logoutBtnGo.transform, false);
+        var lbImg = lBorder.GetComponent<Image>();
+        var frameSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+        if (frameSpr != null) { lbImg.sprite = frameSpr; lbImg.type = Image.Type.Sliced; }
+        lbImg.color = new Color(1f, 0.85f, 0.35f, 0.95f);
+        Fill(lBorder.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
+
+        var lTxt = AddText(logoutBtnGo.transform, "Label", "🚪 ĐĂNG XUẤT", 20, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(lTxt.rectTransform);
+        AddShadow(lTxt.gameObject);
 
         logoutBtnGo.GetComponent<Button>().onClick.AddListener(() =>
         {
@@ -2012,26 +2098,35 @@ public sealed class HomeUI : MonoBehaviour
     private void ShowInfoDialog(string title, string content, string actionLabel, Action onConfirm)
     {
         var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        var box = CreateBaseModal(title, new Vector2(640f, 370f), font);
+        var box = CreateBaseModal(title, new Vector2(720f, 420f), font);
 
-        var cTxt = AddText(box.transform, "Content", content, 13, new Color(0.9f, 0.94f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
-        cTxt.lineSpacing = 1.35f;
-        SetRect(cTxt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(560, 120), new Vector2(0, 15));
+        var cTxt = AddText(box.transform, "Content", content, 18, new Color(0.92f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
+        cTxt.lineSpacing = 1.4f;
+        SetRect(cTxt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(640, 140), new Vector2(0, 18));
 
         var actBtnGo = new GameObject("ConfirmBtn", typeof(RectTransform), typeof(Image), typeof(Button));
         actBtnGo.transform.SetParent(box.transform, false);
         var aImg = actBtnGo.GetComponent<Image>();
         var btnSpr = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
         if (btnSpr != null) { aImg.sprite = btnSpr; aImg.type = Image.Type.Sliced; }
-        aImg.color = new Color(0.85f, 0.45f, 0.12f, 1f);
+        aImg.color = new Color(0.88f, 0.48f, 0.12f, 1f);
 
         var aRt = actBtnGo.GetComponent<RectTransform>();
         aRt.anchorMin = aRt.anchorMax = aRt.pivot = new Vector2(0.5f, 0f);
-        aRt.sizeDelta = new Vector2(260f, 44f);
+        aRt.sizeDelta = new Vector2(300f, 52f);
         aRt.anchoredPosition = new Vector2(0f, 26f);
 
-        var aTxt = AddText(actBtnGo.transform, "Label", actionLabel, 13, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var aBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        aBorder.transform.SetParent(actBtnGo.transform, false);
+        var abImg = aBorder.GetComponent<Image>();
+        var frameSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+        if (frameSpr != null) { abImg.sprite = frameSpr; abImg.type = Image.Type.Sliced; }
+        abImg.color = new Color(1f, 0.88f, 0.35f, 0.95f);
+        Fill(aBorder.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
+
+        var aTxt = AddText(actBtnGo.transform, "Label", actionLabel, 20, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(aTxt.rectTransform);
+        AddShadow(aTxt.gameObject);
 
         actBtnGo.GetComponent<Button>().onClick.AddListener(() =>
         {
@@ -2040,6 +2135,7 @@ public sealed class HomeUI : MonoBehaviour
         });
     }
     #endregion
+
 
     #region UI Helper Utilities
     private static Text AddText(Transform parent, string name, string text, int fontSize, Color color, FontStyle style, TextAnchor align)

@@ -152,6 +152,7 @@ public static class AppwriteMatchmaking
         public List<GameStateCard> hand = new List<GameStateCard>();
         public List<GameStateCard> equipments = new List<GameStateCard>();
         public List<GameStateCard> judgements = new List<GameStateCard>();
+        public int aoBaoCharges;
         public List<string> skills = new List<string>();
     }
 
@@ -166,6 +167,26 @@ public static class AppwriteMatchmaking
         public bool isWineBuff;
         public string reqType;
         public string reqName;
+    }
+
+    [Serializable]
+    public class GameStateTargetCardOption
+    {
+        public string token;
+        public string zone;
+        public string label;
+        public GameStateCard card;
+    }
+
+    [Serializable]
+    public class GameStateTargetCardSelection
+    {
+        public int chooserSeat;
+        public int targetSeat;
+        public string operation;
+        public string cardId;
+        public string cardName;
+        public List<GameStateTargetCardOption> options = new List<GameStateTargetCardOption>();
     }
 
     [Serializable]
@@ -191,6 +212,7 @@ public static class AppwriteMatchmaking
         public int handCount;
         public bool isWineBuffActive;
         public List<GameStateCard> equipments = new List<GameStateCard>();
+        public List<GameStateCard> judgements = new List<GameStateCard>();
     }
 
     [Serializable]
@@ -205,7 +227,10 @@ public static class AppwriteMatchmaking
         public int waitingTargetSeat;
         public string waitingReactionType;
         public int waitingTimer;
+        public int nearDeathVictimSeat;
+        public List<int> aoeVictimsQueue = new List<int>();
         public GameStateActiveCard activeCard;
+        public GameStateTargetCardSelection targetCardSelection;
         public int deckCount;
         public int discardCount;
         public GameStateCard discardTop;
@@ -221,12 +246,15 @@ public static class AppwriteMatchmaking
         public string roomId;
         public string status; // "PLAYING", "FINISHED"
         public int turnSeat;
-        public string phase; // "PLAY", "AWAIT_NULLIFY", "AWAIT_SLASH_DEFENSE", "AWAIT_HARVEST", "AWAIT_AOE", "AWAIT_DUEL", "AWAIT_NEAR_DEATH", "DISCARD"
+        public string phase; // "PLAY", "AWAIT_NULLIFY", "AWAIT_TARGET_CARD", "AWAIT_SLASH_DEFENSE", "AWAIT_HARVEST", "AWAIT_AOE", "AWAIT_DUEL", "AWAIT_NEAR_DEATH", "DISCARD"
         public int turnTimer;
         public int waitingTargetSeat;
         public string waitingReactionType;
         public int waitingTimer;
+        public int nearDeathVictimSeat;
+        public List<int> aoeVictimsQueue = new List<int>();
         public GameStateActiveCard activeCard;
+        public GameStateTargetCardSelection targetCardSelection;
         public List<GameStateCard> harvestPool = new List<GameStateCard>();
         public GameStateLastAction lastAction;
         public List<GameStateLastAction> actionHistory = new List<GameStateLastAction>();
@@ -244,6 +272,7 @@ public static class AppwriteMatchmaking
         public string roomId;
         public int seat;
         public string cardId;
+        public string targetCardId;
         public int targetSeat;
         public int damage;
         public bool isWineBuff;

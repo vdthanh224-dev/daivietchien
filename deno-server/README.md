@@ -28,6 +28,13 @@ Deno Deploy cung cấp cụm máy chủ Edge toàn cầu (bao gồm Singapore) v
 
 ### Các Bước Triển Khai:
 
+Server dùng Deno KV làm nguồn state authoritative dùng chung giữa các edge isolate. Project phải được gắn một database Deno KV trước khi deploy:
+
+```bash
+deno deploy database provision dai-viet-chien-state --kind denokv --org vdthanh
+deno deploy database assign dai-viet-chien-state --org vdthanh --app dai-viet-chien-server
+```
+
 1. **Đăng nhập Deno Deploy**:
    - Truy cập: [https://dash.deno.com](https://dash.deno.com)
    - Đăng nhập bằng tài khoản GitHub.

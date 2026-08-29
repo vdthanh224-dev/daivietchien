@@ -2,6 +2,7 @@
   "version": "5",
   "specifiers": {
     "jsr:@deno/deployctl@*": "1.13.1",
+    "jsr:@deno/deployctl@1.13.1": "1.13.1",
     "jsr:@denosaurs/tty@0.2.1": "0.2.1",
     "jsr:@denosaurs/tty@~0.2.1": "0.2.1",
     "jsr:@denosaurs/wait@0.2.2": "0.2.2",

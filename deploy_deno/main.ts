@@ -185,9 +185,13 @@ function broadcastRoom(room: RoomData, messageObj: any) {
     if (ws.readyState === WebSocket.OPEN) {
       try {
         if (messageObj.type === "STATE_UPDATE" && messageObj.state) {
+          const sanitizedState = sanitizeGameStateForClient(room.state, seat);
           const personalized = {
             ...messageObj,
-            state: sanitizeGameStateForClient(room.state, seat),
+            state: sanitizedState,
+            delta: messageObj.delta
+              ? { ...messageObj.delta, targetCardSelection: sanitizedState.targetCardSelection }
+              : null,
           };
           ws.send(JSON.stringify(personalized));
         } else {
@@ -236,7 +240,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
     socket.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data);
-        const { action, roomId, cardId, targetSeat, accepted, cardIds, players, expectedVersion } = payload;
+        const { action, roomId, cardId, targetCardId, targetSeat, accepted, cardIds, players, expectedVersion } = payload;
         const requestSeat = normalizeSeat(payload.seat);
 
         if (!roomId) {
@@ -343,7 +347,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
         if (action === "PLAY_CARD") {
           result = handlePlayCard(room.state, boundSeat, cardId, targetSeat);
         } else if (action === "RESPOND_ACTION") {
-          result = handleRespondAction(room.state, boundSeat, accepted, cardId);
+          result = handleRespondAction(room.state, boundSeat, accepted, cardId, targetCardId);
         } else if (action === "END_TURN") {
           result = handleEndTurn(room.state, boundSeat);
         } else if (action === "DISCARD_CARDS") {
@@ -413,7 +417,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
   if (req.method === "POST") {
     try {
       const payload = await req.json();
-      const { action, roomId, cardId, targetSeat, accepted, cardIds, players, expectedVersion } = payload;
+      const { action, roomId, cardId, targetCardId, targetSeat, accepted, cardIds, players, expectedVersion } = payload;
       const requestSeat = normalizeSeat(payload.seat);
 
       if (!roomId) {
@@ -490,7 +494,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
       } else if (action === "PLAY_CARD") {
         result = handlePlayCard(room.state, requestSeat, cardId, targetSeat);
       } else if (action === "RESPOND_ACTION") {
-        result = handleRespondAction(room.state, requestSeat, accepted, cardId);
+        result = handleRespondAction(room.state, requestSeat, accepted, cardId, targetCardId);
       } else if (action === "END_TURN") {
         result = handleEndTurn(room.state, requestSeat);
       } else if (action === "DISCARD_CARDS") {
