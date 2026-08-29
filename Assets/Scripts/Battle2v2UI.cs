@@ -491,7 +491,7 @@ public class Battle2v2UI : MonoBehaviour
             var turnGen = GetGeneralBySeat(delta.turnSeat);
             if (turnGen != null && turnGen.CurrentHp > 0)
             {
-                turnGen.ShowHeadTimer(40);
+                turnGen.ShowHeadTimer(delta.turnTimer > 0 ? delta.turnTimer : 40);
             }
             for (int s = 1; s <= 4; s++)
             {
@@ -1111,9 +1111,7 @@ public class Battle2v2UI : MonoBehaviour
             isAwaitingServerDuel = false;
             isAwaitingServerNearDeath = false;
             isAwaitingServerSongCung = false;
-            isAwaitingServerNamSon = false;
-            serverTargetCardSelectionInFlight = false;
-        }
+            isAwaitingServerNamSon = false; serverTargetCardSelectionInFlight = false; isDiscardPhaseActive = false; if (playerHandUI != null) { playerHandUI.IsMultiSelectMode = false; playerHandUI.ClearSelection(); } }
 
         switch (state.phase)
         {
@@ -7137,11 +7135,7 @@ public class Battle2v2UI : MonoBehaviour
 
         if (g == playerCard)
         {
-            isDiscardPhaseActive = true;
-            discardExcessRequired = excess;
-            selectedDiscardCards.Clear();
-            turnTimer = 40.0f;
-            isTimerRunning = true;
+            isDiscardPhaseActive = true; discardExcessRequired = excess; selectedDiscardCards.Clear(); if (playerHandUI != null) { playerHandUI.IsMultiSelectMode = true; playerHandUI.MaxSelectableCards = discardExcessRequired; playerHandUI.ClearSelection(); } turnTimer = 40.0f; isTimerRunning = true;
 
             discardConfirmBtn.gameObject.SetActive(true);
             discardConfirmBtn.interactable = false;
@@ -7248,8 +7242,7 @@ public class Battle2v2UI : MonoBehaviour
             }, (s) => { if (s != null) ApplyServerGameState(s); });
         }
 
-        selectedDiscardCards.Clear();
-        AudioManager.Instance.PlayCardDiscard();
+        selectedDiscardCards.Clear(); if (playerHandUI != null) { playerHandUI.IsMultiSelectMode = false; playerHandUI.ClearSelection(); } AudioManager.Instance.PlayCardDiscard();
         UpdateHandCountsVisual();
         if (string.IsNullOrEmpty(currentRoomId))
         {
@@ -7279,8 +7272,7 @@ public class Battle2v2UI : MonoBehaviour
             }
             playerHandUI.ClearHand();
             playerHandUI.AddCards(playerHandCards);
-            selectedDiscardCards.Clear();
-            AudioManager.Instance.PlayCardDiscard();
+            selectedDiscardCards.Clear(); if (playerHandUI != null) { playerHandUI.IsMultiSelectMode = false; playerHandUI.ClearSelection(); } AudioManager.Instance.PlayCardDiscard();
             UpdateHandCountsVisual();
             isDiscardPhaseActive = false;
         }
