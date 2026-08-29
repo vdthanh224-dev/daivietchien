@@ -2,8 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
@@ -170,6 +168,8 @@ public static class AppwriteMatchmaking
         public string reqName;
         public bool namSonFollowUp;
         public string selectionOperation;
+        public int nullifyRound;
+        public int nullifyBySeat;
     }
 
     [Serializable]
@@ -194,6 +194,15 @@ public static class AppwriteMatchmaking
     }
 
     [Serializable]
+    public class GameStateNullifyChain
+    {
+        public bool isCanceled;
+        public int currentIdx;
+        public int whoUsedLast;
+        public List<int> querySeats = new List<int>();
+    }
+
+    [Serializable]
     public class GameStateLastAction
     {
         public string type;
@@ -215,6 +224,7 @@ public static class AppwriteMatchmaking
         public int maxHp;
         public int handCount;
         public bool isWineBuffActive;
+        public int aoBaoCharges;
         public List<GameStateCard> equipments = new List<GameStateCard>();
         public List<GameStateCard> judgements = new List<GameStateCard>();
     }
@@ -228,13 +238,20 @@ public static class AppwriteMatchmaking
         public string description;
         public int turnSeat;
         public string phase;
+        public int turnTimer;
         public int waitingTargetSeat;
         public string waitingReactionType;
         public int waitingTimer;
         public int nearDeathVictimSeat;
+        public List<int> nearDeathAskerQueue = new List<int>();
         public List<int> aoeVictimsQueue = new List<int>();
+        public List<int> harvestPickers = new List<int>();
+        public int slashesUsedThisTurn;
+        public int duelCasterSeat;
+        public int duelTargetSeat;
         public GameStateActiveCard activeCard;
         public GameStateTargetCardSelection targetCardSelection;
+        public GameStateNullifyChain nullifyChain;
         public int deckCount;
         public int discardCount;
         public GameStateCard discardTop;
@@ -256,9 +273,15 @@ public static class AppwriteMatchmaking
         public string waitingReactionType;
         public int waitingTimer;
         public int nearDeathVictimSeat;
+        public List<int> nearDeathAskerQueue = new List<int>();
         public List<int> aoeVictimsQueue = new List<int>();
+        public List<int> harvestPickers = new List<int>();
+        public int slashesUsedThisTurn;
         public GameStateActiveCard activeCard;
+        public int duelCasterSeat;
+        public int duelTargetSeat;
         public GameStateTargetCardSelection targetCardSelection;
+        public GameStateNullifyChain nullifyChain;
         public List<GameStateCard> harvestPool = new List<GameStateCard>();
         public GameStateLastAction lastAction;
         public List<GameStateLastAction> actionHistory = new List<GameStateLastAction>();
@@ -1296,105 +1319,27 @@ public static class AppwriteMatchmaking
     public const string DenoEndpoint = "https://dai-viet-chien-server.vdthanh.deno.net"; // URL Deno Deploy Authoritative Server
 
     /// <summary>
-    /// Lưu GameState đồng bộ tập trung vào Appwrite Database Document (gs_{roomId})
+    /// Legacy shim: game state is server-owned and must never be written by Unity.
     /// </summary>
     public static IEnumerator SaveServerGameState(string roomId, ServerGameState state, Action<bool> onSaved = null)
     {
-        if (string.IsNullOrEmpty(roomId) || state == null) { onSaved?.Invoke(false); yield break; }
-        string docId = GetDeterministicDocId("gs_", roomId);
-        string docsUrl = $"{Endpoint}/databases/{DatabaseId}/collections/{CollectionId}/documents";
-        string stateJson = JsonUtility.ToJson(state);
-
-        string patchUrl = $"{docsUrl}/{docId}";
-        string patchJson = BuildPatchJson("GAME_STATE", stateJson, state.turnSeat, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
-
-        using (var patchReq = new UnityWebRequest(patchUrl, "PATCH"))
-        {
-            patchReq.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(patchJson));
-            patchReq.downloadHandler = new DownloadHandlerBuffer();
-            AddAppwriteHeaders(patchReq);
-            yield return patchReq.SendWebRequest();
-
-            if (patchReq.result == UnityWebRequest.Result.Success)
-            {
-                onSaved?.Invoke(true);
-                yield break;
-            }
-        }
-
-        // Nếu chưa tồn tại (404) -> Tạo mới bằng POST
-        string createJson = BuildCreateJson(docId, "GAME_STATE", stateJson, state.turnSeat, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
-        using (var postReq = new UnityWebRequest(docsUrl, "POST"))
-        {
-            postReq.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(createJson));
-            postReq.downloadHandler = new DownloadHandlerBuffer();
-            AddAppwriteHeaders(postReq);
-            yield return postReq.SendWebRequest();
-            onSaved?.Invoke(postReq.result == UnityWebRequest.Result.Success);
-        }
+        onSaved?.Invoke(false);
+        yield break;
     }
 
     /// <summary>
-    /// Đọc GameState đồng bộ tập trung từ Appwrite Database Document (gs_{roomId})
+    /// Đọc GameState qua authoritative Deno/Appwrite Function, never from the
+    /// private persistence document.
     /// </summary>
-    public static IEnumerator PollServerGameState(string roomId, Action<ServerGameState> onState)
+    public static IEnumerator PollServerGameState(string roomId, Action<ServerGameState> onState, int requestingSeat = 0)
     {
         if (string.IsNullOrEmpty(roomId)) { onState?.Invoke(null); yield break; }
-        string docId = GetDeterministicDocId("gs_", roomId);
-        string getUrl = $"{Endpoint}/databases/{DatabaseId}/collections/{CollectionId}/documents/{docId}";
-
-        using (var req = UnityWebRequest.Get(getUrl))
+        yield return ExecuteGameEngineAction(new GameActionPayload
         {
-            AddAppwriteHeaders(req);
-            req.timeout = 2;
-            yield return req.SendWebRequest();
-
-            if (req.result == UnityWebRequest.Result.Success)
-            {
-                var doc = JsonUtility.FromJson<AppwriteDocument>(req.downloadHandler.text);
-                if (doc != null && !string.IsNullOrEmpty(doc.userName) && doc.userId == "GAME_STATE")
-                {
-                    try
-                    {
-                        // The authoritative server stores large snapshots as
-                        // GZIP1:<base64>, while older documents remain plain JSON.
-                        string stateJson = DecodePersistedGameState(doc.userName);
-                        var state = string.IsNullOrEmpty(stateJson)
-                            ? null
-                            : JsonUtility.FromJson<ServerGameState>(stateJson);
-                        if (state != null)
-                        {
-                            onState?.Invoke(state);
-                            yield break;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogWarning("[AppwriteMatchmaking] Parse GameState error: " + ex.Message);
-                    }
-                }
-            }
-        }
-        onState?.Invoke(null);
-    }
-
-    private const string PersistedGameStatePrefix = "GZIP1:";
-
-    /// <summary>
-    /// Decode server snapshots without breaking legacy plain-JSON documents.
-    /// </summary>
-    private static string DecodePersistedGameState(string value)
-    {
-        if (string.IsNullOrEmpty(value) || !value.StartsWith(PersistedGameStatePrefix, StringComparison.Ordinal))
-            return value;
-
-        byte[] compressed = Convert.FromBase64String(value.Substring(PersistedGameStatePrefix.Length));
-        using (var input = new MemoryStream(compressed, writable: false))
-        using (var gzip = new GZipStream(input, CompressionMode.Decompress))
-        using (var reader = new StreamReader(gzip, Encoding.UTF8))
-        {
-            return reader.ReadToEnd();
-        }
+            action = "GET_STATE",
+            roomId = roomId,
+            seat = requestingSeat
+        }, onState);
     }
 
     public static int currentServerStateVersion = 0;
@@ -1423,7 +1368,7 @@ public static class AppwriteMatchmaking
         denoReq.timeout = 3; // Timeout nhanh để kịp fallback
         yield return denoReq.SendWebRequest();
 
-        if (denoReq.result == UnityWebRequest.Result.Success)
+        if (denoReq.result == UnityWebRequest.Result.Success || !string.IsNullOrEmpty(denoReq.downloadHandler?.text))
         {
             try
             {
@@ -1465,7 +1410,7 @@ public static class AppwriteMatchmaking
         req.timeout = 4;
         yield return req.SendWebRequest();
 
-        if (req.result == UnityWebRequest.Result.Success)
+        if (req.result == UnityWebRequest.Result.Success || !string.IsNullOrEmpty(req.downloadHandler?.text))
         {
             try
             {
@@ -1488,15 +1433,17 @@ public static class AppwriteMatchmaking
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Fallback to polling DB
+                Debug.LogWarning($"[Appwrite Function] Parse error: {ex.Message}");
             }
         }
     }
 
-    // 3. Fallback cuối cùng: Đọc thẳng bản ghi mới nhất từ DB
-    yield return PollServerGameState(actionPayload.roomId, onResult);
+    // Do not read the private persistence document from the client. A missing
+    // authoritative endpoint is a connection failure, not permission to trust
+    // a client-visible database snapshot.
+    onResult?.Invoke(null);
 }
 
     [Serializable]

@@ -28,6 +28,8 @@ console.log(`- Bài cọc rút: ${state.deckCount} lá`);
 
 const p1 = state.players[0];
 const p3 = state.players[2];
+const p2 = state.players[1];
+p1.equipments = [{ id: "D1_D_A", name: "Kiếm Thuận Thiên", suit: "Diamond", rank: 1, category: 1, subType: CARD_SUBTYPES.WEAPON, range: 2 }];
 
 // Cho Ghế 1: 1 lá Hủ Rượu (subType: 5), 1 lá Trảm (subType: 2)
 p1.hand[0] = { id: "D1_C_J", name: "Hủ Rượu", suit: "Club", rank: 11, category: 0, subType: CARD_SUBTYPES.WINE };
@@ -39,17 +41,17 @@ console.log(`- Kết quả: ${wineRes.success}`);
 console.log(`- isWineBuffActive của Ghế 1: ${p1.isWineBuffActive}`);
 console.log(`- Nhật ký: ${state.lastAction.description}`);
 
-console.log(`\n3. Ghế 1 (${p1.generalName}) ĐÁNH [Trảm - Lôi] nhắm vào Ghế 3 (${p3.generalName}):`);
-const slashRes = handlePlayCard(state, 1, "D1_S_8", 3);
+console.log(`\n3. Ghế 1 (${p1.generalName}) ĐÁNH [Trảm - Lôi] nhắm vào Ghế 2 (${p2.generalName}):`);
+const slashRes = handlePlayCard(state, 1, "D1_S_8", 2);
 console.log(`- Sát thương đòn đánh: ${state.activeCard.damage} (Kỳ vọng: 2)`);
 if (state.activeCard.damage !== 2) throw new Error("LỖI: Sát thương Hủ Rượu phải là 2!");
 console.log(`- Nhật ký: ${state.lastAction.description}`);
 
-console.log(`\n4. Ghế 3 (${p3.generalName}) KHÔNG DÙNG ĐỠ (chịu sát thương):`);
-const respRes = handleRespondAction(state, 3, false, null);
+console.log(`\n4. Ghế 2 (${p2.generalName}) KHÔNG DÙNG ĐỠ (chịu sát thương):`);
+const respRes = handleRespondAction(state, 2, false, null);
 console.log(`- Kết quả: ${respRes.success}`);
-console.log(`- Máu mới của Ghế 3: ${p3.hp}/${p3.maxHp} (Mất 2 máu từ 4 -> 2)`);
-if (p3.hp !== 2) throw new Error("LỖI: Máu Ghế 3 phải là 2 sau đòn Trảm kèm Rượu!");
+console.log(`- Máu mới của Ghế 2: ${p2.hp}/${p2.maxHp} (Mất 2 máu từ 4 -> 2)`);
+if (p2.hp !== 2) throw new Error("LỖI: Máu Ghế 2 phải là 2 sau đòn Trảm kèm Rượu!");
 console.log(`- Nhật ký: ${state.lastAction.description}`);
 
 console.log(`\n5. Ghế 1 kết thúc lượt:`);
@@ -62,14 +64,18 @@ console.log(`- AI Step thành công: ${aiStepRes.success}`);
 console.log(`- Hành động AI đã làm: ${state.lastAction.type} - ${state.lastAction.description}`);
 
 console.log(`\n7. KIỂM THỬ PHA HẤP HỐI (NEAR DEATH):`);
-// Giảm máu Ghế 3 xuống 1, sau đó Ghế 1 Trảm gây 1 damage
-p3.hp = 1;
+// Giảm máu Ghế 2 xuống 1, sau đó Ghế 1 Trảm gây 1 damage
+p2.hp = 1;
 p1.hand.push({ id: "D1_S_TEST", name: "Trảm Thường", suit: "Spade", rank: 10, category: 0, subType: CARD_SUBTYPES.ATTACK_NORMAL });
 state.turnSeat = 1;
 state.phase = "PLAY";
-handlePlayCard(state, 1, "D1_S_TEST", 3);
-// Ghế 3 không đỡ -> Rơi vào Hấp Hối
-handleRespondAction(state, 3, false, null);
+state.slashesUsedThisTurn = 0;
+state.waitingTargetSeat = 0;
+state.waitingReactionType = "NONE";
+state.activeCard = null;
+handlePlayCard(state, 1, "D1_S_TEST", 2);
+// Ghế 2 không đỡ -> Rơi vào Hấp Hối
+handleRespondAction(state, 2, false, null);
 console.log(`- Giai đoạn: ${state.phase} (Kỳ vọng: AWAIT_NEAR_DEATH)`);
 console.log(`- Ghế nạn nhân: ${state.nearDeathVictimSeat}`);
 console.log(`- Người đầu tiên được hỏi cứu: Ghế ${state.waitingTargetSeat} (Kỳ vọng: 1 - Người trong lượt)`);
@@ -80,17 +86,13 @@ handleRespondAction(state, 1, false, null);
 console.log(`- Người tiếp theo được hỏi cứu: Ghế ${state.waitingTargetSeat} (Kỳ vọng: 2 - Người bên phải kế tiếp)`);
 if (state.waitingTargetSeat !== 2) throw new Error("LỖI: Người tiếp theo phải là Ghế 2!");
 
-// Ghế 2 từ chối cứu
-handleRespondAction(state, 2, false, null);
-console.log(`- Người tiếp theo được hỏi cứu: Ghế ${state.waitingTargetSeat} (Kỳ vọng: 3 - Nạn nhân)`);
-if (state.waitingTargetSeat !== 3) throw new Error("LỖI: Người tiếp theo phải là Ghế 3!");
-
-// Cho Ghế 3 (nạn nhân) 1 lá Bánh Chưng để tự cứu
-p3.hand.push({ id: "PEACH_SAVE", name: "Bánh Chưng", suit: "Heart", rank: 12, category: 0, subType: CARD_SUBTYPES.PEACH });
-const saveRes = handleRespondAction(state, 3, true, "PEACH_SAVE");
-console.log(`- Ghế 3 tự cứu thành công: ${saveRes.success}`);
-console.log(`- Máu sau khi được cứu: ${p3.hp}/4`);
-if (p3.hp !== 1) throw new Error("LỖI: Máu sau khi được cứu phải là 1!");
+// Cho Ghế 2 (nạn nhân) 1 lá Bánh Chưng trước khi tới lượt được hỏi cứu
+p2.hand.push({ id: "PEACH_SAVE", name: "Bánh Chưng", suit: "Heart", rank: 12, category: 0, subType: CARD_SUBTYPES.PEACH });
+// Ghế 2 tự cứu khi tới lượt được hỏi
+const saveRes = handleRespondAction(state, 2, true, "PEACH_SAVE");
+console.log(`- Ghế 2 tự cứu thành công: ${saveRes.success}`);
+console.log(`- Máu sau khi được cứu: ${p2.hp}/4`);
+if (p2.hp !== 1) throw new Error("LỖI: Máu sau khi được cứu phải là 1!");
 
 console.log("\n=== KIỂM THỬ SANITIZE DỮ LIỆU ĐỂ GỬI REALTIME CHO CLIENT ===");
 const clientData = sanitizeGameStateForClient(state, 1);

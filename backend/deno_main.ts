@@ -6,7 +6,10 @@ import {
   handleDiscardCards,
   handleAIStep,
   handleAIReaction,
+  checkVersion,
+  hydrateGameState,
   sanitizeGameStateForClient,
+  ensureMutationVersion,
 } from "./functions/game-engine/src/gameEngine.js";
 
 const APPWRITE_ENDPOINT = Deno.env.get("APPWRITE_ENDPOINT") || "https://sgp.cloud.appwrite.io/v1";
@@ -89,7 +92,7 @@ async function saveStateToDatabase(roomId: string, state: any): Promise<void> {
       rankPoints: state.turnSeat,
       timestamp: Date.now(),
     };
-    const permissions = ["read(\"any\")", "update(\"any\")", "delete(\"any\")"];
+    const permissions = [];
     const res = await fetch(`${APPWRITE_ENDPOINT}/databases/${DATABASE_ID}/collections/${COLLECTION_ID}/documents/${docId}`, {
       method: "PATCH",
       headers: {
@@ -122,7 +125,7 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const { action, roomId, seat, cardId, targetSeat, accepted, cardIds, players, expectedVersion } = payload;
+    const { action, roomId, seat, cardId, targetCardId, targetSeat, accepted, cardIds, players, expectedVersion } = payload;
 
     if (!roomId) {
       return new Response(JSON.stringify({ success: false, error: "Thiếu roomId" }), { status: 400 });
@@ -131,7 +134,23 @@ Deno.serve(async (req) => {
     let state = liveGames.get(roomId);
 
     if (action === "INIT_GAME") {
-      if (!Array.isArray(players) || players.length < 4) {
+      if (!state) {
+        const persistedState = await loadStateFromDatabase(roomId);
+        if (persistedState) {
+          state = hydrateGameState(persistedState, roomId);
+          if (state) liveGames.set(roomId, state);
+        }
+      }
+      if (state) {
+        const requestedSeat = Number(seat);
+        if (!state.players.some((player: any) => player.seat === requestedSeat)) {
+          return new Response(JSON.stringify({ success: false, error: "Ghế không thuộc phòng đấu" }), { status: 403 });
+        }
+        return new Response(JSON.stringify({ success: true, state: sanitizeGameStateForClient(state, requestedSeat) }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (!Array.isArray(players) || players.length !== 4) {
         return new Response(JSON.stringify({ success: false, error: "Cần đủ thông tin 4 người chơi" }), { status: 400 });
       }
       state = initGame(roomId, players);
@@ -145,21 +164,27 @@ Deno.serve(async (req) => {
     if (!state) {
       state = await loadStateFromDatabase(roomId);
       if (state) {
-        liveGames.set(roomId, state);
+        state = hydrateGameState(state, roomId);
+        if (state) liveGames.set(roomId, state);
       } else {
         return new Response(JSON.stringify({ success: false, error: "Phòng đấu chưa được khởi tạo GameState" }), { status: 404 });
       }
+      if (!state) {
+        return new Response(JSON.stringify({ success: false, error: "GameState trong Database không hợp lệ" }), { status: 500 });
+      }
     }
 
-    if (expectedVersion && state.version !== expectedVersion) {
+    const versionError = checkVersion(state, expectedVersion);
+    if (versionError) {
       return new Response(JSON.stringify({
         success: false,
-        error: "Conflict: State version mismatch",
-        code: "VERSION_CONFLICT",
+        error: versionError.error,
+        code: versionError.code,
         state: sanitizeGameStateForClient(state, seat)
       }), { status: 409 });
     }
 
+    const previousVersion = state.version;
     let result: any;
     if (action === "GET_STATE") {
       return new Response(JSON.stringify({ success: true, state: sanitizeGameStateForClient(state, seat) }), {
@@ -168,7 +193,7 @@ Deno.serve(async (req) => {
     } else if (action === "PLAY_CARD") {
       result = handlePlayCard(state, seat, cardId, targetSeat);
     } else if (action === "RESPOND_ACTION") {
-      result = handleRespondAction(state, seat, accepted, cardId);
+      result = handleRespondAction(state, seat, accepted, cardId, targetCardId, cardIds);
     } else if (action === "END_TURN") {
       result = handleEndTurn(state, seat);
     } else if (action === "DISCARD_CARDS") {
@@ -184,6 +209,8 @@ Deno.serve(async (req) => {
     if (result && result.error) {
       return new Response(JSON.stringify({ success: false, error: result.error, state: sanitizeGameStateForClient(state, seat) }), { status: 400 });
     }
+
+    ensureMutationVersion(state, previousVersion);
 
     await saveStateToDatabase(roomId, state);
     return new Response(JSON.stringify({ success: true, state: sanitizeGameStateForClient(state, seat) }), {

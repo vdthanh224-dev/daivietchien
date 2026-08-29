@@ -14,6 +14,7 @@ import {
   tickGameState,
   hydrateGameState,
   sanitizeGameStateForClient,
+  ensureMutationVersion,
 } from "./functions/game-engine/src/gameEngine.js";
 
 const APPWRITE_ENDPOINT = Deno.env.get("APPWRITE_ENDPOINT") || "https://sgp.cloud.appwrite.io/v1";
@@ -138,7 +139,7 @@ async function persistStateToDatabase(roomId: string, state: any): Promise<void>
       timestamp: Date.now(),
     };
 
-    const permissions = ["read(\"any\")", "update(\"any\")", "delete(\"any\")"];
+    const permissions = [];
 
     const res = await fetch(`${APPWRITE_ENDPOINT}/databases/${DATABASE_ID}/collections/${COLLECTION_ID}/documents/${docId}`, {
       method: "PATCH",
@@ -189,9 +190,7 @@ function broadcastRoom(room: RoomData, messageObj: any) {
           const personalized = {
             ...messageObj,
             state: sanitizedState,
-            delta: messageObj.delta
-              ? { ...messageObj.delta, targetCardSelection: sanitizedState.targetCardSelection }
-              : null,
+            delta: sanitizedState.delta,
           };
           ws.send(JSON.stringify(personalized));
         } else {
@@ -341,13 +340,14 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           }));
         }
 
+        const previousVersion = room.state.version;
         let result: any = null;
 
         // E. XỬ LÝ HÀNH ĐỘNG ĐÁNH BÀI TRÊN RAM SIÊU TỐC
         if (action === "PLAY_CARD") {
           result = handlePlayCard(room.state, boundSeat, cardId, targetSeat);
         } else if (action === "RESPOND_ACTION") {
-          result = handleRespondAction(room.state, boundSeat, accepted, cardId, targetCardId);
+          result = handleRespondAction(room.state, boundSeat, accepted, cardId, targetCardId, cardIds);
         } else if (action === "END_TURN") {
           result = handleEndTurn(room.state, boundSeat);
         } else if (action === "DISCARD_CARDS") {
@@ -367,6 +367,8 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
             state: sanitizeGameStateForClient(room.state, boundSeat),
           }));
         }
+
+        ensureMutationVersion(room.state, previousVersion);
 
         // F. PHÁT SÓNG ĐỒNG BỘ CHO CẢ PHÒNG TRONG RAM (<15ms)
         broadcastRoom(room, {
@@ -486,6 +488,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
         }), { status: 409 });
       }
 
+      const previousVersion = room.state.version;
       let result: any = null;
       if (action === "GET_STATE") {
         return new Response(JSON.stringify({ success: true, state: sanitizeGameStateForClient(room.state, requestSeat || 1) }), {
@@ -494,7 +497,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
       } else if (action === "PLAY_CARD") {
         result = handlePlayCard(room.state, requestSeat, cardId, targetSeat);
       } else if (action === "RESPOND_ACTION") {
-        result = handleRespondAction(room.state, requestSeat, accepted, cardId, targetCardId);
+        result = handleRespondAction(room.state, requestSeat, accepted, cardId, targetCardId, cardIds);
       } else if (action === "END_TURN") {
         result = handleEndTurn(room.state, requestSeat);
       } else if (action === "DISCARD_CARDS") {
@@ -510,6 +513,8 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
       if (result && result.error) {
         return new Response(JSON.stringify({ success: false, error: result.error, state: sanitizeGameStateForClient(room.state, requestSeat) }), { status: 400 });
       }
+
+      ensureMutationVersion(room.state, previousVersion);
 
       // Phát sóng cập nhật qua WebSocket nếu có người đang kết nối
       broadcastRoom(room, {

@@ -14,6 +14,7 @@ import {
   tickGameState,
   sanitizeGameStateForClient,
   hydrateGameState,
+  ensureMutationVersion,
 } from "./gameEngine.js";
 
 const APPWRITE_ENDPOINT = Deno.env.get("APPWRITE_ENDPOINT") || "https://sgp.cloud.appwrite.io/v1";
@@ -124,7 +125,7 @@ async function persistStateToDatabase(roomId, state) {
 
     // Keep existing Appwrite fallback compatibility; this document contains
     // private hands/deck, so clients must use the sanitized server response.
-    const permissions = ["read(\"any\")", "update(\"any\")", "delete(\"any\")"];
+    const permissions = [];
 
     const res = await fetch(`${APPWRITE_ENDPOINT}/databases/${DATABASE_ID}/collections/${COLLECTION_ID}/documents/${docId}`, {
       method: "PATCH",
@@ -285,11 +286,13 @@ async function mutateSharedState(roomId, seat, payload) {
     const versionError = checkVersion(state, payload.expectedVersion);
     if (versionError) return { error: versionError.error, code: versionError.code, conflict: true, state };
 
+    const previousVersion = state.version;
     const result = payload.action === "SERVER_TICK"
       ? { success: true, changed: tickGameState(state) }
       : applyActionToState(state, seat, payload);
     if (result?.error) return { error: result.error, state };
     if (result?.changed === false) return { state, result, committed: false };
+    ensureMutationVersion(state, previousVersion);
 
     const commit = await sharedKv.atomic()
       .check({ key: stateKey(roomId), versionstamp: entry.versionstamp })
@@ -381,9 +384,7 @@ function broadcastRoom(room, messageObj) {
           const personalized = {
             ...messageObj,
             state: sanitizedState,
-            delta: messageObj.delta
-              ? { ...messageObj.delta, targetCardSelection: sanitizedState.targetCardSelection }
-              : null,
+            delta: sanitizedState.delta,
           };
           ws.send(JSON.stringify(personalized));
         } else {

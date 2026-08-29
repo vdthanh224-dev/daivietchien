@@ -46,7 +46,7 @@ public static class CardDatabase
         list.Add(CreateCard("D1_C_4", "Diệu Kế Phá Mưu", CardSuit.Club, CardRank.Four, 1, CardCategory.InstantScroll, CardSubType.FlawlessDefense, "Vô hiệu hóa 1 Cẩm Nang bất kỳ vừa đánh ra HOẶC hủy 1 lá bài bất kỳ.", "UI/icon_flawless"));
         list.Add(CreateCard("D1_C_5", "Giáp Đồng Sơn Vi", CardSuit.Club, CardRank.Five, 1, CardCategory.Equipment, CardSubType.Armor, "Áo giáp. Vô hiệu hóa toàn bộ Trảm Thường (không mang thuộc tính Hỏa/Lôi).", "UI/icon_armor"));
         list.Add(CreateCard("D1_C_6", "Trường Đao Nam Sơn", CardSuit.Club, CardRank.Six, 1, CardCategory.Equipment, CardSubType.Weapon, "Tầm 3. Khi Trảm bị Đỡ, có thể bỏ thêm 1 Trảm ép đối phương phải Đỡ thêm lần nữa.", "UI/icon_weapon", 3));
-        list.Add(CreateCard("D1_C_7", "Bánh Chưng", CardSuit.Club, CardRank.Seven, 1, CardCategory.Basic, CardSubType.Peach, "Hồi phục 1 Máu cho bản thân HOẶC cứu đồng minh vừa rơi vào trạng thái Cận Tử.", "UI/icon_banh_chung"));
+        list.Add(CreateCard("D1_C_7", "Bánh Chưng", CardSuit.Club, CardRank.Seven, 1, CardCategory.Basic, CardSubType.Peach, "Hồi phục 1 Máu cho bản thân HOẶC cứu bất kỳ người chơi nào vừa rơi vào trạng thái Cận Tử.", "UI/icon_banh_chung"));
         list.Add(CreateCard("D1_C_8", "Trảm Thường", CardSuit.Club, CardRank.Eight, 1, CardCategory.Basic, CardSubType.AttackNormal, "Tấn công 1 mục tiêu trong tầm đánh. Đối phương phải Đỡ hoặc mất 1 máu.", "UI/icon_slash"));
         list.Add(CreateCard("D1_C_9", "Trảm Thường", CardSuit.Club, CardRank.Nine, 1, CardCategory.Basic, CardSubType.AttackNormal, "Tấn công 1 mục tiêu trong tầm đánh. Đối phương phải Đỡ hoặc mất 1 máu.", "UI/icon_slash"));
         list.Add(CreateCard("D1_C_10", "Trảm Thường", CardSuit.Club, CardRank.Ten, 1, CardCategory.Basic, CardSubType.AttackNormal, "Tấn công 1 mục tiêu trong tầm đánh. Đối phương phải Đỡ hoặc mất 1 máu.", "UI/icon_slash"));
@@ -73,7 +73,7 @@ public static class CardDatabase
         list.Add(CreateCard("D1_H_5", "Voi Chiến Đại Việt", CardSuit.Heart, CardRank.Five, 1, CardCategory.Equipment, CardSubType.DefensiveHorse, "Tăng +1 khoảng cách từ người khác tới bạn (Ngựa thủ phòng ngự).", "UI/icon_mount_defense", 0, 1));
         for (int r = 6; r <= 9; r++)
         {
-            list.Add(CreateCard($"D1_H_{r}", "Bánh Chưng", CardSuit.Heart, (CardRank)r, 1, CardCategory.Basic, CardSubType.Peach, "Hồi phục 1 Máu cho bản thân HOẶC cứu đồng minh vừa rơi vào trạng thái Cận Tử.", "UI/icon_banh_chung"));
+            list.Add(CreateCard($"D1_H_{r}", "Bánh Chưng", CardSuit.Heart, (CardRank)r, 1, CardCategory.Basic, CardSubType.Peach, "Hồi phục 1 Máu cho bản thân HOẶC cứu bất kỳ người chơi nào vừa rơi vào trạng thái Cận Tử.", "UI/icon_banh_chung"));
         }
         list.Add(CreateCard("D1_H_10", "Mưa Tên Liên Châu", CardSuit.Heart, CardRank.Ten, 1, CardCategory.InstantScroll, CardSubType.ArrowRain, "Diện rộng. Từng người chơi khác trên bàn (trừ người dùng) phải đánh ra 1 Đỡ HOẶC chịu 1 sát thương.", "UI/icon_arrow_rain"));
         list.Add(CreateCard("D1_H_J", "Trảm - Hỏa", CardSuit.Heart, CardRank.Jack, 1, CardCategory.Basic, CardSubType.AttackFire, "Tấn công 1 sát thương Hỏa. Lan truyền khi mục tiêu bị Xích Liên Hoàn.", "UI/icon_slash_fire"));
@@ -133,7 +133,7 @@ public static class CardDatabase
         list.Add(CreateCard("D2_H_5", "Ngựa Trắng Thuần Nông", CardSuit.Heart, CardRank.Five, 2, CardCategory.Equipment, CardSubType.OffensiveHorse, "Giảm -1 khoảng cách từ bạn tới tất cả người chơi khác (Ngựa công).", "UI/icon_mount_offense", 0, -1));
         for (int r = 6; r <= 7; r++)
         {
-            list.Add(CreateCard($"D2_H_{r}", "Bánh Chưng", CardSuit.Heart, (CardRank)r, 2, CardCategory.Basic, CardSubType.Peach, "Hồi phục 1 Máu cho bản thân HOẶC cứu đồng minh vừa rơi vào trạng thái Cận Tử.", "UI/icon_banh_chung"));
+            list.Add(CreateCard($"D2_H_{r}", "Bánh Chưng", CardSuit.Heart, (CardRank)r, 2, CardCategory.Basic, CardSubType.Peach, "Hồi phục 1 Máu cho bản thân HOẶC cứu bất kỳ người chơi nào vừa rơi vào trạng thái Cận Tử.", "UI/icon_banh_chung"));
         }
         for (int r = 8; r <= 11; r++)
         {

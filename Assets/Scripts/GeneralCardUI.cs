@@ -293,15 +293,20 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
     private GameObject seatBadgeGo;
     private Text seatBadgeText;
     private GameObject turnHaloGo;
+    private Color normalFrameColor = Color.white;
+    private bool deadVisualActive;
 
     /// <summary>
     /// Đổi màu viền khung thẻ bài.
     /// </summary>
     public void SetFrameColor(Color color)
     {
+        normalFrameColor = color;
         if (cardFrameImage != null)
         {
-            cardFrameImage.color = color;
+            cardFrameImage.color = deadVisualActive
+                ? new Color(0.35f, 0.35f, 0.35f, 0.8f)
+                : color;
         }
     }
 
@@ -695,7 +700,7 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
         {
             if (reactionHaloGo != null) reactionHaloGo.SetActive(false);
             if (avatarRawImage != null) avatarRawImage.color = Color.white;
-            if (cardFrameImage != null) cardFrameImage.color = Color.white;
+            if (cardFrameImage != null) cardFrameImage.color = normalFrameColor;
         }
     }
 
@@ -725,6 +730,7 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
 
     public void SetDeadVisual(bool isDead)
     {
+        deadVisualActive = isDead;
         if (deadOverlayGo == null && isDead)
         {
             deadOverlayGo = new GameObject("DeadOverlay", typeof(RectTransform), typeof(Image));
@@ -761,7 +767,14 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
         {
             SetTurnActive(false);
             if (avatarImage != null) avatarImage.color = new Color(0.3f, 0.3f, 0.3f, 0.6f);
+            if (avatarRawImage != null) avatarRawImage.color = new Color(0.3f, 0.3f, 0.3f, 0.6f);
             if (cardFrameImage != null) cardFrameImage.color = new Color(0.35f, 0.35f, 0.35f, 0.8f);
+        }
+        else
+        {
+            if (avatarImage != null) avatarImage.color = Color.white;
+            if (avatarRawImage != null) avatarRawImage.color = Color.white;
+            if (cardFrameImage != null) cardFrameImage.color = normalFrameColor;
         }
     }
 
@@ -831,6 +844,7 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
     private int aoBaoCharges = 3;
     public int AoBaoCharges => aoBaoCharges;
     public void ResetAoBaoCharges() => aoBaoCharges = 3;
+    public void SetAoBaoCharges(int charges) => aoBaoCharges = Mathf.Clamp(charges, 0, 3);
     public bool TryConsumeAoBaoCharge()
     {
         if (aoBaoCharges > 0)

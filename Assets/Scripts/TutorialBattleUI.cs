@@ -8,7 +8,7 @@ using UnityEngine.UI;
 /// Màn hình Chiến Trận Hướng Dẫn (Tutorial Battle Screen)
 /// Kịch bản hướng dẫn chuẩn xác & trực quan:
 /// 1. Hướng dẫn Sinh mệnh (Hoa sen) & Điều kiện thắng/thua.
-/// 2. Hướng dẫn Giai đoạn Rút bài: Đầu lượt tự động bốc 2 lá bài vào tay.
+/// 2. Hướng dẫn Giai đoạn Rút bài: Lượt đầu bốc 1 lá, các lượt sau bốc 2 lá.
 /// 3. Hướng dẫn Giai đoạn Ra bài: Cách chọn lá TRẢM và nhắm mục tiêu để tấn công.
 /// 4. Hướng dẫn Quy tắc: Mỗi turn chỉ được dùng tối đa 1 lá TRẢM (trừ Nỏ Thần).
 /// 5. Hướng dẫn Phòng thủ: Khi Sơn Tặc dùng Trảm, hướng dẫn dùng lá ĐỠ (Né) để triệt tiêu đòn đánh.
@@ -812,7 +812,7 @@ public class TutorialBattleUI : MonoBehaviour
     }
     #endregion
 
-    #region 3. CHIA BÀI BAN ĐẦU & BƯỚC 2: RÚT 2 LÁ ĐẦU LƯỢT
+    #region 3. CHIA BÀI BAN ĐẦU & BƯỚC 2: RÚT LÁ ĐẦU LƯỢT
     private IEnumerator SequenceInitialDealing()
     {
         currentStep = TutorialStep.InitialDealing;
@@ -847,7 +847,7 @@ public class TutorialBattleUI : MonoBehaviour
 
         yield return new WaitForSeconds(0.4f);
 
-        // Bắt đầu Bước 2: Hướng dẫn đầu lượt tự động bốc 2 lá bài
+        // Bắt đầu Bước 2: Hướng dẫn lượt đầu tự động bốc 1 lá bài
         StartCoroutine(SequenceDrawTwoLesson());
     }
 
@@ -862,15 +862,15 @@ public class TutorialBattleUI : MonoBehaviour
         if (tutorialPromptText != null)
         {
             tutorialPromptText.text = "📜 <color=#FFD700><b>GIAI ĐOẠN 1: RÚT BÀI ĐẦU LƯỢT</b></color>\n" +
-                                      "Mỗi khi đến lượt của mình, người chơi sẽ <color=#55FF55><b>TỰ ĐỘNG BỐC 2 LÁ BÀI</b></color> từ kho bài vào tay!";
+                                      "Người đầu tiên chơi sẽ <color=#55FF55><b>BỐC 1 LÁ BÀI</b></color>; các lượt sau tự động bốc 2 lá từ kho bài!";
         }
 
-        SetLog("📜 LƯỢT CỦA BẠN: Tự động rút 2 lá bài đầu lượt.");
+        SetLog("📜 LƯỢT ĐẦU CỦA BẠN: Người đầu tiên chơi chỉ rút 1 lá bài.");
 
         yield return new WaitForSeconds(0.8f);
 
-        // Tự động rút 2 lá bài bay vào tay
-        for (int k = 0; k < 2; k++)
+        // Người đầu tiên chơi chỉ rút 1 lá; lượt sau mới rút 2 lá.
+        for (int k = 0; k < 1; k++)
         {
             var card = deckManager.DrawCard();
             if (card != null)
@@ -1551,7 +1551,7 @@ public class TutorialBattleUI : MonoBehaviour
         if (tutorialPromptText != null)
         {
             tutorialPromptText.text = "🎉 <color=#FFD700><b>CHÚC MỪNG! BẠN ĐÃ NẮM TRỌN QUY TẮC!</b></color>\n" +
-                                      "• <b>Đầu lượt:</b> Tự động rút 2 lá bài.\n" +
+                                      "• <b>Đầu lượt:</b> Lượt đầu rút 1 lá, các lượt sau rút 2 lá.\n" +
                                       "• <b>Tấn công:</b> Mỗi turn dùng tối đa 1 lá Trảm.\n" +
                                       "• <b>Phòng thủ:</b> Dùng Đỡ để né đòn Trảm của đối phương.\n" +
                                       "Hãy tự do chiến đấu để tiêu diệt Thủ Lĩnh Sơn Tặc!";

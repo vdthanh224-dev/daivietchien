@@ -51,6 +51,32 @@ export const HEROES = {
   }
 };
 
+const HERO_MAX_HP = [
+  0, 4, 4, 4, 3, 4, 3, 3, 4, 4, 4,
+  4, 3, 4, 4, 4, 4, 4, 3, 3, 4,
+  3, 4, 4, 3, 4, 4, 4, 4, 4, 4,
+  4, 4, 4, 4, 4, 4, 3, 4, 3, 4,
+  4, 4, 3, 3, 4, 4, 3, 4, 4, 4,
+  4, 4, 4, 4, 3, 4, 4, 4, 4, 4,
+  4, 3, 4, 4, 4, 3, 3, 3, 3, 3,
+  4, 4, 4, 4, 4, 4, 4, 3, 4, 4,
+  4, 4, 4, 4, 3, 4, 3, 4, 4, 4,
+  4, 3, 4, 3, 4, 4, 3, 4, 4, 4
+];
+
+for (let heroNumber = 1; heroNumber <= 100; heroNumber++) {
+  const heroId = `HERO_${heroNumber}`;
+  if (!HEROES[heroId]) {
+    HEROES[heroId] = {
+      id: heroId,
+      name: heroId,
+      faction: FACTIONS.DAI_VIET,
+      maxHp: HERO_MAX_HP[heroNumber] || 4,
+      skills: []
+    };
+  }
+}
+
 export const SKILLS = {
   KIEP_BACH: {
     id: 'KIEP_BACH',
@@ -116,6 +142,11 @@ export function normalizeHeroId(heroId, generalName = "") {
   };
   const byId = aliases[rawId.toUpperCase()] || rawId.toUpperCase();
   if (HEROES[byId]) return byId;
+
+  const numericId = Number(rawId);
+  if (Number.isInteger(numericId) && numericId >= 1 && numericId <= 100) {
+    return `HERO_${numericId}`;
+  }
 
   const key = String(generalName ?? "")
     .normalize("NFD")

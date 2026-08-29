@@ -1,4 +1,4 @@
-import { initGame, handlePlayCard, handleRespondAction, handleEndTurn, handleDiscardCards, handleAIStep } from './functions/game-engine/src/gameEngine.js';
+import { initGame, handlePlayCard, handleRespondAction, handleEndTurn, handleDiscardCards, handleAIStep, handleAIReaction } from './functions/game-engine/src/gameEngine.js';
 import { isSlash, isDodge, isPeach, isWine } from './functions/game-engine/src/deck.js';
 
 let totalSteps = 0;
@@ -22,7 +22,10 @@ for (let g = 0; g < GAMES; g++) {
         if (st.phase === 'AWAIT_SLASH_DEFENSE') {
             const target = st.players.find(p => p.seat === st.waitingTargetSeat);
             if (!target || target.hp <= 0) { handleRespondAction(st, st.waitingTargetSeat, false, null); return; }
-            const dodge = target.hand.find(c => isDodge(c));
+            const caster = st.players.find(p => p.seat === st.activeCard?.casterSeat);
+            const hasHolyCannon = caster?.equipments?.some(c => c.name?.includes('Súng Thần Công'));
+            const dodge = target.hand.find(c => isDodge(c)
+                && (!hasHolyCannon || c.suit !== st.activeCard?.suit));
             handleRespondAction(st, target.seat, !!dodge, dodge ? dodge.id : null);
         } else if (st.phase === 'AWAIT_AOE') {
             const target = st.players.find(p => p.seat === st.waitingTargetSeat);
@@ -44,10 +47,12 @@ for (let g = 0; g < GAMES; g++) {
             const isSelf = asker.seat === victim.seat;
             let saveCard = asker.hand.find(c => isPeach(c));
             if (!saveCard && isSelf) saveCard = asker.hand.find(c => isWine(c));
-            const willSave = saveCard && (isSelf || asker.isAlly === victim.isAlly);
+            const willSave = !!saveCard;
             handleRespondAction(st, asker.seat, willSave, willSave ? saveCard.id : null);
         } else if (st.phase === 'AWAIT_NULLIFY') {
             handleRespondAction(st, st.waitingTargetSeat, false, null);
+        } else if (st.phase === 'AWAIT_TARGET_CARD') {
+            handleAIReaction(st, st.waitingTargetSeat);
         } else if (st.phase === 'AWAIT_HARVEST') {
             const picker = st.players.find(p => p.seat === st.waitingTargetSeat);
             if (st.harvestPool && st.harvestPool.length > 0) {
@@ -60,6 +65,8 @@ for (let g = 0; g < GAMES; g++) {
             if (!caster || caster.hp <= 0) { handleRespondAction(st, st.waitingTargetSeat, false, null); return; }
             const slash = caster.hand.find(c => isSlash(c));
             handleRespondAction(st, caster.seat, !!slash, slash ? slash.id : null);
+        } else if (st.phase === 'AWAIT_SONG_CUNG_FOLLOW_UP') {
+            handleAIReaction(st, st.waitingTargetSeat);
         } else if (st.phase === 'DISCARD') {
             const p = st.players.find(pl => pl.seat === st.waitingTargetSeat);
             const excess = p.hand.length - p.hp;

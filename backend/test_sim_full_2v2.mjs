@@ -17,7 +17,10 @@ function autoRespond(st) {
     if (st.phase === 'AWAIT_SLASH_DEFENSE') {
         const target = st.players.find(p => p.seat === st.waitingTargetSeat);
         if (!target || target.hp <= 0) { handleRespondAction(st, st.waitingTargetSeat, false, null); return; }
-        const dodge = target.hand.find(c => isDodge(c));
+        const attacker = st.players.find(p => p.seat === st.activeCard?.casterSeat);
+        const hasHolyCannon = attacker?.equipments?.some(e => e.name?.includes('Súng Thần Công'));
+        const dodge = target.hand.find(c => isDodge(c)
+            && (!hasHolyCannon || c.suit !== st.activeCard?.suit));
         handleRespondAction(st, target.seat, !!dodge, dodge ? dodge.id : null);
     } else if (st.phase === 'AWAIT_AOE') {
         const target = st.players.find(p => p.seat === st.waitingTargetSeat);
@@ -39,8 +42,11 @@ function autoRespond(st) {
         const isSelf = asker.seat === victim.seat;
         let saveCard = asker.hand.find(c => isPeach(c));
         if (!saveCard && isSelf) saveCard = asker.hand.find(c => isWine(c));
-        const willSave = saveCard && (isSelf || asker.isAlly === victim.isAlly);
+        const willSave = !!saveCard;
         handleRespondAction(st, asker.seat, willSave, willSave ? saveCard.id : null);
+    } else if (st.phase === 'AWAIT_TARGET_CARD') {
+        const token = st.targetCardSelection?.options?.[0]?.token || null;
+        handleRespondAction(st, st.waitingTargetSeat, true, null, token);
     } else if (st.phase === 'AWAIT_NULLIFY') {
         handleRespondAction(st, st.waitingTargetSeat, false, null);
     } else if (st.phase === 'AWAIT_HARVEST') {
@@ -55,6 +61,12 @@ function autoRespond(st) {
         if (!caster || caster.hp <= 0) { handleRespondAction(st, st.waitingTargetSeat, false, null); return; }
         const slash = caster.hand.find(c => isSlash(c));
         handleRespondAction(st, caster.seat, !!slash, slash ? slash.id : null);
+    } else if (st.phase === 'AWAIT_SONG_CUNG_FOLLOW_UP') {
+        const caster = st.players.find(p => p.seat === st.waitingTargetSeat);
+        const cardIds = caster && caster.hand.length >= 2
+            ? caster.hand.slice(0, 2).map(c => c.id)
+            : [];
+        handleRespondAction(st, st.waitingTargetSeat, cardIds.length === 2, null, null, cardIds);
     } else if (st.phase === 'DISCARD') {
         const p = st.players.find(pl => pl.seat === st.waitingTargetSeat);
         const excess = p.hand.length - p.hp;

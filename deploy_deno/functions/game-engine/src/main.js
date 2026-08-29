@@ -54,7 +54,7 @@ async function decodePersistedState(value) {
 export default async ({ req, res, log, error }) => {
   try {
     const payload = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-    const { action, roomId, seat, cardId, targetSeat, accepted, cardIds, players, expectedVersion } = payload;
+    const { action, roomId, seat, cardId, targetCardId, targetSeat, accepted, cardIds, players, expectedVersion } = payload;
 
     if (!roomId) {
       return res.json({ success: false, error: "Thiếu roomId" }, 400);
@@ -66,7 +66,21 @@ export default async ({ req, res, log, error }) => {
 
     // 1. Khởi tạo trận đấu
     if (action === "INIT_GAME") {
-      if (!Array.isArray(players) || players.length < 4) {
+      if (!state) {
+        const persistedState = await loadStateFromDatabase(roomId, log, error);
+        if (persistedState) {
+          state = hydrateGameState(persistedState, roomId);
+          if (state) liveGames.set(roomId, state);
+        }
+      }
+      if (state) {
+        const requestedSeat = Number(seat);
+        if (!state.players.some((player) => player.seat === requestedSeat)) {
+          return res.json({ success: false, error: "Ghế không thuộc phòng đấu" }, 403);
+        }
+        return res.json({ success: true, state: sanitizeGameStateForClient(state, requestedSeat) });
+      }
+      if (!Array.isArray(players) || players.length !== 4) {
         return res.json({ success: false, error: "Cần đủ thông tin 4 người chơi để bắt đầu trận" }, 400);
       }
       state = initGame(roomId, players);
@@ -79,9 +93,13 @@ export default async ({ req, res, log, error }) => {
     if (!state) {
       state = await loadStateFromDatabase(roomId, log, error);
       if (state) {
-        liveGames.set(roomId, state);
+        state = hydrateGameState(state, roomId);
+        if (state) liveGames.set(roomId, state);
       } else {
         return res.json({ success: false, error: "Phòng đấu chưa được khởi tạo GameState" }, 404);
+      }
+      if (!state) {
+        return res.json({ success: false, error: "GameState trong Database không hợp lệ" }, 500);
       }
     }
 
@@ -109,17 +127,19 @@ export default async ({ req, res, log, error }) => {
         return res.json({ success: false, error: result.error, state: sanitizeGameStateForClient(state, seat) });
       }
       await saveStateToDatabase(roomId, state, log, error);
-      return res.json({ success: true, state: sanitizeGameStateForClient(state, seat), delta: state.lastDelta });
+      const sanitizedState = sanitizeGameStateForClient(state, seat);
+      return res.json({ success: true, state: sanitizedState, delta: sanitizedState.delta });
     }
 
     // 4. Phản hồi đòn đánh / cẩm nang (RESPOND_ACTION)
     if (action === "RESPOND_ACTION") {
-      const result = handleRespondAction(state, seat, accepted, cardId);
+      const result = handleRespondAction(state, seat, accepted, cardId, targetCardId, cardIds);
       if (result.error) {
         return res.json({ success: false, error: result.error, state: sanitizeGameStateForClient(state, seat) });
       }
       await saveStateToDatabase(roomId, state, log, error);
-      return res.json({ success: true, state: sanitizeGameStateForClient(state, seat), delta: state.lastDelta });
+      const sanitizedState = sanitizeGameStateForClient(state, seat);
+      return res.json({ success: true, state: sanitizedState, delta: sanitizedState.delta });
     }
 
     // 5. Kết thúc lượt (END_TURN)
@@ -129,7 +149,8 @@ export default async ({ req, res, log, error }) => {
         return res.json({ success: false, error: result.error, state: sanitizeGameStateForClient(state, seat) });
       }
       await saveStateToDatabase(roomId, state, log, error);
-      return res.json({ success: true, state: sanitizeGameStateForClient(state, seat), delta: state.lastDelta });
+      const sanitizedState = sanitizeGameStateForClient(state, seat);
+      return res.json({ success: true, state: sanitizedState, delta: sanitizedState.delta });
     }
 
     // 6. Bỏ bài thừa (DISCARD_CARDS)
@@ -139,7 +160,8 @@ export default async ({ req, res, log, error }) => {
         return res.json({ success: false, error: result.error, state: sanitizeGameStateForClient(state, seat) });
       }
       await saveStateToDatabase(roomId, state, log, error);
-      return res.json({ success: true, state: sanitizeGameStateForClient(state, seat), delta: state.lastDelta });
+      const sanitizedState = sanitizeGameStateForClient(state, seat);
+      return res.json({ success: true, state: sanitizedState, delta: sanitizedState.delta });
     }
 
     // 7. AI tự động thực hiện bước đánh (AI_STEP)
@@ -149,7 +171,8 @@ export default async ({ req, res, log, error }) => {
         return res.json({ success: false, error: result.error, state: sanitizeGameStateForClient(state, seat) });
       }
       await saveStateToDatabase(roomId, state, log, error);
-      return res.json({ success: true, state: sanitizeGameStateForClient(state, seat), delta: state.lastDelta });
+      const sanitizedState = sanitizeGameStateForClient(state, seat);
+      return res.json({ success: true, state: sanitizedState, delta: sanitizedState.delta });
     }
 
     // 8. AI tự động phản ứng đòn đánh (AI_REACTION)
@@ -159,7 +182,8 @@ export default async ({ req, res, log, error }) => {
         return res.json({ success: false, error: result.error, state: sanitizeGameStateForClient(state, seat) });
       }
       await saveStateToDatabase(roomId, state, log, error);
-      return res.json({ success: true, state: sanitizeGameStateForClient(state, seat), delta: state.lastDelta });
+      const sanitizedState = sanitizeGameStateForClient(state, seat);
+      return res.json({ success: true, state: sanitizedState, delta: sanitizedState.delta });
     }
 
     return res.json({ success: false, error: "Hành động không được hỗ trợ" }, 400);
@@ -180,7 +204,7 @@ async function saveStateToDatabase(roomId, state, log, error) {
     const db = new Databases(client);
 
     const docId = `gs_${roomId.replace(/[^a-zA-Z0-9_-]/g, '')}`.substring(0, 36);
-    // Persist the complete authoritative state so a restart can resume
+    // Persist the complete authoritative state so restart recovery retains
     // reaction queues, delayed judgements, and duel/near-death bookkeeping.
     const stateJson = await encodePersistedState(state);
 
@@ -191,7 +215,7 @@ async function saveStateToDatabase(roomId, state, log, error) {
       timestamp: Date.now()
     };
 
-    const permissions = ["read(\"any\")", "update(\"any\")", "delete(\"any\")"];
+    const permissions = [];
 
     try {
       await db.updateDocument(DATABASE_ID, COLLECTION_ID, docId, docData, permissions);
@@ -219,10 +243,10 @@ async function loadStateFromDatabase(roomId, log, error) {
     const db = new Databases(client);
 
     const docId = `gs_${roomId.replace(/[^a-zA-Z0-9_-]/g, '')}`.substring(0, 36);
-      const doc = await db.getDocument(DATABASE_ID, COLLECTION_ID, docId);
-      if (doc && doc.userName) {
-      return hydrateGameState(await decodePersistedState(doc.userName), roomId);
-      }
+    const doc = await db.getDocument(DATABASE_ID, COLLECTION_ID, docId);
+    if (doc && doc.userName) {
+      return await decodePersistedState(doc.userName);
+    }
   } catch (err) {
     log(`[GameEngine DB] Chưa tìm thấy GameState trong DB cho phòng ${roomId}`);
   }
