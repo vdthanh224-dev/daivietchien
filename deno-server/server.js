@@ -252,7 +252,14 @@ function applyActionToState(state, seat, payload) {
     return handlePlayCard(state, seat, payload.cardId, payload.targetSeat);
   }
   if (payload.action === "RESPOND_ACTION") {
-    return handleRespondAction(state, seat, payload.accepted, payload.cardId, payload.targetCardId);
+    return handleRespondAction(
+      state,
+      seat,
+      payload.accepted,
+      payload.cardId,
+      payload.targetCardId,
+      payload.cardIds,
+    );
   }
   if (payload.action === "END_TURN") {
     return handleEndTurn(state, seat);

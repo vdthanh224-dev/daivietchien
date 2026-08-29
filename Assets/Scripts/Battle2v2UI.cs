@@ -249,6 +249,14 @@ public class Battle2v2UI : MonoBehaviour
     private void HandleDenoErrorMessage(string message)
     {
         if (string.IsNullOrEmpty(message)) return;
+        isAwaitingSlashDefense = false;
+        isAwaitingServerAoE = false;
+        isAwaitingServerDuel = false;
+        isAwaitingServerNearDeath = false;
+        isAwaitingServerSongCung = false;
+        isAwaitingServerNamSon = false;
+        isDiscardPhaseActive = false;
+        lastHandledPhaseVersion = -1;
         serverTargetCardSelectionInFlight = false;
         EnableServerTargetCardButtons(true);
         Debug.LogWarning($"[DenoGameClient] Server rejected action: {message}");
@@ -281,6 +289,11 @@ public class Battle2v2UI : MonoBehaviour
                 draftTimer -= Time.unscaledDeltaTime;
             }
             UpdateDraftTimerVisual();
+        }
+
+        if (!string.IsNullOrEmpty(currentRoomId) || DenoGameClient.IsConnected)
+        {
+            return;
         }
 
         // Đếm giờ trong trận đấu (Battle Phase)
@@ -342,6 +355,8 @@ public class Battle2v2UI : MonoBehaviour
     private bool isAwaitingServerAoE = false;
     private bool isAwaitingServerDuel = false;
     private bool isAwaitingServerNearDeath = false;
+    private bool isAwaitingServerSongCung = false;
+    private bool isAwaitingServerNamSon = false;
     private GameObject activeServerTargetCardModal = null;
     private long lastServerTargetCardPromptVersion = -1;
     private bool serverTargetCardSelectionInFlight = false;

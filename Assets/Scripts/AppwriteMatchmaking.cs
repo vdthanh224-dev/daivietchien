@@ -165,8 +165,11 @@ public static class AppwriteMatchmaking
         public int targetSeat;
         public int damage;
         public bool isWineBuff;
+        public string suit;
         public string reqType;
         public string reqName;
+        public bool namSonFollowUp;
+        public string selectionOperation;
     }
 
     [Serializable]
@@ -184,6 +187,7 @@ public static class AppwriteMatchmaking
         public int chooserSeat;
         public int targetSeat;
         public string operation;
+        public string effectType;
         public string cardId;
         public string cardName;
         public List<GameStateTargetCardOption> options = new List<GameStateTargetCardOption>();
@@ -246,7 +250,7 @@ public static class AppwriteMatchmaking
         public string roomId;
         public string status; // "PLAYING", "FINISHED"
         public int turnSeat;
-        public string phase; // "PLAY", "AWAIT_NULLIFY", "AWAIT_TARGET_CARD", "AWAIT_SLASH_DEFENSE", "AWAIT_HARVEST", "AWAIT_AOE", "AWAIT_DUEL", "AWAIT_NEAR_DEATH", "DISCARD"
+        public string phase; // "PLAY", "AWAIT_NULLIFY", "AWAIT_TARGET_CARD", "AWAIT_SLASH_DEFENSE", "AWAIT_HARVEST", "AWAIT_AOE", "AWAIT_DUEL", "AWAIT_NEAR_DEATH", "AWAIT_SONG_CUNG_FOLLOW_UP", "AWAIT_NAM_SON_FOLLOW_UP", "DISCARD"
         public int turnTimer;
         public int waitingTargetSeat;
         public string waitingReactionType;

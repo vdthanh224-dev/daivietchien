@@ -38,7 +38,7 @@ export function createDeck52() {
   const list = [];
   // --- BÍCH (Spade) ---
   list.push(createCard("D1_S_A", "Diệu Kế Phá Mưu", "Spade", 1, 2, 10, "Vô hiệu hóa 1 Cẩm nang bất kỳ"));
-  list.push(createCard("D1_S_2", "Nỏ Thần Kim Quy", "Spade", 2, 1, 6, "Tầm 3. Không giới hạn số Trảm trong lượt", 3));
+  list.push(createCard("D1_S_2", "Nỏ Thần Kim Quy", "Spade", 2, 1, 6, "Tầm 1. Không giới hạn số Trảm trong lượt", 1));
   list.push(createCard("D1_S_3", "Vườn Không Nhà Trống", "Spade", 3, 2, 11, "Hủy 1 lá của mục tiêu"));
   list.push(createCard("D1_S_4", "Vườn Không Nhà Trống", "Spade", 4, 2, 11, "Hủy 1 lá của mục tiêu"));
   list.push(createCard("D1_S_5", "Ngựa Trắng Thuần Nông", "Spade", 5, 1, 8, "Ngựa công -1 khoảng cách", 1, -1));
