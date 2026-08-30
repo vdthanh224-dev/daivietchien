@@ -526,8 +526,11 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
   if (!caster || caster.hp <= 0) return { error: "Người chơi không hợp lệ" };
 
   // Card IDs are authoritative; never substitute a different card by subtype.
-  const cardIndex = caster.hand.findIndex(c => c.id === cardId);
-  if (cardIndex < 0) return { error: "Không tìm thấy lá bài trên tay" };
+  let cardIndex = caster.hand.findIndex(c => c.id === cardId);
+  if (cardIndex < 0) {
+     console.error("[handlePlayCard] Mismatch! Client requested cardId:", cardId, "but hand has:", caster.hand.map(c => c.id));
+     return { error: "Không tìm thấy lá bài trên tay (" + cardId + ")" };
+  }
 
   const targetValidation = validateTarget(state, casterSeat, targetSeat, caster.hand[cardIndex]);
   if (targetValidation) return targetValidation;
@@ -804,6 +807,7 @@ function beginSlashAfterDodge(state, caster, targetSeat, defenseName = "Đỡ") 
     type: "DODGE_SUCCESS",
     casterSeat: targetSeat,
     targetSeat,
+    cardId: state.discardTop?.id || "",
     description: `🛡️ ${target?.generalName || `Ghế ${targetSeat}`} đã dùng ${defenseName} hóa giải đòn Trảm!`
   });
 }
@@ -1556,6 +1560,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     recordAction(state, {
       type: satisfied ? "AOE_DEFENDED" : "AOE_HIT",
       targetSeat: respondentSeat,
+      cardId: satisfied ? (state.discardTop?.id || "") : "",
       description: satisfied
         ? `🛡️ ${respondent.generalName} đã né đòn diện rộng thành công!`
         : `💥 ${respondent.generalName} không ra bài né, bị mất 1 máu (${respondent.hp}/${respondent.maxHp})!`
@@ -1586,6 +1591,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         recordAction(state, {
           type: "DUEL_RESPOND",
           casterSeat: respondentSeat,
+          cardId: s.id,
           description: `⚔️ ${respondent.generalName} đáp trả 1 lá [${s.name}] trong Thách Đấu!`
         });
         return { success: true, state };
