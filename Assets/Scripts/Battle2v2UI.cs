@@ -362,7 +362,7 @@ public class Battle2v2UI : MonoBehaviour
 
     #region SERVERLESS GAME STATE SYNCHRONIZER
     private long lastAppliedStateVersion = -1;
-    private long lastAppliedActionTimestamp = 0;
+    private long lastAppliedActionSeq = 0;
     private long lastHandledPhaseVersion = -1;
     private int lastHandledWaitingSeat = -1;
     private string lastHandledPromptKey = "";
@@ -945,52 +945,71 @@ public class Battle2v2UI : MonoBehaviour
         }
 
         // 5. Đồng bộ Nhật ký trận đấu
-        if (state.lastAction != null && state.lastAction.timestamp > lastAppliedActionTimestamp)
+        if (state.actionHistory != null && state.actionHistory.Count > 0)
         {
-            lastAppliedActionTimestamp = state.lastAction.timestamp;
-            if (!string.IsNullOrEmpty(state.lastAction.description))
+            // Duyệt qua tất cả các action mới chưa xử lý
+            foreach (var act in state.actionHistory)
             {
-                SetLog(state.lastAction.description);
-            }
-            
-            // Xử lý hiệu ứng bài đáp ứng (Dodge, Nullify, Duel response, AOE defense)
-            string actType = state.lastAction.type;
-            if ((actType == "DODGE_SUCCESS" || actType == "NULLIFY_PLAYED" || actType == "DUEL_RESPOND" || actType == "AOE_DEFENDED") && !string.IsNullOrEmpty(state.lastAction.cardId))
-            {
-                var responderSeat = state.lastAction.casterSeat;
-                if (actType == "AOE_DEFENDED" || actType == "DODGE_SUCCESS") responderSeat = state.lastAction.targetSeat;
-                
-                var responder = GetGeneralBySeat(responderSeat);
-                var card = CardDatabase.GetCardById(state.lastAction.cardId);
-                if (responder != null && card != null)
+                if (act.seq > lastAppliedActionSeq)
                 {
-                    // Lấy vị trí để phóng bài ra
-                    Vector2 startPos = new Vector2(0, 0);
-                    var casterRt = responder.GetComponent<RectTransform>();
-                    if (casterRt != null)
+                    lastAppliedActionSeq = act.seq; // Dùng seq thay vì timestamp vì có thể trùng lặp
+                    if (!string.IsNullOrEmpty(act.description))
                     {
-                        Vector2 casterScreen = RectTransformUtility.WorldToScreenPoint(null, casterRt.position);
-                        RectTransformUtility.ScreenPointToLocalPointInRectangle(battleRootGo != null ? battleRootGo.GetComponent<RectTransform>() : canvasGo.GetComponent<RectTransform>(), casterScreen, null, out startPos);
+                        SetLog(act.description);
                     }
                     
-                    StartCoroutine(ShowResponseCardAnimation(card, startPos));
-                }
-            }
-            // Hiệu ứng phán xét từ Server
+                    string actType = act.type;
+                    if ((actType == "DODGE_SUCCESS" || actType == "NULLIFY_PLAYED" || actType == "DUEL_RESPOND" || actType == "AOE_DEFENDED") && !string.IsNullOrEmpty(act.cardId))
+                    {
+                        var responderSeat = act.casterSeat;
+                        if (actType == "AOE_DEFENDED" || actType == "DODGE_SUCCESS") responderSeat = act.targetSeat;
+                        
+                        var responder = GetGeneralBySeat(responderSeat);
+                        var card = CardDatabase.GetCardById(act.cardId);
+                        if (responder != null && card != null)
+                        {
+                            Vector2 startPos = new Vector2(0, 0);
+                            var casterRt = responder.GetComponent<RectTransform>();
+                            if (casterRt != null)
+                            {
+                                Vector2 casterScreen = RectTransformUtility.WorldToScreenPoint(null, casterRt.position);
+                                RectTransformUtility.ScreenPointToLocalPointInRectangle(battleRootGo != null ? battleRootGo.GetComponent<RectTransform>() : canvasGo.GetComponent<RectTransform>(), casterScreen, null, out startPos);
+                            }
+                            StartCoroutine(ShowResponseCardAnimation(card, startPos));
+                        }
+                    }
+                    else if ((actType.StartsWith("PLAY_") || actType == "EQUIP" || actType == "DELAYED_SCROLL_ATTACHED") && !string.IsNullOrEmpty(act.cardId))
+                    {
+                        if (playerCard == null || act.casterSeat != playerCard.SeatNumber) 
+                        {
+                            var casterGen = GetGeneralBySeat(act.casterSeat);
+                            var targetGen = GetGeneralBySeat(act.targetSeat);
+                            var card = CardDatabase.GetCardById(act.cardId);
+                            if (casterGen != null && card != null)
+                            {
+                                if (actType == "EQUIP")
+                                    ShowCardAtCenter(card, casterGen, targetGen, $"Trang bị [{card.cardName}]");
+                                else
+                                    ShowCardAtCenter(card, casterGen, targetGen);
+                            }
+                        }
+                    }
+                    // Hiệu ứng phán xét từ Server
             else if (actType == "LIGHTNING_HIT" || actType == "LIGHTNING_PASSED" || actType == "SUPPLY_SHORTAGE_TRIGGERED" || actType == "SUPPLY_SHORTAGE_PASSED" || actType == "ACEDIA_TRIGGERED" || actType == "ACEDIA_PASSED")
-            {
-                var targetGen = GetGeneralBySeat(state.lastAction.targetSeat);
-                var judgeCard = CardDatabase.GetCardById(state.lastAction.cardId);
-                if (judgeCard != null && targetGen != null)
-                {
-                    string title = "PHÁN XÉT";
-                    if (actType.StartsWith("LIGHTNING")) title = "PHÁN XÉT THẦN SẤM";
-                    else if (actType.StartsWith("SUPPLY")) title = "PHÁN XÉT CẮT LƯƠNG";
-                    else if (actType.StartsWith("ACEDIA")) title = "PHÁN XÉT SA BẪY";
-                    
-                    bool success = actType.EndsWith("PASSED");
-                    StartCoroutine(ServerJudgementAnimation(judgeCard, targetGen, title, success));
-                }
+                    {
+                        var targetGen = GetGeneralBySeat(act.targetSeat);
+                        var judgeCard = CardDatabase.GetCardById(act.cardId);
+                        if (judgeCard != null && targetGen != null)
+                        {
+                            string title = "PHÁN XÉT";
+                            if (actType.StartsWith("LIGHTNING")) title = "PHÁN XÉT THẦN SẤM";
+                            else if (actType.StartsWith("SUPPLY")) title = "PHÁN XÉT CẮT LƯƠNG";
+                            else if (actType.StartsWith("ACEDIA")) title = "PHÁN XÉT SA BẪY";
+                            
+                            bool success = actType.EndsWith("PASSED");
+                            StartCoroutine(ServerJudgementAnimation(judgeCard, targetGen, title, success));
+                        }
+                    }
             }
         }
 
@@ -8482,6 +8501,11 @@ public class Battle2v2UI : MonoBehaviour
     }
     #endregion
 }
+
+
+
+
+
 
 
 
