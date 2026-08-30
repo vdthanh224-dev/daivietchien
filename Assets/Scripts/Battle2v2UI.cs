@@ -304,9 +304,15 @@ public class Battle2v2UI : MonoBehaviour
             turnTimer -= Time.unscaledDeltaTime;
 
             // Cập nhật số đếm ngược 40s, 39s, ... ngay bên trái avatar tướng đang đánh
-            if (turnOrderGenerals.Count > currentTurnIndex)
+            // Tìm tướng nào đang có lượt thực sự từ server state
+            var activeGen = GetGeneralBySeat(GameStateManager.Instance?.CurrentState?.turnSeat ?? -1);
+            if (activeGen != null && activeGen.CurrentHp > 0)
             {
-                var activeGen = turnOrderGenerals[currentTurnIndex];
+                activeGen.UpdateHeadTimer(Mathf.CeilToInt(turnTimer));
+            }
+            else if (turnOrderGenerals.Count > currentTurnIndex)
+            {
+                activeGen = turnOrderGenerals[currentTurnIndex];
                 if (activeGen != null)
                 {
                     activeGen.UpdateHeadTimer(Mathf.CeilToInt(turnTimer));
@@ -336,9 +342,15 @@ public class Battle2v2UI : MonoBehaviour
         if (!battleFinished && !isDiscardPhaseActive)
         {
             isTimerRunning = true;
-            if (turnOrderGenerals != null && currentTurnIndex >= 0 && currentTurnIndex < turnOrderGenerals.Count)
+            // Dùng turnSeat từ server nếu có, thay vì currentTurnIndex cục bộ dễ lệch
+            var activeGen = GetGeneralBySeat(GameStateManager.Instance?.CurrentState?.turnSeat ?? -1);
+            if (activeGen != null && activeGen.CurrentHp > 0)
             {
-                var activeGen = turnOrderGenerals[currentTurnIndex];
+                activeGen.ShowHeadTimer(Mathf.CeilToInt(turnTimer));
+            }
+            else if (turnOrderGenerals != null && currentTurnIndex >= 0 && currentTurnIndex < turnOrderGenerals.Count)
+            {
+                activeGen = turnOrderGenerals[currentTurnIndex];
                 if (activeGen != null && activeGen.CurrentHp > 0)
                 {
                     activeGen.ShowHeadTimer(Mathf.CeilToInt(turnTimer));
@@ -478,7 +490,9 @@ public class Battle2v2UI : MonoBehaviour
             var targetGen = GetGeneralBySeat(delta.waitingTargetSeat);
             if (targetGen != null && targetGen.CurrentHp > 0)
             {
-                targetGen.ShowHeadTimer(delta.waitingTimer > 0 ? delta.waitingTimer : 40);
+                turnTimer = delta.waitingTimer > 0 ? delta.waitingTimer : 40.0f;
+                isTimerRunning = true;
+                targetGen.ShowHeadTimer(Mathf.CeilToInt(turnTimer));
             }
             var casterGen = GetGeneralBySeat(delta.turnSeat);
             if (casterGen != null && casterGen != targetGen)
@@ -491,7 +505,9 @@ public class Battle2v2UI : MonoBehaviour
             var turnGen = GetGeneralBySeat(delta.turnSeat);
             if (turnGen != null && turnGen.CurrentHp > 0)
             {
-                turnGen.ShowHeadTimer(delta.turnTimer > 0 ? delta.turnTimer : 40);
+                turnTimer = delta.turnTimer > 0 ? delta.turnTimer : 40.0f;
+                isTimerRunning = true;
+                turnGen.ShowHeadTimer(Mathf.CeilToInt(turnTimer));
             }
             for (int s = 1; s <= 4; s++)
             {
