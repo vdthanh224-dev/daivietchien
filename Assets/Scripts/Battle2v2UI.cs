@@ -299,29 +299,8 @@ public class Battle2v2UI : MonoBehaviour
         {
             turnTimer -= Time.unscaledDeltaTime;
 
-            // NẾU client đang TỰ ĐẾM trong một Coroutine đặc biệt (như Diệu Kế, Đỡ, Thách Đấu...)
-            // Thì không để Update() này ghi đè lên con số timer riêng của prompt
-            bool isHandlingSpecialPromptLocally = 
-                isAwaitingSlashDefense || 
-                isAwaitingServerAoE || 
-                isAwaitingServerDuel || 
-                isAwaitingServerNearDeath || 
-                isAwaitingServerSongCung || 
-                isAwaitingServerNamSon || 
-                activeCounterPromptCoroutine != null; // Có prompt Diệu Kế
-
-            // Nếu đang trong AWAIT_NULLIFY mà activeCounterPromptCoroutine không chạy,
-            // hoặc các phase đặc biệt khác, cờ này giúp ngăn ghi đè lên targetGen.
-            if (string.Equals(currentAuthoritativePhase, "AWAIT_NULLIFY", System.StringComparison.Ordinal)) {
-                isHandlingSpecialPromptLocally = true;
-            }
-
-            // Cập nhật số đếm ngược 40s, 39s, ... ngay bên trái avatar tướng đang đánh
-            // Tìm tướng nào đang có lượt thực sự từ server state
-            var activeGen = GetGeneralBySeat(currentAuthoritativeTurnSeat);
+                        var activeGen = GetGeneralBySeat(currentAuthoritativeTurnSeat);
             var waitingGen = currentAuthoritativeWaitingSeat > 0 ? GetGeneralBySeat(currentAuthoritativeWaitingSeat) : null;
-
-            if (!isHandlingSpecialPromptLocally)
             {
                 if (waitingGen != null && waitingGen.CurrentHp > 0)
                 {
@@ -867,10 +846,7 @@ public class Battle2v2UI : MonoBehaviour
                     int diff = myServerData.hand.Count - playerHandCards.Count;
                     if (diff > 0)
                     {
-                        for (int i = 0; i < diff; i++)
-                        {
-                            StartCoroutine(AnimateDealtCard(playerCard));
-                        }
+                        StartCoroutine(AnimateMultipleDealtCards(playerCard, diff));
                     }
 
                     playerHandCards.Clear();
@@ -1639,7 +1615,8 @@ public class Battle2v2UI : MonoBehaviour
         playerCard.ShowHeadTimer(40);
         while (!decided && !battleFinished && (!serverControlled || IsAuthoritativePromptActive("AWAIT_NEAR_DEATH")))
         {
-            timer -= Time.unscaledDeltaTime;
+            if (serverControlled) timer = turnTimer;
+            else timer -= Time.unscaledDeltaTime;
             playerCard.UpdateHeadTimer(Mathf.Max(0, Mathf.CeilToInt(timer)));
             if (timerText != null) timerText.text = $"⏳ Còn {Mathf.CeilToInt(timer)}s";
             
@@ -1806,6 +1783,7 @@ public class Battle2v2UI : MonoBehaviour
 
     private IEnumerator ShowAuthoritativeAoEPrompt(bool needSlash, string aoeName, string reqName)
     {
+        bool serverControlled = !string.IsNullOrEmpty(currentRoomId) || DenoGameClient.IsConnected;
         var modal = new GameObject("ServerAoEReactionModal", typeof(RectTransform), typeof(Image));
         modal.transform.SetParent(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, false);
         modal.transform.SetAsLastSibling();
@@ -1827,6 +1805,8 @@ public class Battle2v2UI : MonoBehaviour
             Color.white, FontStyle.Normal, TextAnchor.MiddleCenter);
         SetRect(message.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
             new Vector2(0.5f, 0.5f), new Vector2(610f, 30f), new Vector2(0f, 28f));
+        var timerTxt = AddText(modal.transform, "Timer", "⏳ Còn 40s để quyết định...", 13, ThemeUI.CyanPrimary, FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(timerTxt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(300f, 24f), new Vector2(0f, -5f));
 
         var buttonSprite = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
         var useGo = new GameObject("Btn_Respond", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -1874,8 +1854,11 @@ public class Battle2v2UI : MonoBehaviour
         float promptTimer = 40.0f;
         while (!decided && !battleFinished && IsAuthoritativePromptActive("AWAIT_AOE"))
         {
-            promptTimer -= Time.unscaledDeltaTime;
+            if (serverControlled) promptTimer = turnTimer;
+            else if (serverControlled) promptTimer = turnTimer;
+            else promptTimer -= Time.unscaledDeltaTime;
             playerCard.UpdateHeadTimer(Mathf.Max(0, Mathf.CeilToInt(promptTimer)));
+            if (timerTxt != null) timerTxt.text = $"⏳ Còn {Mathf.Max(0, Mathf.CeilToInt(promptTimer))}s để quyết định...";
             if (promptTimer <= 0f) decided = true;
             yield return null;
         }
@@ -1898,6 +1881,7 @@ public class Battle2v2UI : MonoBehaviour
 
     private IEnumerator ShowAuthoritativeDuelPrompt(GeneralCardUI caster, GeneralCardUI target)
     {
+        bool serverControlled = !string.IsNullOrEmpty(currentRoomId) || DenoGameClient.IsConnected;
         var modal = new GameObject("ServerDuelReactionModal", typeof(RectTransform), typeof(Image));
         modal.transform.SetParent(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, false);
         modal.transform.SetAsLastSibling();
@@ -1919,6 +1903,8 @@ public class Battle2v2UI : MonoBehaviour
             Color.white, FontStyle.Normal, TextAnchor.MiddleCenter);
         SetRect(message.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
             new Vector2(0.5f, 0.5f), new Vector2(610f, 30f), new Vector2(0f, 28f));
+        var timerTxt = AddText(modal.transform, "Timer", "⏳ Còn 40s để quyết định...", 13, ThemeUI.CyanPrimary, FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(timerTxt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(300f, 24f), new Vector2(0f, -5f));
 
         var buttonSprite = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
         var useGo = new GameObject("Btn_Respond", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -1963,7 +1949,8 @@ public class Battle2v2UI : MonoBehaviour
         float promptTimer = 40.0f;
         while (!decided && !battleFinished && IsAuthoritativePromptActive("AWAIT_DUEL"))
         {
-            promptTimer -= Time.unscaledDeltaTime;
+            if (serverControlled) promptTimer = turnTimer;
+            else promptTimer -= Time.unscaledDeltaTime;
             playerCard.UpdateHeadTimer(Mathf.Max(0, Mathf.CeilToInt(promptTimer)));
             if (promptTimer <= 0f) decided = true;
             yield return null;
@@ -3707,6 +3694,15 @@ public class Battle2v2UI : MonoBehaviour
         SetLog("🔄 <color=#FFD700><b>KHO BÀI ĐÃ ĐƯỢC XÁO LẠI!</b></color> Toàn bộ xấp bài đã dùng được xáo lại.");
     }
 
+    private IEnumerator AnimateMultipleDealtCards(GeneralCardUI targetGeneral, int count)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            yield return AnimateDealtCard(targetGeneral);
+            yield return new WaitForSeconds(0.05f);
+        }
+    }
+
     private IEnumerator AnimateDealtCard(GeneralCardUI targetGeneral)
     {
         if (targetGeneral == null) yield break;
@@ -4063,13 +4059,13 @@ public class Battle2v2UI : MonoBehaviour
 
         Color suitColor = (judgeCard.suit == CardSuit.Heart || judgeCard.suit == CardSuit.Diamond) ? new Color(0.8f, 0.1f, 0.1f) : new Color(0.1f, 0.1f, 0.1f);
         
-        var txtValue = AddText(centerContainer.transform, "Rank", judgeCard.RankString, 18, suitColor, FontStyle.Bold, TextAnchor.UpperLeft);
+        var txtValue = AddText(centerContainer.transform, "Rank", judgeCard.GetRankString(), 18, suitColor, FontStyle.Bold, TextAnchor.UpperLeft);
         SetRect(txtValue.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, 30), new Vector2(5, -5));
         
-        var txtSuit = AddText(centerContainer.transform, "Suit", judgeCard.SuitString, 24, suitColor, FontStyle.Normal, TextAnchor.UpperLeft);
+        var txtSuit = AddText(centerContainer.transform, "Suit", judgeCard.GetSuitSymbol(), 24, suitColor, FontStyle.Normal, TextAnchor.UpperLeft);
         SetRect(txtSuit.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, 30), new Vector2(5, -35));
 
-        var txtName = AddText(centerContainer.transform, "Name", judgeCard.name, 12, ThemeUI.BgDeepNavy, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var txtName = AddText(centerContainer.transform, "Name", judgeCard.cardName, 12, ThemeUI.BgDeepNavy, FontStyle.Bold, TextAnchor.MiddleCenter);
         SetRect(txtName.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
         
         AudioManager.Instance.PlayCardSelect();
@@ -4292,19 +4288,6 @@ public class Battle2v2UI : MonoBehaviour
 
         if (isDiscardPhaseActive)
         {
-            if (selectedDiscardCards.Contains(cardUI))
-            {
-                selectedDiscardCards.Remove(cardUI);
-                cardUI.SetSelected(false);
-            }
-            else if (selectedDiscardCards.Count < discardExcessRequired)
-            {
-                selectedDiscardCards.Add(cardUI);
-                cardUI.SetSelected(true);
-            }
-
-            discardConfirmBtnText.text = $"BỎ BÀI ({selectedDiscardCards.Count}/{discardExcessRequired})";
-            discardConfirmBtn.interactable = selectedDiscardCards.Count == discardExcessRequired;
             return;
         }
 
@@ -5556,7 +5539,8 @@ public class Battle2v2UI : MonoBehaviour
         {
             if (!serverControlled)
             {
-                reactionTimer -= Time.unscaledDeltaTime;
+                if (!string.IsNullOrEmpty(currentRoomId)) reactionTimer = turnTimer;
+                else reactionTimer -= Time.unscaledDeltaTime;
                 playerCard.UpdateHeadTimer(Mathf.Max(0, Mathf.CeilToInt(reactionTimer)));
 
                 if (reactionTimer <= 0f)
@@ -5982,8 +5966,9 @@ public class Battle2v2UI : MonoBehaviour
         {
             if (!serverControlled)
             {
-                promptTimer -= Time.unscaledDeltaTime;
-                caster.UpdateHeadTimer(Mathf.Max(0, Mathf.CeilToInt(promptTimer)));
+                if (serverControlled) promptTimer = turnTimer;
+            else promptTimer -= Time.unscaledDeltaTime;
+            caster.UpdateHeadTimer(Mathf.Max(0, Mathf.CeilToInt(promptTimer)));
                 if (promptTimer <= 0f)
                 {
                     SetLog("⏰ <b>Đã hết 40s!</b> Tự động bỏ qua không dùng thêm Trảm.");
@@ -6157,7 +6142,8 @@ public class Battle2v2UI : MonoBehaviour
 
         while (!decided && !battleFinished && (!serverControlled || IsAuthoritativePromptActive("AWAIT_NULLIFY")))
         {
-            promptTimer -= Time.unscaledDeltaTime;
+            if (serverControlled) promptTimer = turnTimer;
+            else promptTimer -= Time.unscaledDeltaTime;
             playerCard.UpdateHeadTimer(Mathf.Max(0, Mathf.CeilToInt(promptTimer)));
             if (timerTxt != null) timerTxt.text = $"⏳ Còn {Mathf.CeilToInt(promptTimer)}s để quyết định...";
             
@@ -6692,7 +6678,8 @@ public class Battle2v2UI : MonoBehaviour
 
             while (!decided && !battleFinished)
             {
-                reactionTimer -= Time.unscaledDeltaTime;
+                if (!string.IsNullOrEmpty(currentRoomId)) reactionTimer = turnTimer;
+                else reactionTimer -= Time.unscaledDeltaTime;
                 victim.UpdateHeadTimer(Mathf.Max(0, Mathf.CeilToInt(reactionTimer)));
 
                 if (reactionTimer <= 0f)
@@ -6915,7 +6902,8 @@ public class Battle2v2UI : MonoBehaviour
 
                 while (!playerDecided && !battleFinished)
                 {
-                    duelTimer -= Time.unscaledDeltaTime;
+                    if (!string.IsNullOrEmpty(currentRoomId)) duelTimer = turnTimer;
+                    else duelTimer -= Time.unscaledDeltaTime;
                     currentDuelist.UpdateHeadTimer(Mathf.Max(0, Mathf.CeilToInt(duelTimer)));
 
                     if (duelTimer <= 0f)
@@ -7343,7 +7331,18 @@ public class Battle2v2UI : MonoBehaviour
 
         if (g == playerCard)
         {
-            isDiscardPhaseActive = true; discardExcessRequired = excess; selectedDiscardCards.Clear(); if (playerHandUI != null) { playerHandUI.IsMultiSelectMode = true; playerHandUI.MaxSelectableCards = discardExcessRequired; playerHandUI.ClearSelection(); } turnTimer = 40.0f; isTimerRunning = true;
+            isDiscardPhaseActive = true; 
+            discardExcessRequired = excess; 
+            selectedDiscardCards.Clear(); 
+            if (playerHandUI != null) 
+            { 
+                playerHandUI.IsMultiSelectMode = true; 
+                playerHandUI.MaxSelectableCards = discardExcessRequired; 
+                playerHandUI.ClearSelection(); 
+                playerHandUI.OnSelectionChanged += OnDiscardSelectionChanged;
+            } 
+            turnTimer = 40.0f; 
+            isTimerRunning = true;
 
             discardConfirmBtn.gameObject.SetActive(true);
             discardConfirmBtn.interactable = false;
@@ -7419,6 +7418,18 @@ public class Battle2v2UI : MonoBehaviour
         }
     }
 
+    private void OnDiscardSelectionChanged(List<CardUI> selectedCards)
+    {
+        if (!isDiscardPhaseActive) return;
+        selectedDiscardCards.Clear();
+        if (selectedCards != null)
+        {
+            selectedDiscardCards.AddRange(selectedCards);
+        }
+        discardConfirmBtnText.text = $"BỎ BÀI ({selectedDiscardCards.Count}/{discardExcessRequired})";
+        discardConfirmBtn.interactable = selectedDiscardCards.Count == discardExcessRequired;
+    }
+
     private void OnPlayerConfirmDiscardClicked()
     {
         if (!isDiscardPhaseActive || selectedDiscardCards.Count < discardExcessRequired) return;
@@ -7449,7 +7460,7 @@ public class Battle2v2UI : MonoBehaviour
             }, (s) => { if (s != null) ApplyServerGameState(s); });
         }
 
-        selectedDiscardCards.Clear(); if (playerHandUI != null) { playerHandUI.IsMultiSelectMode = false; playerHandUI.ClearSelection(); } AudioManager.Instance.PlayCardDiscard();
+        selectedDiscardCards.Clear(); if (playerHandUI != null) { playerHandUI.IsMultiSelectMode = false; playerHandUI.ClearSelection(); playerHandUI.OnSelectionChanged -= OnDiscardSelectionChanged; } AudioManager.Instance.PlayCardDiscard();
         UpdateHandCountsVisual();
         if (string.IsNullOrEmpty(currentRoomId))
         {
@@ -7479,7 +7490,7 @@ public class Battle2v2UI : MonoBehaviour
             }
             playerHandUI.ClearHand();
             playerHandUI.AddCards(playerHandCards);
-            selectedDiscardCards.Clear(); if (playerHandUI != null) { playerHandUI.IsMultiSelectMode = false; playerHandUI.ClearSelection(); } AudioManager.Instance.PlayCardDiscard();
+            selectedDiscardCards.Clear(); if (playerHandUI != null) { playerHandUI.IsMultiSelectMode = false; playerHandUI.ClearSelection(); playerHandUI.OnSelectionChanged -= OnDiscardSelectionChanged; } AudioManager.Instance.PlayCardDiscard();
             UpdateHandCountsVisual();
             isDiscardPhaseActive = false;
         }
@@ -7527,6 +7538,7 @@ public class Battle2v2UI : MonoBehaviour
 
             if (asker == playerCard)
             {
+                bool serverControlled = !string.IsNullOrEmpty(currentRoomId) || DenoGameClient.IsConnected;
                 // Ưu tiên dùng Hủ Rượu nếu là tự cứu bản thân, hoặc Bánh Chưng
                 var rescueCard = playerHandCards.Find(c => (asker == victim && c.subType == CardSubType.Wine) || c.subType == CardSubType.Peach);
                 if (rescueCard != null)
@@ -7617,8 +7629,9 @@ public class Battle2v2UI : MonoBehaviour
 
                     while (!decided && timer > 0f && !battleFinished)
                     {
-                        timer -= Time.unscaledDeltaTime;
-                        asker.UpdateHeadTimer(Mathf.Max(0, Mathf.CeilToInt(timer)));
+                        if (serverControlled) timer = turnTimer;
+            else timer -= Time.unscaledDeltaTime;
+            asker.UpdateHeadTimer(Mathf.Max(0, Mathf.CeilToInt(timer)));
                         string waitingLabel = isWine ? $"⏳ Còn {Mathf.CeilToInt(timer)}s để uống Hủ Rượu tự cứu..." : $"⏳ Còn {Mathf.CeilToInt(timer)}s để cứu...";
                         if (timerTxt != null) timerTxt.text = waitingLabel;
                         yield return null;
@@ -8007,6 +8020,22 @@ public class Battle2v2UI : MonoBehaviour
         if (card == null) return;
         AudioManager.Instance.PlayCardVoice(card);
 
+        if (card.category == CardCategory.Basic)
+        {
+            if (card.subType == CardSubType.AttackNormal || card.subType == CardSubType.AttackFire || card.subType == CardSubType.AttackThunder)
+                AudioManager.Instance.PlaySlash();
+            else if (card.subType == CardSubType.Dodge)
+                AudioManager.Instance.PlayParry();
+            else if (card.subType == CardSubType.Peach)
+                AudioManager.Instance.PlayHeal();
+            else if (card.subType == CardSubType.Wine)
+                AudioManager.Instance.PlaySkill();
+        }
+        else if (card.category == CardCategory.InstantScroll || card.category == CardCategory.DelayedScroll || card.category == CardCategory.Equipment)
+        {
+            AudioManager.Instance.PlaySkill();
+        }
+
         if (centerCardDismissCoroutine != null)
         {
             StopCoroutine(centerCardDismissCoroutine);
@@ -8109,7 +8138,7 @@ public class Battle2v2UI : MonoBehaviour
         bgRt.anchorMin = Vector2.zero; bgRt.anchorMax = Vector2.one;
         bgRt.offsetMin = bgRt.offsetMax = Vector2.zero;
         
-        var txt = AddText(container.transform, "Name", card.name, 12, ThemeUI.BgDeepNavy, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var txt = AddText(container.transform, "Name", card.cardName, 12, ThemeUI.BgDeepNavy, FontStyle.Bold, TextAnchor.MiddleCenter);
         SetRect(txt.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
         
         AudioManager.Instance.PlayCardSelect();
@@ -8453,3 +8482,6 @@ public class Battle2v2UI : MonoBehaviour
     }
     #endregion
 }
+
+
+

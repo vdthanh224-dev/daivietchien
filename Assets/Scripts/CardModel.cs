@@ -117,16 +117,24 @@ public class CardModel
     public bool IsRed => suit == CardSuit.Heart || suit == CardSuit.Diamond;
     public bool IsBlack => suit == CardSuit.Spade || suit == CardSuit.Club;
 
+    public string SuitString
+    {
+        get
+        {
+            return suit switch
+            {
+                CardSuit.Spade => "♠",
+                CardSuit.Heart => "♥",
+                CardSuit.Club => "♣",
+                CardSuit.Diamond => "♦",
+                _ => "?"
+            };
+        }
+    }
+
     public string GetSuitSymbol()
     {
-        return suit switch
-        {
-            CardSuit.Spade => "♠",
-            CardSuit.Club => "♣",
-            CardSuit.Heart => "♥",
-            CardSuit.Diamond => "♦",
-            _ => "?"
-        };
+        return SuitString;
     }
 
     public string GetSuitShortName()
@@ -170,16 +178,24 @@ public class CardModel
         return IsRed ? new Color(0.85f, 0.15f, 0.15f, 1f) : new Color(0.12f, 0.14f, 0.18f, 1f);
     }
 
+    public string RankString
+    {
+        get
+        {
+            return rank switch
+            {
+                CardRank.Ace => "A",
+                CardRank.Jack => "J",
+                CardRank.Queen => "Q",
+                CardRank.King => "K",
+                _ => ((int)rank).ToString()
+            };
+        }
+    }
+
     public string GetRankString()
     {
-        return rank switch
-        {
-            CardRank.Ace => "A",
-            CardRank.Jack => "J",
-            CardRank.Queen => "Q",
-            CardRank.King => "K",
-            _ => ((int)rank).ToString()
-        };
+        return RankString;
     }
 
     public string GetCategoryName()

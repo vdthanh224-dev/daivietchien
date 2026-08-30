@@ -1316,7 +1316,7 @@ public static class AppwriteMatchmaking
 
     #region 4. SERVERLESS GAME ENGINE & STATE SYNC
     public const string GameEngineFunctionId = "game-engine";
-    public const string DenoEndpoint = "http://127.0.0.1:8080"; // Chuyển tạm về localhost để test // URL Deno Deploy Authoritative Server
+    public const string DenoEndpoint = "http://127.0.0.1:8082"; // Chuyển tạm về localhost để test // URL Deno Deploy Authoritative Server
 
     /// <summary>
     /// Legacy shim: game state is server-owned and must never be written by Unity.

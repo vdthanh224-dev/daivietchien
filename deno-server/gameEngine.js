@@ -674,6 +674,9 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
   }
 
   // 5. CÁC LÁ CẨM NANG (Instant / Delayed Scroll) -> BẮT ĐẦU CHUỖI HỎI DIỆU KẾ PHÁ MƯU (AWAIT_NULLIFY)
+  if (card.category === CARD_CATEGORIES.DELAYED_SCROLL || card.subType === CARD_SUBTYPES.LIGHTNING || card.subType === CARD_SUBTYPES.SUPPLY_SHORTAGE || card.subType === CARD_SUBTYPES.ACEDIA) {
+    return executeCardEffect(state, card, casterSeat, targetSeat);
+  }
   return startNullifyChain(state, card, casterSeat, targetSeat);
 }
 
@@ -2438,3 +2441,4 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
     delta: sanitizeDeltaForClient(state.lastDelta, requestingSeat)
   };
 }
+
