@@ -1,19 +1,12 @@
-@@ -977,6 +977,18 @@
+@@ -982,7 +982,10 @@
+                     var card = CardDatabase.GetCardById(state.lastAction.cardId);
+                     if (casterGen != null && card != null)
+                     {
+-                        ShowCardAtCenter(card, casterGen, targetGen);
++                        if (actType == "EQUIP")
++                            ShowCardAtCenter(card, casterGen, targetGen, $"Trang bị [{card.cardName}]");
++                        else
++                            ShowCardAtCenter(card, casterGen, targetGen);
+                     }
                  }
              }
-             // Hiệu ứng phán xét từ Server
-+            else if ((actType.StartsWith("PLAY_") || actType == "EQUIP" || actType == "DELAYED_SCROLL_ATTACHED") && !string.IsNullOrEmpty(state.lastAction.cardId))
-+            {
-+                if (playerCard == null || state.lastAction.casterSeat != playerCard.SeatNumber) // Chỉ hiện cho người khác đánh để tránh duplicate
-+                {
-+                    var casterGen = GetGeneralBySeat(state.lastAction.casterSeat);
-+                    var targetGen = GetGeneralBySeat(state.lastAction.targetSeat);
-+                    var card = CardDatabase.GetCardById(state.lastAction.cardId);
-+                    if (casterGen != null && card != null)
-+                    {
-+                        ShowCardAtCenter(card, casterGen, targetGen);
-+                    }
-+                }
-+            }
-             else if (actType == "LIGHTNING_HIT" || actType == "LIGHTNING_PASSED" || actType == "SUPPLY_SHORTAGE_TRIGGERED" || actType == "SUPPLY_SHORTAGE_PASSED" || actType == "ACEDIA_TRIGGERED" || actType == "ACEDIA_PASSED")
-             {
