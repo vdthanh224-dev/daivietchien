@@ -2221,8 +2221,9 @@ export function handleAIReaction(state, aiSeat) {
  * Chạy mỗi giây (1000ms) trên Server In-Memory
  */
 export function tickGameState(state) {
-  if (!state || state.status === "FINISHED") return false;
+  if (!state || state.status === "FINISHED") return { changed: false, important: false };
   let changed = false;
+  let important = false;
   const startingVersion = state.version || 0;
 
   // 1. Nếu đang trong pha phản ứng (waitingTargetSeat > 0)
@@ -2258,7 +2259,8 @@ export function tickGameState(state) {
       } else if (state.phase === "DISCARD") {
         handleDiscardCards(state, waitingSeat, []);
       }
-      return changed || state.version !== startingVersion;
+      important = true;
+      return { changed: true, important };
     }
 
     // AI reacts only in phases that have a response handler. DISCARD is
@@ -2268,7 +2270,8 @@ export function tickGameState(state) {
       && state.phase !== "DISCARD";
     if (canAIReact && state.waitingTimer > 0 && state.waitingTimer <= 38) {
       handleAIReaction(state, waitingSeat);
-      return changed || state.version !== startingVersion;
+      important = true;
+      return { changed: true, important };
     }
   }
   // 2. Nếu đang trong pha ra bài (PLAY)
@@ -2284,21 +2287,23 @@ export function tickGameState(state) {
     if (state.turnTimer <= 0) {
       if (!turnPlayer || turnPlayer.hp <= 0) advanceTurn(state);
       else handleEndTurn(state, state.turnSeat);
-      return changed || state.version !== startingVersion;
+      important = true;
+      return { changed: true, important };
     }
 
     // Nếu là AI trong lượt -> AI đánh bài sau 2 giây
     if (turnPlayer && turnPlayer.isAI && turnPlayer.hp > 0 && state.turnTimer <= 38) {
       handleAIStep(state, state.turnSeat);
-      return changed || state.version !== startingVersion;
+      important = true;
+      return { changed: true, important };
     }
   }
 
-  if (changed && state.version === startingVersion) {
-    state.version = startingVersion + 1;
-    refreshLastDelta(state);
+  if (state.version !== startingVersion) {
+    important = true;
   }
-  return changed || state.version !== startingVersion;
+
+  return { changed, important };
 }
 
 /**

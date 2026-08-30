@@ -287,25 +287,36 @@ async function mutateSharedState(roomId, seat, payload) {
     if (versionError) return { error: versionError.error, code: versionError.code, conflict: true, state };
 
     const previousVersion = state.version;
-    const result = payload.action === "SERVER_TICK"
-      ? { success: true, changed: tickGameState(state) }
-      : applyActionToState(state, seat, payload);
-    if (result?.error) return { error: result.error, state };
-    if (result?.changed === false) return { state, result, committed: false };
-    ensureMutationVersion(state, previousVersion);
+      let tickRes = null;
+      let result = null;
+      if (payload.action === "SERVER_TICK") {
+        tickRes = tickGameState(state);
+        result = { success: true, changed: tickRes.changed };
+      } else {
+        result = applyActionToState(state, seat, payload);
+      }
+      
+      if (result?.error) return { error: result.error, state };
+      if (result?.changed === false) return { state, result, committed: false };
+      
+      const isImportant = payload.action !== "SERVER_TICK" || (tickRes && tickRes.important);
+      if (isImportant) {
+        ensureMutationVersion(state, previousVersion);
+      }
 
-    const commit = await sharedKv.atomic()
-      .check({ key: stateKey(roomId), versionstamp: entry.versionstamp })
-      .set(stateKey(roomId), state)
-      .commit();
-    if (commit.ok) {
-      return {
-        state,
-        result,
-        committed: true,
-        versionstamp: commit.versionstamp,
-      };
-    }
+      const commit = await sharedKv.atomic()
+        .check({ key: stateKey(roomId), versionstamp: entry.versionstamp })
+        .set(stateKey(roomId), state)
+        .commit();
+      if (commit.ok) {
+        return {
+          state,
+          result,
+          important: isImportant,
+          committed: true,
+          versionstamp: commit.versionstamp,
+        };
+      }
 
     const latest = await readSharedState(roomId);
     const expected = Number(payload.expectedVersion);
@@ -363,16 +374,18 @@ async function tryAcquireTickLease(roomId) {
 }
 
 async function tickSharedRoom(roomId, room) {
-  if (!(await tryAcquireTickLease(roomId))) return;
-  const result = await mutateSharedState(roomId, undefined, {
-    action: "SERVER_TICK",
-  });
-  if (result.committed) {
-    updateLocalRoom(roomId, result.state, result.versionstamp);
-    broadcastStateUpdate(room, "SERVER_TICK");
-    saveStateToDatabase(roomId, result.state);
+    if (!(await tryAcquireTickLease(roomId))) return;
+    const result = await mutateSharedState(roomId, undefined, {
+      action: "SERVER_TICK",
+    });
+    if (result.committed) {
+      updateLocalRoom(roomId, result.state, result.versionstamp);
+      if (result.important) {
+        broadcastStateUpdate(room, "SERVER_TICK");
+        saveStateToDatabase(roomId, result.state);
+      }
+    }
   }
-}
 
 function broadcastRoom(room, messageObj) {
   const json = JSON.stringify(messageObj);

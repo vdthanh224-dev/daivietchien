@@ -84,7 +84,7 @@ setInterval(() => {
   for (const [roomId, room] of rooms.entries()) {
     if (!room?.state || room.state.status === "FINISHED") continue;
     try {
-      if (tickGameState(room.state)) {
+      if (tickGameState(room.state).important) {
         room.lastActivity = Date.now();
         broadcastRoom(room, {
           type: "STATE_UPDATE",
