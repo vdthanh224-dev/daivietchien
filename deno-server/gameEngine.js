@@ -2099,12 +2099,7 @@ export function handleAIStep(state, aiSeat) {
     return handlePlayCard(state, aiSeat, aoe.id, 0);
   }
 
-  // I. Diệu Kế Phá Mưu chủ động hủy bài đối phương
-  const flawlessTarget = enemies.find((enemy) => buildTargetCardOptions(state, enemy.seat, true).length > 0) || null;
-  const flawless = ai.hand.find((card) => card.subType === CARD_SUBTYPES.FLAWLESS_DEFENSE);
-  if (flawless && flawlessTarget) {
-    return handlePlayCard(state, aiSeat, flawless.id, flawlessTarget.seat);
-  }
+
 
   // J. Cẩm nang phá bài (Vườn Không / Đột Kích)
   const snatchTarget = enemies.find((enemy) =>

@@ -2,9 +2,10 @@
   "name": "dai-viet-chien-server",
   "version": "1.0.0",
   "exports": "./main.js",
+  "unstable": ["kv"],
   "tasks": {
     "start": "deno run --unstable-kv --allow-read --allow-write --allow-net --allow-env main.js",
-    "dev": "deno run --unstable-kv --watch --allow-read --allow-write --allow-net --allow-env main.js"
+    "dev": "deno run --watch --unstable-kv --allow-read --allow-write --allow-net --allow-env main.js"
   },
   "deploy": {
     "org": "vdthanh",

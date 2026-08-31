@@ -980,9 +980,7 @@ public class Battle2v2UI : MonoBehaviour
                     }
                     else if ((actType.StartsWith("PLAY_") || actType == "EQUIP" || actType == "DELAYED_SCROLL_ATTACHED") && !string.IsNullOrEmpty(act.cardId))
                     {
-                        if (playerCard == null || act.casterSeat != playerCard.SeatNumber) 
-                        {
-                            var casterGen = GetGeneralBySeat(act.casterSeat);
+                        var casterGen = GetGeneralBySeat(act.casterSeat);
                             var targetGen = GetGeneralBySeat(act.targetSeat);
                             var card = CardDatabase.GetCardById(act.cardId);
                             if (casterGen != null && card != null)
@@ -4065,27 +4063,11 @@ public class Battle2v2UI : MonoBehaviour
 
         currentCenterCardGo = centerContainer;
 
-        // Render mặt trước lá bài
-        var bg = new GameObject("Bg", typeof(RectTransform), typeof(Image));
-        bg.transform.SetParent(centerContainer.transform, false);
-        var bgImg = bg.GetComponent<Image>();
-        var bgSpr = LotusHealthUI.LoadSpriteFromResources("UI/auth_card_bg");
-        if (bgSpr != null) { bgImg.sprite = bgSpr; bgImg.type = Image.Type.Sliced; }
-        bgImg.color = new Color(0.9f, 0.85f, 0.75f, 1f);
-        var bgRt = bg.GetComponent<RectTransform>();
-        bgRt.anchorMin = Vector2.zero; bgRt.anchorMax = Vector2.one;
-        bgRt.offsetMin = bgRt.offsetMax = Vector2.zero;
-
-        Color suitColor = (judgeCard.suit == CardSuit.Heart || judgeCard.suit == CardSuit.Diamond) ? new Color(0.8f, 0.1f, 0.1f) : new Color(0.1f, 0.1f, 0.1f);
-        
-        var txtValue = AddText(centerContainer.transform, "Rank", judgeCard.GetRankString(), 18, suitColor, FontStyle.Bold, TextAnchor.UpperLeft);
-        SetRect(txtValue.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, 30), new Vector2(5, -5));
-        
-        var txtSuit = AddText(centerContainer.transform, "Suit", judgeCard.GetSuitSymbol(), 24, suitColor, FontStyle.Normal, TextAnchor.UpperLeft);
-        SetRect(txtSuit.rectTransform, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(40, 30), new Vector2(5, -35));
-
-        var txtName = AddText(centerContainer.transform, "Name", judgeCard.cardName, 12, ThemeUI.BgDeepNavy, FontStyle.Bold, TextAnchor.MiddleCenter);
-        SetRect(txtName.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+        // Render card
+        var cardUI = CardUI.Create(centerContainer.transform, judgeCard, new Vector2(94, 130));
+        var cardRt = cardUI.GetComponent<RectTransform>();
+        cardRt.anchorMin = Vector2.zero; cardRt.anchorMax = Vector2.one;
+        cardRt.offsetMin = cardRt.offsetMax = Vector2.zero;
         
         AudioManager.Instance.PlayCardSelect();
         yield return new WaitForSeconds(0.25f);
@@ -4591,7 +4573,7 @@ public class Battle2v2UI : MonoBehaviour
                     SetLog($"👑 <b>{remoteGen.GeneralName}</b> đã kết thúc lượt ra bài.");
                     remoteTurnActive = false;
                 }
-                else if (act.actionType == "PLAY_CARD" && !processedActionTimestamps.Contains(act.timestamp))
+                else if (act.actionType != "END_TURN" && !string.IsNullOrEmpty(act.cardId) && !processedActionTimestamps.Contains(act.timestamp))
                 {
                     processedActionTimestamps.Add(act.timestamp);
                     var playedCard = CardDatabase.GetCardById(act.cardId);
@@ -8086,7 +8068,7 @@ public class Battle2v2UI : MonoBehaviour
         
         rt.anchoredPosition = startPos;
         rt.localScale = Vector3.one * 0.1f;
-        StartCoroutine(PopOutCard(rt, startPos, new Vector2(-80f, 0f), 1f));
+        StartCoroutine(PopOutCard(rt, startPos, new Vector2(-80f, 0f), 1f, target, card));
 
         currentCenterCardGo = centerContainer;
 
@@ -8147,18 +8129,10 @@ public class Battle2v2UI : MonoBehaviour
         rt.localScale = Vector3.one * 0.1f;
         
         // Render card
-        var bg = new GameObject("Bg", typeof(RectTransform), typeof(Image));
-        bg.transform.SetParent(container.transform, false);
-        var bgImg = bg.GetComponent<Image>();
-        var bgSpr = LotusHealthUI.LoadSpriteFromResources("UI/auth_card_bg");
-        if (bgSpr != null) { bgImg.sprite = bgSpr; bgImg.type = Image.Type.Sliced; }
-        bgImg.color = new Color(0.9f, 0.85f, 0.75f, 1f);
-        var bgRt = bg.GetComponent<RectTransform>();
-        bgRt.anchorMin = Vector2.zero; bgRt.anchorMax = Vector2.one;
-        bgRt.offsetMin = bgRt.offsetMax = Vector2.zero;
-        
-        var txt = AddText(container.transform, "Name", card.cardName, 12, ThemeUI.BgDeepNavy, FontStyle.Bold, TextAnchor.MiddleCenter);
-        SetRect(txt.rectTransform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+        var cardUI = CardUI.Create(container.transform, card, new Vector2(94, 130));
+        var cardRt = cardUI.GetComponent<RectTransform>();
+        cardRt.anchorMin = Vector2.zero; cardRt.anchorMax = Vector2.one;
+        cardRt.offsetMin = cardRt.offsetMax = Vector2.zero;
         
         AudioManager.Instance.PlayCardSelect();
         
