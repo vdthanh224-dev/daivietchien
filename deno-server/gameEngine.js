@@ -2225,80 +2225,72 @@ export function handleAIReaction(state, aiSeat) {
  * Chạy mỗi giây (1000ms) trên Server In-Memory
  */
 export function tickGameState(state) {
-  if (!state || state.status === "FINISHED") return { changed: false, important: false };
+  if (!state || state.status === ""FINISHED"") return { changed: false, important: false };
   let changed = false;
   let important = false;
   const startingVersion = state.version || 0;
 
-  // 1. Nếu đang trong pha phản ứng (waitingTargetSeat > 0)
-  if (state.waitingTargetSeat > 0) {
-    if (state.waitingTimer > 0) {
-      state.waitingTimer--;
+  if (!state.timerStartAt) {
+      state.timerStartAt = Date.now();
       changed = true;
-    }
+  }
+  const elapsed = Math.floor((Date.now() - state.timerStartAt) / 1000);
 
+  if (state.waitingTargetSeat > 0) {
     const waitingSeat = state.waitingTargetSeat;
     const waitingPlayer = state.players.find(p => p.seat === waitingSeat);
 
-    // Khi hết 40s -> Tự động xử lý hành động mặc định
-    if (state.waitingTimer <= 0) {
-      if (state.phase === "AWAIT_SLASH_DEFENSE") {
+    if (elapsed >= 40) {
+      if (state.phase === ""AWAIT_SLASH_DEFENSE"") {
         handleRespondAction(state, waitingSeat, false, null);
-      } else if (state.phase === "AWAIT_NULLIFY") {
+      } else if (state.phase === ""AWAIT_NULLIFY"") {
         handleRespondAction(state, waitingSeat, false, null);
-      } else if (state.phase === "AWAIT_TARGET_CARD") {
+      } else if (state.phase === ""AWAIT_TARGET_CARD"") {
         handleRespondAction(state, waitingSeat, true, null, null);
-      } else if (state.phase === "AWAIT_AOE") {
+      } else if (state.phase === ""AWAIT_AOE"") {
         handleRespondAction(state, waitingSeat, false, null);
-      } else if (state.phase === "AWAIT_DUEL") {
+      } else if (state.phase === ""AWAIT_DUEL"") {
         handleRespondAction(state, waitingSeat, false, null);
-      } else if (state.phase === "AWAIT_HARVEST") {
+      } else if (state.phase === ""AWAIT_HARVEST"") {
         handleRespondAction(state, waitingSeat, true, null);
-      } else if (state.phase === "AWAIT_NEAR_DEATH") {
+      } else if (state.phase === ""AWAIT_NEAR_DEATH"") {
         handleRespondAction(state, waitingSeat, false, null);
-      } else if (state.phase === "AWAIT_NAM_SON_FOLLOW_UP") {
+      } else if (state.phase === ""AWAIT_NAM_SON_FOLLOW_UP"") {
         handleRespondAction(state, waitingSeat, false, null);
-      } else if (state.phase === "AWAIT_SONG_CUNG_FOLLOW_UP") {
+      } else if (state.phase === ""AWAIT_SONG_CUNG_FOLLOW_UP"") {
         handleRespondAction(state, waitingSeat, false, null);
-      } else if (state.phase === "DISCARD") {
+      } else if (state.phase === ""DISCARD"") {
         handleDiscardCards(state, waitingSeat, []);
       }
       important = true;
+      state.timerStartAt = Date.now();
       return { changed: true, important };
     }
 
-    // AI reacts only in phases that have a response handler. DISCARD is
-    // resolved by the timeout branch above.
     const canAIReact = waitingPlayer && waitingPlayer.isAI
-      && (waitingPlayer.hp > 0 || state.phase === "AWAIT_NEAR_DEATH")
-      && state.phase !== "DISCARD";
-    if (canAIReact && state.waitingTimer > 0 && state.waitingTimer <= 38) {
+      && (waitingPlayer.hp > 0 || state.phase === ""AWAIT_NEAR_DEATH"");
+    if (canAIReact && elapsed >= 2 && elapsed < 40) {
       handleAIReaction(state, waitingSeat);
       important = true;
+      state.timerStartAt = Date.now();
       return { changed: true, important };
     }
   }
-  // 2. Nếu đang trong pha ra bài (PLAY)
-  else if (state.phase === "PLAY" && state.turnSeat > 0) {
-    if (state.turnTimer > 0) {
-      state.turnTimer--;
-      changed = true;
-    }
-
+  else if (state.phase === ""PLAY"" && state.turnSeat > 0) {
     const turnPlayer = state.players.find(p => p.seat === state.turnSeat);
 
-    // Khi hết 40s lượt chơi -> Tự động kết thúc lượt
-    if (state.turnTimer <= 0) {
+    if (elapsed >= 40) {
       if (!turnPlayer || turnPlayer.hp <= 0) advanceTurn(state);
       else handleEndTurn(state, state.turnSeat);
       important = true;
+      state.timerStartAt = Date.now();
       return { changed: true, important };
     }
 
-    // Nếu là AI trong lượt -> AI đánh bài sau 2 giây
-    if (turnPlayer && turnPlayer.isAI && turnPlayer.hp > 0 && state.turnTimer <= 38) {
+    if (turnPlayer && turnPlayer.isAI && turnPlayer.hp > 0 && elapsed >= 2 && elapsed < 40) {
       handleAIStep(state, state.turnSeat);
       important = true;
+      state.timerStartAt = Date.now();
       return { changed: true, important };
     }
   }
@@ -2352,16 +2344,19 @@ function sanitizeDeltaForClient(delta, requestingSeat) {
 
 export function sanitizeGameStateForClient(state, requestingSeat = 0) {
   const viewerSeat = Number(requestingSeat);
+  const elapsed = state.timerStartAt ? Math.floor((Date.now() - state.timerStartAt) / 1000) : 0;
+  const remaining = Math.max(0, 40 - elapsed);
+  
   return {
     version: state.version,
     roomId: state.roomId,
     status: state.status,
     turnSeat: state.turnSeat,
     phase: state.phase,
-    turnTimer: state.turnTimer,
+    turnTimer: (state.phase === ""PLAY"") ? remaining : 0,
     waitingTargetSeat: state.waitingTargetSeat,
     waitingReactionType: state.waitingReactionType,
-    waitingTimer: state.waitingTimer,
+    waitingTimer: (state.waitingTargetSeat > 0) ? remaining : 0,
     nearDeathVictimSeat: state.nearDeathVictimSeat,
     nearDeathAskerQueue: state.nearDeathAskerQueue || [],
     aoeVictimsQueue: state.aoeVictimsQueue || [],
@@ -2436,4 +2431,8 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
     delta: sanitizeDeltaForClient(state.lastDelta, requestingSeat)
   };
 }
+
+
+
+
 

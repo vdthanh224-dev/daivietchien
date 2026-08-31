@@ -881,7 +881,12 @@ public class Battle2v2UI : MonoBehaviour
                 if (g != null && g != playerCard)
                 {
                     var hand = GetHandOfGeneral(g);
-                    while (hand.Count < p.handCount) hand.Add(new CardModel { id = "HIDDEN", cardName = "Ẩn" });
+                    int diff = p.handCount - hand.Count;
+                    if (diff > 0)
+                    {
+                        StartCoroutine(AnimateMultipleDealtCards(g, diff));
+                        for (int i = 0; i < diff; i++) hand.Add(new CardModel { id = "HIDDEN", cardName = "Ẩn" });
+                    }
                     while (hand.Count > p.handCount && hand.Count > 0) hand.RemoveAt(0);
                 }
             }
@@ -1007,6 +1012,7 @@ public class Battle2v2UI : MonoBehaviour
                             StartCoroutine(ServerJudgementAnimation(judgeCard, targetGen, title, success));
                         }
                     }
+                }
             }
         }
 
@@ -1730,6 +1736,7 @@ public class Battle2v2UI : MonoBehaviour
         };
 
         playerHandUI.IsMultiSelectMode = true;
+                playerHandUI.MaxSelectableCards = discardExcessRequired;
         playerHandUI.MaxSelectableCards = 2;
         playerHandUI.ClearSelection();
         playerHandUI.HighlightOnlyMatching(_ => true);
@@ -7341,7 +7348,8 @@ public class Battle2v2UI : MonoBehaviour
             selectedDiscardCards.Clear(); 
             if (playerHandUI != null) 
             { 
-                playerHandUI.IsMultiSelectMode = true; 
+                playerHandUI.IsMultiSelectMode = true;
+                playerHandUI.MaxSelectableCards = discardExcessRequired; 
                 playerHandUI.MaxSelectableCards = discardExcessRequired; 
                 playerHandUI.ClearSelection(); 
                 playerHandUI.OnSelectionChanged += OnDiscardSelectionChanged;
@@ -8483,6 +8491,9 @@ public class Battle2v2UI : MonoBehaviour
     }
     #endregion
 }
+
+
+
 
 
 

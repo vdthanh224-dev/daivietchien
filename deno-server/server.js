@@ -289,12 +289,15 @@ async function mutateSharedState(roomId, seat, payload) {
     const previousVersion = state.version;
       let tickRes = null;
       let result = null;
-      if (payload.action === "SERVER_TICK") {
-        tickRes = tickGameState(state);
-        result = { success: true, changed: tickRes.changed };
-      } else {
-        result = applyActionToState(state, seat, payload);
-      }
+              if (payload.action === ""SERVER_TICK"") {
+          tickRes = tickGameState(state);
+          result = { success: true, changed: tickRes.changed };
+        } else {
+          result = applyActionToState(state, seat, payload);
+          if (result && !result.error && state) {
+            state.timerStartAt = Date.now();
+          }
+        }
       
       if (result?.error) return { error: result.error, state };
       if (result?.changed === false) return { state, result, committed: false };
@@ -747,3 +750,4 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8082 }, async (req) => {
     headers: { "Content-Type": "application/json; charset=utf-8", "Access-Control-Allow-Origin": "*" },
   });
 });
+
