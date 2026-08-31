@@ -1277,7 +1277,8 @@ public class Battle2v2UI : MonoBehaviour
                                 var oldWait = GameObject.Find("CounterWaitingModal");
                                 if (oldWait != null) Destroy(oldWait);
                                 Debug.Log($"[NullifyPrompt] Tạo CounterWaitingModal cho ghế {playerCard.SeatNumber} - đang chờ ghế {state.waitingTargetSeat}");
-                                ShowWaitingCounterScrollModal(queriedGen, qText);
+                                var waitingModalGo = ShowWaitingCounterScrollModal(queriedGen, qText);
+                                StartCoroutine(UpdateCounterWaitingModalTimer(waitingModalGo, queriedGen));
                             }
                         }
                     }
@@ -5704,7 +5705,7 @@ public class Battle2v2UI : MonoBehaviour
                         elapsed += Time.unscaledDeltaTime;
                         aiTimer -= Time.unscaledDeltaTime;
                         currentGen.UpdateHeadTimer(Mathf.Max(0, Mathf.CeilToInt(aiTimer)));
-                        if (timerTxt != null) timerTxt.text = $"⏳ Còn {Mathf.CeilToInt(aiTimer)}s... (Đang chờ phản hồi)";
+                        if (timerTxt != null) timerTxt.text = $"⏳ Còn {Mathf.Max(0, Mathf.CeilToInt(aiTimer))}s... (Đang chờ phản hồi)";
                         yield return null;
                     }
 
@@ -5765,7 +5766,7 @@ public class Battle2v2UI : MonoBehaviour
                             float elapsed = Time.unscaledTime - startTime;
                             float remaining = Mathf.Max(0f, 40.0f - elapsed);
                             currentGen.UpdateHeadTimer(Mathf.CeilToInt(remaining));
-                            if (timerTxt != null) timerTxt.text = $"⏳ Còn {Mathf.CeilToInt(remaining)}s... (Đang chờ phản hồi)";
+                            if (timerTxt != null) timerTxt.text = $"⏳ Còn {Mathf.Max(0, Mathf.CeilToInt(remaining))}s... (Đang chờ phản hồi)";
 
                             if (nullifyActionsPerSeat.TryGetValue(currentGen.SeatNumber, out var liveAct) && liveAct.timestamp >= promptChainStartTime)
                             {
@@ -6089,10 +6090,10 @@ public class Battle2v2UI : MonoBehaviour
         fImg.raycastTarget = false;
         Fill(fGo.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
 
-        var titleTxt = AddText(panelGo.transform, "Title", promptTitle, 14, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var titleTxt = AddText(panelGo.transform, "Title", promptTitle, 18, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter);
         SetRect(titleTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(600f, 44f), new Vector2(0, -8f));
 
-        var timerTxt = AddText(panelGo.transform, "Timer", "⏳ Còn 40s để quyết định...", 13, ThemeUI.CyanPrimary, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var timerTxt = AddText(panelGo.transform, "Timer", "⏳ Còn 40s để quyết định...", 16, ThemeUI.CyanPrimary, FontStyle.Bold, TextAnchor.MiddleCenter);
         SetRect(timerTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(300f, 24f), new Vector2(0, -52f));
 
         var btnSpr = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
@@ -6107,7 +6108,7 @@ public class Battle2v2UI : MonoBehaviour
         var uRt = useBtnGo.GetComponent<RectTransform>();
         SetRect(uRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(270f, 42f), new Vector2(-140f, 16f));
 
-        var uTxt = AddText(useBtnGo.transform, "Txt", hasCounterCard ? "🛡️ DÙNG DIỆU KẾ PHÁ MƯU" : "🛡️ KHÔNG CÓ DIỆU KẾ", 13, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var uTxt = AddText(useBtnGo.transform, "Txt", hasCounterCard ? "🛡️ DÙNG DIỆU KẾ PHÁ MƯU" : "🛡️ KHÔNG CÓ DIỆU KẾ", 18, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(uTxt.rectTransform);
 
         var passBtnGo = new GameObject("Btn_Pass", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -6118,7 +6119,7 @@ public class Battle2v2UI : MonoBehaviour
         var paRt = passBtnGo.GetComponent<RectTransform>();
         SetRect(paRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(230f, 42f), new Vector2(150f, 16f));
 
-        var paTxt = AddText(passBtnGo.transform, "Txt", "❌ BỎ QUA / KHÔNG DÙNG", 13, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var paTxt = AddText(passBtnGo.transform, "Txt", "❌ BỎ QUA / KHÔNG DÙNG", 18, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(paTxt.rectTransform);
 
         if (hasCounterCard)
@@ -6157,7 +6158,7 @@ public class Battle2v2UI : MonoBehaviour
             if (serverControlled) promptTimer = turnTimer;
             else promptTimer -= Time.unscaledDeltaTime;
             playerCard.UpdateHeadTimer(Mathf.Max(0, Mathf.CeilToInt(promptTimer)));
-            if (timerTxt != null) timerTxt.text = $"⏳ Còn {Mathf.CeilToInt(promptTimer)}s để quyết định...";
+            if (timerTxt != null) timerTxt.text = $"⏳ Còn {Mathf.Max(0, Mathf.CeilToInt(promptTimer))}s để quyết định...";
             
             if (!serverControlled && promptTimer <= 0f)
             {
@@ -6171,6 +6172,19 @@ public class Battle2v2UI : MonoBehaviour
         if (!serverControlled || decided)
         {
             onResolved?.Invoke(used, counterCard);
+        }
+    }
+
+        private IEnumerator UpdateCounterWaitingModalTimer(GameObject modalGo, GeneralCardUI targetGen)
+    {
+        var timerTxt = modalGo != null ? modalGo.transform.Find("Timer")?.GetComponent<UnityEngine.UI.Text>() : null;
+        float promptTimer = 40.0f;
+        while (modalGo != null && !battleFinished)
+        {
+            promptTimer = turnTimer;
+            targetGen.UpdateHeadTimer(Mathf.Max(0, Mathf.CeilToInt(promptTimer)));
+            if (timerTxt != null) timerTxt.text = $"⏳ Đang chờ phản hồi ({Mathf.Max(0, Mathf.CeilToInt(promptTimer))}s)...";
+            yield return null;
         }
     }
 
@@ -6202,13 +6216,13 @@ public class Battle2v2UI : MonoBehaviour
         fImg.raycastTarget = false;
         Fill(fGo.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
 
-        var titleTxt = AddText(panelGo.transform, "Title", $"🛡️ ĐANG HỎI: <color=#FFD166><b>{targetGen.GeneralName}</b></color> (Ghế #{targetGen.SeatNumber})", 14, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var titleTxt = AddText(panelGo.transform, "Title", $"🛡️ ĐANG HỎI: <color=#FFD166><b>{targetGen.GeneralName}</b></color> (Ghế #{targetGen.SeatNumber})", 18, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter);
         SetRect(titleTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(600f, 38f), new Vector2(0, -10f));
 
-        var qTxt = AddText(panelGo.transform, "Question", $"<i>\"{questionText}\"</i>", 12, ThemeUI.TextMuted, FontStyle.Normal, TextAnchor.MiddleCenter);
+        var qTxt = AddText(panelGo.transform, "Question", $"<i>\"{questionText}\"</i>", 16, ThemeUI.TextMuted, FontStyle.Normal, TextAnchor.MiddleCenter);
         SetRect(qTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(600f, 32f), new Vector2(0, -48f));
 
-        var timerTxt = AddText(panelGo.transform, "Timer", "⏳ Đang chờ phản hồi (40s)...", 13, ThemeUI.CyanPrimary, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var timerTxt = AddText(panelGo.transform, "Timer", "⏳ Đang chờ phản hồi (40s)...", 16, ThemeUI.CyanPrimary, FontStyle.Bold, TextAnchor.MiddleCenter);
         SetRect(timerTxt.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(400f, 32f), new Vector2(0, 16f));
 
         return panelGo;
@@ -8491,6 +8505,16 @@ public class Battle2v2UI : MonoBehaviour
     }
     #endregion
 }
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -1,28 +1,12 @@
-@@ -1016,21 +1016,24 @@
-       state.waitingTargetSeat = targetSeat;
-       state.waitingReactionType = "DODGE";
-       state.waitingTimer = 40;
-       state.activeCard = {
-         cardId: card.id,
-         cardName: card.name,
-         suit: card.suit,
-         casterSeat,
-         targetSeat,
-         damage,
-         isWineBuff: isWine
-       };
-+
-+      const cannon = getEquippedWeapon(caster, "Súng Thần Công");
-+      const requiredDodgeText = cannon ?  (phải ĐỠ bằng lá khác chất <b></b>) : "";
-+
-       recordAction(state, {
-         type: "PLAY_SLASH",
-         casterSeat,
-         targetSeat,
-         cardId: card.id,
-         cardName: card.name,
-         damage,
-         isWineBuff: isWine,
--        description: 🗡️ <b></b> tung chiêu  nhắm vào <b></b>! (Mục tiêu có 40s để Đỡ)
-+        description: 🗡️ <b></b> tung chiêu  nhắm vào <b></b>! (Mục tiêu có 40s để Đỡ)
-       });
+@@ -1280,12 +1280,31 @@
+                                 var oldWait = GameObject.Find("CounterWaitingModal");
+                                 if (oldWait != null) Destroy(oldWait);
+                                 Debug.Log($"[NullifyPrompt] Tạo CounterWaitingModal cho ghế {playerCard.SeatNumber} - đang chờ ghế {state.waitingTargetSeat}");
+-                                ShowWaitingCounterScrollModal(queriedGen, qText);
++                                var waitingModalGo = ShowWaitingCounterScrollModal(queriedGen, qText);
++                                StartCoroutine(UpdateCounterWaitingModalTimer(waitingModalGo, queriedGen, turnTimer));
+                             }
+                         }
+                     }
+                 }
+                 break;
