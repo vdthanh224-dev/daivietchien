@@ -1,92 +1,28 @@
-@@ -2288,44 +2288,38 @@
-     if (!state || state.status === "FINISHED") return { changed: false, important: false };
-     let changed = false;
-     let important = false;
-     const startingVersion = state.version || 0;
+@@ -1016,21 +1016,24 @@
+       state.waitingTargetSeat = targetSeat;
+       state.waitingReactionType = "DODGE";
+       state.waitingTimer = 40;
+       state.activeCard = {
+         cardId: card.id,
+         cardName: card.name,
+         suit: card.suit,
+         casterSeat,
+         targetSeat,
+         damage,
+         isWineBuff: isWine
+       };
 +
-+    // Khởi tạo timerStartAt nếu chưa có
-+    if (!state.timerStartAt) {
-+        state.timerStartAt = Date.now();
-+        changed = true;
-+    }
-+    const elapsed = Math.floor((Date.now() - state.timerStartAt) / 1000);
-   
-     // 1. Nếu đang trong pha phản ứng (waitingTargetSeat > 0)
-     if (state.waitingTargetSeat > 0) {
--      if (state.waitingTimer > 0) {
--        state.waitingTimer--;
--        changed = true;
--      }
--  
-       const waitingSeat = state.waitingTargetSeat;
-       const waitingPlayer = state.players.find(p => p.seat === waitingSeat);
-   
-       // Khi hết 40s -> Tự động xử lý hành động mặc định
--      if (state.waitingTimer <= 0) {
-+      if (elapsed >= 40) {
-         if (state.phase === "AWAIT_SLASH_DEFENSE") {
-           handleRespondAction(state, waitingSeat, false, null);
-         } else if (state.phase === "AWAIT_NULLIFY") {
-           handleRespondAction(state, waitingSeat, false, null);
-         } else if (state.phase === "AWAIT_TARGET_CARD") {
-           handleRespondAction(state, waitingSeat, true, null, null);
-         } else if (state.phase === "AWAIT_AOE") {
-           handleRespondAction(state, waitingSeat, false, null);
-         } else if (state.phase === "AWAIT_DUEL") {
-           handleRespondAction(state, waitingSeat, false, null);
-         } else if (state.phase === "AWAIT_HARVEST") {
-           handleRespondAction(state, waitingSeat, true, null);
-         } else if (state.phase === "AWAIT_NEAR_DEATH") {
-           handleRespondAction(state, waitingSeat, false, null);
-         } else if (state.phase === "AWAIT_NAM_SON_FOLLOW_UP") {
-           handleRespondAction(state, waitingSeat, false, null);
-         } else if (state.phase === "AWAIT_SONG_CUNG_FOLLOW_UP") {
-           handleRespondAction(state, waitingSeat, false, null);
-         } else if (state.phase === "DISCARD") {
-           handleDiscardCards(state, waitingSeat, []);
-         }
-         important = true;
-+        state.timerStartAt = Date.now(); // Reset timer cho hành động tiếp theo
-         return { changed: true, important };
-       }
-   
-       // AI reacts only in phases that have a response handler. DISCARD is
-       // resolved by the timeout branch above.
-       const canAIReact = waitingPlayer && waitingPlayer.isAI
-         && (waitingPlayer.hp > 0 || state.phase === "AWAIT_NEAR_DEATH");
--      if (canAIReact && state.waitingTimer > 0 && state.waitingTimer <= 38) {
-+      if (canAIReact && elapsed >= 2 && elapsed < 40) {
-         handleAIReaction(state, waitingSeat);
-         important = true;
-+        state.timerStartAt = Date.now();
-         return { changed: true, important };
-       }
-     }
-     // 2. Nếu đang trong pha ra bài (PLAY)
-     else if (state.phase === "PLAY" && state.turnSeat > 0) {
--      if (state.turnTimer > 0) {
--        state.turnTimer--;
--        changed = true;
--      }
--  
-       const turnPlayer = state.players.find(p => p.seat === state.turnSeat);
-   
-       // Khi hết 40s lượt chơi -> Tự động kết thúc lượt
--      if (state.turnTimer <= 0) {
-+      if (elapsed >= 40) {
-         if (!turnPlayer || turnPlayer.hp <= 0) advanceTurn(state);
-         else handleEndTurn(state, state.turnSeat);
-         important = true;
-+        state.timerStartAt = Date.now();
-         return { changed: true, important };
-       }
-   
-       // Nếu là AI trong lượt -> AI đánh bài sau 2 giây
--      if (turnPlayer && turnPlayer.isAI && turnPlayer.hp > 0 && state.turnTimer <= 38) {
-+      if (turnPlayer && turnPlayer.isAI && turnPlayer.hp > 0 && elapsed >= 2 && elapsed < 40) {
-         handleAIStep(state, state.turnSeat);
-         important = true;
-+        state.timerStartAt = Date.now();
-         return { changed: true, important };
-       }
-     }
++      const cannon = getEquippedWeapon(caster, "Súng Thần Công");
++      const requiredDodgeText = cannon ?  (phải ĐỠ bằng lá khác chất <b></b>) : "";
++
+       recordAction(state, {
+         type: "PLAY_SLASH",
+         casterSeat,
+         targetSeat,
+         cardId: card.id,
+         cardName: card.name,
+         damage,
+         isWineBuff: isWine,
+-        description: 🗡️ <b></b> tung chiêu  nhắm vào <b></b>! (Mục tiêu có 40s để Đỡ)
++        description: 🗡️ <b></b> tung chiêu  nhắm vào <b></b>! (Mục tiêu có 40s để Đỡ)
+       });

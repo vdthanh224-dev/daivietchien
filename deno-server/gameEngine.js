@@ -13,6 +13,28 @@ function getDeckCache() {
   return _deckCache;
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Tìm lá bài trong bộ bài chuẩn theo ID để lấy subType (dùng khi ID client/server không khớp)
  */
@@ -39,6 +61,28 @@ function isTeamOneSeat(seat) {
 
 function areTeammates(leftSeat, rightSeat) {
   return isTeamOneSeat(leftSeat) === isTeamOneSeat(rightSeat);
+}
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
 }
 
 /**
@@ -170,6 +214,50 @@ export function hydrateGameState(rawState, roomId = "") {
   return state;
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Xáo bài Fisher-Yates chuẩn
  */
@@ -180,6 +268,28 @@ export function shuffle(array) {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
+}
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
 }
 
 /**
@@ -286,6 +396,28 @@ export function initGame(roomId, playersInput) {
   return initialState;
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Kiểm tra Optimistic Locking: nếu client gửi expectedVersion thì phải khớp với state.version
  */
@@ -359,6 +491,28 @@ export function ensureMutationVersion(state, previousVersion) {
   return state.version;
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Ghi nhận hành động vào lịch sử trận đấu, tăng version state và tạo Delta Update
  */
@@ -374,6 +528,28 @@ export function recordAction(state, action) {
   refreshLastDelta(state);
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Tìm người chơi còn sống kế tiếp
  */
@@ -384,6 +560,28 @@ export function getNextAliveSeat(state, currentSeat) {
     if (p && p.hp > 0) return next;
   }
   return currentSeat;
+}
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
 }
 
 /**
@@ -508,6 +706,28 @@ function validateTarget(state, casterSeat, targetSeat, card) {
   return null;
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Xử lý khi một người chơi đánh ra 1 lá bài từ tay
  */
@@ -581,7 +801,7 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
         targetSeat,
         cardId: card.id,
         cardName: card.name,
-        description: `🛡️ [Giáp Đồng Sơn Vi] vô hiệu hóa [${card.name}] của ${caster.generalName}!`
+        description: `🛡️ [Giáp Đồng Sơn Vi] vô hiệu hóa `${formatCardText(card)}` của ${caster.generalName}!`
       });
       return { success: true, state };
     }
@@ -591,24 +811,29 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
     state.waitingReactionType = "DODGE";
     state.waitingTimer = 40;
     state.activeCard = {
-      cardId: card.id,
-      cardName: card.name,
-      suit: card.suit,
-      casterSeat,
-      targetSeat,
-      damage,
-      isWineBuff: isWine
-    };
-    recordAction(state, {
-      type: "PLAY_SLASH",
-      casterSeat,
-      targetSeat,
-      cardId: card.id,
-      cardName: card.name,
-      damage,
-      isWineBuff: isWine,
-      description: `🗡️ <b>${caster.generalName}</b> tung chiêu [${card.name}]${isWine ? ' <color=#FFD700><b>(kèm hiệu ứng Hủ Rượu: +1 Sát thương -> 2 Tổng!)</b></color>' : ''} nhắm vào <b>${target ? target.generalName : 'đối thủ'}</b>! (Mục tiêu có 40s để Đỡ)`
-    });
+        cardId: card.id,
+        cardName: card.name,
+        suit: card.suit,
+        casterSeat,
+        targetSeat,
+        damage,
+        isWineBuff: isWine
+      };
+
+      const cannon = getEquippedWeapon(caster, "Súng Thần Công");
+      const requiredDodgeText = cannon ? ` (yêu cầu lá Đỡ khác chất <b>${card.suit === "Heart" ? "<color=#FF5555>♥</color>" : card.suit === "Diamond" ? "<color=#FF5555>♦</color>" : card.suit === "Club" ? "♣" : "♠"}</b>)` : ``;
+
+      recordAction(state, {
+        type: "PLAY_SLASH",
+        casterSeat,
+        targetSeat,
+        cardId: card.id,
+        cardName: card.name,
+        damage,
+        isWineBuff: isWine,
+        description: `🗡️ <b>${caster.generalName}</b> tung chiêu ${formatCardText(card)}${isWine ? ' <color=#FFD700><b>(kèm hiệu ứng Hủ Rượu: +1 Sát thương -> 2 Tổng!)</b></color>' : ''} nhắm vào <b>${target ? target.generalName : 'đối thủ'}</b>! (Mục tiêu có 40s để Đỡ${requiredDodgeText})`
+      });
+
     if (tryKhienMayDefense(state, targetSeat, "đòn Trảm")) {
       beginSlashAfterDodge(state, caster, targetSeat, "Khiên Mây Bện");
       return { success: true, state };
@@ -668,7 +893,7 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
       casterSeat,
       cardId: card.id,
       cardName: card.name,
-      description: `🛡️ <b>${caster.generalName}</b> trang bị [${card.name}]: ${card.desc}`
+      description: `🛡️ <b>${caster.generalName}</b> trang bị `${formatCardText(card)}`: ${card.desc}`
     });
     return { success: true, state };
   }
@@ -678,6 +903,28 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
     return executeCardEffect(state, card, casterSeat, targetSeat);
   }
   return startNullifyChain(state, card, casterSeat, targetSeat);
+}
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
 }
 
 /**
@@ -728,7 +975,7 @@ export function startNullifyChain(state, card, casterSeat, targetSeat = 0, conti
     targetSeat,
     cardId: card.id,
     cardName: card.name,
-    description: `📜 <b>${caster ? caster.generalName : 'Ghế ' + casterSeat}</b> thi triển [${card.name}]${targetDesc}! Đang hỏi <b>${firstQueriedGen ? firstQueriedGen.generalName : 'Ghế ' + querySeats[0]}</b> có dùng Diệu Kế Phá Mưu không (40s)...`
+    description: `📜 <b>${caster ? caster.generalName : 'Ghế ' + casterSeat}</b> thi triển `${formatCardText(card)}`${targetDesc}! Đang hỏi <b>${firstQueriedGen ? firstQueriedGen.generalName : 'Ghế ' + querySeats[0]}</b> có dùng Diệu Kế Phá Mưu không (40s)...`
   });
 
   return { success: true, state };
@@ -890,7 +1137,7 @@ function startTargetCardSelection(state, card, casterSeat, targetSeat, selection
       targetSeat,
       cardId: card.id,
       cardName: card.name,
-      description: `📜 <b>${caster ? caster.generalName : 'Người chơi'}</b> dùng [${card.name}] lên <b>${target ? target.generalName : 'mục tiêu'}</b>, nhưng mục tiêu không có bài để chọn.`
+      description: `📜 <b>${caster ? caster.generalName : 'Người chơi'}</b> dùng `${formatCardText(card)}` lên <b>${target ? target.generalName : 'mục tiêu'}</b>, nhưng mục tiêu không có bài để chọn.`
     });
     return { success: true, state };
   }
@@ -995,6 +1242,28 @@ function completeTargetCardSelection(state, chooserSeat, targetCardId) {
   return { success: true, state };
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Thực thi hiệu ứng cẩm nang sau khi chuỗi Diệu Kế kết thúc và không bị hóa giải
  */
@@ -1093,7 +1362,7 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0) {
         targetSeat: firstVictim,
         cardId: card.id,
         cardName: card.name,
-        description: `🏹 <b>${caster ? caster.generalName : 'Người chơi'}</b> thi triển [${card.name}]! Đang kiểm tra <b>Ghế ${firstVictim}</b> (cần [${reqName}] - 40s)...`
+        description: `🏹 <b>${caster ? caster.generalName : 'Người chơi'}</b> thi triển `${formatCardText(card)}`! Đang kiểm tra <b>Ghế ${firstVictim}</b> (cần [${reqName}] - 40s)...`
       });
     } else {
       resetWaitingState(state);
@@ -1157,9 +1426,53 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0) {
   });
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Xử lý phản ứng từ người bị nhắm tới (Đỡ, Trảm, Bỏ qua / Hết giờ, Diệu Kế Phá Mưu, Chọn bài kho lương)
  */
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
 
 /**
 * KhÃ´i phá»¥c láº¡i luá»“ng game sau khi pha Háº¥p Há»“i (Near Death) káº¿t thÃºc (cá»©u sá»‘ng hoáº·c cháº¿t)
@@ -1281,7 +1594,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
           casterSeat: respondentSeat,
           cardId: nullifyCard.id,
           cardName: nullifyCard.name,
-          description: `🛡️ <b>${respondent.generalName}</b> đã tung <color=#55FF55><b>[Diệu Kế Phá Mưu]</b></color>! Trạng thái mưu kế [${rootCard.name}]: ${chain.isCanceled ? '<color=#FF5555>BỊ VÔ HIỆU HÓA</color>' : '<color=#55FF55>ĐƯỢC BẢO VỆ THÀNH CÔNG</color>'}. Đang hỏi Ghế ${newQuerySeats[0]} (40s)...`
+          description: `🛡️ <b>${respondent.generalName}</b> đã tung <color=#55FF55><b>[Diệu Kế Phá Mưu]</b></color>! Trạng thái mưu kế `${formatCardText(rootCard)}`: ${chain.isCanceled ? '<color=#FF5555>BỊ VÔ HIỆU HÓA</color>' : '<color=#55FF55>ĐƯỢC BẢO VỆ THÀNH CÔNG</color>'}. Đang hỏi Ghế ${newQuerySeats[0]} (40s)...`
         });
         return { success: true, state };
       }
@@ -1312,7 +1625,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       resetWaitingState(state);
       recordAction(state, {
         type: "NULLIFY_SUCCEEDED",
-        description: `🛡️ Mưu kế [${rootCard.name}] đã chính thức bị vô hiệu hóa hoàn toàn bởi Diệu Kế Phá Mưu!`
+        description: `🛡️ Mưu kế `${formatCardText(rootCard)}` đã chính thức bị vô hiệu hóa hoàn toàn bởi Diệu Kế Phá Mưu!`
       });
       if (chain.continuation?.type === "TURN_JUDGEMENT") {
         return continueTurnStart(state);
@@ -1595,7 +1908,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
           type: "DUEL_RESPOND",
           casterSeat: respondentSeat,
           cardId: s.id,
-          description: `⚔️ ${respondent.generalName} đáp trả 1 lá [${s.name}] trong Thách Đấu!`
+          description: `⚔️ ${respondent.generalName} đáp trả 1 lá `${formatCardText(s)}` trong Thách Đấu!`
         });
         return { success: true, state };
       }
@@ -1632,7 +1945,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         type: "RESCUE_SUCCESS",
         casterSeat: respondentSeat,
         targetSeat: victim.seat,
-        description: `💮 <b>${respondent.generalName}</b> đã dùng [${rescueCard.name}] cứu sống <b>${victim.generalName}</b> (${victim.hp}/${victim.maxHp})!`
+        description: `💮 <b>${respondent.generalName}</b> đã dùng `${formatCardText(rescueCard)}` cứu sống <b>${victim.generalName}</b> (${victim.hp}/${victim.maxHp})!`
       });
       const resume = resolveNearDeathResume(state);
       refreshLastDelta(state);
@@ -1665,6 +1978,28 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
   }
 
   return { error: "Giai đoạn không hỗ trợ phản hồi này" };
+}
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
 }
 
 /**
@@ -1750,6 +2085,28 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
   return { finalDamage, enteredNearDeath: false };
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Kết thúc lượt đánh (Chuyển sang bỏ bài nếu thừa, hoặc rút bài cho người kế tiếp)
  */
@@ -1783,6 +2140,28 @@ export function handleEndTurn(state, casterSeat) {
 
   // Chuyển sang lượt người tiếp theo
   return advanceTurn(state);
+}
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
 }
 
 /**
@@ -1943,6 +2322,28 @@ function continueTurnStart(state) {
   return { success: true, state };
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Chuyển sang lượt kế tiếp; mọi phán xét và rút bài đều do server tiếp tục điều phối.
  */
@@ -1982,6 +2383,28 @@ function advanceTurn(state) {
   return continueTurnStart(state);
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Kiểm tra xem trận đấu đã ngã ngũ chưa (1 trong 2 đội bị hạ gục hết)
  * Lưu ý: Người đang trong Hấp Hối (hp=0 nhưng chưa tử trận) không được tính là đã chết
@@ -2002,6 +2425,28 @@ function checkGameOver(state) {
       description: `🏆 <b>TRẬN ĐẤU KẾT THÚC!</b> ${winningTeam} ĐÃ GIÀNH CHIẾN THẮNG!`
     });
   }
+}
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
 }
 
 /**
@@ -2120,6 +2565,28 @@ export function handleAIStep(state, aiSeat) {
   return handleEndTurn(state, aiSeat);
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * AI tự động phản ứng khi bị nhắm tới (Đỡ, Trảm, Bỏ qua)
  */
@@ -2220,6 +2687,28 @@ export function handleAIReaction(state, aiSeat) {
   return { error: "Không có phản ứng nào đang chờ AI này" };
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Nhịp đếm thời gian và tự động hành động trên Server (Authoritative Server Loop)
  * Chạy mỗi giây (1000ms) trên Server In-Memory
@@ -2302,6 +2791,28 @@ export function tickGameState(state) {
   return { changed, important };
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "`${formatCardText(card)}`";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Format GameState an toàn để gửi về client (ẩn bài của đối thủ nếu cần hoặc gửi công khai 4 tay)
  */
@@ -2353,7 +2864,7 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
     status: state.status,
     turnSeat: state.turnSeat,
     phase: state.phase,
-    turnTimer: (state.phase === ""PLAY"") ? remaining : 0,
+    turnTimer: (state.phase === "PLAY") ? remaining : 0,
     waitingTargetSeat: state.waitingTargetSeat,
     waitingReactionType: state.waitingReactionType,
     waitingTimer: (state.waitingTargetSeat > 0) ? remaining : 0,
@@ -2431,6 +2942,12 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
     delta: sanitizeDeltaForClient(state.lastDelta, requestingSeat)
   };
 }
+
+
+
+
+
+
 
 
 

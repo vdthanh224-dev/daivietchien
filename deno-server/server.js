@@ -289,7 +289,7 @@ async function mutateSharedState(roomId, seat, payload) {
     const previousVersion = state.version;
       let tickRes = null;
       let result = null;
-              if (payload.action === ""SERVER_TICK"") {
+              if (payload.action === "SERVER_TICK") {
           tickRes = tickGameState(state);
           result = { success: true, changed: tickRes.changed };
         } else {
@@ -750,4 +750,5 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8082 }, async (req) => {
     headers: { "Content-Type": "application/json; charset=utf-8", "Access-Control-Allow-Origin": "*" },
   });
 });
+
 
