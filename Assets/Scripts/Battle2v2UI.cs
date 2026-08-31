@@ -950,9 +950,9 @@ public class Battle2v2UI : MonoBehaviour
             // Duyệt qua tất cả các action mới chưa xử lý
             foreach (var act in state.actionHistory)
             {
-                if (act.seq > lastAppliedActionSeq)
+                if (act.timestamp > lastAppliedActionSeq)
                 {
-                    lastAppliedActionSeq = act.seq; // Dùng seq thay vì timestamp vì có thể trùng lặp
+                    lastAppliedActionSeq = act.timestamp; // Dùng seq thay vì timestamp vì có thể trùng lặp
                     if (!string.IsNullOrEmpty(act.description))
                     {
                         SetLog(act.description);
@@ -981,19 +981,18 @@ public class Battle2v2UI : MonoBehaviour
                     else if ((actType.StartsWith("PLAY_") || actType == "EQUIP" || actType == "DELAYED_SCROLL_ATTACHED") && !string.IsNullOrEmpty(act.cardId))
                     {
                         var casterGen = GetGeneralBySeat(act.casterSeat);
-                            var targetGen = GetGeneralBySeat(act.targetSeat);
-                            var card = CardDatabase.GetCardById(act.cardId);
-                            if (casterGen != null && card != null)
-                            {
-                                if (actType == "EQUIP")
-                                    ShowCardAtCenter(card, casterGen, targetGen, $"Trang bị [{card.cardName}]");
-                                else
-                                    ShowCardAtCenter(card, casterGen, targetGen);
-                            }
+                        var targetGen = GetGeneralBySeat(act.targetSeat);
+                        var card = CardDatabase.GetCardById(act.cardId);
+                        if (casterGen != null && card != null)
+                        {
+                            if (actType == "EQUIP")
+                                ShowCardAtCenter(card, casterGen, targetGen, $"Trang bị [{card.cardName}]");
+                            else
+                                ShowCardAtCenter(card, casterGen, targetGen);
                         }
                     }
                     // Hiệu ứng phán xét từ Server
-            else if (actType == "LIGHTNING_HIT" || actType == "LIGHTNING_PASSED" || actType == "SUPPLY_SHORTAGE_TRIGGERED" || actType == "SUPPLY_SHORTAGE_PASSED" || actType == "ACEDIA_TRIGGERED" || actType == "ACEDIA_PASSED")
+                    else if (actType == "LIGHTNING_HIT" || actType == "LIGHTNING_PASSED" || actType == "SUPPLY_SHORTAGE_TRIGGERED" || actType == "SUPPLY_SHORTAGE_PASSED" || actType == "ACEDIA_TRIGGERED" || actType == "ACEDIA_PASSED")
                     {
                         var targetGen = GetGeneralBySeat(act.targetSeat);
                         var judgeCard = CardDatabase.GetCardById(act.cardId);
@@ -4069,6 +4068,11 @@ public class Battle2v2UI : MonoBehaviour
         cardRt.anchorMin = Vector2.zero; cardRt.anchorMax = Vector2.one;
         cardRt.offsetMin = cardRt.offsetMax = Vector2.zero;
         
+        if (!string.IsNullOrEmpty(title)) {
+            var txtValue = AddText(centerContainer.transform, "Title", title, 14, Color.white, FontStyle.Bold, TextAnchor.UpperCenter);
+            SetRect(txtValue.rectTransform, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1), new Vector2(0, 30), new Vector2(0, 5));
+        }
+
         AudioManager.Instance.PlayCardSelect();
         yield return new WaitForSeconds(0.25f);
         
@@ -8068,7 +8072,11 @@ public class Battle2v2UI : MonoBehaviour
         
         rt.anchoredPosition = startPos;
         rt.localScale = Vector3.one * 0.1f;
-        StartCoroutine(PopOutCard(rt, startPos, new Vector2(-80f, 0f), 1f, target, card));
+        StartCoroutine(PopOutCard(rt, startPos, new Vector2(-80f, 0f), 1f));
+        if (target != null)
+        {
+            StartCoroutine(AnimateAttackBeam(rt, target.GetComponent<RectTransform>(), card));
+        }
 
         currentCenterCardGo = centerContainer;
 
