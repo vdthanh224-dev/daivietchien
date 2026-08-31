@@ -132,7 +132,14 @@ public class CardModel
         }
     }
 
-    public string GetSuitSymbol()
+        public string GetFormattedName()
+    {
+        if ((int)suit == 0 && (int)rank == 0) return $"[{cardName}]";
+        string colorTag = IsRed ? "<color=#FF5555>" : "<color=#BBBBBB>";
+        return $"[{cardName} ({colorTag}{SuitString}</color> {RankString})]";
+    }
+
+public string GetSuitSymbol()
     {
         return SuitString;
     }

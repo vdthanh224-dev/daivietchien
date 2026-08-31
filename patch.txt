@@ -1,0 +1,46 @@
+--- deno-server/gameEngine.js
++++ deno-server/gameEngine.js
+@@ -1487,14 +1487,15 @@
+       if (chain.continuation?.type === "TURN_JUDGEMENT") {
+         return continueTurnStart(state);
+       }
+-      return { success: true, state };
+-    if (chain.continuation?.type === "CONTINUE_AOE") {
+-      // Bị Diệu Kế hóa giải cho mục tiêu này -> bỏ qua nạn nhân này, chuyển sang người tiếp theo
+-      beginNextAoeVictim(state);
+-      refreshLastDelta(state);
+-      return { success: true, state };
+-    }
+-      if (chain.continuation?.type === "CONTINUE_HARVEST") {
+-        // Bị Diệu Kế hóa giải cho mục tiêu này -> bỏ qua nạn nhân này, chuyển sang người tiếp theo
+-        state.harvestPickers.shift(); // Remove this picker
+-        beginNextHarvestPicker(state);
+-        refreshLastDelta(state);
+-        return { success: true, state };
+-      }
+-    if (chain.continuation?.type === "CONTINUE_HARVEST") {
+-      // Mưu kế diện rộng không bị hóa giải cho mục tiêu này -> Bắt đầu chờ nạn nhân chọn bài
+-      const nextVictim = chain.targetSeat;
+-      state.phase = "AWAIT_HARVEST";
+-      state.waitingReactionType = "HARVEST";
+-      state.waitingTargetSeat = nextVictim;
+-      state.waitingTimer = 40;
+-      refreshLastDelta(state);
+-      return { success: true, state };
+-    }
+-
++      if (chain.continuation?.type === "CONTINUE_AOE") {
++        beginNextAoeVictim(state);
++        refreshLastDelta(state);
++        return { success: true, state };
++      }
++      if (chain.continuation?.type === "CONTINUE_HARVEST") {
++        state.harvestPickers.shift();
++        beginNextHarvestPicker(state);
++        refreshLastDelta(state);
++        return { success: true, state };
++      }
++      return { success: true, state };
+     }
+ 
+     // Mưu kế được thực thi thành công!

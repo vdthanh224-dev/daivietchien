@@ -13,6 +13,28 @@ function getDeckCache() {
   return _deckCache;
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Tìm lá bài trong bộ bài chuẩn theo ID để lấy subType (dùng khi ID client/server không khớp)
  */
@@ -39,6 +61,28 @@ function isTeamOneSeat(seat) {
 
 function areTeammates(leftSeat, rightSeat) {
   return isTeamOneSeat(leftSeat) === isTeamOneSeat(rightSeat);
+}
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
 }
 
 /**
@@ -171,25 +215,25 @@ export function hydrateGameState(rawState, roomId = "") {
 }
 
 function formatCardText(card) {
-  if (!card) return "";
-  if (!card.suit && !card.rank) return `[${card.name}]`;
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
   
-  let suitSym = "";
+  let suitSym = """";
   switch (card.suit) {
-    case "Spade": suitSym = "♠"; break;
-    case "Heart": suitSym = "<color=#FF5555>♥</color>"; break;
-    case "Club": suitSym = "♣"; break;
-    case "Diamond": suitSym = "<color=#FF5555>♦</color>"; break;
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
     default: suitSym = card.suit; break;
   }
 
   let rankStr = String(card.rank);
-  if (card.rank === 1) rankStr = "A";
-  else if (card.rank === 11) rankStr = "J";
-  else if (card.rank === 12) rankStr = "Q";
-  else if (card.rank === 13) rankStr = "K";
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
 
-  return `[${card.name} (${suitSym} ${rankStr})]`;
+  return "[${card.name} (${suitSym} ${rankStr})]";
 }
 
 /**
@@ -202,6 +246,28 @@ export function shuffle(array) {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
+}
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
 }
 
 /**
@@ -308,6 +374,28 @@ export function initGame(roomId, playersInput) {
   return initialState;
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Kiểm tra Optimistic Locking: nếu client gửi expectedVersion thì phải khớp với state.version
  */
@@ -381,6 +469,28 @@ export function ensureMutationVersion(state, previousVersion) {
   return state.version;
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Ghi nhận hành động vào lịch sử trận đấu, tăng version state và tạo Delta Update
  */
@@ -396,6 +506,28 @@ export function recordAction(state, action) {
   refreshLastDelta(state);
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Tìm người chơi còn sống kế tiếp
  */
@@ -406,6 +538,28 @@ export function getNextAliveSeat(state, currentSeat) {
     if (p && p.hp > 0) return next;
   }
   return currentSeat;
+}
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
 }
 
 /**
@@ -527,16 +681,29 @@ function validateTarget(state, casterSeat, targetSeat, card) {
       && getDistance(state, casterSeat, normalizedTarget) > 1) {
     return { error: "Mục tiêu ngoài tầm" };
   }
-  
-  if ([CARD_SUBTYPES.SNATCH, CARD_SUBTYPES.DISMANTLE, CARD_SUBTYPES.FLAWLESS_DEFENSE].includes(card.subType)) {
-    const targetHand = target.hand ? target.hand.length : 0;
-    const targetEquip = target.equipments ? target.equipments.length : 0;
-    const targetJudge = target.judgements ? target.judgements.length : 0;
-    if (targetHand + targetEquip + targetJudge === 0) {
-      return { error: "Mục tiêu không có bài để chọn" };
-    }
-  }
   return null;
+}
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
 }
 
 /**
@@ -612,7 +779,7 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
         targetSeat,
         cardId: card.id,
         cardName: card.name,
-        description: `🛡️ [Giáp Đồng Sơn Vi] vô hiệu hóa ${formatCardText(card)} của ${caster.generalName}!`
+        description: `🛡️ [Giáp Đồng Sơn Vi] vô hiệu hóa [${card.name}] của ${caster.generalName}!`
       });
       return { success: true, state };
     }
@@ -622,28 +789,24 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
     state.waitingReactionType = "DODGE";
     state.waitingTimer = 40;
     state.activeCard = {
-        cardId: card.id,
-        cardName: card.name,
-        suit: card.suit,
-        casterSeat,
-        targetSeat,
-        damage,
-        isWineBuff: isWine
-      };
-
-      const cannon = getEquippedWeapon(caster, "Súng Thần Công");
-      const requiredDodgeText = cannon ? ` (yêu cầu lá Đỡ khác chất <b>${card.suit === "Heart" ? "<color=#FF5555>♥</color>" : card.suit === "Diamond" ? "<color=#FF5555>♦</color>" : card.suit === "Club" ? "♣" : "♠"}</b>)` : "";
-
-      recordAction(state, {
-        type: "PLAY_SLASH",
-        casterSeat,
-        targetSeat,
-        cardId: card.id,
-        cardName: card.name,
-        damage,
-        isWineBuff: isWine,
-        description: `🗡️ <b>${caster.generalName}</b> tung chiêu ${formatCardText(card)}${isWine ? ' <color=#FFD700><b>(kèm hiệu ứng Hủ Rượu: +1 Sát thương -> 2 Tổng!)</b></color>' : ''} nhắm vào <b>${target ? target.generalName : 'đối thủ'}</b>! (Mục tiêu có 40s để Đỡ${requiredDodgeText})`
-      });
+      cardId: card.id,
+      cardName: card.name,
+      suit: card.suit,
+      casterSeat,
+      targetSeat,
+      damage,
+      isWineBuff: isWine
+    };
+    recordAction(state, {
+      type: "PLAY_SLASH",
+      casterSeat,
+      targetSeat,
+      cardId: card.id,
+      cardName: card.name,
+      damage,
+      isWineBuff: isWine,
+      description: `🗡️ <b>${caster.generalName}</b> tung chiêu [${card.name}]${isWine ? ' <color=#FFD700><b>(kèm hiệu ứng Hủ Rượu: +1 Sát thương -> 2 Tổng!)</b></color>' : ''} nhắm vào <b>${target ? target.generalName : 'đối thủ'}</b>! (Mục tiêu có 40s để Đỡ)`
+    });
     if (tryKhienMayDefense(state, targetSeat, "đòn Trảm")) {
       beginSlashAfterDodge(state, caster, targetSeat, "Khiên Mây Bện");
       return { success: true, state };
@@ -703,7 +866,7 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
       casterSeat,
       cardId: card.id,
       cardName: card.name,
-      description: `🛡️ <b>${caster.generalName}</b> trang bị ${formatCardText(card)}: ${card.desc}`
+      description: `🛡️ <b>${caster.generalName}</b> trang bị [${card.name}]: ${card.desc}`
     });
     return { success: true, state };
   }
@@ -713,6 +876,28 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
     return executeCardEffect(state, card, casterSeat, targetSeat);
   }
   return startNullifyChain(state, card, casterSeat, targetSeat);
+}
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
 }
 
 /**
@@ -729,44 +914,7 @@ export function startNullifyChain(state, card, casterSeat, targetSeat = 0, conti
   for (let i = 0; i < 4; i++) {
     const s = ((firstSeat - 1 + i) % 4) + 1;
     const p = state.players.find(x => x.seat === s);
-    // Chỉ hỏi những người CÓ Diệu Kế Phá Mưu trên tay
-    if (p && p.hp > 0) {
-      const hasNullify = p.hand && p.hand.some(c => c.subType === CARD_SUBTYPES.FLAWLESS_DEFENSE || (c.name && c.name.includes("Diệu Kế")));
-      if (hasNullify) {
-        querySeats.push(s);
-      }
-    }
-  }
-
-  // Nếu không ai có Diệu Kế, thực thi ngay mưu kế
-  if (querySeats.length === 0) {
-    if (continuation?.type === "TURN_JUDGEMENT") {
-      resolveJudgementCard(state, card, continuation.seat);
-      if (state.phase === "AWAIT_NEAR_DEATH") return { success: true, state };
-      return continueTurnStart(state);
-    }
-    if (continuation?.type === "CONTINUE_AOE") {
-      const nextVictim = targetSeat;
-      if (state.activeCard?.reqType === "DODGE" && tryKhienMayDefense(state, nextVictim, "đòn diện rộng")) {
-         beginNextAoeVictim(state);
-      } else {
-         state.phase = "AWAIT_AOE";
-         state.waitingReactionType = state.activeCard?.reqType || "DODGE";
-         state.waitingTargetSeat = nextVictim;
-         state.waitingTimer = 40;
-         refreshLastDelta(state);
-      }
-      return { success: true, state };
-    }
-    if (continuation?.type === "CONTINUE_HARVEST") {
-      state.phase = "AWAIT_HARVEST";
-      state.waitingTargetSeat = targetSeat;
-      state.waitingReactionType = "HARVEST";
-      state.waitingTimer = 40;
-      refreshLastDelta(state);
-      return { success: true, state };
-    }
-    return executeCardEffect(state, card, casterSeat, targetSeat);
+    if (p && p.hp > 0) querySeats.push(s);
   }
 
   state.phase = "AWAIT_NULLIFY";
@@ -800,7 +948,7 @@ export function startNullifyChain(state, card, casterSeat, targetSeat = 0, conti
     targetSeat,
     cardId: card.id,
     cardName: card.name,
-    description: `📜 <b>${caster ? caster.generalName : 'Ghế ' + casterSeat}</b> thi triển ${formatCardText(card)}${targetDesc}! Đang hỏi <b>${firstQueriedGen ? firstQueriedGen.generalName : 'Ghế ' + querySeats[0]}</b> có dùng Diệu Kế Phá Mưu không (40s)...`
+    description: `📜 <b>${caster ? caster.generalName : 'Ghế ' + casterSeat}</b> thi triển [${card.name}]${targetDesc}! Đang hỏi <b>${firstQueriedGen ? firstQueriedGen.generalName : 'Ghế ' + querySeats[0]}</b> có dùng Diệu Kế Phá Mưu không (40s)...`
   });
 
   return { success: true, state };
@@ -892,11 +1040,6 @@ function beginNextAoeVictim(state) {
     const nextVictim = state.aoeVictimsQueue.shift();
     const victim = state.players.find((player) => player.seat === nextVictim);
     if (!victim || victim.hp <= 0) continue;
-    // Hỏi Diệu Kế Phá Mưu trước khi bắt buộc nạn nhân Đỡ/Trảm
-    if (state.activeCard && state.activeCard.cardName) {
-      const aoecard = { id: state.activeCard.cardId, name: state.activeCard.cardName, subType: state.activeCard.reqType === "DODGE" ? "ARROW_RAIN" : "BARBARIAN_INVASION" };
-      return startNullifyChain(state, aoecard, state.activeCard.casterSeat, nextVictim, { type: "CONTINUE_AOE" });
-    }
 
     if (state.activeCard?.reqType === "DODGE" && tryKhienMayDefense(state, nextVictim, "đòn diện rộng")) {
       continue;
@@ -912,52 +1055,6 @@ function beginNextAoeVictim(state) {
   resetWaitingState(state);
   return false;
 }
-
-function beginNextHarvestPicker(state) {
-  while (state.harvestPickers && state.harvestPickers.length > 0 && state.harvestPool.length > 0) {
-    const nextPicker = state.harvestPickers[0];
-    const player = state.players.find(p => p.seat === nextPicker);
-    if (!player || player.hp <= 0) {
-      state.harvestPickers.shift();
-      continue;
-    }
-    
-    // Nếu activeCard có cờ harvestNullifiedForSeat, nghĩa là mưu kế đã bị Diệu Kế phá giải cho ghế này
-    // Cờ này được đặt ở nullify chain để bỏ qua nạn nhân, nhưng nếu không có cờ, ta sẽ hỏi Diệu Kế.
-    if (state.activeCard && state.activeCard.cardName) {
-      const aoecard = { id: state.activeCard.cardId, name: state.activeCard.cardName, subType: CARD_SUBTYPES.HARVEST };
-      return startNullifyChain(state, aoecard, state.activeCard.casterSeat, nextPicker, { type: "CONTINUE_HARVEST" });
-    }
-    
-    state.phase = "AWAIT_HARVEST";
-    state.waitingTargetSeat = nextPicker;
-    state.waitingReactionType = "HARVEST";
-    state.waitingTimer = 40;
-    
-    recordAction(state, {
-      type: "HARVEST_PICK_START",
-      targetSeat: nextPicker,
-      description: `Đang tới lượt <b>${player.generalName}</b> chọn bài từ Kho Cứu Tế (40s)...`
-    });
-    return true;
-  }
-  
-  // Finish Harvest
-  if (state.harvestPool && state.harvestPool.length > 0) {
-    for (const card of state.harvestPool) {
-      discardCard(state, card);
-    }
-  }
-  resetWaitingState(state);
-  state.harvestPool = [];
-  state.harvestPickers = [];
-  recordAction(state, {
-    type: "HARVEST_EMPTY",
-    description: `🍚 [Mở Kho Cứu Tế] đã chia xong, các lá còn dư được bỏ vào Mộ.`
-  });
-  return false;
-}
-
 
 function buildTargetCardOptions(state, targetSeat, allowDelayed = true) {
   const target = state.players.find((player) => player.seat === targetSeat);
@@ -1013,7 +1110,7 @@ function startTargetCardSelection(state, card, casterSeat, targetSeat, selection
       targetSeat,
       cardId: card.id,
       cardName: card.name,
-      description: `📜 <b>${caster ? caster.generalName : 'Người chơi'}</b> dùng ${formatCardText(card)} lên <b>${target ? target.generalName : 'mục tiêu'}</b>, nhưng mục tiêu không có bài để chọn.`
+      description: `📜 <b>${caster ? caster.generalName : 'Người chơi'}</b> dùng [${card.name}] lên <b>${target ? target.generalName : 'mục tiêu'}</b>, nhưng mục tiêu không có bài để chọn.`
     });
     return { success: true, state };
   }
@@ -1118,6 +1215,28 @@ function completeTargetCardSelection(state, chooserSeat, targetCardId) {
   return { success: true, state };
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Thực thi hiệu ứng cẩm nang sau khi chuỗi Diệu Kế kết thúc và không bị hóa giải
  */
@@ -1216,7 +1335,7 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0) {
         targetSeat: firstVictim,
         cardId: card.id,
         cardName: card.name,
-        description: `🏹 <b>${caster ? caster.generalName : 'Người chơi'}</b> thi triển ${formatCardText(card)}! Đang kiểm tra <b>Ghế ${firstVictim}</b> (cần [${reqName}] - 40s)...`
+        description: `🏹 <b>${caster ? caster.generalName : 'Người chơi'}</b> thi triển [${card.name}]! Đang kiểm tra <b>Ghế ${firstVictim}</b> (cần [${reqName}] - 40s)...`
       });
     } else {
       resetWaitingState(state);
@@ -1280,9 +1399,53 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0) {
   });
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Xử lý phản ứng từ người bị nhắm tới (Đỡ, Trảm, Bỏ qua / Hết giờ, Diệu Kế Phá Mưu, Chọn bài kho lương)
  */
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
 
 /**
 * KhÃ´i phá»¥c láº¡i luá»“ng game sau khi pha Háº¥p Há»“i (Near Death) káº¿t thÃºc (cá»©u sá»‘ng hoáº·c cháº¿t)
@@ -1381,109 +1544,32 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
 
         chain.isCanceled = !chain.isCanceled;
         chain.whoUsedLast = respondentSeat;
-        state.activeCard = {
-          ...state.activeCard,
-          isCanceled: !chain.isCanceled
-        };
 
         // Bắt đầu vòng hỏi mới từ người bên phải của người vừa dùng Diệu Kế
         const newQuerySeats = [];
-          for (let i = 0; i < 4; i++) {
-            const s = ((respondentSeat + i) % 4) + 1;
-            const p = state.players.find(x => x.seat === s);
-            if (p && p.hp > 0) {
-              const hasNullify = p.hand && p.hand.some(c => c.subType === CARD_SUBTYPES.FLAWLESS_DEFENSE || (c.name && c.name.includes("Diệu Kế")));
-              if (hasNullify) newQuerySeats.push(s);
-            }
-          }
+        for (let i = 0; i < 4; i++) {
+          const s = ((respondentSeat + i) % 4) + 1;
+          const p = state.players.find(x => x.seat === s);
+          if (p && p.hp > 0) newQuerySeats.push(s);
+        }
+        chain.querySeats = newQuerySeats;
+        chain.currentIdx = 0;
+        state.waitingTargetSeat = newQuerySeats[0];
+        state.waitingTimer = 40;
         state.activeCard = {
           ...state.activeCard,
           nullifyRound: (Number(state.activeCard?.nullifyRound) || 0) + 1,
           nullifyBySeat: respondentSeat
         };
 
-        if (newQuerySeats.length > 0) {
-            chain.querySeats = newQuerySeats;
-            chain.currentIdx = 0;
-            state.waitingTargetSeat = newQuerySeats[0];
-            state.waitingTimer = 40;
-
-            recordAction(state, {
-              type: "NULLIFY_PLAYED",
-              casterSeat: respondentSeat,
-              cardId: nullifyCard.id,
-              cardName: nullifyCard.name,
-              description: `🛡️ <b>${respondent.generalName}</b> đã tung <color=#55FF55><b>[Diệu Kế Phá Mưu]</b></color>! Trạng thái mưu kế ${formatCardText(rootCard)}: ${chain.isCanceled ? '<color=#FF5555>BỊ VÔ HIỆU HÓA</color>' : '<color=#55FF55>ĐƯỢC BẢO VỆ THÀNH CÔNG</color>'}. Đang hỏi Ghế ${newQuerySeats[0]} (40s)...`
-            });
-            return { success: true, state };
-        } else {
-            recordAction(state, {
-              type: "NULLIFY_PLAYED",
-              casterSeat: respondentSeat,
-              cardId: nullifyCard.id,
-              cardName: nullifyCard.name,
-              description: `🛡️ <b>${respondent.generalName}</b> đã tung <color=#55FF55><b>[Diệu Kế Phá Mưu]</b></color>! Trạng thái mưu kế ${formatCardText(rootCard)}: ${chain.isCanceled ? '<color=#FF5555>BỊ VÔ HIỆU HÓA</color>' : '<color=#55FF55>ĐƯỢC BẢO VỆ THÀNH CÔNG</color>'}. Không ai khác có Diệu Kế, tiến hành thực thi.`
-            });
-            
-            if (chain.isCanceled) {
-                recordAction(state, {
-                  type: "EFFECT_CANCELED",
-                  casterSeat: chain.casterSeat,
-                  targetSeat: chain.targetSeat,
-                  description: `🚫 Mưu kế ${formatCardText(rootCard)} nhắm vào <b>${state.players.find(x=>x.seat===chain.targetSeat)?.generalName || "Ghế "+chain.targetSeat}</b> đã bị vô hiệu hóa hoàn toàn!`
-                });
-                state.nullifyChain = null;
-                if (chain.continuation?.type === "TURN_JUDGEMENT") {
-                  if (state.phase === "AWAIT_NEAR_DEATH") return { success: true, state };
-                  return continueTurnStart(state);
-                }
-                if (chain.continuation?.type === "CONTINUE_AOE") {
-                  beginNextAoeVictim(state);
-                  refreshLastDelta(state);
-                  return { success: true, state };
-                }
-                if (chain.continuation?.type === "CONTINUE_HARVEST") {
-                  state.harvestPickers.shift();
-                  beginNextHarvestPicker(state);
-                  refreshLastDelta(state);
-                  return { success: true, state };
-                }
-                state.phase = "PLAY";
-                state.waitingTargetSeat = 0;
-                return { success: true, state };
-            } else {
-                const cont = chain.continuation;
-                const effCard = chain.rootCard;
-                const target = chain.targetSeat;
-                const effCaster = chain.casterSeat;
-                state.nullifyChain = null;
-
-                if (cont?.type === "TURN_JUDGEMENT") {
-                  resolveJudgementCard(state, effCard, cont.seat);
-                  if (state.phase === "AWAIT_NEAR_DEATH") return { success: true, state };
-                  return continueTurnStart(state);
-                }
-                if (cont?.type === "CONTINUE_AOE") {
-                  executeCardEffect(state, effCard, effCaster, target);
-                  if (state.phase !== "AWAIT_NEAR_DEATH" && state.phase !== "AWAIT_SLASH_DEFENSE") {
-                    return executeAOEChain(state, effCard, effCaster, state.aoeVictimsQueue);
-                  }
-                  return { success: true, state };
-                }
-                if (cont?.type === "CONTINUE_HARVEST") {
-                  state.phase = "AWAIT_HARVEST";
-                  state.waitingTargetSeat = target;
-                  state.waitingTimer = 40;
-                  recordAction(state, {
-                    type: "AWAIT_HARVEST",
-                    casterSeat: target,
-                    description: `Kho Cứu Tế: Đang chờ <b>${state.players.find(p=>p.seat===target)?.generalName}</b> chọn bài (40s)...`
-                  });
-                  return { success: true, state };
-                }
-                return executeCardEffect(state, effCard, effCaster, target);
-            }
-        }
+        recordAction(state, {
+          type: "NULLIFY_PLAYED",
+          casterSeat: respondentSeat,
+          cardId: nullifyCard.id,
+          cardName: nullifyCard.name,
+          description: `🛡️ <b>${respondent.generalName}</b> đã tung <color=#55FF55><b>[Diệu Kế Phá Mưu]</b></color>! Trạng thái mưu kế [${rootCard.name}]: ${chain.isCanceled ? '<color=#FF5555>BỊ VÔ HIỆU HÓA</color>' : '<color=#55FF55>ĐƯỢC BẢO VỆ THÀNH CÔNG</color>'}. Đang hỏi Ghế ${newQuerySeats[0]} (40s)...`
+        });
+        return { success: true, state };
       }
     }
 
@@ -1512,21 +1598,10 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       resetWaitingState(state);
       recordAction(state, {
         type: "NULLIFY_SUCCEEDED",
-        description: `🛡️ Mưu kế ${formatCardText(rootCard)} đã chính thức bị vô hiệu hóa hoàn toàn bởi Diệu Kế Phá Mưu!`
+        description: `🛡️ Mưu kế [${rootCard.name}] đã chính thức bị vô hiệu hóa hoàn toàn bởi Diệu Kế Phá Mưu!`
       });
       if (chain.continuation?.type === "TURN_JUDGEMENT") {
         return continueTurnStart(state);
-      }
-      if (chain.continuation?.type === "CONTINUE_AOE") {
-        beginNextAoeVictim(state);
-        refreshLastDelta(state);
-        return { success: true, state };
-      }
-      if (chain.continuation?.type === "CONTINUE_HARVEST") {
-        state.harvestPickers.shift();
-        beginNextHarvestPicker(state);
-        refreshLastDelta(state);
-        return { success: true, state };
       }
       return { success: true, state };
     }
@@ -1538,30 +1613,6 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       resolveJudgementCard(state, rootCard, chain.continuation.seat);
       if (state.phase === "AWAIT_NEAR_DEATH") return { success: true, state };
       return continueTurnStart(state);
-    }
-    if (chain.continuation?.type === "CONTINUE_AOE") {
-      // Mưu kế diện rộng không bị hóa giải cho mục tiêu này -> Bắt đầu chờ Đỡ/Trảm từ nạn nhân
-      const nextVictim = chain.targetSeat;
-      if (state.activeCard?.reqType === "DODGE" && tryKhienMayDefense(state, nextVictim, "đòn diện rộng")) {
-         beginNextAoeVictim(state);
-      } else {
-         state.phase = "AWAIT_AOE";
-         state.waitingReactionType = state.activeCard?.reqType || "DODGE";
-         state.waitingTargetSeat = nextVictim;
-         state.waitingTimer = 40;
-         refreshLastDelta(state);
-      }
-      return { success: true, state };
-    }
-    if (chain.continuation?.type === "CONTINUE_HARVEST") {
-      // Mưu kế diện rộng không bị hóa giải cho mục tiêu này -> Bắt đầu chờ nạn nhân chọn bài
-      const nextVictim = chain.targetSeat;
-      state.phase = "AWAIT_HARVEST";
-      state.waitingReactionType = "HARVEST";
-      state.waitingTargetSeat = nextVictim;
-      state.waitingTimer = 40;
-      refreshLastDelta(state);
-      return { success: true, state };
     }
     return executeCardEffect(state, rootCard, casterSeat, targetSeat);
   }
@@ -1599,12 +1650,23 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       state.harvestPickers.shift(); // Bỏ người vừa chọn
     }
 
-    // Continue to next picker (this will check for Nullify again)
-    beginNextHarvestPicker(state);
-    refreshLastDelta(state);
-    return { success: true, state };
+    if (state.harvestPickers && state.harvestPickers.length > 0 && state.harvestPool.length > 0) {
+      const nextSeat = state.harvestPickers[0];
+      state.waitingTargetSeat = nextSeat;
+      state.waitingTimer = 40;
+      refreshLastDelta(state);
+      return { success: true, state };
+    } else {
+      // Đã chia xong toàn bộ bài trong kho
+      resetWaitingState(state);
+      state.harvestPool = [];
+      state.harvestPickers = [];
+      refreshLastDelta(state);
+      return { success: true, state };
+    }
   }
 
+  // --- 1. PHẢN HỒI ĐÒN TRẢM ---
   if (state.phase === "AWAIT_SLASH_DEFENSE") {
     if (accepted && cardId) {
       const caster = state.players.find(x => x.seat === (state.activeCard ? state.activeCard.casterSeat : 0));
@@ -1819,7 +1881,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
           type: "DUEL_RESPOND",
           casterSeat: respondentSeat,
           cardId: s.id,
-          description: `⚔️ ${respondent.generalName} đáp trả 1 lá ${formatCardText(s)} trong Thách Đấu!`
+          description: `⚔️ ${respondent.generalName} đáp trả 1 lá [${s.name}] trong Thách Đấu!`
         });
         return { success: true, state };
       }
@@ -1856,7 +1918,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         type: "RESCUE_SUCCESS",
         casterSeat: respondentSeat,
         targetSeat: victim.seat,
-        description: `💮 <b>${respondent.generalName}</b> đã dùng ${formatCardText(rescueCard)} cứu sống <b>${victim.generalName}</b> (${victim.hp}/${victim.maxHp})!`
+        description: `💮 <b>${respondent.generalName}</b> đã dùng [${rescueCard.name}] cứu sống <b>${victim.generalName}</b> (${victim.hp}/${victim.maxHp})!`
       });
       const resume = resolveNearDeathResume(state);
       refreshLastDelta(state);
@@ -1889,6 +1951,28 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
   }
 
   return { error: "Giai đoạn không hỗ trợ phản hồi này" };
+}
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
 }
 
 /**
@@ -1974,6 +2058,28 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
   return { finalDamage, enteredNearDeath: false };
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Kết thúc lượt đánh (Chuyển sang bỏ bài nếu thừa, hoặc rút bài cho người kế tiếp)
  */
@@ -2007,6 +2113,28 @@ export function handleEndTurn(state, casterSeat) {
 
   // Chuyển sang lượt người tiếp theo
   return advanceTurn(state);
+}
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
 }
 
 /**
@@ -2167,6 +2295,28 @@ function continueTurnStart(state) {
   return { success: true, state };
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Chuyển sang lượt kế tiếp; mọi phán xét và rút bài đều do server tiếp tục điều phối.
  */
@@ -2206,6 +2356,28 @@ function advanceTurn(state) {
   return continueTurnStart(state);
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Kiểm tra xem trận đấu đã ngã ngũ chưa (1 trong 2 đội bị hạ gục hết)
  * Lưu ý: Người đang trong Hấp Hối (hp=0 nhưng chưa tử trận) không được tính là đã chết
@@ -2228,6 +2400,28 @@ function checkGameOver(state) {
   }
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * Trọng tài AI tự động chọn lá bài tối ưu nhất để đánh hoặc kết thúc lượt
  */
@@ -2238,7 +2432,12 @@ export function handleAIStep(state, aiSeat) {
   if (!ai || ai.hp <= 0) return { error: "Người chơi không hợp lệ" };
   if (state.turnSeat !== aiSeat) return { error: "Không phải lượt của AI này" };
 
-
+  // 1. Nếu đang ở giai đoạn BỎ BÀI (DISCARD)
+  if (state.phase === "DISCARD") {
+    const excess = ai.hand.length - ai.hp;
+    const ids = excess > 0 ? ai.hand.slice(0, excess).map((card) => card.id) : [];
+    return handleDiscardCards(state, aiSeat, ids);
+  }
 
   // 2. Nếu đang ở giai đoạn AWAIT phản ứng từ người khác thì chưa thể ra bài mới
   if (state.phase !== "PLAY") {
@@ -2339,6 +2538,28 @@ export function handleAIStep(state, aiSeat) {
   return handleEndTurn(state, aiSeat);
 }
 
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
+}
+
 /**
  * AI tự động phản ứng khi bị nhắm tới (Đỡ, Trảm, Bỏ qua)
  */
@@ -2436,13 +2657,29 @@ export function handleAIReaction(state, aiSeat) {
     return handleRespondAction(state, aiSeat, true, pickedCard ? pickedCard.id : null);
   }
 
-  if (state.phase === "DISCARD" && state.waitingTargetSeat === aiSeat) {
-    const excess = ai.hand.length - ai.hp;
-    const ids = excess > 0 ? ai.hand.slice(0, excess).map((card) => card.id) : [];
-    return handleDiscardCards(state, aiSeat, ids);
+  return { error: "Không có phản ứng nào đang chờ AI này" };
+}
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
   }
 
-  return { error: "Không có phản ứng nào đang chờ AI này" };
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
 }
 
 /**
@@ -2465,8 +2702,6 @@ export function tickGameState(state) {
     const waitingSeat = state.waitingTargetSeat;
     const waitingPlayer = state.players.find(p => p.seat === waitingSeat);
 
-    
-    
     if (elapsed >= 40) {
       if (state.phase === "AWAIT_SLASH_DEFENSE") {
         handleRespondAction(state, waitingSeat, false, null);
@@ -2497,15 +2732,11 @@ export function tickGameState(state) {
     const canAIReact = waitingPlayer && waitingPlayer.isAI
       && (waitingPlayer.hp > 0 || state.phase === "AWAIT_NEAR_DEATH");
     if (canAIReact && elapsed >= 2 && elapsed < 40) {
-        const res = handleAIReaction(state, waitingSeat);
-        if (res && res.error) {
-            console.log("[AI ERROR]", res.error, state.phase, waitingSeat);
-            return { changed: false, important: false };
-        }
-        important = true;
-        state.timerStartAt = Date.now();
-        return { changed: true, important };
-      }
+      handleAIReaction(state, waitingSeat);
+      important = true;
+      state.timerStartAt = Date.now();
+      return { changed: true, important };
+    }
   }
   else if (state.phase === "PLAY" && state.turnSeat > 0) {
     const turnPlayer = state.players.find(p => p.seat === state.turnSeat);
@@ -2531,6 +2762,28 @@ export function tickGameState(state) {
   }
 
   return { changed, important };
+}
+
+function formatCardText(card) {
+  if (!card) return """";
+  if (!card.suit && !card.rank) return "[${card.name}]";
+  
+  let suitSym = """";
+  switch (card.suit) {
+    case ""Spade"": suitSym = ""♠""; break;
+    case ""Heart"": suitSym = ""<color=#FF5555>♥</color>""; break;
+    case ""Club"": suitSym = ""♣""; break;
+    case ""Diamond"": suitSym = ""<color=#FF5555>♦</color>""; break;
+    default: suitSym = card.suit; break;
+  }
+
+  let rankStr = String(card.rank);
+  if (card.rank === 1) rankStr = ""A"";
+  else if (card.rank === 11) rankStr = ""J"";
+  else if (card.rank === 12) rankStr = ""Q"";
+  else if (card.rank === 13) rankStr = ""K"";
+
+  return "[${card.name} (${suitSym} ${rankStr})]";
 }
 
 /**
@@ -2662,8 +2915,6 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
     delta: sanitizeDeltaForClient(state.lastDelta, requestingSeat)
   };
 }
-
-
 
 
 

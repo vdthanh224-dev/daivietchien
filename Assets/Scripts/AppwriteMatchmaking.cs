@@ -166,6 +166,7 @@ public static class AppwriteMatchmaking
         public string suit;
         public string reqType;
         public string reqName;
+        public bool isCanceled;
         public bool namSonFollowUp;
         public string selectionOperation;
         public int nullifyRound;
@@ -214,6 +215,7 @@ public static class AppwriteMatchmaking
         public bool isWineBuff;
         public string description;
         public long timestamp;
+        public int seq;
     }
 
     [Serializable]
@@ -1550,4 +1552,5 @@ public static class AppwriteMatchmaking
     }
     #endregion
 }
+
 
