@@ -1,0 +1,10 @@
+const fs = require('fs');
+const lines = fs.readFileSync('Assets/Scripts/Battle2v2UI.cs', 'utf8').split('\n');
+console.log("--- 4504 ---");
+console.log(lines[4503]);
+console.log("--- 4517 ---");
+console.log(lines[4516]);
+console.log("--- 4527 ---");
+console.log(lines[4526]);
+console.log("--- 8659 ---");
+console.log(lines[8658]);

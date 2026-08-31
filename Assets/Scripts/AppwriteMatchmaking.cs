@@ -152,6 +152,10 @@ public static class AppwriteMatchmaking
         public List<GameStateCard> judgements = new List<GameStateCard>();
         public int aoBaoCharges;
         public List<string> skills = new List<string>();
+        public string[] activeSkillsKeys;
+        public bool[] activeSkillsValues;
+        public string[] usedSkillsKeys;
+        public bool[] usedSkillsValues;
     }
 
     [Serializable]
@@ -229,6 +233,10 @@ public static class AppwriteMatchmaking
         public int aoBaoCharges;
         public List<GameStateCard> equipments = new List<GameStateCard>();
         public List<GameStateCard> judgements = new List<GameStateCard>();
+        public string[] activeSkillsKeys;
+        public bool[] activeSkillsValues;
+        public string[] usedSkillsKeys;
+        public bool[] usedSkillsValues;
     }
 
     [Serializable]
@@ -298,6 +306,7 @@ public static class AppwriteMatchmaking
     public class GameActionPayload
     {
         public string action;
+        public string skillId;
         public string roomId;
         public int seat;
         public string cardId;

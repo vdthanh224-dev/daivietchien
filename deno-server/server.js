@@ -7,6 +7,8 @@ import {
   checkVersion,
   handlePlayCard,
   handleRespondAction,
+  handleUseSkill,
+  handleToggleSkill,
   handleEndTurn,
   handleDiscardCards,
   handleAIStep,
@@ -249,7 +251,13 @@ function updateLocalRoom(roomId, state, versionstamp) {
 function applyActionToState(state, seat, payload) {
   if (!hasSeat(state, seat)) return { error: "Ghế không thuộc phòng đấu" };
 
-  if (payload.action === "PLAY_CARD") {
+  if (payload.action === "USE_SKILL") {
+      return handleUseSkill(state, seat, payload.skillId, payload.targetSeat);
+    }
+    if (payload.action === "TOGGLE_SKILL") {
+      return handleToggleSkill(state, seat, payload.skillId);
+    }
+    if (payload.action === "PLAY_CARD") {
     return handlePlayCard(state, seat, payload.cardId, payload.targetSeat);
   }
   if (payload.action === "RESPOND_ACTION") {

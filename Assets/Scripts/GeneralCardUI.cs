@@ -19,7 +19,16 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
 {
     public event Action<GeneralCardUI> OnGeneralClicked;
 
-    public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
+    
+    public string HeroId
+    {
+        get 
+        { 
+            var heroData = HeroDatabase100.GetHeroByName(generalName);
+            return heroData != null ? heroData.id.ToString() : "";
+        }
+    }
+public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
     {
         OnGeneralClicked?.Invoke(this);
     }
@@ -93,6 +102,31 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
             }
             SetSkillState(true);
         }
+    }
+
+    public string[] ActiveSkillsKeys;
+    public bool[] ActiveSkillsValues;
+    public string[] UsedSkillsKeys;
+    public bool[] UsedSkillsValues;
+    
+    public bool HasUsedSkill(string skillId)
+    {
+        if (UsedSkillsKeys == null || UsedSkillsValues == null) return false;
+        for (int i = 0; i < UsedSkillsKeys.Length; i++)
+        {
+            if (UsedSkillsKeys[i] == skillId) return i < UsedSkillsValues.Length && UsedSkillsValues[i];
+        }
+        return false;
+    }
+
+    public bool IsSkillActive(string skillId)
+    {
+        if (ActiveSkillsKeys == null || ActiveSkillsValues == null) return false;
+        for (int i = 0; i < ActiveSkillsKeys.Length; i++)
+        {
+            if (ActiveSkillsKeys[i] == skillId) return i < ActiveSkillsValues.Length && ActiveSkillsValues[i];
+        }
+        return false;
     }
 
     public void SetSkillState(bool isUsable)

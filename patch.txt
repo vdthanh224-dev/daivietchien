@@ -1,46 +1,47 @@
---- deno-server/gameEngine.js
-+++ deno-server/gameEngine.js
-@@ -1487,14 +1487,15 @@
-       if (chain.continuation?.type === "TURN_JUDGEMENT") {
-         return continueTurnStart(state);
-       }
--      return { success: true, state };
--    if (chain.continuation?.type === "CONTINUE_AOE") {
--      // Bị Diệu Kế hóa giải cho mục tiêu này -> bỏ qua nạn nhân này, chuyển sang người tiếp theo
--      beginNextAoeVictim(state);
--      refreshLastDelta(state);
--      return { success: true, state };
--    }
--      if (chain.continuation?.type === "CONTINUE_HARVEST") {
--        // Bị Diệu Kế hóa giải cho mục tiêu này -> bỏ qua nạn nhân này, chuyển sang người tiếp theo
--        state.harvestPickers.shift(); // Remove this picker
--        beginNextHarvestPicker(state);
--        refreshLastDelta(state);
--        return { success: true, state };
--      }
--    if (chain.continuation?.type === "CONTINUE_HARVEST") {
--      // Mưu kế diện rộng không bị hóa giải cho mục tiêu này -> Bắt đầu chờ nạn nhân chọn bài
--      const nextVictim = chain.targetSeat;
--      state.phase = "AWAIT_HARVEST";
--      state.waitingReactionType = "HARVEST";
--      state.waitingTargetSeat = nextVictim;
--      state.waitingTimer = 40;
--      refreshLastDelta(state);
--      return { success: true, state };
--    }
--
-+      if (chain.continuation?.type === "CONTINUE_AOE") {
-+        beginNextAoeVictim(state);
-+        refreshLastDelta(state);
-+        return { success: true, state };
-+      }
-+      if (chain.continuation?.type === "CONTINUE_HARVEST") {
-+        state.harvestPickers.shift();
-+        beginNextHarvestPicker(state);
-+        refreshLastDelta(state);
-+        return { success: true, state };
-+      }
-+      return { success: true, state };
+--- Assets/Scripts/Battle2v2UI.cs
++++ Assets/Scripts/Battle2v2UI.cs
+@@ -470,8 +470,18 @@
+                         if (myServerData.hand.Count > playerHandCards.Count)
+                         {
+                             int diff = myServerData.hand.Count - playerHandCards.Count;
+-                            StartCoroutine(AnimateMultipleDealtCards(playerCard, diff));
++                            var newDealtCards = new List<CardModel>();
++                            for (int i = playerHandCards.Count; i < myServerData.hand.Count; i++) {
++                                var sc = myServerData.hand[i];
++                                if (sc != null && sc.id != "HIDDEN") {
++                                    var cm = ConvertGameStateCardToCardModel(sc);
++                                    if (cm != null) newDealtCards.Add(cm);
++                                }
++                            }
++                            StartCoroutine(AnimateMultipleDealtCards(playerCard, diff, newDealtCards));
+                         }
+ 
+                         playerHandCards.Clear();
+@@ -485,7 +495,7 @@
+                             }
+                         }
+                         playerHandUI.ClearHand();
+-                        playerHandUI.AddCards(playerHandCards);
++                        if (diff <= 0) playerHandUI.AddCards(playerHandCards);
+                     }
+                 }
+             }
+@@ -539,12 +549,16 @@
+         }
      }
  
-     // Mưu kế được thực thi thành công!
+-    private IEnumerator AnimateMultipleDealtCards(GeneralCardUI targetGeneral, int count)
++    private IEnumerator AnimateMultipleDealtCards(GeneralCardUI targetGeneral, int count, List<CardModel> myNewCards = null)
+     {
+         for (int i = 0; i < count; i++)
+         {
+             yield return AnimateDealtCard(targetGeneral);
++            if (myNewCards != null && i < myNewCards.Count && targetGeneral.SeatNumber == (playerCard != null ? playerCard.SeatNumber : -1)) {
++                playerHandUI.AddCard(myNewCards[i]);
++            }
+             yield return new WaitForSeconds(0.05f);
+         }
++        if (myNewCards != null && count > 0 && targetGeneral.SeatNumber == (playerCard != null ? playerCard.SeatNumber : -1)) {
++            UpdateHandCountsVisual();
++        }
+     }
