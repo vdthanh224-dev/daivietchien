@@ -1195,6 +1195,27 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0) {
   const caster = state.players.find(x => x.seat === casterSeat);
   const target = state.players.find(x => x.seat === targetSeat);
 
+  // 0. XÍCH TÂM TỎA (Iron Chain)
+  if (card.subType === CARD_SUBTYPES.IRON_CHAIN) {
+    discardCard(state, card);
+    const target = state.players.find(p => p.seat === targetSeat) || caster;
+    if (target) {
+      target.isChained = !target.isChained;
+    }
+    resetWaitingState(state);
+    recordAction(state, {
+      type: "PLAY_IRON_CHAIN",
+      casterSeat,
+      targetSeat: target ? target.seat : 0,
+      cardId: card.id,
+      cardName: card.name,
+      description: target?.isChained
+        ? `⛓️ <b>${caster ? caster.generalName : 'Người chơi'}</b> dùng [Xích Tâm Tỏa] trói <b>${target.generalName}</b> vào Xích Liên Hoàn!`
+        : `⛓️ <b>${caster ? caster.generalName : 'Người chơi'}</b> dùng [Xích Tâm Tỏa] gỡ xích cho <b>${target.generalName}</b>!`
+    });
+    return { success: true, state };
+  }
+
   // 1. DỤNG BINH NHƯ THẦN (Ex Nihilo)
   if (card.subType === CARD_SUBTYPES.EX_NIHILO) {
     discardCard(state, card);

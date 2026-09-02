@@ -801,16 +801,50 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
             chainedOverlayGo.transform.SetParent(transform, false);
             chainedOverlayGo.transform.SetAsLastSibling();
             var img = chainedOverlayGo.GetComponent<Image>();
-            img.color = new Color(0.08f, 0.04f, 0.02f, 0.45f);
+            img.color = new Color(0.04f, 0.02f, 0.01f, 0.65f);
+            img.raycastTarget = false;
             FillRect(chainedOverlayGo.GetComponent<RectTransform>());
 
-            var iconTxt = ThemeUI.CreateText(chainedOverlayGo.transform, "Icon", "⛓️ XÍCH", 18, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, true);
+            // Viền xích phát sáng màu vàng
+            var chainBorder = new GameObject("ChainBorder", typeof(RectTransform), typeof(Image));
+            chainBorder.transform.SetParent(chainedOverlayGo.transform, false);
+            var cbImg = chainBorder.GetComponent<Image>();
+            var fSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+            if (fSpr != null) { cbImg.sprite = fSpr; cbImg.type = Image.Type.Sliced; }
+            cbImg.color = new Color(1f, 0.75f, 0.2f, 0.95f);
+            cbImg.raycastTarget = false;
+            FillRect(chainBorder.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
+
+            // Dây xích chéo trên & dưới
+            var topChains = ThemeUI.CreateText(chainedOverlayGo.transform, "TopChains", "⛓️ ⛓️ ⛓️ ⛓️ ⛓️", 16, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, true);
+            ThemeUI.SetRect(topChains.rectTransform, new Vector2(0.5f, 0.75f), new Vector2(0.5f, 0.75f), new Vector2(0.5f, 0.5f), new Vector2(180f, 26f), Vector2.zero);
+
+            var botChains = ThemeUI.CreateText(chainedOverlayGo.transform, "BotChains", "⛓️ ⛓️ ⛓️ ⛓️ ⛓️", 16, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, true);
+            ThemeUI.SetRect(botChains.rectTransform, new Vector2(0.5f, 0.25f), new Vector2(0.5f, 0.25f), new Vector2(0.5f, 0.5f), new Vector2(180f, 26f), Vector2.zero);
+
+            // Huy hiệu trung tâm
+            var badgeGo = new GameObject("ChainBadge", typeof(RectTransform), typeof(Image));
+            badgeGo.transform.SetParent(chainedOverlayGo.transform, false);
+            var bImg = badgeGo.GetComponent<Image>();
+            bImg.color = new Color(0.18f, 0.08f, 0.02f, 0.95f);
+            var bRt = badgeGo.GetComponent<RectTransform>();
+            ThemeUI.SetRect(bRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(150f, 32f), Vector2.zero);
+
+            var bBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
+            bBorder.transform.SetParent(badgeGo.transform, false);
+            var bbImg = bBorder.GetComponent<Image>();
+            if (fSpr != null) { bbImg.sprite = fSpr; bbImg.type = Image.Type.Sliced; }
+            bbImg.color = ThemeUI.GoldPrimary;
+            FillRect(bBorder.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
+
+            var iconTxt = ThemeUI.CreateText(badgeGo.transform, "Icon", "⛓️ XÍCH LIÊN HOÀN", 13, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, true);
             FillRect(iconTxt.rectTransform);
         }
 
         if (chainedOverlayGo != null)
         {
             chainedOverlayGo.SetActive(chained);
+            if (chained) chainedOverlayGo.transform.SetAsLastSibling();
         }
     }
 

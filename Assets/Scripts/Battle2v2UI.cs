@@ -7035,6 +7035,68 @@ public class Battle2v2UI : MonoBehaviour
                 }
                 break;
 
+            case CardSubType.IronChain:
+                ShowCardAtCenter(card, caster, null, "Xích Tâm Tỏa: Nối / Gỡ Xích Liên Hoàn");
+                if (caster == playerCard)
+                {
+                    bool done = false;
+                    ShowIronChainSelectionModal(caster, (chosenGenerals) =>
+                    {
+                        if (chosenGenerals != null && chosenGenerals.Count > 0)
+                        {
+                            foreach (var g in chosenGenerals)
+                            {
+                                g.SetChained(!g.IsChained);
+                                if (g.IsChained)
+                                    SetLog($"⛓️ <color=#FFD700><b>[XÍCH TÂM TỎA]</b></color>: Trói <b>{g.GeneralName}</b> vào Xích Liên Hoàn!");
+                                else
+                                    SetLog($"⛓️ <color=#FFD700><b>[XÍCH TÂM TỎA]</b></color>: Đã gỡ xích cho <b>{g.GeneralName}</b>!");
+                            }
+                            AudioManager.Instance.PlaySkill();
+                        }
+                        else
+                        {
+                            SetLog($"⛓️ [Xích Tâm Tỏa]: Không chọn mục tiêu nào để thay đổi xích.");
+                        }
+                        done = true;
+                    });
+                    while (!done && !battleFinished) yield return null;
+                }
+                else
+                {
+                    var candidateTargets = new List<GeneralCardUI>();
+                    foreach (var g in allGenerals)
+                    {
+                        if (g != null && g.CurrentHp > 0)
+                        {
+                            bool isEnemy = !IsSameTeamSeat(caster.SeatNumber, g.SeatNumber);
+                            if (isEnemy && !g.IsChained) candidateTargets.Add(g);
+                            else if (!isEnemy && g.IsChained) candidateTargets.Add(g);
+                        }
+                    }
+                    if (candidateTargets.Count == 0)
+                    {
+                        foreach (var g in allGenerals)
+                        {
+                            if (g != null && g.CurrentHp > 0 && !IsSameTeamSeat(caster.SeatNumber, g.SeatNumber))
+                                candidateTargets.Add(g);
+                        }
+                    }
+
+                    int countToChain = Mathf.Min(2, candidateTargets.Count);
+                    for (int i = 0; i < countToChain; i++)
+                    {
+                        var g = candidateTargets[i];
+                        g.SetChained(!g.IsChained);
+                        if (g.IsChained)
+                            SetLog($"⛓️ <color=#FFD700><b>[XÍCH TÂM TỎA]</b></color>: <b>{caster.GeneralName}</b> trói <b>{g.GeneralName}</b> vào Xích Liên Hoàn!");
+                        else
+                            SetLog($"⛓️ <color=#FFD700><b>[XÍCH TÂM TỎA]</b></color>: <b>{caster.GeneralName}</b> gỡ xích cho <b>{g.GeneralName}</b>!");
+                    }
+                    AudioManager.Instance.PlaySkill();
+                }
+                break;
+
             case CardSubType.Harvest:
                 yield return ResolveHarvest(card, caster);
                 break;
@@ -7715,6 +7777,110 @@ public class Battle2v2UI : MonoBehaviour
     #endregion
 
     #region 9. MODAL CHỌN BÀI CƯỚP HOẶC PHÁ HỦY (HỖ TRỢ 100% TRANG BỊ & PHÁN XÉT)
+
+    private void ShowIronChainSelectionModal(GeneralCardUI caster, Action<List<GeneralCardUI>> onConfirmed)
+    {
+        var overlayGo = ThemeUI.CreateModal(canvasGo.transform, "IronChainModal", "⛓️ XÍCH TÂM TỎA: CHỌN TỐI ĐA 2 TƯỚNG", new Vector2(740f, 440f), out var contentRt, new Color(0.18f, 0.12f, 0.05f, 0.98f));
+
+        var subTxt = ThemeUI.CreateText(contentRt, "Sub", "Chọn 1 hoặc 2 tướng để trói vào Xích Liên Hoàn (hoặc gỡ xích). Sát thương Hỏa/Lôi sẽ truyền qua xích!", ThemeUI.SizeBody, ThemeUI.GoldHighlight, FontStyle.Normal, TextAnchor.MiddleCenter, true);
+        ThemeUI.SetRect(subTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(700f, 40f), new Vector2(0f, -65f));
+
+        var gridGo = new GameObject("Grid", typeof(RectTransform), typeof(GridLayoutGroup));
+        gridGo.transform.SetParent(contentRt, false);
+        var glg = gridGo.GetComponent<GridLayoutGroup>();
+        glg.cellSize = new Vector2(160f, 210f);
+        glg.spacing = new Vector2(16f, 0f);
+        glg.childAlignment = TextAnchor.MiddleCenter;
+        var gRt = gridGo.GetComponent<RectTransform>();
+        ThemeUI.SetRect(gRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(700f, 220f), new Vector2(0f, -10f));
+
+        var selectedGenerals = new HashSet<GeneralCardUI>();
+        var buttonImages = new Dictionary<GeneralCardUI, Image>();
+        var checkTexts = new Dictionary<GeneralCardUI, Text>();
+
+        var livingGenerals = new List<GeneralCardUI>();
+        if (allGenerals != null)
+        {
+            foreach (var g in allGenerals)
+            {
+                if (g != null && g.CurrentHp > 0) livingGenerals.Add(g);
+            }
+        }
+
+        foreach (var g in livingGenerals)
+        {
+            var cardBtnGo = new GameObject("Gen_" + g.SeatNumber, typeof(RectTransform), typeof(Image), typeof(Button));
+            cardBtnGo.transform.SetParent(gridGo.transform, false);
+            var cImg = cardBtnGo.GetComponent<Image>();
+            cImg.color = new Color(0.12f, 0.16f, 0.24f, 0.95f);
+            buttonImages[g] = cImg;
+
+            var bBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
+            bBorder.transform.SetParent(cardBtnGo.transform, false);
+            var bbImg = bBorder.GetComponent<Image>();
+            var fSpr = ThemeUI.LoadSprite("UI/card_frame");
+            if (fSpr != null) { bbImg.sprite = fSpr; bbImg.type = Image.Type.Sliced; }
+            bbImg.color = g.IsChained ? new Color(1f, 0.4f, 0.4f, 1f) : ThemeUI.GoldPrimary;
+            ThemeUI.Fill(bBorder.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
+
+            var nameTxt = ThemeUI.CreateText(cardBtnGo.transform, "Name", $"#{g.SeatNumber} {g.GeneralName}", ThemeUI.SizeBody, ThemeUI.WhitePure, FontStyle.Bold, TextAnchor.UpperCenter, true);
+            ThemeUI.SetRect(nameTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(150f, 30f), new Vector2(0f, -10f));
+
+            var hpTxt = ThemeUI.CreateText(cardBtnGo.transform, "Hp", $"❤️ {g.CurrentHp}/{g.MaxHp} máu", ThemeUI.SizeMicro, new Color(0.55f, 0.9f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter, true);
+            ThemeUI.SetRect(hpTxt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(150f, 24f), new Vector2(0f, 15f));
+
+            string currentStatus = g.IsChained ? "⛓️ Đang Xích" : "🔓 Tự do";
+            var statusTxt = ThemeUI.CreateText(cardBtnGo.transform, "Status", currentStatus, ThemeUI.SizeMicro, g.IsChained ? new Color(1f, 0.5f, 0.5f, 1f) : ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, true);
+            ThemeUI.SetRect(statusTxt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(150f, 24f), new Vector2(0f, -15f));
+
+            var checkTxt = ThemeUI.CreateText(cardBtnGo.transform, "Check", "☐ CHỌN", ThemeUI.SizeBody, ThemeUI.TextMuted, FontStyle.Bold, TextAnchor.LowerCenter, true);
+            ThemeUI.SetRect(checkTxt.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(150f, 32f), new Vector2(0f, 8f));
+            checkTexts[g] = checkTxt;
+
+            var targetGen = g;
+            cardBtnGo.GetComponent<Button>().onClick.AddListener(() =>
+            {
+                AudioManager.Instance.PlayCardSelect();
+                if (selectedGenerals.Contains(targetGen))
+                {
+                    selectedGenerals.Remove(targetGen);
+                    cImg.color = new Color(0.12f, 0.16f, 0.24f, 0.95f);
+                    checkTxt.text = "☐ CHỌN";
+                    checkTxt.color = ThemeUI.TextMuted;
+                }
+                else
+                {
+                    if (selectedGenerals.Count >= 2)
+                    {
+                        SetLog("⚠️ Chỉ được chọn tối đa 2 mục tiêu cho Xích Tâm Tỏa!");
+                        return;
+                    }
+                    selectedGenerals.Add(targetGen);
+                    cImg.color = new Color(0.35f, 0.25f, 0.08f, 0.98f);
+                    checkTxt.text = "☑ ĐÃ CHỌN";
+                    checkTxt.color = ThemeUI.GoldHighlight;
+                }
+            });
+        }
+
+        var btnGroup = new GameObject("BtnGroup", typeof(RectTransform));
+        btnGroup.transform.SetParent(contentRt, false);
+        var bgRt = btnGroup.GetComponent<RectTransform>();
+        ThemeUI.SetRect(bgRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(480f, 48f), new Vector2(0f, 28f));
+
+        ThemeUI.CreateButton(btnGroup.transform, "ConfirmBtn", "⛓️ XÁC NHẬN XÍCH", new Vector2(220f, 44f), new Vector2(120f, 0f), () =>
+        {
+            Destroy(overlayGo);
+            onConfirmed?.Invoke(new List<GeneralCardUI>(selectedGenerals));
+        }, ThemeUI.ButtonTheme.Gold);
+
+        ThemeUI.CreateButton(btnGroup.transform, "CancelBtn", "✕ HỦY BỎ", new Vector2(180f, 44f), new Vector2(-120f, 0f), () =>
+        {
+            Destroy(overlayGo);
+            onConfirmed?.Invoke(new List<GeneralCardUI>());
+        }, ThemeUI.ButtonTheme.Dark);
+    }
+
     private bool ShowCardStealOrDestroyModal(GeneralCardUI target, bool isSteal, string actionTitle, Action<CardModel> onCardSelected)
     {
         if (target == null) return false;
@@ -9299,7 +9465,7 @@ public void ShowCardAtCenter(CardModel card, GeneralCardUI caster, GeneralCardUI
     private bool RequiresTarget(CardModel c)
     {
         if (c == null) return false;
-        return CanActAsSlash(playerCard, c) || c.subType == CardSubType.Duel || c.subType == CardSubType.Snatch || c.subType == CardSubType.Dismantle || c.subType == CardSubType.SupplyShortage || c.subType == CardSubType.Acedia || c.subType == CardSubType.IronChain;
+        return CanActAsSlash(playerCard, c) || c.subType == CardSubType.Duel || c.subType == CardSubType.Snatch || c.subType == CardSubType.Dismantle || c.subType == CardSubType.SupplyShortage || c.subType == CardSubType.Acedia;
     }
 
     private GameObject CreateBaseModal(string title, Vector2 size)
