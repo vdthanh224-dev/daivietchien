@@ -462,12 +462,7 @@ public class Battle2v2UI : MonoBehaviour
                 Debug.LogWarning("[Battle2v2UI] DenoGameClient chưa kết nối; dùng REST authoritative fallback.");
             StartCoroutine(AppwriteMatchmaking.ExecuteGameEngineAction(actionPayload, onFallbackResult));
         }
-        if (pendingDealTargets.Count > 0) {
-            StartCoroutine(GlobalDealRoutine(new System.Collections.Generic.List<GeneralCardUI>(pendingDealTargets), new System.Collections.Generic.List<int>(pendingDealCounts), new System.Collections.Generic.List<System.Collections.Generic.List<CardModel>>(pendingDealMyCards)));
-            pendingDealTargets.Clear();
-            pendingDealCounts.Clear();
-            pendingDealMyCards.Clear();
-        }
+
     }
     
     private IEnumerator GlobalDealRoutine(List<GeneralCardUI> targets, List<int> counts, List<List<CardModel>> newCardsList) {
@@ -571,12 +566,7 @@ public class Battle2v2UI : MonoBehaviour
             }
         }
         
-        if (pendingDealTargets.Count > 0) {
-            StartCoroutine(GlobalDealRoutine(new System.Collections.Generic.List<GeneralCardUI>(pendingDealTargets), new System.Collections.Generic.List<int>(pendingDealCounts), new System.Collections.Generic.List<System.Collections.Generic.List<CardModel>>(pendingDealMyCards)));
-            pendingDealTargets.Clear();
-            pendingDealCounts.Clear();
-            pendingDealMyCards.Clear();
-        }
+
 
         // 2. Cập nhật Head Timers
         if (delta.waitingTargetSeat > 0)
@@ -944,12 +934,22 @@ public class Battle2v2UI : MonoBehaviour
             var myServerData = state.players.Find(p => p.seat == playerCard.SeatNumber);
             if (myServerData != null && myServerData.hand != null)
             {
-                bool handChanged = playerHandCards.Count != myServerData.hand.Count;
+                var newCards = new System.Collections.Generic.List<CardModel>();
+                foreach (var sc in myServerData.hand)
+                {
+                    if (sc != null && sc.id != "HIDDEN")
+                    {
+                        var cm = ConvertGameStateCardToCardModel(sc);
+                        if (cm != null) newCards.Add(cm);
+                    }
+                }
+
+                bool handChanged = playerHandCards.Count != newCards.Count;
                 if (!handChanged)
                 {
                     for (int i = 0; i < playerHandCards.Count; i++)
                     {
-                        if (i < myServerData.hand.Count && playerHandCards[i].id != myServerData.hand[i].id)
+                        if (playerHandCards[i].id != newCards[i].id)
                         {
                             handChanged = true;
                             break;
@@ -959,36 +959,12 @@ public class Battle2v2UI : MonoBehaviour
 
                 if (handChanged)
                 {
-                    int diff = myServerData.hand.Count - playerHandCards.Count;
-                        if (diff > 0)
-                        {
-                            var newDealtCards = new System.Collections.Generic.List<CardModel>();
-                            for (int i = playerHandCards.Count; i < myServerData.hand.Count; i++) {
-                                var sc = myServerData.hand[i];
-                                if (sc != null && sc.id != "HIDDEN") {
-                                    var cm = ConvertGameStateCardToCardModel(sc);
-                                    if (cm != null) newDealtCards.Add(cm);
-                                }
-                            }
-                            pendingDealTargets.Add(playerCard);
-                            pendingDealCounts.Add(diff);
-                            pendingDealMyCards.Add(newDealtCards);
-                        }
-
                     playerHandCards.Clear();
-                    foreach (var sc in myServerData.hand)
-                    {
-                        if (sc != null && sc.id != "HIDDEN")
-                        {
-                            var cm = ConvertGameStateCardToCardModel(sc);
-                            if (cm != null) playerHandCards.Add(cm);
-                        }
-                    }
+                    playerHandCards.AddRange(newCards);
                     if (playerHandUI != null)
                     {
                         playerHandUI.ClearHand();
-                        if (diff <= 0) playerHandUI.AddCards(playerHandCards);
-                        else if (playerHandCards.Count - diff > 0) playerHandUI.AddCards(playerHandCards.GetRange(0, playerHandCards.Count - diff));
+                        playerHandUI.AddCards(playerHandCards);
                     }
                 }
             }
@@ -1008,13 +984,14 @@ public class Battle2v2UI : MonoBehaviour
                 if (g != null && g != playerCard)
                 {
                     var hand = GetHandOfGeneral(g);
-                    int diff = p.handCount - hand.Count;
-                    if (diff > 0)
+                    if (hand.Count != p.handCount)
                     {
-                        StartCoroutine(AnimateMultipleDealtCards(g, diff));
-                        for (int i = 0; i < diff; i++) hand.Add(new CardModel { id = "HIDDEN", cardName = "Ẩn" });
+                        hand.Clear();
+                        for (int i = 0; i < p.handCount; i++)
+                        {
+                            hand.Add(new CardModel { id = "HIDDEN", cardName = "Ẩn" });
+                        }
                     }
-                    while (hand.Count > p.handCount && hand.Count > 0) hand.RemoveAt(0);
                 }
             }
             UpdateHandCountsVisual();
@@ -1184,12 +1161,7 @@ public class Battle2v2UI : MonoBehaviour
             lastServerTargetCardPromptKey = "";
             serverTargetCardSelectionInFlight = false;
 
-            if (pendingDealTargets.Count > 0) {
-            StartCoroutine(GlobalDealRoutine(new System.Collections.Generic.List<GeneralCardUI>(pendingDealTargets), new System.Collections.Generic.List<int>(pendingDealCounts), new System.Collections.Generic.List<System.Collections.Generic.List<CardModel>>(pendingDealMyCards)));
-            pendingDealTargets.Clear();
-            pendingDealCounts.Clear();
-            pendingDealMyCards.Clear();
-        }
+    
         
         // Bật/tắt tương tác lượt của người chơi theo Server
             if (playerCard != null)
@@ -3785,6 +3757,15 @@ public class Battle2v2UI : MonoBehaviour
 
         isFirstTurnOfMatch = true;
 
+        // Xoá sạch bài trên tay mọi tướng trước khi bắt đầu chia
+        playerHandCards.Clear();
+        if (playerHandUI != null) playerHandUI.ClearHand();
+        foreach (var g in allGenerals)
+        {
+            if (g != null) GetHandOfGeneral(g).Clear();
+        }
+        UpdateHandCountsVisual();
+
         SetLog("🎴 Kết nối Máy Chủ Authoritative để chia bài và bắt đầu trận đấu...");
         var initPlayers = BuildInitialServerPlayers();
         if (DenoGameClient.Instance != null && !string.IsNullOrEmpty(currentRoomId))
@@ -3801,7 +3782,8 @@ public class Battle2v2UI : MonoBehaviour
 
         if (lastAppliedStateVersion > 0)
         {
-            SetLog("👑 Trận đấu bắt đầu! 100% diễn biến do Máy Chủ Server điều phối.");
+            SetLog("👑 Trận đấu bắt đầu! Máy chủ đã chia 4 lá bài ban đầu và mở lượt.");
+            AudioManager.Instance.PlayCardDraw();
             yield break;
         }
 
