@@ -156,6 +156,23 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
         return false;
     }
 
+    public void SetSkillSelected(bool isSelected)
+    {
+        if (skillButtonGo == null) return;
+        if (isSelected)
+        {
+            // Sáng rực rỡ khi kỹ năng được chọn
+            if (skillBtnImg != null) skillBtnImg.color = new Color(0.12f, 0.70f, 0.98f, 1f);
+            if (skillBorderImg != null) skillBorderImg.color = new Color(1f, 1f, 0.6f, 1f);
+            if (skillButtonText != null) skillButtonText.color = new Color(1f, 1f, 1f, 1f);
+            if (skillHaloGo != null) skillHaloGo.SetActive(true);
+        }
+        else
+        {
+            SetSkillState(!HasUsedSkill("Triều Dâng"));
+        }
+    }
+
     public void SetSkillState(bool isUsable)
     {
         if (skillButtonGo == null) return;

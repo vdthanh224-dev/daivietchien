@@ -4879,6 +4879,13 @@ public class Battle2v2UI : MonoBehaviour
 
     private void OnPlayerActionBtnClicked()
     {
+        if (isWaitingForTrieuDangTarget && currentSelectedTarget != null && currentSelectedTarget != playerCard)
+        {
+            if (actionBtnGo != null) actionBtnGo.SetActive(false);
+            ExecuteTrieuDangOnTarget(currentSelectedTarget);
+            return;
+        }
+
         if (currentSelectedCardUI == null || currentSelectedCardUI.Data == null || !isPlayerTurnActive || actionInProgress) return;
         var cardUI = currentSelectedCardUI;
         var target = currentSelectedTarget != null ? currentSelectedTarget : playerCard;
@@ -7839,12 +7846,12 @@ public class Battle2v2UI : MonoBehaviour
         }, ThemeUI.ButtonTheme.Dark);
     }
 
-    private bool ShowCardStealOrDestroyModal(GeneralCardUI target, bool isSteal, string actionTitle, Action<CardModel> onCardSelected)
+    private bool ShowCardStealOrDestroyModal(GeneralCardUI target, bool isSteal, string actionTitle, Action<CardModel> onCardSelected, bool onlyEquipment = false)
     {
         if (target == null) return false;
 
         bool allowDelayed = isSteal;
-        var options = BuildTargetCardOptions(target, allowDelayed);
+        var options = BuildTargetCardOptions(target, allowDelayed, onlyEquipment);
         if (options.Count == 0)
         {
             SetLog($"ℹ️ {target.GeneralName} không có lá bài hợp lệ trong tay, vùng trang bị hoặc vùng trì hoãn.");
@@ -8009,20 +8016,23 @@ public class Battle2v2UI : MonoBehaviour
         Fill(label.rectTransform);
     }
 
-    private List<TargetCardOption> BuildTargetCardOptions(GeneralCardUI target, bool allowDelayed)
+    private List<TargetCardOption> BuildTargetCardOptions(GeneralCardUI target, bool allowDelayed, bool onlyEquipment = false)
     {
         var options = new List<TargetCardOption>();
-        var hand = GetHandOfGeneral(target);
 
-        foreach (var c in hand)
+        if (!onlyEquipment)
         {
-            if (c == null) continue;
-            options.Add(new TargetCardOption
+            var hand = GetHandOfGeneral(target);
+            foreach (var c in hand)
             {
-                Card = c,
-                Zone = TargetCardZone.Hand,
-                Label = "TRÊN TAY"
-            });
+                if (c == null) continue;
+                options.Add(new TargetCardOption
+                {
+                    Card = c,
+                    Zone = TargetCardZone.Hand,
+                    Label = "TRÊN TAY"
+                });
+            }
         }
 
         foreach (EquipmentType eqType in Enum.GetValues(typeof(EquipmentType)))
@@ -8049,7 +8059,7 @@ public class Battle2v2UI : MonoBehaviour
             }
         }
 
-        if (allowDelayed)
+        if (allowDelayed && !onlyEquipment)
         {
             var delayTypes = new[] { CardSubType.SupplyShortage, CardSubType.Acedia, CardSubType.Lightning };
             foreach (var dt in delayTypes)
@@ -9169,15 +9179,33 @@ public void ShowCardAtCenter(CardModel card, GeneralCardUI caster, GeneralCardUI
             UpdateActionButtonState();
             return;
         }
-        currentSelectedTarget = clicked;
-        AudioManager.Instance.PlayCardSelect();
-
-        // Kích hoạt Triều Dâng luôn nếu đang bật mode
-        if (isWaitingForTrieuDangTarget) {
-            isWaitingForTrieuDangTarget = false;
-            OnPlayerSkillTrieuDangClicked();
+        if (isWaitingForTrieuDangTarget)
+        {
+            if (clicked == playerCard)
+            {
+                SetLog("⚠️ Kỹ năng [Triều Dâng] phải chọn tướng khác làm mục tiêu!");
+                return;
+            }
+            if (!clicked.HasAnyEquipment())
+            {
+                SetLog($"⚠️ Tướng <b>{clicked.GeneralName}</b> không mang bất kỳ trang bị nào!");
+                return;
+            }
+            currentSelectedTarget = clicked;
+            AudioManager.Instance.PlayCardSelect();
+            if (targetHighlightGo != null)
+            {
+                targetHighlightGo.transform.SetParent(clicked.transform, false);
+                targetHighlightGo.transform.SetAsLastSibling();
+                targetHighlightGo.SetActive(true);
+            }
+            UpdateActionButtonState();
+            SetLog($"🌊 Đã chọn mục tiêu: <b>{clicked.GeneralName}</b>. Nhấn nút [DÙNG TRIỀU DÂNG] để phá hủy trang bị!");
             return;
         }
+
+        currentSelectedTarget = clicked;
+        AudioManager.Instance.PlayCardSelect();
 
         if (targetHighlightGo == null)
         {
@@ -9266,7 +9294,7 @@ public void ShowCardAtCenter(CardModel card, GeneralCardUI caster, GeneralCardUI
 
     void OnPlayerSkillTrieuDangClicked()
     {
-        if (playerCard == null) return;
+        if (playerCard == null || !isPlayerTurnActive) return;
 
         bool hasUsed = playerCard.HasUsedSkill("Triều Dâng");
         if (hasUsed)
@@ -9275,11 +9303,11 @@ public void ShowCardAtCenter(CardModel card, GeneralCardUI caster, GeneralCardUI
             return;
         }
 
-        // Tìm tất cả các tướng đang có trang bị
+        // Tìm tất cả các tướng khác đang có trang bị
         List<GeneralCardUI> targetsWithEquip = new List<GeneralCardUI>();
-        foreach (var g in new GeneralCardUI[] { enemy1Card, enemy2Card, allyCard })
+        foreach (var g in allGenerals)
         {
-            if (g != null && g.CurrentHp > 0 && g.HasAnyEquipment())
+            if (g != null && g != playerCard && g.CurrentHp > 0 && g.HasAnyEquipment())
             {
                 targetsWithEquip.Add(g);
             }
@@ -9291,14 +9319,31 @@ public void ShowCardAtCenter(CardModel card, GeneralCardUI caster, GeneralCardUI
             return;
         }
 
-        if (currentSelectedTarget == null || !targetsWithEquip.Contains(currentSelectedTarget))
-        {
-            isWaitingForTrieuDangTarget = true;
-            SetLog("🌊 <color=#55DDFF><b>[Triều Dâng]</b></color>: Hãy chạm chọn 1 tướng có trang bị trên bàn đấu để phá hủy trang bị!");
-            return;
-        }
+        isWaitingForTrieuDangTarget = !isWaitingForTrieuDangTarget;
+        playerCard.SetSkillSelected(isWaitingForTrieuDangTarget);
 
-        ExecuteTrieuDangOnTarget(currentSelectedTarget);
+        if (isWaitingForTrieuDangTarget)
+        {
+            if (playerHandUI != null) playerHandUI.ClearSelection();
+            currentSelectedCardUI = null;
+            HideCardDescription();
+
+            SetLog("🌊 <color=#55DDFF><b>[Triều Dâng]</b></color>: Click vào một tướng để dùng Kỹ năng Triều Dâng như chọn lá bài.");
+
+            if (currentSelectedTarget != null && targetsWithEquip.Contains(currentSelectedTarget))
+            {
+                UpdateActionButtonState();
+            }
+            else
+            {
+                if (actionBtnGo != null) actionBtnGo.SetActive(false);
+            }
+        }
+        else
+        {
+            if (actionBtnGo != null) actionBtnGo.SetActive(false);
+            SetLog("🌊 Đã hủy chọn Kỹ năng [Triều Dâng].");
+        }
     }
 
     private void ExecuteTrieuDangOnTarget(GeneralCardUI target)
@@ -9337,9 +9382,14 @@ public void ShowCardAtCenter(CardModel card, GeneralCardUI caster, GeneralCardUI
                         playerCard.UsedSkillsValues = vList.ToArray();
                     }
                 }
-                UpdatePlayerSkillButtonState();
 
-                if (!string.IsNullOrEmpty(currentRoomId))
+                isWaitingForTrieuDangTarget = false;
+                playerCard.SetSkillSelected(false);
+                UpdatePlayerSkillButtonState();
+                ClearSelectedTarget();
+                if (actionBtnGo != null) actionBtnGo.SetActive(false);
+
+                if (DenoGameClient.IsConnected)
                 {
                     DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
                     {
@@ -9352,7 +9402,7 @@ public void ShowCardAtCenter(CardModel card, GeneralCardUI caster, GeneralCardUI
                     }, (s) => { if (s != null) ApplyServerGameState(s); });
                 }
             }
-        });
+        }, onlyEquipment: true);
     }
 
     private void OnPlayerSkillTienThoaiClicked()
