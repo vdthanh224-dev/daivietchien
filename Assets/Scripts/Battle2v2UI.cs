@@ -1835,91 +1835,108 @@ public class Battle2v2UI : MonoBehaviour
         isAwaitingServerNearDeath = false;
     }
 
-    private IEnumerator ResolveServerSongCungFollowUp(AppwriteMatchmaking.ServerGameState state)
+    private IEnumerator PromptPlayerSongCungDiscard(GeneralCardUI caster, GeneralCardUI target, Action<bool, List<CardModel>> onResolved)
     {
-        isAwaitingServerSongCung = true;
-        var target = state != null && state.activeCard != null
-            ? GetGeneralBySeat(state.activeCard.targetSeat)
-            : null;
-        var modal = new GameObject("ServerSongCungPromptModal", typeof(RectTransform), typeof(Image));
+        bool decided = false;
+        bool accepted = false;
+        var chosenCards = new List<CardModel>();
+        float promptTimer = 40.0f;
+
+        caster.ShowHeadTimer(40);
+
+        var modal = new GameObject("SongCungPromptModal", typeof(RectTransform), typeof(Image));
         modal.transform.SetParent(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, false);
         modal.transform.SetAsLastSibling();
+
         var modalImage = modal.GetComponent<Image>();
         var bg = LotusHealthUI.LoadSpriteFromResources("UI/auth_card_bg");
         if (bg != null) { modalImage.sprite = bg; modalImage.type = Image.Type.Sliced; }
-        modalImage.color = new Color(0.08f, 0.04f, 0.02f, 0.98f);
+        modalImage.color = new Color(0.04f, 0.07f, 0.14f, 0.98f);
+
         var modalRect = modal.GetComponent<RectTransform>();
         modalRect.anchorMin = modalRect.anchorMax = modalRect.pivot = new Vector2(0.5f, 0.5f);
-        modalRect.sizeDelta = new Vector2(650f, 180f);
-        modalRect.anchoredPosition = new Vector2(0f, 100f);
+        modalRect.sizeDelta = new Vector2(740f, 190f);
+        modalRect.anchoredPosition = new Vector2(0f, 65f);
 
-        var title = AddText(modal.transform, "Title", "🏹 SONG CUNG MƯỜNG NHẠ", 14,
-            ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter);
-        SetRect(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0.5f, 1f), new Vector2(620f, 30f), new Vector2(0f, -10f));
-        var message = AddText(modal.transform, "Message",
-            $"Trảm đã bị Đỡ. Chọn đúng 2 lá trên tay để ép {(target != null ? target.GeneralName : "mục tiêu")} chịu 1 sát thương xuyên Đỡ.",
-            11, Color.white, FontStyle.Normal, TextAnchor.MiddleCenter);
-        SetRect(message.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-            new Vector2(0.5f, 0.5f), new Vector2(610f, 38f), new Vector2(0f, 30f));
+        var fGo = new GameObject("Frame", typeof(RectTransform), typeof(Image));
+        fGo.transform.SetParent(modal.transform, false);
+        var fImg = fGo.GetComponent<Image>();
+        var fSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+        if (fSpr != null) { fImg.sprite = fSpr; fImg.type = Image.Type.Sliced; }
+        fImg.color = ThemeUI.GoldPrimary;
+        fImg.raycastTarget = false;
+        Fill(fGo.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
+
+        var title = AddText(modal.transform, "Title", "🏹 KÍCH HOẠT SONG CUNG MƯỜNG NHẠ", 18, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleLeft);
+        SetRect(title.rectTransform, new Vector2(0f, 1f), new Vector2(0.7f, 1f), new Vector2(0f, 1f), new Vector2(0, 28f), new Vector2(24f, -12f));
+
+        var timerTxt = AddText(modal.transform, "Timer", "⏳ Còn 40s...", 16, ThemeUI.CyanPrimary, FontStyle.Bold, TextAnchor.MiddleRight);
+        SetRect(timerTxt.rectTransform, new Vector2(0.7f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(0, 28f), new Vector2(-24f, -12f));
+
+        string targetName = target != null ? target.GeneralName : "mục tiêu";
+        var message = AddText(modal.transform, "Message", $"Đòn Trảm bị Đỡ! Hãy chọn đúng 2 lá trên tay (0/2) để ép <b>{targetName}</b> vẫn phải chịu 1 sát thương xuyên Đỡ.", 15, new Color(0.9f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
+        message.lineSpacing = 1.2f;
+        message.horizontalOverflow = HorizontalWrapMode.Wrap;
+        message.verticalOverflow = VerticalWrapMode.Truncate;
+        SetRect(message.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(-48f, 50f), new Vector2(0f, -44f));
 
         var buttonSprite = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
         var useGo = new GameObject("Btn_Use", typeof(RectTransform), typeof(Image), typeof(Button));
         useGo.transform.SetParent(modal.transform, false);
         var useImage = useGo.GetComponent<Image>();
         if (buttonSprite != null) { useImage.sprite = buttonSprite; useImage.type = Image.Type.Sliced; }
-        useImage.color = new Color(0.2f, 0.75f, 0.35f, 1f);
-        SetRect(useGo.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-            new Vector2(0.5f, 0f), new Vector2(300f, 40f), new Vector2(-160f, 14f));
-        var useText = AddText(useGo.transform, "Text", "🏹 BỎ 2 LÁ KÍCH HOẠT", 11,
-            Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        useImage.color = new Color(0.35f, 0.4f, 0.5f, 0.7f);
+        SetRect(useGo.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(300f, 44f), new Vector2(-125f, 16f));
+        var useText = AddText(useGo.transform, "Text", "🏹 BỎ 2 LÁ ÉP MẤT MÁU", 15, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(useText.rectTransform);
 
         var passGo = new GameObject("Btn_Pass", typeof(RectTransform), typeof(Image), typeof(Button));
         passGo.transform.SetParent(modal.transform, false);
         var passImage = passGo.GetComponent<Image>();
         if (buttonSprite != null) { passImage.sprite = buttonSprite; passImage.type = Image.Type.Sliced; }
-        passImage.color = new Color(0.5f, 0.55f, 0.65f, 1f);
-        SetRect(passGo.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-            new Vector2(0.5f, 0f), new Vector2(210f, 40f), new Vector2(155f, 14f));
-        var passText = AddText(passGo.transform, "Text", "❌ BỎ QUA", 11,
-            Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        passImage.color = new Color(0.40f, 0.44f, 0.52f, 1f);
+        SetRect(passGo.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(200f, 44f), new Vector2(155f, 16f));
+        var passText = AddText(passGo.transform, "Text", "❌ BỎ QUA", 15, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(passText.rectTransform);
 
-        bool decided = false;
-        bool accepted = false;
-        var selectedIds = new List<string>();
         Action<List<CardUI>> onSelectionChanged = selected =>
         {
-            selectedIds.Clear();
+            chosenCards.Clear();
             if (selected != null)
             {
                 foreach (var cardUI in selected)
                 {
-                    if (cardUI != null && cardUI.Data != null) selectedIds.Add(cardUI.Data.id);
+                    if (cardUI != null && cardUI.Data != null) chosenCards.Add(cardUI.Data);
                 }
             }
-            useGo.GetComponent<Button>().interactable = selectedIds.Count == 2;
-            useImage.color = selectedIds.Count == 2
-                ? new Color(0.2f, 0.75f, 0.35f, 1f)
-                : new Color(0.4f, 0.44f, 0.52f, 0.85f);
-            message.text = selectedIds.Count == 2
-                ? "Đã chọn đủ 2 lá. Bấm để kích hoạt Song Cung."
-                : $"Trảm đã bị Đỡ. Hãy chọn đúng 2 lá trên tay ({selectedIds.Count}/2).";
+            bool isEnough = chosenCards.Count == 2;
+            useGo.GetComponent<Button>().interactable = isEnough;
+            useImage.color = isEnough ? ThemeUI.JadeGreen : new Color(0.35f, 0.4f, 0.5f, 0.7f);
+            message.text = isEnough
+                ? $"<color=#55FF55><b>Đã chọn đủ 2 lá bài!</b></color> Nhấn nút [BỎ 2 LÁ ÉP MẤT MÁU] để kích hoạt."
+                : $"Đòn Trảm bị Đỡ! Hãy chọn đúng 2 lá trên tay ({chosenCards.Count}/2) để ép <b>{targetName}</b> chịu 1 sát thương.";
         };
 
         playerHandUI.IsMultiSelectMode = true;
-                playerHandUI.MaxSelectableCards = discardExcessRequired;
         playerHandUI.MaxSelectableCards = 2;
         playerHandUI.ClearSelection();
         playerHandUI.HighlightOnlyMatching(_ => true);
         playerHandUI.OnSelectionChanged += onSelectionChanged;
+
         useGo.GetComponent<Button>().interactable = false;
         useGo.GetComponent<Button>().onClick.AddListener(() => { accepted = true; decided = true; });
         passGo.GetComponent<Button>().onClick.AddListener(() => { accepted = false; decided = true; });
 
-        while (!decided && !battleFinished && IsAuthoritativePromptActive("AWAIT_SONG_CUNG_FOLLOW_UP"))
+        while (!decided && !battleFinished)
         {
+            promptTimer -= Time.unscaledDeltaTime;
+            caster.UpdateHeadTimer(Mathf.Max(0, Mathf.CeilToInt(promptTimer)));
+            if (timerTxt != null) timerTxt.text = $"⏳ Còn {Mathf.Max(0, Mathf.CeilToInt(promptTimer))}s...";
+
+            if (promptTimer <= 0f)
+            {
+                decided = true;
+            }
             yield return null;
         }
 
@@ -1927,10 +1944,73 @@ public class Battle2v2UI : MonoBehaviour
         playerHandUI.ClearSelection();
         playerHandUI.IsMultiSelectMode = false;
         playerHandUI.ClearHighlights();
+        caster.HideHeadTimer();
         if (modal != null) Destroy(modal);
 
-        if (decided && IsAuthoritativePromptActive("AWAIT_SONG_CUNG_FOLLOW_UP"))
+        onResolved?.Invoke(accepted && chosenCards.Count == 2, chosenCards);
+    }
+
+    private IEnumerator AwaitRemoteSongCungFollowUp(GeneralCardUI caster, GeneralCardUI target, Action<bool, List<CardModel>> onResolved)
+    {
+        bool remoteDecided = false;
+        bool wantsFollowUp = false;
+        var chosenCards = new List<CardModel>();
+        float waitTimer = 40.0f;
+
+        caster.ShowHeadTimer(40);
+        SetLog($"⏳ Đang đợi <b>{caster.GeneralName}</b> chọn có kích hoạt [Song Cung Mường Nhạ] ép đối phương chịu sát thương không... (40s)");
+
+        while (waitTimer > 0f && !remoteDecided && !battleFinished)
         {
+            waitTimer -= Time.unscaledDeltaTime;
+            caster.UpdateHeadTimer(Mathf.Max(0, Mathf.CeilToInt(waitTimer)));
+
+            yield return AppwriteMatchmaking.PollBattleActions(currentRoomId, (actions) =>
+            {
+                foreach (var act in actions)
+                {
+                    if (act.casterSeat == caster.SeatNumber && act.actionType == "SONG_CUNG_TRIGGERED" && !processedActionTimestamps.Contains(act.timestamp))
+                    {
+                        processedActionTimestamps.Add(act.timestamp);
+                        remoteDecided = true;
+                        wantsFollowUp = act.accepted;
+                        if (wantsFollowUp && !string.IsNullOrEmpty(act.cardId))
+                        {
+                            var ids = act.cardId.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                            foreach (var cid in ids)
+                            {
+                                var trimmed = cid.Trim();
+                                var cm = CardDatabase.GetCardById(trimmed) ?? new CardModel { id = trimmed, cardName = "Bài Bỏ" };
+                                chosenCards.Add(cm);
+                            }
+                        }
+                    }
+                }
+            });
+
+            if (remoteDecided) break;
+            yield return null;
+        }
+
+        caster.HideHeadTimer();
+        onResolved?.Invoke(wantsFollowUp && chosenCards.Count == 2, chosenCards);
+    }
+
+    private IEnumerator ResolveServerSongCungFollowUp(AppwriteMatchmaking.ServerGameState state)
+    {
+        isAwaitingServerSongCung = true;
+        var target = state != null && state.activeCard != null
+            ? GetGeneralBySeat(state.activeCard.targetSeat)
+            : null;
+
+        yield return PromptPlayerSongCungDiscard(playerCard, target, (accepted, chosenCards) =>
+        {
+            var selectedIds = new List<string>();
+            if (chosenCards != null)
+            {
+                foreach (var c in chosenCards) selectedIds.Add(c.id);
+            }
+
             DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
             {
                 action = "RESPOND_ACTION",
@@ -1939,7 +2019,8 @@ public class Battle2v2UI : MonoBehaviour
                 accepted = accepted,
                 cardIds = accepted ? new List<string>(selectedIds) : new List<string>()
             }, (s) => { if (s != null) ApplyServerGameState(s); });
-        }
+        });
+
         isAwaitingServerSongCung = false;
     }
 
@@ -4760,6 +4841,19 @@ public class Battle2v2UI : MonoBehaviour
                 return;
             }
 
+            if (card.subType == CardSubType.Snatch || card.subType == CardSubType.Dismantle)
+            {
+                var targetOptions = BuildTargetCardOptions(currentSelectedTarget, true);
+                if (targetOptions == null || targetOptions.Count == 0)
+                {
+                    btn.interactable = false;
+                    btnImg.color = new Color(0.55f, 0.25f, 0.25f, 0.9f);
+                    actionBtnText.text = "❌ MỤC TIÊU KHÔNG CÒN BÀI";
+                    SetLog($"❌ Mục tiêu [{currentSelectedTarget.GeneralName}] không còn lá bài nào trên tay, trang bị hay phán xét để cướp/hủy!");
+                    return;
+                }
+            }
+
             btn.interactable = true;
             btnImg.color = new Color(0.92f, 0.65f, 0.15f, 1f);
 
@@ -5564,7 +5658,65 @@ public class Battle2v2UI : MonoBehaviour
 
         target.SetAwaitingReaction(false); // Dừng nhấp nháy sau khi đã phản ứng xong
 
-        // 2.5. VÒNG LẶP TRƯỜNG ĐAO NAM SƠN: KHI BỊ ĐỠ, HỎI CASTER CÓ BỎ 1 LÁ TRẢM TIẾP TỤC TRUY KÍCH KHÔNG
+        // 2.5. HIỆU ỨNG SONG CUNG MƯỜNG NHẠ: KHI BỊ ĐỠ, HỎI CASTER CÓ BỎ 2 LÁ BÀI BẤT KỲ TRÊN TAY ÉP MỤC TIÊU CHỊU SÁT THƯƠNG KHÔNG
+        if (dodged && caster.HasEquipment(EquipmentType.Weapon, "Song Cung") && !battleFinished)
+        {
+            var casterHand = GetHandOfGeneral(caster);
+            if (casterHand != null && casterHand.Count >= 2)
+            {
+                bool casterWantsSongCung = false;
+                List<CardModel> chosenCards = null;
+
+                if (caster == playerCard)
+                {
+                    yield return PromptPlayerSongCungDiscard(caster, target, (wants, cards) =>
+                    {
+                        casterWantsSongCung = wants;
+                        chosenCards = cards;
+                    });
+                }
+                else if (caster.IsAI)
+                {
+                    yield return new WaitForSeconds(1.0f);
+                    casterWantsSongCung = (UnityEngine.Random.value < 0.80f);
+                    if (casterWantsSongCung && casterHand.Count >= 2)
+                    {
+                        chosenCards = new List<CardModel> { casterHand[0], casterHand[1] };
+                    }
+                }
+                else
+                {
+                    yield return AwaitRemoteSongCungFollowUp(caster, target, (wants, cards) =>
+                    {
+                        casterWantsSongCung = wants;
+                        chosenCards = cards;
+                    });
+                }
+
+                if (casterWantsSongCung && chosenCards != null && chosenCards.Count == 2)
+                {
+                    foreach (var c in chosenCards)
+                    {
+                        casterHand.Remove(c);
+                        deckManager.DiscardCard(c);
+                    }
+                    if (caster == playerCard)
+                    {
+                        playerHandUI.ClearHand();
+                        playerHandUI.AddCards(playerHandCards);
+                    }
+                    UpdateHandCountsVisual();
+
+                    AudioManager.Instance.PlaySkill();
+                    ShowCardAtCenter(chosenCards[0], caster, target, "Song Cung Mường Nhạ");
+                    SetLog($"🏹 <color=#FFD700><b>[SONG CUNG MƯỜNG NHẠ]</b></color>: <b>{caster.GeneralName}</b> bỏ 2 lá bài ép <b>{target.GeneralName}</b> vẫn phải chịu 1 sát thương!");
+
+                    dodged = false; // Bỏ qua né đòn, ép trúng đích!
+                }
+            }
+        }
+
+        // 2.6. VÒNG LẶP TRƯỜNG ĐAO NAM SƠN: KHI BỊ ĐỠ, HỎI CASTER CÓ BỎ 1 LÁ TRẢM TIẾP TỤC TRUY KÍCH KHÔNG
         while (dodged && caster.HasEquipment(EquipmentType.Weapon, "Trường Đao") && !battleFinished)
         {
             var casterHand = GetHandOfGeneral(caster);
