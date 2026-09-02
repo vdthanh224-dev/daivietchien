@@ -1010,13 +1010,13 @@ function beginNextHarvestPicker(state) {
       discardCard(state, card);
     }
   }
-  resetWaitingState(state);
   state.harvestPool = [];
   state.harvestPickers = [];
   recordAction(state, {
     type: "HARVEST_EMPTY",
-    description: `🍚 Mở Kho Cứu Tế đã chia xong, các lá còn dư được bỏ vào Mộ.`
+    description: 🍚 Mở Kho Cứu Tế đã chia xong, các lá còn dư được bỏ vào Mộ.
   });
+  resetWaitingState(state);
   return false;
 }
 
@@ -1247,7 +1247,13 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0) {
         return { success: true, state };
       }
 
-      beginNextHarvestPicker(state);
+      const hasMore = beginNextHarvestPicker(state);
+    if (!hasMore && state.harvestPickers && state.harvestPickers.length === 0 && (!state.harvestPool || state.harvestPool.length === 0)) {
+        state.phase = "PLAY";
+        state.waitingTargetSeat = 0;
+        state.waitingReactionType = null;
+        state.activeCard = null;
+    }
       refreshLastDelta(state);
       return { success: true, state };
     }
@@ -1505,7 +1511,13 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
                 }
                 if (chain.continuation?.type === "CONTINUE_HARVEST") {
                   state.harvestPickers.shift();
-                  beginNextHarvestPicker(state);
+                  const hasMore = beginNextHarvestPicker(state);
+    if (!hasMore && state.harvestPickers && state.harvestPickers.length === 0 && (!state.harvestPool || state.harvestPool.length === 0)) {
+        state.phase = "PLAY";
+        state.waitingTargetSeat = 0;
+        state.waitingReactionType = null;
+        state.activeCard = null;
+    }
                   refreshLastDelta(state);
                   return { success: true, state };
                 }
@@ -1594,7 +1606,13 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       }
       if (chain.continuation?.type === "CONTINUE_HARVEST") {
         state.harvestPickers.shift();
-        beginNextHarvestPicker(state);
+        const hasMore = beginNextHarvestPicker(state);
+    if (!hasMore && state.harvestPickers && state.harvestPickers.length === 0 && (!state.harvestPool || state.harvestPool.length === 0)) {
+        state.phase = "PLAY";
+        state.waitingTargetSeat = 0;
+        state.waitingReactionType = null;
+        state.activeCard = null;
+    }
         refreshLastDelta(state);
         return { success: true, state };
       }
@@ -1672,7 +1690,13 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     }
 
     // Continue to next picker (this will check for Nullify again)
-    beginNextHarvestPicker(state);
+    const hasMore = beginNextHarvestPicker(state);
+    if (!hasMore && state.harvestPickers && state.harvestPickers.length === 0 && (!state.harvestPool || state.harvestPool.length === 0)) {
+        state.phase = "PLAY";
+        state.waitingTargetSeat = 0;
+        state.waitingReactionType = null;
+        state.activeCard = null;
+    }
     refreshLastDelta(state);
     return { success: true, state };
   }
@@ -2952,6 +2976,9 @@ export function handleToggleSkill(state, seat, skillId) {
   refreshLastDelta(state);
   return { success: true, state };
 }
+
+
+
 
 
 
