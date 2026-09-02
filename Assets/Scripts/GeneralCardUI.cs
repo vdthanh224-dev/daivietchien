@@ -789,6 +789,31 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
         }
     }
 
+    public bool IsChained { get; private set; } = false;
+    private GameObject chainedOverlayGo;
+
+    public void SetChained(bool chained)
+    {
+        IsChained = chained;
+        if (chainedOverlayGo == null && transform != null)
+        {
+            chainedOverlayGo = new GameObject("ChainedOverlay", typeof(RectTransform), typeof(Image));
+            chainedOverlayGo.transform.SetParent(transform, false);
+            chainedOverlayGo.transform.SetAsLastSibling();
+            var img = chainedOverlayGo.GetComponent<Image>();
+            img.color = new Color(0.08f, 0.04f, 0.02f, 0.45f);
+            FillRect(chainedOverlayGo.GetComponent<RectTransform>());
+
+            var iconTxt = ThemeUI.CreateText(chainedOverlayGo.transform, "Icon", "⛓️ XÍCH", 18, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, true);
+            FillRect(iconTxt.rectTransform);
+        }
+
+        if (chainedOverlayGo != null)
+        {
+            chainedOverlayGo.SetActive(chained);
+        }
+    }
+
     public void SetDeadVisual(bool isDead)
     {
         deadVisualActive = isDead;

@@ -4862,6 +4862,7 @@ public class Battle2v2UI : MonoBehaviour
             else if (card.subType == CardSubType.Dismantle) actionBtnText.text = $"🏚️ PHÁ HỦY BÀI [{currentSelectedTarget.GeneralName.ToUpper()}]";
             else if (card.subType == CardSubType.FlawlessDefense) actionBtnText.text = $"🛡️ HỦY BÀI [{currentSelectedTarget.GeneralName.ToUpper()}]";
             else if (card.subType == CardSubType.Duel) actionBtnText.text = $"⚔️ THÁCH ĐẤU [{currentSelectedTarget.GeneralName.ToUpper()}]";
+            else if (card.subType == CardSubType.IronChain) actionBtnText.text = $"⛓️ KHÓA/GỠ XÍCH [{currentSelectedTarget.GeneralName.ToUpper()}]";
             else if (card.subType == CardSubType.SupplyShortage) actionBtnText.text = $"🌾 GÀI CẮT LƯƠNG [{currentSelectedTarget.GeneralName.ToUpper()}]";
             else if (card.subType == CardSubType.Acedia) actionBtnText.text = $"🕸️ GÀI TRẦM ẢO [{currentSelectedTarget.GeneralName.ToUpper()}]";
             else actionBtnText.text = $"🃏 DÙNG LÊN [{currentSelectedTarget.GeneralName.ToUpper()}]";
@@ -9276,7 +9277,7 @@ public void ShowCardAtCenter(CardModel card, GeneralCardUI caster, GeneralCardUI
     private bool RequiresTarget(CardModel c)
     {
         if (c == null) return false;
-        return CanActAsSlash(playerCard, c) || c.subType == CardSubType.Duel || c.subType == CardSubType.Snatch || c.subType == CardSubType.Dismantle || c.subType == CardSubType.SupplyShortage || c.subType == CardSubType.Acedia;
+        return CanActAsSlash(playerCard, c) || c.subType == CardSubType.Duel || c.subType == CardSubType.Snatch || c.subType == CardSubType.Dismantle || c.subType == CardSubType.SupplyShortage || c.subType == CardSubType.Acedia || c.subType == CardSubType.IronChain;
     }
 
     private GameObject CreateBaseModal(string title, Vector2 size)

@@ -56,6 +56,7 @@ public enum CardSubType
     Snatch,          // Đột Kích Trộm Lương
     ExNihilo,        // Dụng Binh Như Thần
     Duel,            // Thách Đấu
+    IronChain,       // Xích Tâm Tỏa
     Harvest,         // Mở Kho Cứu Tế
     BarbarianInvasion,// Bãi Cọc Ngầm
     ArrowRain,       // Mưa Tên Liên Châu

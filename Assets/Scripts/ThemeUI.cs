@@ -5,10 +5,10 @@ using UnityEngine.UI;
 
 /// <summary>
 /// Hệ Thống Giao Diện Hợp Nhất Toàn Game (Unified Theme UI System - Đại Việt Chiến)
+/// - Chủ đạo: VÀNG HOÀNG KIM (#FFD700) & TRẮNG BẠCH KIM (#FFFFFF)
 /// - Cỡ chữ to, rõ ràng, dễ đọc, không bị nhỏ (Typography Hierarchy chuẩn hóa)
-/// - Phong cách Hoàng Gia Đại Việt: Vàng Hoàng Kim (#FFD700), Nền Sơn Mài Lam Đậm (#070B14), Sen Hồng & Xanh Ngọc
 /// - Tự động đổ bóng / viền tương phản cao giúp mọi chữ đều sắc nét trên mọi hình nền
-/// - Factory tạo Nút, Bảng, Modal, Huy Hiệu, Thanh Thông Tin đồng bộ xuyên suốt toàn bộ dự án
+/// - Factory tạo Nút, Bảng, Modal, Huy Hiệu, Thanh Thông Tin đồng bộ phong cách Vàng - Trắng Đế Vương
 /// </summary>
 public static class ThemeUI
 {
@@ -38,42 +38,47 @@ public static class ThemeUI
     }
     #endregion
 
-    #region 2. BẢNG MÀU HOÀNG GIA ĐẠI VIỆT (IMPECCABLE COLOR TOKENS)
+    #region 2. BẢNG MÀU CHỦ ĐẠO VÀNG - TRẮNG HOÀNG GIA (IMPERIAL GOLD & WHITE)
     // Vàng Hoàng Kim (Imperial Gold)
-    public static readonly Color GoldPrimary   = new Color(1.00f, 0.82f, 0.40f, 1.0f); // #FFD166
-    public static readonly Color GoldHighlight = new Color(1.00f, 0.94f, 0.60f, 1.0f); // #FFF073
-    public static readonly Color GoldDeep      = new Color(0.83f, 0.62f, 0.22f, 1.0f); // #D4AF37
+    public static readonly Color GoldPrimary   = new Color(1.00f, 0.84f, 0.20f, 1.0f); // #FFD700
+    public static readonly Color GoldHighlight = new Color(1.00f, 0.95f, 0.60f, 1.0f); // #FFF299
+    public static readonly Color GoldDeep      = new Color(0.85f, 0.65f, 0.15f, 1.0f); // #D9A626
+    public static readonly Color GoldLight     = new Color(1.00f, 0.96f, 0.80f, 1.0f); // #FFF5CC
+
+    // Trắng Bạch Kim & Sứ Hoàng Cung (Platinum & Ivory White)
+    public static readonly Color WhitePure     = new Color(1.00f, 1.00f, 1.00f, 1.0f); // #FFFFFF
+    public static readonly Color WhiteIvory    = new Color(0.98f, 0.97f, 0.94f, 1.0f); // #FAF7F0
+    public static readonly Color WhiteCardBg   = new Color(0.96f, 0.95f, 0.92f, 0.98f);
+    public static readonly Color WhiteTranslucent = new Color(1.00f, 1.00f, 1.00f, 0.92f);
 
     // Lam Long & Đồng Minh (Azure Dragon & Ally)
-    public static readonly Color CyanPrimary   = new Color(0.33f, 0.75f, 1.00f, 1.0f); // #55DDFF
+    public static readonly Color CyanPrimary   = new Color(0.33f, 0.78f, 1.00f, 1.0f); // #55C7FF
     public static readonly Color AllyBlue      = new Color(0.23f, 0.51f, 0.96f, 1.0f); // #3B82F6
-    public static readonly Color AllyBorder    = new Color(0.35f, 0.75f, 1.00f, 0.95f);
+    public static readonly Color AllyBorder    = new Color(1.00f, 0.84f, 0.20f, 0.95f); // Viền vàng hoàng gia
 
     // Huyết Đỏ & Đối Thủ (Blood Crimson & Enemy)
     public static readonly Color CrimsonRed    = new Color(0.90f, 0.22f, 0.27f, 1.0f); // #E63946
     public static readonly Color EnemyRed      = new Color(0.94f, 0.27f, 0.27f, 1.0f); // #EF4444
-    public static readonly Color EnemyBorder   = new Color(1.00f, 0.40f, 0.40f, 0.95f);
+    public static readonly Color EnemyBorder   = new Color(1.00f, 0.84f, 0.20f, 0.95f); // Viền vàng hoàng gia
 
     // Ngọc Bích & Cứu Trợ (Lotus Jade & Relief)
-    public static readonly Color JadeGreen     = new Color(0.16f, 0.62f, 0.56f, 1.0f); // #2A9D8F
-    public static readonly Color JadeBright    = new Color(0.33f, 1.00f, 0.33f, 1.0f); // #55FF55
+    public static readonly Color JadeGreen     = new Color(0.18f, 0.72f, 0.42f, 1.0f); // #2EB86B
+    public static readonly Color JadeBright    = new Color(0.35f, 1.00f, 0.45f, 1.0f); // #59FF73
 
     // Màu Chữ & Tương Phản (Typography Contrast)
-    public static readonly Color TextWhite     = new Color(0.97f, 0.98f, 0.99f, 1.0f); // #F8FAFC
-    public static readonly Color TextMuted     = new Color(0.88f, 0.85f, 0.72f, 0.95f); // #E2D9B8
-    public static readonly Color TextDark      = new Color(0.06f, 0.08f, 0.12f, 1.0f);
+    public static readonly Color TextWhite     = new Color(1.00f, 1.00f, 1.00f, 1.0f); // #FFFFFF
+    public static readonly Color TextGold      = new Color(1.00f, 0.88f, 0.35f, 1.0f); // #FFE059
+    public static readonly Color TextMuted     = new Color(0.92f, 0.90f, 0.82f, 0.95f); // #EBE6D1
+    public static readonly Color TextDark      = new Color(0.12f, 0.10f, 0.08f, 1.0f); // #1F1A14
 
-    // Nền Bảng & Panel (Obsidian Dark)
-    public static readonly Color BgDeepNavy    = new Color(0.02f, 0.04f, 0.07f, 0.98f); // #060912
-    public static readonly Color BgCardDark    = new Color(0.04f, 0.06f, 0.12f, 0.98f); // #0A1020
-    public static readonly Color BgModalDark   = new Color(0.02f, 0.03f, 0.07f, 0.95f);
-    public static readonly Color BgOverlay     = new Color(0.02f, 0.03f, 0.07f, 0.88f);
+    // Nền Bảng & Panel (Imperial Lacquer & Gold Trims)
+    public static readonly Color BgDeepNavy    = new Color(0.06f, 0.05f, 0.04f, 0.98f); // Nền sơn mài ấm
+    public static readonly Color BgCardDark    = new Color(0.09f, 0.07f, 0.05f, 0.98f); // #17120D
+    public static readonly Color BgModalDark   = new Color(0.06f, 0.05f, 0.04f, 0.96f);
+    public static readonly Color BgOverlay     = new Color(0.03f, 0.02f, 0.02f, 0.90f);
     #endregion
 
     #region 3. FACTORY TẠO TEXT CHUẨN CÓ BÓNG / VIỀN (HIGH READABILITY)
-    /// <summary>
-    /// Tạo đối tượng Text có cỡ chữ to, rõ ràng và tự động gắn Shadow/Outline để luôn đọc tốt.
-    /// </summary>
     public static Text CreateText(
         Transform parent,
         string name,
@@ -111,7 +116,7 @@ public static class ThemeUI
         if (text == null) return;
         var s = text.GetComponent<Shadow>();
         if (s == null) s = text.gameObject.AddComponent<Shadow>();
-        s.effectColor = shadowColor ?? new Color(0f, 0f, 0f, 0.85f);
+        s.effectColor = shadowColor ?? new Color(0f, 0f, 0f, 0.90f);
         s.effectDistance = distance ?? new Vector2(1.5f, -1.5f);
         s.useGraphicAlpha = true;
     }
@@ -131,9 +136,10 @@ public static class ThemeUI
     public enum ButtonTheme
     {
         Gold,      // Vàng Hoàng Kim (Chính)
+        White,     // Trắng Sứ Viền Vàng (Thứ cấp, Thanh lịch)
         Jade,      // Xanh Lục (Cứu viện, Xác nhận an toàn)
         Crimson,   // Đỏ Huyết (Tấn công, Bỏ bài, Từ chối)
-        Dark,      // Lam Tối (Thứ cấp, Menu phụ)
+        Dark,      // Nâu Tối Hoàng Gia (Menu phụ)
         Disabled   // Xám (Vô hiệu hóa)
     }
 
@@ -156,11 +162,12 @@ public static class ThemeUI
 
         img.color = theme switch
         {
-            ButtonTheme.Gold => new Color(0.95f, 0.72f, 0.18f, 1.0f),
+            ButtonTheme.Gold => new Color(1.00f, 0.80f, 0.20f, 1.0f),
+            ButtonTheme.White => new Color(0.96f, 0.96f, 0.96f, 1.0f),
             ButtonTheme.Jade => new Color(0.20f, 0.78f, 0.38f, 1.0f),
             ButtonTheme.Crimson => new Color(0.88f, 0.25f, 0.22f, 1.0f),
-            ButtonTheme.Dark => new Color(0.22f, 0.28f, 0.40f, 1.0f),
-            ButtonTheme.Disabled => new Color(0.45f, 0.48f, 0.55f, 0.85f),
+            ButtonTheme.Dark => new Color(0.24f, 0.20f, 0.16f, 1.0f),
+            ButtonTheme.Disabled => new Color(0.45f, 0.45f, 0.48f, 0.85f),
             _ => GoldPrimary
         };
 
@@ -169,7 +176,18 @@ public static class ThemeUI
         rt.sizeDelta = size;
         rt.anchoredPosition = pos;
 
-        var txt = CreateText(btnGo.transform, "Label", label, fontSize, TextWhite, FontStyle.Bold, TextAnchor.MiddleCenter, true);
+        // Viền vàng sắc sảo 2 lớp
+        var borderGo = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        borderGo.transform.SetParent(btnGo.transform, false);
+        var bImg = borderGo.GetComponent<Image>();
+        var fSpr = LoadSprite("UI/card_frame");
+        if (fSpr != null) { bImg.sprite = fSpr; bImg.type = Image.Type.Sliced; }
+        bImg.color = GoldPrimary;
+        bImg.raycastTarget = false;
+        Fill(borderGo.GetComponent<RectTransform>(), new Vector2(-1.5f, -1.5f), new Vector2(1.5f, 1.5f));
+
+        Color labelColor = theme == ButtonTheme.White ? TextDark : TextWhite;
+        var txt = CreateText(btnGo.transform, "Label", label, fontSize, labelColor, FontStyle.Bold, TextAnchor.MiddleCenter, true);
         Fill(txt.rectTransform);
 
         var btn = btnGo.GetComponent<Button>();
@@ -192,9 +210,6 @@ public static class ThemeUI
     #endregion
 
     #region 5. FACTORY TẠO PANEL & MODAL HOÀNG GIA ĐỒNG BỘ
-    /// <summary>
-    /// Tạo một Modal chuẩn có Nền đen mờ toàn màn hình, Khung viền Vàng Hoàng Kim và Thanh Tiêu Đề sắc nét.
-    /// </summary>
     public static GameObject CreateModal(
         Transform parent,
         string name,
@@ -215,8 +230,8 @@ public static class ThemeUI
         panelGo.transform.SetParent(overlayGo.transform, false);
 
         var pImg = panelGo.GetComponent<Image>();
-        var slotSpr = LoadSprite("UI/slot_bg");
-        if (slotSpr != null) { pImg.sprite = slotSpr; pImg.type = Image.Type.Sliced; }
+        var bgSprite = LoadSprite("UI/auth_card_bg");
+        if (bgSprite != null) { pImg.sprite = bgSprite; pImg.type = Image.Type.Sliced; }
         pImg.color = BgCardDark;
 
         var pRt = panelGo.GetComponent<RectTransform>();
@@ -225,7 +240,7 @@ public static class ThemeUI
         pRt.anchoredPosition = Vector2.zero;
         contentRt = pRt;
 
-        // Khung Viền Vàng Phát Sáng
+        // Khung Viền Vàng Hoàng Kim 2 Lớp Sắc Nét
         var borderGo = new GameObject("OuterBorder", typeof(RectTransform), typeof(Image));
         borderGo.transform.SetParent(panelGo.transform, false);
         borderGo.transform.SetAsFirstSibling();
@@ -234,7 +249,7 @@ public static class ThemeUI
         if (fSpr != null) { bImg.sprite = fSpr; bImg.type = Image.Type.Sliced; }
         bImg.color = GoldPrimary;
         bImg.raycastTarget = false;
-        Fill(borderGo.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
+        Fill(borderGo.GetComponent<RectTransform>(), new Vector2(-3, -3), new Vector2(3, 3));
 
         // Thanh Tiêu Đề (Header Banner)
         var headerGo = new GameObject("HeaderBanner", typeof(RectTransform), typeof(Image));
@@ -242,7 +257,7 @@ public static class ThemeUI
         var hImg = headerGo.GetComponent<Image>();
         var bSpr = LoadSprite("UI/badge_faction");
         if (bSpr != null) { hImg.sprite = bSpr; hImg.type = Image.Type.Sliced; }
-        hImg.color = headerColor ?? new Color(0.12f, 0.35f, 0.65f, 0.98f);
+        hImg.color = headerColor ?? new Color(0.18f, 0.14f, 0.08f, 0.98f);
 
         var hRt = headerGo.GetComponent<RectTransform>();
         SetRect(hRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(size.x - 24f, 52f), new Vector2(0, -10f));
@@ -262,12 +277,12 @@ public static class ThemeUI
         var img = btnGo.GetComponent<Image>();
         var slotSpr = LoadSprite("UI/slot_bg");
         if (slotSpr != null) { img.sprite = slotSpr; img.type = Image.Type.Sliced; }
-        img.color = new Color(0.35f, 0.10f, 0.10f, 0.95f);
+        img.color = new Color(0.75f, 0.20f, 0.20f, 0.98f);
 
         var rt = btnGo.GetComponent<RectTransform>();
         rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(1f, 1f);
-        rt.sizeDelta = new Vector2(42f, 42f);
-        rt.anchoredPosition = new Vector2(-10f, -10f);
+        rt.sizeDelta = new Vector2(40f, 40f);
+        rt.anchoredPosition = new Vector2(-12f, -12f);
 
         var border = new GameObject("Border", typeof(RectTransform), typeof(Image));
         border.transform.SetParent(btnGo.transform, false);
@@ -278,7 +293,7 @@ public static class ThemeUI
         bImg.raycastTarget = false;
         Fill(border.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
 
-        var txt = CreateText(btnGo.transform, "Txt", "✕", SizeTitleMedium, GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, true);
+        var txt = CreateText(btnGo.transform, "Txt", "✕", SizeTitleMedium, WhitePure, FontStyle.Bold, TextAnchor.MiddleCenter, true);
         Fill(txt.rectTransform);
 
         var btn = btnGo.GetComponent<Button>();
@@ -288,9 +303,6 @@ public static class ThemeUI
     #endregion
 
     #region 6. ĐỊNH DẠNG THẺ BÀI CHUẨN VIỆT HÓA (DỄ ĐỌC)
-    /// <summary>
-    /// Định dạng dòng thông tin lá bài ngắn gọn, to rõ (Ví dụ: [ĐỘT KÍCH TRỘM LƯƠNG] (Cẩm Nang Tức Thời • ♥ K): ...)
-    /// </summary>
     public static string FormatCardDescription(CardModel card)
     {
         if (card == null) return "";
@@ -313,9 +325,9 @@ public static class ThemeUI
 
         string suitSymbol = card.suit switch
         {
-            CardSuit.Spade => "<color=#E2E8F0>♠</color>",
+            CardSuit.Spade => "<color=#FFFFFF>♠</color>",
             CardSuit.Heart => "<color=#FF5555>♥</color>",
-            CardSuit.Club => "<color=#E2E8F0>♣</color>",
+            CardSuit.Club => "<color=#FFFFFF>♣</color>",
             CardSuit.Diamond => "<color=#FF5555>♦</color>",
             _ => ""
         };
