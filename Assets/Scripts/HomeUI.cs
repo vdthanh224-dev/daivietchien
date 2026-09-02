@@ -1126,7 +1126,8 @@ public sealed class HomeUI : MonoBehaviour
 
         if (isCancelled || currentRoom == null) yield break;
 
-        // BƯỚC 3: Vòng lặp chờ ghép trận (15s đếm ngược ngầm, reset khi có người thật mới)
+        // BƯỚC 3: Vòng lặp chờ ghép trận (Đếm tiến thời gian thực, 15s đếm ngầm bù bot)
+        float elapsedTimer = 0f;
         float hostHiddenTimer = 15.0f;
         float heartbeatTimer = 0f;
         int lastRealPlayerCount = 1;
@@ -1134,13 +1135,14 @@ public sealed class HomeUI : MonoBehaviour
 
         while (!isCancelled)
         {
+            elapsedTimer += 0.5f;
             hostHiddenTimer -= 0.5f;
             heartbeatTimer -= 0.5f;
             guestWaitTimer += 0.5f;
 
             if (timerTxt != null)
             {
-                int displaySec = Mathf.Max(0, Mathf.CeilToInt(hostHiddenTimer));
+                int displaySec = Mathf.FloorToInt(elapsedTimer);
                 timerTxt.text = $"⏳ {displaySec}s";
             }
 

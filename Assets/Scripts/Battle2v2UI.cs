@@ -2764,11 +2764,13 @@ public class Battle2v2UI : MonoBehaviour
         var hRt = headerGo.GetComponent<RectTransform>();
         SetRect(hRt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 56f), Vector2.zero);
 
-        var titleTxt = AddText(headerGo.transform, "Title", "👑 ĐẠI VIỆT CHIẾN - GIAI ĐOẠN CHỌN TƯỚNG 2v2", ThemeUI.SizeTitleLarge, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleLeft);
-        SetRect(titleTxt.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(520f, 36f), new Vector2(20f, 0f));
+        var titleTxt = AddText(headerGo.transform, "Title", "👑 ĐẠI VIỆT CHIẾN • CHỌN TƯỚNG 2v2", 18, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleLeft);
+        SetRect(titleTxt.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(340f, 36f), new Vector2(16f, 0f));
 
-        draftTurnStatusText = AddText(headerGo.transform, "Status", "⏳ Đang chuẩn bị lượt chọn 1..4...", ThemeUI.SizeBodyLarge, new Color(0.55f, 0.9f, 1f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
-        SetRect(draftTurnStatusText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(500f, 36f), Vector2.zero);
+        draftTurnStatusText = AddText(headerGo.transform, "Status", "⏳ Đang chuẩn bị lượt chọn 1..4...", 17, ThemeUI.CyanPrimary, FontStyle.Bold, TextAnchor.MiddleCenter);
+        draftTurnStatusText.horizontalOverflow = HorizontalWrapMode.Wrap;
+        draftTurnStatusText.verticalOverflow = VerticalWrapMode.Truncate;
+        SetRect(draftTurnStatusText.rectTransform, new Vector2(0.28f, 0.5f), new Vector2(0.82f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 36f), Vector2.zero);
 
         var timerBoxGo = new GameObject("TimerBox", typeof(RectTransform), typeof(Image));
         timerBoxGo.transform.SetParent(headerGo.transform, false);
