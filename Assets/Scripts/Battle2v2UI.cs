@@ -1395,6 +1395,21 @@ public class Battle2v2UI : MonoBehaviour
                         var orphanWait = GameObject.Find("CounterWaitingModal");
                         if (orphanWait != null) Destroy(orphanWait);
 
+                        var counterCards = playerHandCards.FindAll(c => c != null && (c.subType == CardSubType.FlawlessDefense || (!string.IsNullOrEmpty(c.cardName) && c.cardName.Contains("Diệu Kế"))));
+                        if (counterCards.Count == 0)
+                        {
+                            // Người chơi không có Diệu Kế -> Tự động bỏ qua ngay lập tức, không hiện modal hỏi!
+                            DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
+                            {
+                                action = "RESPOND_ACTION",
+                                roomId = currentRoomId,
+                                seat = playerCard.SeatNumber,
+                                accepted = false,
+                                cardId = ""
+                            }, (s) => { if (s != null) ApplyServerGameState(s); });
+                            break;
+                        }
+
                         var existingPrompt = GameObject.Find("CounterPromptModal");
                         if (existingPrompt == null || promptChanged)
                         {
@@ -1402,9 +1417,8 @@ public class Battle2v2UI : MonoBehaviour
                             if (existingPrompt != null) Destroy(existingPrompt);
                             if (activeCounterPromptCoroutine != null) StopCoroutine(activeCounterPromptCoroutine);
 
-                            Debug.Log($"[NullifyPrompt] Tạo CounterPromptModal cho ghế {playerCard.SeatNumber}");
-                            var counterCard = playerHandCards.Find(c => c != null && (c.subType == CardSubType.FlawlessDefense || (!string.IsNullOrEmpty(c.cardName) && c.cardName.Contains("Diệu Kế"))));
-                            activeCounterPromptCoroutine = StartCoroutine(PromptPlayerCounterScroll(rootCard, qText, counterCard, (didUse, chosenCard) =>
+                            Debug.Log($"[NullifyPrompt] Tạo CounterPromptModal cho ghế {playerCard.SeatNumber} với {counterCards.Count} lá Diệu Kế");
+                            activeCounterPromptCoroutine = StartCoroutine(PromptPlayerCounterScroll(rootCard, qText, counterCards, (didUse, chosenCard) =>
                             {
                                 activeCounterPromptCoroutine = null;
                                 DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
@@ -5916,9 +5930,25 @@ public class Battle2v2UI : MonoBehaviour
                 // 1. NẾU LÀ NGƯỜI CHƠI TRÊN THIẾT BỊ NÀY
                 if (currentGen == playerCard)
                 {
-                    var myCounterCard = playerHandCards.Find(c => c != null && (c.subType == CardSubType.FlawlessDefense || (!string.IsNullOrEmpty(c.cardName) && c.cardName.Contains("Diệu Kế"))));
+                    var myCounterCards = playerHandCards.FindAll(c => c != null && (c.subType == CardSubType.FlawlessDefense || (!string.IsNullOrEmpty(c.cardName) && c.cardName.Contains("Diệu Kế"))));
+                    if (myCounterCards.Count == 0)
+                    {
+                        // Người chơi KHÔNG CÓ Diệu Kế Phá Mưu -> BỎ QUA HOÀN TOÀN, KHÔNG HIỆN BẢNG HỎI!
+                        if (!string.IsNullOrEmpty(currentRoomId))
+                        {
+                            DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
+                            {
+                                action = "RESPOND_ACTION",
+                                roomId = currentRoomId,
+                                seat = playerCard.SeatNumber,
+                                accepted = false,
+                                cardId = ""
+                            }, (s) => { if (s != null) ApplyServerGameState(s); });
+                        }
+                        continue;
+                    }
 
-                    yield return PromptPlayerCounterScroll(rootScroll, questionText, myCounterCard, (didUse, chosenCard) =>
+                    yield return PromptPlayerCounterScroll(rootScroll, questionText, myCounterCards, (didUse, chosenCard) =>
                     {
                         usedCard = didUse;
                         usedCounterCard = chosenCard;
@@ -5942,11 +5972,17 @@ public class Battle2v2UI : MonoBehaviour
                 // 2. NẾU LÀ BOT AI ĐƯỢC ĐIỀU KHIỂN BỞI CLIENT NÀY
                 else if (currentGen.IsAI && IsAIController())
                 {
+                    var aiHand = GetHandOfGeneral(currentGen);
+                    var aiCounters = aiHand != null ? aiHand.FindAll(c => c != null && (c.subType == CardSubType.FlawlessDefense || (!string.IsNullOrEmpty(c.cardName) && c.cardName.Contains("Diệu Kế")))) : null;
+                    if (aiCounters == null || aiCounters.Count == 0)
+                    {
+                        // AI không có Diệu Kế -> Bỏ qua luôn!
+                        continue;
+                    }
+                    var aiCounter = aiCounters[0];
+
                     var waitingModalGo = ShowWaitingCounterScrollModal(currentGen, questionText);
                     var timerTxt = waitingModalGo != null ? waitingModalGo.transform.Find("Timer")?.GetComponent<UnityEngine.UI.Text>() : null;
-
-                    var aiHand = GetHandOfGeneral(currentGen);
-                    var aiCounter = aiHand != null ? aiHand.Find(c => c != null && (c.subType == CardSubType.FlawlessDefense || (!string.IsNullOrEmpty(c.cardName) && c.cardName.Contains("Diệu Kế")))) : null;
 
                     float aiWaitTime = UnityEngine.Random.Range(2.0f, 3.5f);
                     float aiTimer = 40.0f;
@@ -6323,12 +6359,19 @@ public class Battle2v2UI : MonoBehaviour
         onResolved?.Invoke(wantsFollowUp, followUpCard);
     }
 
-    private IEnumerator PromptPlayerCounterScroll(CardModel scrollCard, string promptTitle, CardModel counterCard, Action<bool, CardModel> onResolved)
+    private IEnumerator PromptPlayerCounterScroll(CardModel scrollCard, string promptTitle, List<CardModel> counterCards, Action<bool, CardModel> onResolved)
     {
+        if (counterCards == null || counterCards.Count == 0)
+        {
+            onResolved?.Invoke(false, null);
+            yield break;
+        }
+
         bool serverControlled = !string.IsNullOrEmpty(currentRoomId) || DenoGameClient.IsConnected;
         bool decided = false;
         bool used = false;
         float promptTimer = 40.0f;
+        CardModel selectedCounterCard = counterCards[0];
 
         playerCard.ShowHeadTimer(40);
 
@@ -6343,8 +6386,8 @@ public class Battle2v2UI : MonoBehaviour
 
         var pRt = panelGo.GetComponent<RectTransform>();
         pRt.anchorMin = pRt.anchorMax = pRt.pivot = new Vector2(0.5f, 0.5f);
-        pRt.sizeDelta = new Vector2(900f, 320f);
-        pRt.anchoredPosition = new Vector2(-80f, 120f);
+        pRt.sizeDelta = new Vector2(920f, 380f);
+        pRt.anchoredPosition = new Vector2(0f, 100f);
 
         var fGo = new GameObject("Frame", typeof(RectTransform), typeof(Image));
         fGo.transform.SetParent(panelGo.transform, false);
@@ -6355,36 +6398,110 @@ public class Battle2v2UI : MonoBehaviour
         fImg.raycastTarget = false;
         Fill(fGo.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
 
-        pRt.sizeDelta = new Vector2(950f, 380f);
+        var titleTxt = AddText(panelGo.transform, "Title", "🛡️ ĐẾN LƯỢT BẠN PHẢN HỒI DIỆU KẾ", 24, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(titleTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(600f, 34f), new Vector2(0, -14f));
 
-        var titleTxt = AddText(panelGo.transform, "Title", "🛡️ ĐẾN LƯỢT BẠN PHẢN HỒI", 26, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter);
-        SetRect(titleTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(600f, 38f), new Vector2(0, -15f));
+        var qTxt = AddText(panelGo.transform, "Question", $"<i>{promptTitle}</i>", 20, ThemeUI.TextMuted, FontStyle.Normal, TextAnchor.MiddleCenter);
+        SetRect(qTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(860f, 56f), new Vector2(0, -50f));
+        qTxt.horizontalOverflow = HorizontalWrapMode.Wrap;
 
-        var qTxt = AddText(panelGo.transform, "Question", $"<i>{promptTitle}</i>", 30, ThemeUI.TextMuted, FontStyle.Normal, TextAnchor.MiddleCenter);
-        SetRect(qTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(900f, 250f), new Vector2(0, -140f)); 
-        qTxt.horizontalOverflow = HorizontalWrapMode.Wrap; 
-        qTxt.verticalOverflow = VerticalWrapMode.Overflow;
-        qTxt.resizeTextForBestFit = true;
-        qTxt.resizeTextMinSize = 18;
-        qTxt.resizeTextMaxSize = 30;
+        // Container chọn lá Diệu Kế
+        var cardsContainer = new GameObject("CardsContainer", typeof(RectTransform));
+        cardsContainer.transform.SetParent(panelGo.transform, false);
+        var ccRt = cardsContainer.GetComponent<RectTransform>();
+        SetRect(ccRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(860f, 110f), new Vector2(0, 10f));
 
-        var timerTxt = AddText(panelGo.transform, "Timer", "⏳ Còn 40s để quyết định...", 24, ThemeUI.CyanPrimary, FontStyle.Bold, TextAnchor.MiddleCenter);
-        SetRect(timerTxt.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(400f, 32f), new Vector2(0, 95f));
+        var listHeaderTxt = AddText(cardsContainer.transform, "ListHeader", counterCards.Count > 1 
+            ? $"<b>Chọn 1 trong {counterCards.Count} lá Diệu Kế trên tay bạn:</b>" 
+            : "<b>Lá Diệu Kế Phá Mưu khả dụng:</b>", 16, new Color(0.6f, 0.9f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
+        SetRect(listHeaderTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(800f, 24f), new Vector2(0, 0f));
+
+        var cardsRowGo = new GameObject("CardsRow", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        cardsRowGo.transform.SetParent(cardsContainer.transform, false);
+        var crRt = cardsRowGo.GetComponent<RectTransform>();
+        SetRect(crRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(860f, 66f), new Vector2(0, 0f));
+        var hlg = cardsRowGo.GetComponent<HorizontalLayoutGroup>();
+        hlg.spacing = 16f;
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+        hlg.childControlWidth = false;
+        hlg.childControlHeight = false;
+
+        var cardButtons = new List<Button>();
+        var cardBorders = new List<Image>();
+        var cardImgs = new List<Image>();
 
         var btnSpr = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
+        var slotSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
 
         var useBtnGo = new GameObject("Btn_Use", typeof(RectTransform), typeof(Image), typeof(Button));
         useBtnGo.transform.SetParent(panelGo.transform, false);
         var uImg = useBtnGo.GetComponent<Image>();
         if (btnSpr != null) { uImg.sprite = btnSpr; uImg.type = Image.Type.Sliced; }
-
-        bool hasCounterCard = counterCard != null;
-        uImg.color = hasCounterCard ? ThemeUI.JadeGreen : new Color(0.35f, 0.38f, 0.45f, 0.7f);
+        uImg.color = ThemeUI.JadeGreen;
         var uRt = useBtnGo.GetComponent<RectTransform>();
-        SetRect(uRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(300f, 50f), new Vector2(-170f, 35f));
+        SetRect(uRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(380f, 48f), new Vector2(-150f, 22f));
 
-        var uTxt = AddText(useBtnGo.transform, "Txt", hasCounterCard ? "🛡️ DÙNG DIỆU KẾ PHÁ MƯU" : "🛡️ KHÔNG CÓ DIỆU KẾ", 18, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var uBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        uBorder.transform.SetParent(useBtnGo.transform, false);
+        var ubImg = uBorder.GetComponent<Image>();
+        if (fSpr != null) { ubImg.sprite = fSpr; ubImg.type = Image.Type.Sliced; }
+        ubImg.color = ThemeUI.GoldHighlight;
+        Fill(uBorder.GetComponent<RectTransform>(), new Vector2(-1.5f, -1.5f), new Vector2(1.5f, 1.5f));
+
+        var uTxt = AddText(useBtnGo.transform, "Txt", $"🛡️ DÙNG {GetFormattedCardName(selectedCounterCard)}", 17, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(uTxt.rectTransform);
+
+        void UpdateSelectionVisuals(CardModel chosen)
+        {
+            selectedCounterCard = chosen;
+            uTxt.text = $"🛡️ DÙNG {GetFormattedCardName(selectedCounterCard)}";
+            for (int i = 0; i < counterCards.Count; i++)
+            {
+                bool isSel = counterCards[i].id == selectedCounterCard.id;
+                if (i < cardBorders.Count && cardBorders[i] != null)
+                {
+                    cardBorders[i].color = isSel ? ThemeUI.GoldHighlight : new Color(0.4f, 0.5f, 0.65f, 0.6f);
+                }
+                if (i < cardImgs.Count && cardImgs[i] != null)
+                {
+                    cardImgs[i].color = isSel ? new Color(0.12f, 0.28f, 0.22f, 0.98f) : new Color(0.06f, 0.10f, 0.18f, 0.90f);
+                }
+            }
+        }
+
+        for (int i = 0; i < counterCards.Count; i++)
+        {
+            var c = counterCards[i];
+            var cBtnGo = new GameObject("CardBtn_" + i, typeof(RectTransform), typeof(Image), typeof(Button));
+            cBtnGo.transform.SetParent(cardsRowGo.transform, false);
+            var cbRt = cBtnGo.GetComponent<RectTransform>();
+            cbRt.sizeDelta = new Vector2(220f, 56f);
+
+            var cbImg = cBtnGo.GetComponent<Image>();
+            if (slotSpr != null) { cbImg.sprite = slotSpr; cbImg.type = Image.Type.Sliced; }
+            cardImgs.Add(cbImg);
+
+            var cbBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
+            cbBorder.transform.SetParent(cBtnGo.transform, false);
+            var cbbImg = cbBorder.GetComponent<Image>();
+            if (fSpr != null) { cbbImg.sprite = fSpr; cbbImg.type = Image.Type.Sliced; }
+            Fill(cbBorder.GetComponent<RectTransform>(), new Vector2(-1.5f, -1.5f), new Vector2(1.5f, 1.5f));
+            cardBorders.Add(cbbImg);
+
+            string suitColor = (c.suit == CardSuit.Heart || c.suit == CardSuit.Diamond) ? "#FF5555" : "#FFFFFF";
+            var cbTxt = AddText(cBtnGo.transform, "Txt", $"<color={suitColor}><b>{c.GetSuitSymbol()}{c.GetRankString()}</b></color>  {c.cardName}", 16, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+            Fill(cbTxt.rectTransform);
+
+            var bComponent = cBtnGo.GetComponent<Button>();
+            cardButtons.Add(bComponent);
+            bComponent.onClick.AddListener(() =>
+            {
+                AudioManager.Instance.PlayCardSelect();
+                UpdateSelectionVisuals(c);
+            });
+        }
+
+        UpdateSelectionVisuals(selectedCounterCard);
 
         var passBtnGo = new GameObject("Btn_Pass", typeof(RectTransform), typeof(Image), typeof(Button));
         passBtnGo.transform.SetParent(panelGo.transform, false);
@@ -6392,35 +6509,31 @@ public class Battle2v2UI : MonoBehaviour
         if (btnSpr != null) { paImg.sprite = btnSpr; paImg.type = Image.Type.Sliced; }
         paImg.color = new Color(0.40f, 0.44f, 0.52f, 1f);
         var paRt = passBtnGo.GetComponent<RectTransform>();
-        SetRect(paRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(250f, 50f), new Vector2(170f, 35f));
+        SetRect(paRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(240f, 48f), new Vector2(175f, 22f));
 
-        var paTxt = AddText(passBtnGo.transform, "Txt", "❌ BỎ QUA / KHÔNG DÙNG", 18, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var paTxt = AddText(passBtnGo.transform, "Txt", "❌ BỎ QUA / KHÔNG DÙNG", 17, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(paTxt.rectTransform);
 
-        if (hasCounterCard)
-        {
-            useBtnGo.GetComponent<Button>().onClick.AddListener(() =>
-            {
-                if (!serverControlled)
-                {
-                    playerHandCards.Remove(counterCard);
-                    playerHandUI.ClearHand();
-                    playerHandUI.AddCards(playerHandCards);
-                    deckManager.DiscardCard(counterCard);
-                    UpdateHandCountsVisual();
-                }
+        var timerTxt = AddText(panelGo.transform, "Timer", "⏳ Còn 40s...", 16, ThemeUI.CyanPrimary, FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(timerTxt.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(160f, 30f), new Vector2(-15f, -15f));
 
-                ShowCardAtCenter(counterCard, playerCard, null, "Hóa giải mưu kế!");
-                AudioManager.Instance.PlaySkill();
-                SetLog($"🛡️ <color=#55FF55><b>[DIỆU KẾ PHÁ MƯU]</b></color>: Bạn đã tung Diệu Kế Phá Mưu để hóa giải!");
-                used = true;
-                decided = true;
-            });
-        }
-        else
+        useBtnGo.GetComponent<Button>().onClick.AddListener(() =>
         {
-            useBtnGo.GetComponent<Button>().interactable = false;
-        }
+            if (!serverControlled)
+            {
+                playerHandCards.Remove(selectedCounterCard);
+                playerHandUI.ClearHand();
+                playerHandUI.AddCards(playerHandCards);
+                deckManager.DiscardCard(selectedCounterCard);
+                UpdateHandCountsVisual();
+            }
+
+            ShowCardAtCenter(selectedCounterCard, playerCard, null, "Hóa giải mưu kế!");
+            AudioManager.Instance.PlaySkill();
+            SetLog($"🛡️ <color=#55FF55><b>[DIỆU KẾ PHÁ MƯU]</b></color>: Bạn đã tung {GetFormattedCardName(selectedCounterCard)} để hóa giải!");
+            used = true;
+            decided = true;
+        });
 
         passBtnGo.GetComponent<Button>().onClick.AddListener(() =>
         {
@@ -6428,13 +6541,26 @@ public class Battle2v2UI : MonoBehaviour
             decided = true;
         });
 
+        Action<CardUI> onHandCardSelected = (cUI) =>
+        {
+            if (cUI != null && cUI.Data != null)
+            {
+                var matched = counterCards.Find(c => c.id == cUI.Data.id);
+                if (matched != null)
+                {
+                    AudioManager.Instance.PlayCardSelect();
+                    UpdateSelectionVisuals(matched);
+                }
+            }
+        };
+        if (playerHandUI != null) playerHandUI.OnCardSelected += onHandCardSelected;
+
         while (!decided && !battleFinished && (!serverControlled || IsAuthoritativePromptActive("AWAIT_NULLIFY")))
         {
-            
             promptTimer -= Time.unscaledDeltaTime;
             playerCard.UpdateHeadTimer(Mathf.Max(0, Mathf.CeilToInt(promptTimer)));
-            if (timerTxt != null) timerTxt.text = $"⏳ Còn {Mathf.Max(0, Mathf.CeilToInt(promptTimer))}s để quyết định...";
-            
+            if (timerTxt != null) timerTxt.text = $"⏳ Còn {Mathf.Max(0, Mathf.CeilToInt(promptTimer))}s...";
+
             if (!serverControlled && promptTimer <= 0f)
             {
                 decided = true;
@@ -6442,11 +6568,12 @@ public class Battle2v2UI : MonoBehaviour
             yield return null;
         }
 
+        if (playerHandUI != null) playerHandUI.OnCardSelected -= onHandCardSelected;
         playerCard.HideHeadTimer();
         if (panelGo != null) Destroy(panelGo);
         if (!serverControlled || decided)
         {
-            onResolved?.Invoke(used, counterCard);
+            onResolved?.Invoke(used, selectedCounterCard);
         }
     }
 

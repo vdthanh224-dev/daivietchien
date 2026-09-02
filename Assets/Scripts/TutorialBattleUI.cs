@@ -5313,21 +5313,22 @@ public class TutorialBattleUI : MonoBehaviour
             yield break;
         }
 
-        CardUI counterCard = null;
+        var counterCards = new List<CardUI>();
         foreach (var cardUI in playerHandUI.Cards)
         {
             if (cardUI != null && cardUI.Data != null && cardUI.Data.subType == CardSubType.FlawlessDefense)
             {
-                counterCard = cardUI;
-                break;
+                counterCards.Add(cardUI);
             }
         }
 
-        if (counterCard == null)
+        if (counterCards.Count == 0)
         {
             onResolved?.Invoke(false);
             yield break;
         }
+
+        CardUI selectedCounterCard = counterCards[0];
 
         counterPromptActive = true;
         playerHandUI.ClearSelection();
@@ -5343,52 +5344,64 @@ public class TutorialBattleUI : MonoBehaviour
         panelImg.color = new Color(0.04f, 0.02f, 0.08f, 0.97f);
         var panelRt = panelGo.GetComponent<RectTransform>();
         panelRt.anchorMin = panelRt.anchorMax = panelRt.pivot = new Vector2(0.5f, 0.5f);
-        panelRt.sizeDelta = new Vector2(580f, 130f);
+        panelRt.sizeDelta = new Vector2(620f, 150f);
         panelRt.anchoredPosition = new Vector2(-70f, 122f);
 
         var titleGo = new GameObject("Title", typeof(RectTransform), typeof(Text));
         titleGo.transform.SetParent(panelGo.transform, false);
         var title = titleGo.GetComponent<Text>();
         title.font = font;
-        title.fontSize = 14;
+        title.fontSize = 15;
         title.fontStyle = FontStyle.Bold;
         title.alignment = TextAnchor.MiddleCenter;
         title.color = new Color(1f, 0.85f, 0.35f, 1f);
         title.text = string.IsNullOrEmpty(customTitle) ? $"🛡️ [DIỆU KẾ] Hóa giải [{scrollCard.cardName}] của Sơn Tặc?" : customTitle;
-        Fill(title.rectTransform, new Vector2(12f, 76f), new Vector2(-12f, -8f));
+        Fill(title.rectTransform, new Vector2(12f, 85f), new Vector2(-12f, -8f));
 
-        GameObject MakeButton(string name, string label, Vector2 position, Color color)
+        GameObject MakeButton(string name, string label, Vector2 position, Color color, out Text outTxt)
         {
             var buttonGo = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
             buttonGo.transform.SetParent(panelGo.transform, false);
             var buttonRt = buttonGo.GetComponent<RectTransform>();
             buttonRt.anchorMin = buttonRt.anchorMax = buttonRt.pivot = new Vector2(0.5f, 0.5f);
-            buttonRt.sizeDelta = new Vector2(240f, 42f);
+            buttonRt.sizeDelta = new Vector2(260f, 44f);
             buttonRt.anchoredPosition = position;
             buttonGo.GetComponent<Image>().color = color;
             var txtGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
             txtGo.transform.SetParent(buttonGo.transform, false);
-            var txt = txtGo.GetComponent<Text>();
-            txt.font = font;
-            txt.fontSize = 12;
-            txt.fontStyle = FontStyle.Bold;
-            txt.alignment = TextAnchor.MiddleCenter;
-            txt.color = Color.white;
-            txt.text = label;
-            Fill(txt.rectTransform);
+            outTxt = txtGo.GetComponent<Text>();
+            outTxt.font = font;
+            outTxt.fontSize = 13;
+            outTxt.fontStyle = FontStyle.Bold;
+            outTxt.alignment = TextAnchor.MiddleCenter;
+            outTxt.color = Color.white;
+            outTxt.text = label;
+            Fill(outTxt.rectTransform);
             return buttonGo;
         }
 
-        var cancelGo = MakeButton("Cancel", "🛡️ DÙNG DIỆU KẾ PHÁ MƯU", new Vector2(-130f, -28f), new Color(0.15f, 0.58f, 0.32f, 1f));
-        var passGo = MakeButton("Pass", "BỎ QUA / KHÔNG DÙNG", new Vector2(130f, -28f), new Color(0.42f, 0.42f, 0.48f, 1f));
+        Text useBtnTxt, passBtnTxt;
+        string initialCardLabel = selectedCounterCard.Data != null ? $"[{selectedCounterCard.Data.GetSuitSymbol()}{selectedCounterCard.Data.GetRankString()}]" : "";
+        var cancelGo = MakeButton("Cancel", $"🛡️ DÙNG DIỆU KẾ {initialCardLabel}", new Vector2(-140f, -32f), new Color(0.15f, 0.58f, 0.32f, 1f), out useBtnTxt);
+        var passGo = MakeButton("Pass", "BỎ QUA / KHÔNG DÙNG", new Vector2(140f, -32f), new Color(0.42f, 0.42f, 0.48f, 1f), out passBtnTxt);
+
+        Action<CardUI> onCardClickedInHand = (cUI) =>
+        {
+            if (cUI != null && cUI.Data != null && cUI.Data.subType == CardSubType.FlawlessDefense)
+            {
+                selectedCounterCard = cUI;
+                if (useBtnTxt != null) useBtnTxt.text = $"🛡️ DÙNG DIỆU KẾ [{cUI.Data.GetSuitSymbol()}{cUI.Data.GetRankString()}]";
+            }
+        };
+        playerHandUI.OnCardSelected += onCardClickedInHand;
 
         cancelGo.GetComponent<Button>().onClick.AddListener(() =>
         {
-            if (counterCard == null || !playerHandUI.RemoveCard(counterCard)) return;
-            deckManager.DiscardCard(counterCard.Data);
-            ShowCardAtCenter(counterCard.Data, playerCard, bossCard);
+            if (selectedCounterCard == null || !playerHandUI.RemoveCard(selectedCounterCard)) return;
+            deckManager.DiscardCard(selectedCounterCard.Data);
+            ShowCardAtCenter(selectedCounterCard.Data, playerCard, bossCard);
             AudioManager.Instance.PlaySkill();
-            SetLog($"🛡️ [Diệu Kế Phá Mưu]: Bạn đã dùng Diệu Kế Phá Mưu để hóa giải mưu kế!");
+            SetLog($"🛡️ [Diệu Kế Phá Mưu]: Bạn đã dùng Diệu Kế Phá Mưu [{selectedCounterCard.Data.GetSuitSymbol()}{selectedCounterCard.Data.GetRankString()}] để hóa giải mưu kế!");
             canceled = true;
             decided = true;
         });
@@ -5397,6 +5410,7 @@ public class TutorialBattleUI : MonoBehaviour
         while (!decided && !gameFinished)
             yield return null;
 
+        playerHandUI.OnCardSelected -= onCardClickedInHand;
         playerHandUI.ResetAllCardsVisuals();
         if (panelGo != null) Destroy(panelGo);
         counterPromptActive = false;
