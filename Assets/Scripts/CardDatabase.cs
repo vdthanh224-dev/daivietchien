@@ -36,7 +36,7 @@ public static class CardDatabase
         list.Add(CreateCard("D1_S_9", "Trảm - Lôi", CardSuit.Spade, CardRank.Nine, 1, CardCategory.Basic, CardSubType.AttackThunder, "Tấn công gây 1 sát thương Lôi trong tầm đánh.", "UI/icon_slash_thunder"));
         list.Add(CreateCard("D1_S_10", "Trảm - Lôi", CardSuit.Spade, CardRank.Ten, 1, CardCategory.Basic, CardSubType.AttackThunder, "Tấn công gây 1 sát thương Lôi trong tầm đánh.", "UI/icon_slash_thunder"));
         list.Add(CreateCard("D1_S_J", "Đột Kích Trộm Lương", CardSuit.Spade, CardRank.Jack, 1, CardCategory.InstantScroll, CardSubType.Snatch, "Cướp 1 lá bài trên tay, vùng trang bị hoặc vùng trì hoãn của mục tiêu cự ly 1.", "UI/icon_snatch"));
-        list.Add(CreateCard("D1_S_Q", "Súng Thần Công Hồ Triều", CardSuit.Spade, CardRank.Queen, 1, CardCategory.Equipment, CardSubType.Weapon, "Tầm 5. Mục tiêu không được dùng Đỡ có cùng chất với Trảm của bạn.", "UI/icon_weapon", 5));
+        list.Add(CreateCard("D1_S_Q", "Súng Thần Công Hồ Triều", CardSuit.Spade, CardRank.Queen, 1, CardCategory.Equipment, CardSubType.Weapon, "Tầm 5. Mục tiêu phải dùng Đỡ có cùng chất với Trảm của bạn.", "UI/icon_weapon", 5));
         list.Add(CreateCard("D1_S_K", "Trảm - Lôi", CardSuit.Spade, CardRank.King, 1, CardCategory.Basic, CardSubType.AttackThunder, "Tấn công gây 1 sát thương Lôi trong tầm đánh.", "UI/icon_slash_thunder"));
 
         // --- CHUỒN (♣) ---

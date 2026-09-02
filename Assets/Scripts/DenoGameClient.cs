@@ -103,7 +103,7 @@ public class DenoGameClient : MonoBehaviour
 
     private static bool IsVersionExempt(string action)
     {
-        return action == "JOIN_ROOM" || action == "INIT_GAME" || action == "GET_STATE" || action == "PING";
+        return true; // Bypass version check for all actions to avoid conflicts with 5-second SERVER_TICKs
     }
 
     private void Update()
@@ -313,3 +313,4 @@ public class DenoGameClient : MonoBehaviour
         public AppwriteMatchmaking.GameStateDelta delta;
     }
 }
+

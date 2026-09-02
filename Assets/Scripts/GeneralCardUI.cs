@@ -25,7 +25,7 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
         get 
         { 
             var heroData = HeroDatabase100.GetHeroByName(generalName);
-            return heroData != null ? heroData.id.ToString() : "";
+            return heroData != null ? "HERO_" + heroData.id.ToString() : "";
         }
     }
 public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)

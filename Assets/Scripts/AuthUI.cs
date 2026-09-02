@@ -82,15 +82,18 @@ public sealed class AuthUI : MonoBehaviour
     private void Update()
     {
 #if UNITY_EDITOR || UNITY_STANDALONE_WIN
-        if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Alpha1)) QuickLogin(1);
-        else if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Alpha2)) QuickLogin(2);
-        else if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Alpha3)) QuickLogin(3);
-        else if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Alpha4)) QuickLogin(4);
-        else if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Alpha5)) QuickLogin(5);
-        else if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Alpha6)) QuickLogin(6);
-        else if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Alpha7)) QuickLogin(7);
-        else if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Alpha8)) QuickLogin(8);
-        else if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Alpha9)) QuickLogin(9);
+        var kb = UnityEngine.InputSystem.Keyboard.current;
+        if (kb != null) {
+            if (kb.digit1Key.wasPressedThisFrame) QuickLogin(1);
+            else if (kb.digit2Key.wasPressedThisFrame) QuickLogin(2);
+            else if (kb.digit3Key.wasPressedThisFrame) QuickLogin(3);
+            else if (kb.digit4Key.wasPressedThisFrame) QuickLogin(4);
+            else if (kb.digit5Key.wasPressedThisFrame) QuickLogin(5);
+            else if (kb.digit6Key.wasPressedThisFrame) QuickLogin(6);
+            else if (kb.digit7Key.wasPressedThisFrame) QuickLogin(7);
+            else if (kb.digit8Key.wasPressedThisFrame) QuickLogin(8);
+            else if (kb.digit9Key.wasPressedThisFrame) QuickLogin(9);
+        }
 #endif
     }
 
@@ -123,18 +126,48 @@ public sealed class AuthUI : MonoBehaviour
         Screen.autorotateToLandscapeLeft = true;
         Screen.autorotateToLandscapeRight = true;
 
-        var canvasGo = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-        canvasGo.transform.SetParent(transform, false);
-        var canvas = canvasGo.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        if (canvasGo == null)
+        {
+            canvasGo = new GameObject("AuthCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            canvasGo.transform.SetParent(transform, false);
+            var canvas = canvasGo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 999;
 
-        scaler = canvasGo.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1280, 720);
-        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 0.5f;
+            scaler = canvasGo.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1280, 720);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
+            
+            // Add Quick Login Panel for dev
+#if UNITY_EDITOR || UNITY_STANDALONE_WIN
+            var qlPanel = new GameObject("QuickLoginPanel", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+            qlPanel.transform.SetParent(canvasGo.transform, false);
+            var qlRt = qlPanel.GetComponent<RectTransform>();
+            qlRt.anchorMin = new Vector2(0f, 1f);
+            qlRt.anchorMax = new Vector2(1f, 1f);
+            qlRt.pivot = new Vector2(0.5f, 1f);
+            qlRt.sizeDelta = new Vector2(0, 40f);
+            qlRt.anchoredPosition = new Vector2(0, -10f);
+            var hlg = qlPanel.GetComponent<HorizontalLayoutGroup>();
+            hlg.spacing = 10;
+            hlg.childAlignment = TextAnchor.MiddleCenter;
+            hlg.childControlWidth = false;
+            hlg.childControlHeight = false;
 
-        // 1. Hình nền & Lớp phủ đọc tốt
+            for (int i = 1; i <= 9; i++) {
+                int num = i;
+                var btnGo = new GameObject("Btn_Quick" + num, typeof(RectTransform), typeof(Image), typeof(Button));
+                btnGo.transform.SetParent(qlPanel.transform, false);
+                btnGo.GetComponent<RectTransform>().sizeDelta = new Vector2(120, 35);
+                btnGo.GetComponent<Image>().color = new Color(0.2f, 0.6f, 1f, 0.8f);
+                var txt = AddText(btnGo.transform, "Txt", "Nick " + num, 16, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+                Fill(txt.rectTransform);
+                btnGo.GetComponent<Button>().onClick.AddListener(() => QuickLogin(num));
+            }
+#endif
+        }// 1. Hình nền & Lớp phủ đọc tốt
         var bg = AddRawImage(canvasGo.transform, "Background", new Color(0.08f, 0.1f, 0.15f, 1f));
         bg.raycastTarget = false;
         Fill(bg.rectTransform);
@@ -1484,3 +1517,4 @@ public static class GameTheme
     public static readonly Color Muted = new Color(0.68f, 0.72f, 0.8f, 1f);
     public static readonly Color Danger = new Color(1f, 0.42f, 0.42f, 1f);
 }
+

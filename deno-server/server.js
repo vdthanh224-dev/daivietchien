@@ -403,7 +403,7 @@ function broadcastRoom(room, messageObj) {
   for (const [seat, ws] of room.sockets.entries()) {
     if (ws.readyState === WebSocket.OPEN) {
       try {
-        if (messageObj.type === "STATE_UPDATE" && messageObj.state) {
+        if ((messageObj.type === "STATE_UPDATE" || messageObj.type === "STATE_SNAPSHOT") && messageObj.state) {
           const sanitizedState = sanitizeGameStateForClient(room.state, seat);
           const personalized = {
             ...messageObj,
@@ -758,5 +758,6 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8082 }, async (req) => {
     headers: { "Content-Type": "application/json; charset=utf-8", "Access-Control-Allow-Origin": "*" },
   });
 });
+
 
 

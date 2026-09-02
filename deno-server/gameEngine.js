@@ -146,6 +146,16 @@ export function hydrateGameState(rawState, roomId = "") {
   } else {
     state.nullifyChain = null;
   }
+  if (state.pendingJudgement && typeof state.pendingJudgement === "object") {
+    state.pendingJudgement = { ...state.pendingJudgement };
+  } else {
+    state.pendingJudgement = null;
+  }
+  if (state.pendingJudgement && typeof state.pendingJudgement === "object") {
+    state.pendingJudgement = { ...state.pendingJudgement };
+  } else {
+    state.pendingJudgement = null;
+  }
   if (state.targetCardSelection && typeof state.targetCardSelection === "object") {
     state.targetCardSelection = {
       ...state.targetCardSelection,
@@ -427,18 +437,34 @@ export function drawCards(state, seat, count = 2) {
     }
     const card = state._deck.pop();
     if (card) {
+      if (p.activeSkills && p.activeSkills["Chế Nỏ"] && card.suit === "Spade" && card.subType !== "WEAPON") {
+          card.orig_name = card.name;
+          card.orig_subType = card.subType;
+          card.orig_category = card.category;
+          card.orig_desc = card.desc;
+          card.name = "Nỏ Thần Kim Quy";
+          card.subType = "WEAPON";
+          card.category = "EQUIPMENT";
+          card.desc = "Tầm 1. Không giới hạn số Trảm trong lượt";
+      }
       p.hand.push(card);
       drawn.push(card);
     }
   }
   state.deckCount = state._deck.length;
-  state.discardCount = state._discard.length;
   return drawn;
 }
 
 function discardCard(state, card, reveal = true) {
     if (!card) return;
-    if (card.originalCard) card = card.originalCard;
+    if (card.originalCardId) { const orig = findCardByIdInDeck(card.originalCardId); if (orig) card = orig; }
+    if (card.orig_name) {
+        card.name = card.orig_name;
+        card.subType = card.orig_subType;
+        card.category = card.orig_category;
+        card.desc = card.orig_desc;
+        delete card.orig_name; delete card.orig_subType; delete card.orig_category; delete card.orig_desc;
+    }
     state._discard.push(card);
   state.discardTop = {
     id: reveal ? card.id : "HIDDEN",
@@ -472,6 +498,9 @@ function getDistance(state, fromSeat, toSeat) {
   distance += (to.equipments || [])
     .filter((equipment) => equipment.subType === CARD_SUBTYPES.DEFENSIVE_HORSE)
     .reduce((total, equipment) => total + (Number(equipment.distMod) || 1), 0);
+  if (String(from.heroId) === "2" || from.generalName === "Đào Hãn") {
+    distance -= 2;
+  }
   return Math.max(1, distance);
 }
 
@@ -575,7 +604,7 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
      return { error: "Không tìm thấy lá bài trên tay (" + cardId + ")" };
   }
 
-  const targetValidation = validateTarget(state, casterSeat, targetSeat, caster.hand[cardIndex]);
+  const targetValidation = validateTarget(state, casterSeat, targetSeat, card);
   if (targetValidation) return targetValidation;
   const selectedCard = card;
   if (isDodge(selectedCard)) {
@@ -592,15 +621,15 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
       return { error: "Mục tiêu đã có cẩm nang trì hoãn cùng loại" };
     }
   }
-  if (isSlash(caster.hand[cardIndex])
+  if (isSlash(card)
       && state.slashesUsedThisTurn > 0
       && !caster.equipments.some(e => e.name && e.name.includes("Nỏ Thần"))) {
     return { error: "Đã dùng hết lượt Trảm" };
   }
 
   const realCard = caster.hand.splice(cardIndex, 1)[0];
-  const card = selectedCard; // Use the properly modified copy with Nỏ Thần
-  card.originalCard = realCard;
+  card = { ...selectedCard }; // Use the properly modified copy with Nỏ Thần
+  card.originalCardId = realCard.id;
   const target = state.players.find(x => x.seat === targetSeat);
   state.turnTimer = 40;
 
@@ -635,6 +664,7 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
     state.waitingTargetSeat = targetSeat;
     state.waitingReactionType = "DODGE";
     state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
     state.activeCard = {
         cardId: card.id,
         cardName: card.name,
@@ -646,7 +676,7 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
       };
 
       const cannon = getEquippedWeapon(caster, "Súng Thần Công");
-      const requiredDodgeText = cannon ? ` (yêu cầu lá Đỡ khác chất <b>${card.suit === "Heart" ? "<color=#FF5555>♥</color>" : card.suit === "Diamond" ? "<color=#FF5555>♦</color>" : card.suit === "Club" ? "♣" : "♠"}</b>)` : "";
+      const requiredDodgeText = cannon ? ` (KHÔNG được dùng lá Đỡ chất <b>${card.suit === "Heart" ? "<color=#FF5555>♥</color>" : card.suit === "Diamond" ? "<color=#FF5555>♦</color>" : card.suit === "Club" ? "♣" : "♠"}</b>)` : "";
 
       recordAction(state, {
         type: "PLAY_SLASH",
@@ -733,6 +763,9 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
   if (card.category === CARD_CATEGORIES.DELAYED_SCROLL || card.subType === CARD_SUBTYPES.LIGHTNING || card.subType === CARD_SUBTYPES.SUPPLY_SHORTAGE || card.subType === CARD_SUBTYPES.ACEDIA) {
     return executeCardEffect(state, card, casterSeat, targetSeat);
   }
+  if (card.subType === CARD_SUBTYPES.ARROW_RAIN || card.subType === CARD_SUBTYPES.BARBARIAN_INVASION || card.subType === CARD_SUBTYPES.HARVEST) {
+    return executeCardEffect(state, card, casterSeat, targetSeat);
+  }
   return startNullifyChain(state, card, casterSeat, targetSeat);
 }
 
@@ -775,6 +808,7 @@ export function startNullifyChain(state, card, casterSeat, targetSeat = 0, conti
          state.waitingReactionType = state.activeCard?.reqType || "DODGE";
          state.waitingTargetSeat = nextVictim;
          state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
          refreshLastDelta(state);
       }
       return { success: true, state };
@@ -784,6 +818,7 @@ export function startNullifyChain(state, card, casterSeat, targetSeat = 0, conti
       state.waitingTargetSeat = targetSeat;
       state.waitingReactionType = "HARVEST";
       state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
       refreshLastDelta(state);
       return { success: true, state };
     }
@@ -804,7 +839,9 @@ export function startNullifyChain(state, card, casterSeat, targetSeat = 0, conti
   state.waitingTargetSeat = querySeats[0];
   state.waitingReactionType = "FLAWLESS_DEFENSE";
   state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
   state.activeCard = {
+    ...(state.activeCard || {}),
     cardId: card.id,
     cardName: card.name,
     casterSeat,
@@ -821,7 +858,7 @@ export function startNullifyChain(state, card, casterSeat, targetSeat = 0, conti
     targetSeat,
     cardId: card.id,
     cardName: card.name,
-    description: `📜 <b>${caster ? caster.generalName : 'Ghế ' + casterSeat}</b> thi triển ${formatCardText(card)}${targetDesc}! Đang chờ người chơi phản hồi có dùng Diệu Kế Phá Mưu không (40s)...`
+    description: continuation?.type === "TURN_JUDGEMENT" ? `⚖️ Cẩm nang trì hoãn ${formatCardText(card)} chuẩn bị phán xét${targetDesc}! Đang chờ người chơi phản hồi có dùng Diệu Kế Phá Mưu không (40s)...` : `📜 <b>${caster ? caster.generalName : "Ghế " + casterSeat}</b> thi triển ${formatCardText(card)}${targetDesc}! Đang chờ người chơi phản hồi có dùng Diệu Kế Phá Mưu không (40s)...`
   });
 
   return { success: true, state };
@@ -874,6 +911,7 @@ function beginSlashAfterDodge(state, caster, targetSeat, defenseName = "Đỡ") 
     state.phase = "AWAIT_SONG_CUNG_FOLLOW_UP";
     state.waitingTargetSeat = caster.seat;
     state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
     state.waitingReactionType = "DISCARD_TWO";
     recordAction(state, {
       type: "SONG_CUNG_PROMPT",
@@ -888,6 +926,7 @@ function beginSlashAfterDodge(state, caster, targetSeat, defenseName = "Đỡ") 
     state.phase = "AWAIT_NAM_SON_FOLLOW_UP";
     state.waitingTargetSeat = caster.seat;
     state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
     state.waitingReactionType = "SLASH";
     recordAction(state, {
       type: "NAM_SON_PROMPT",
@@ -927,6 +966,7 @@ function beginNextAoeVictim(state) {
     state.waitingReactionType = state.activeCard?.reqType || "DODGE";
     state.waitingTargetSeat = nextVictim;
     state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
     return true;
   }
 
@@ -945,7 +985,7 @@ function beginNextHarvestPicker(state) {
     
     // Nếu activeCard có cờ harvestNullifiedForSeat, nghĩa là mưu kế đã bị Diệu Kế phá giải cho ghế này
     // Cờ này được đặt ở nullify chain để bỏ qua nạn nhân, nhưng nếu không có cờ, ta sẽ hỏi Diệu Kế.
-    if (state.activeCard && state.activeCard.cardName) {
+    if (state.activeCard && state.activeCard.cardName && state.activeCard.harvestNullifiedForSeat !== nextPicker) {
       const aoecard = { id: state.activeCard.cardId, name: state.activeCard.cardName, subType: CARD_SUBTYPES.HARVEST };
       return startNullifyChain(state, aoecard, state.activeCard.casterSeat, nextPicker, { type: "CONTINUE_HARVEST" });
     }
@@ -954,6 +994,7 @@ function beginNextHarvestPicker(state) {
     state.waitingTargetSeat = nextPicker;
     state.waitingReactionType = "HARVEST";
     state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
     
     recordAction(state, {
       type: "HARVEST_PICK_START",
@@ -974,7 +1015,7 @@ function beginNextHarvestPicker(state) {
   state.harvestPickers = [];
   recordAction(state, {
     type: "HARVEST_EMPTY",
-    description: `🍚 ${formatCardText(card)} đã chia xong, các lá còn dư được bỏ vào Mộ.`
+    description: `🍚 Mở Kho Cứu Tế đã chia xong, các lá còn dư được bỏ vào Mộ.`
   });
   return false;
 }
@@ -1053,6 +1094,7 @@ function startTargetCardSelection(state, card, casterSeat, targetSeat, selection
   state.waitingTargetSeat = casterSeat;
   state.waitingReactionType = "TARGET_CARD";
   state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
   state.activeCard = {
     cardId: card.id,
     cardName: card.name,
@@ -1187,38 +1229,31 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0) {
     state.deckCount = state._deck.length;
     state.harvestPool = pool;
     state.harvestPickers = living.slice(0, pool.length).map(p => p.seat);
-    if (state.harvestPool.length === 0 || state.harvestPickers.length === 0) {
-      state.harvestPool = [];
-      state.harvestPickers = [];
-      resetWaitingState(state);
+      
+      state.activeCard = { cardId: card.id, cardName: card.name, casterSeat };
       recordAction(state, {
-        type: "HARVEST_EMPTY",
+        type: "HARVEST_START",
         casterSeat,
         cardId: card.id,
         cardName: card.name,
-        description: `🍚 ${formatCardText(card)} không còn lá bài để chia.`
+        harvestPool: pool,
+        description: `🌾 <b>${caster ? caster.generalName : 'Người chơi'}</b> ${formatCardText(card)} lật ${pool.length} lá bài công khai!`
       });
+
+      if (state.harvestPool.length === 0 || state.harvestPickers.length === 0) {
+        state.harvestPool = [];
+        state.harvestPickers = [];
+        resetWaitingState(state);
+        return { success: true, state };
+      }
+
+      beginNextHarvestPicker(state);
+      refreshLastDelta(state);
       return { success: true, state };
     }
-    state.phase = "AWAIT_HARVEST";
-    state.waitingTargetSeat = state.harvestPickers[0];
-    state.waitingTimer = 40;
-    state.activeCard = { cardId: card.id, cardName: card.name, casterSeat };
 
-    const firstPicker = state.players.find(x => x.seat === state.harvestPickers[0]);
-    recordAction(state, {
-      type: "HARVEST_START",
-      casterSeat,
-      cardId: card.id,
-      cardName: card.name,
-      harvestPool: pool,
-      description: `🌾 <b>${caster ? caster.generalName : 'Người chơi'}</b> ${formatCardText(card)} lật ${pool.length} lá bài công khai! Đang tới lượt <b>${firstPicker ? firstPicker.generalName : 'Ghế 1'}</b> chọn bài (40s)...`
-    });
-    return { success: true, state };
-  }
-
-  // 3. DIỆN RỘNG (Mưa Tên / Bãi Cọc Ngầm)
-  if (card.subType === CARD_SUBTYPES.ARROW_RAIN || card.subType === CARD_SUBTYPES.BARBARIAN_INVASION) {
+    // 3. DIỆN RỘNG (Mưa Tên / Bãi Cọc Ngầm)
+    if (card.subType === CARD_SUBTYPES.ARROW_RAIN || card.subType === CARD_SUBTYPES.BARBARIAN_INVASION) {
     discardCard(state, card);
     const reqType = (card.subType === CARD_SUBTYPES.ARROW_RAIN) ? "DODGE" : "SLASH";
     const reqName = (card.subType === CARD_SUBTYPES.ARROW_RAIN) ? "Đỡ" : "Trảm";
@@ -1257,6 +1292,7 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0) {
     state.waitingTargetSeat = targetSeat;
     state.waitingReactionType = "SLASH";
     state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
     state.activeCard = { cardId: card.id, cardName: card.name, casterSeat, targetSeat };
     recordAction(state, {
       type: "PLAY_DUEL",
@@ -1431,6 +1467,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
             chain.currentIdx = 0;
             state.waitingTargetSeat = newQuerySeats[0];
             state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
 
             recordAction(state, {
               type: "NULLIFY_PLAYED",
@@ -1488,9 +1525,16 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
                   return continueTurnStart(state);
                 }
                 if (cont?.type === "CONTINUE_AOE") {
-                  executeCardEffect(state, effCard, effCaster, target);
-                  if (state.phase !== "AWAIT_NEAR_DEATH" && state.phase !== "AWAIT_SLASH_DEFENSE") {
-                    return executeAOEChain(state, effCard, effCaster, state.aoeVictimsQueue);
+                  const nextVictim = target;
+                  if (state.activeCard?.reqType === "DODGE" && tryKhienMayDefense(state, nextVictim, "đòn diện rộng")) {
+                     beginNextAoeVictim(state);
+                  } else {
+                     state.phase = "AWAIT_AOE";
+                     state.waitingReactionType = state.activeCard?.reqType || "DODGE";
+                     state.waitingTargetSeat = nextVictim;
+                     state.waitingTimer = 40;
+                     state.timerStartAt = Date.now();
+                     refreshLastDelta(state);
                   }
                   return { success: true, state };
                 }
@@ -1498,6 +1542,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
                   state.phase = "AWAIT_HARVEST";
                   state.waitingTargetSeat = target;
                   state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
                   recordAction(state, {
                     type: "AWAIT_HARVEST",
                     casterSeat: target,
@@ -1520,6 +1565,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       const nextGen = state.players.find(x => x.seat === nextSeat);
       state.waitingTargetSeat = nextSeat;
       state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
       recordAction(state, {
         type: "NULLIFY_PASS",
         casterSeat: respondentSeat,
@@ -1573,6 +1619,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
          state.waitingReactionType = state.activeCard?.reqType || "DODGE";
          state.waitingTargetSeat = nextVictim;
          state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
          refreshLastDelta(state);
       }
       return { success: true, state };
@@ -1584,6 +1631,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       state.waitingReactionType = "HARVEST";
       state.waitingTargetSeat = nextVictim;
       state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
       refreshLastDelta(state);
       return { success: true, state };
     }
@@ -1640,7 +1688,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         const dodgeCard = respondent.hand.splice(idx, 1)[0];
         discardCard(state, dodgeCard);
 
-        beginSlashAfterDodge(state, caster, respondentSeat, `[${dodgeCard.name}]`);
+        beginSlashAfterDodge(state, caster, respondentSeat, formatCardText(dodgeCard));
         return { success: true, state };
       }
     }
@@ -1733,6 +1781,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         state.waitingTargetSeat = targetSeat;
         state.waitingReactionType = "DODGE";
         state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
         state.activeCard = {
           ...state.activeCard,
           cardId: slashCard.id,
@@ -1838,6 +1887,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         const otherSeat = (respondentSeat === state.duelCasterSeat) ? state.duelTargetSeat : state.duelCasterSeat;
         state.waitingTargetSeat = otherSeat;
         state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
         refreshLastDelta(state);
         recordAction(state, {
           type: "DUEL_RESPOND",
@@ -1872,29 +1922,43 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       const rescueCard = respondent.hand.splice(idx, 1)[0];
       discardCard(state, rescueCard);
 
-      victim.hp = Math.min(victim.maxHp, Math.max(1, victim.hp + 1));
-      state.phase = "PLAY";
-      state.waitingTargetSeat = 0;
-      state.waitingTimer = 0;
-      recordAction(state, {
-        type: "RESCUE_SUCCESS",
-        casterSeat: respondentSeat,
-        targetSeat: victim.seat,
-        description: `💮 <b>${respondent.generalName}</b> đã dùng ${formatCardText(rescueCard)} cứu sống <b>${victim.generalName}</b> (${victim.hp}/${victim.maxHp})!`
-      });
+      victim.hp = Math.min(victim.maxHp, victim.hp + 1);
+      
+      if (victim.hp > 0) {
+        state.phase = "PLAY";
+        state.waitingTargetSeat = 0;
+        state.waitingTimer = 0;
+        recordAction(state, {
+          type: "RESCUE_SUCCESS",
+          casterSeat: respondentSeat,
+          targetSeat: victim.seat,
+          description: `💮 <b>${respondent.generalName}</b> đã dùng ${formatCardText(rescueCard)} cứu sống <b>${victim.generalName}</b> (${victim.hp}/${victim.maxHp})!`
+        });
 
-      if (victim.heroId === "HERO_3") {
-          drawCards(state, victim.seat, 2);
-          recordAction(state, {
-              type: "USE_SKILL",
-              casterSeat: victim.seat,
-              description: `✨ <b>${victim.generalName}</b> kích hoạt <color=#FFD700><b>Hịch Nghĩa</b></color>: Rút 2 lá bài khi thoát khỏi Cận Tử!`
-          });
+        if (String(victim.heroId) === "3") {
+            drawCards(state, victim.seat, 2);
+            recordAction(state, {
+                type: "USE_SKILL",
+                casterSeat: victim.seat,
+                description: `✨ <b>${victim.generalName}</b> kích hoạt <color=#FFD700><b>Hịch Nghĩa</b></color>: Rút 2 lá bài khi thoát khỏi Cận Tử!`
+            });
+        }
+
+        const resume = resolveNearDeathResume(state);
+        refreshLastDelta(state);
+        return resume;
+      } else {
+        state.waitingTimer = 40;
+        state.timerStartAt = Date.now();
+        recordAction(state, {
+          type: "RESCUE_ATTEMPT",
+          casterSeat: respondentSeat,
+          targetSeat: victim.seat,
+          description: `💮 <b>${respondent.generalName}</b> đã dùng ${formatCardText(rescueCard)} cứu <b>${victim.generalName}</b> nhưng vẫn còn (${victim.hp}/${victim.maxHp}) Máu!`
+        });
+        refreshLastDelta(state);
+        return { success: true, state };
       }
-
-      const resume = resolveNearDeathResume(state);
-      refreshLastDelta(state);
-      return resume;
     }
 
     // Nếu người này không cứu -> Hỏi người tiếp theo trong danh sách cứu viện
@@ -1902,6 +1966,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       const nextAsker = state.nearDeathAskerQueue.shift();
       state.waitingTargetSeat = nextAsker;
       state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
       refreshLastDelta(state);
       return { success: true, state };
     } else {
@@ -1952,7 +2017,9 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
   target.hp -= finalDamage;
 
   if (target.hp <= 0) {
-    target.hp = 0;
+    // Máu có thể âm khi sát thương lớn hơn máu hiện tại
+    // target.hp = 0; // KHÔNG SET VỀ 0 NẾU ÂM! Để dành cho Bánh Chưng cộng dồn
+    
     // Thứ tự hỏi cứu: Người trong lượt trước (state.turnSeat), sau đó đến người kế bên phải (ngược chiều kim đồng hồ) cho đến hết vòng
     const startSeat = state.turnSeat || 1;
     const askers = [];
@@ -1972,11 +2039,12 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
       state.waitingTargetSeat = firstAsker;
       state.waitingReactionType = "PEACH";
       state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
       recordAction(state, {
         type: "NEAR_DEATH",
         targetSeat,
          damage: finalDamage,
-         description: `🆘 <b>${target.generalName}</b> trúng đòn bị mất ${finalDamage} máu và rơi vào trạng thái Hấp Hối (0 Máu)! Đang chờ Ghế ${firstAsker} cứu viện (40s)...`
+         description: `🆘 <b>${target.generalName}</b> trúng đòn bị mất ${finalDamage} máu và rơi vào trạng thái Hấp Hối (${target.hp} Máu)! Đang chờ Ghế ${firstAsker} cứu viện (40s)...`
       });
        return { finalDamage, enteredNearDeath: true };
     } else {
@@ -2030,6 +2098,7 @@ export function handleEndTurn(state, casterSeat) {
     state.waitingTargetSeat = casterSeat;
     state.waitingReactionType = "DISCARD";
     state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
     recordAction(state, {
       type: "DISCARD_PHASE",
       casterSeat,
@@ -2094,60 +2163,103 @@ function findNextJudgementRecipient(state, currentSeat, subType) {
 function resolveJudgementCard(state, judgementCard, targetSeat) {
   const target = state.players.find((player) => player.seat === targetSeat);
   if (!target || !judgementCard) return;
-  const judgeCard = drawJudgementCard(state) || { suit: "Heart", rank: 10, name: "Bài Phán Xét" };
+  const judgeCard = drawJudgementCard(state) || { suit: "Heart", rank: 10, name: "Bài Phán Xét", id: "JUDGECARD" };
+
+  let isHit = false;
+  let triggered = false;
+  let actionType = "";
+  let description = "";
+  let nextRecipient = 0;
 
   if (judgementCard.subType === CARD_SUBTYPES.LIGHTNING) {
-    const isHit = judgeCard.suit === "Spade" && judgeCard.rank >= 2 && judgeCard.rank <= 9;
+    isHit = judgeCard.suit === "Spade" && judgeCard.rank >= 2 && judgeCard.rank <= 9;
+    actionType = isHit ? "LIGHTNING_HIT" : "LIGHTNING_PASSED";
+    const recipient = !isHit ? findNextJudgementRecipient(state, targetSeat, CARD_SUBTYPES.LIGHTNING) : null;
+    nextRecipient = recipient ? recipient.seat : 0;
+    description = isHit
+      ? "⚡⚡⚡ [Thần Sấm Báo Ứng] phán xét " + judgeCard.suit + " " + judgeCard.rank + ": <b>" + target.generalName + "</b> chuẩn bị chịu 3 sát thương Lôi!"
+      : (recipient ? "⚡ [Thần Sấm Báo Ứng] phán xét " + judgeCard.suit + " " + judgeCard.rank + " không trúng, chuẩn bị chuyển sang <b>" + recipient.generalName + "</b>." : "⚡ [Thần Sấm Báo Ứng] không trúng và không còn vùng phán xét hợp lệ, lá bài bị bỏ.");
+  } else if (judgementCard.subType === CARD_SUBTYPES.SUPPLY_SHORTAGE) {
+    triggered = judgeCard.suit !== "Club";
+    actionType = triggered ? "SUPPLY_SHORTAGE_TRIGGERED" : "SUPPLY_SHORTAGE_PASSED";
+    description = triggered ? "🌾❌ <b>" + target.generalName + "</b> phán xét " + judgeCard.suit + " " + judgeCard.rank + ", chuẩn bị bỏ qua Giai đoạn Rút bài." : "🌾✅ <b>" + target.generalName + "</b> phán xét ra Chuồn, hóa giải Cắt Đường Lương.";
+  } else if (judgementCard.subType === CARD_SUBTYPES.ACEDIA) {
+    triggered = judgeCard.suit !== "Heart";
+    actionType = triggered ? "ACEDIA_TRIGGERED" : "ACEDIA_PASSED";
+    description = triggered ? "🕸️❌ <b>" + target.generalName + "</b> phán xét " + judgeCard.suit + " " + judgeCard.rank + ", chuẩn bị bỏ qua Giai đoạn Ra bài." : "🕸️✅ <b>" + target.generalName + "</b> phán xét ra Cơ, thoát khỏi Sa Bẫy.";
+  }
+
+  state.phase = "AWAIT_JUDGEMENT";
+  state.waitingTargetSeat = 0;
+  state.waitingTimer = 3;
+  state.timerStartAt = Date.now();
+  state.pendingJudgement = {
+    actionType,
+    targetSeat,
+    judgeCardId: judgeCard.id,
+    judgementCardId: judgementCard.id,
+    judgementCardType: judgementCard.subType,
+    isHit,
+    triggered,
+    nextRecipient
+  };
+
+  recordAction(state, {
+    type: actionType,
+    targetSeat,
+    cardId: judgeCard.id,
+    description
+  });
+}
+
+function applyPendingJudgement(state) {
+  const pending = state.pendingJudgement;
+  if (!pending) {
+     return continueTurnStart(state);
+  }
+  const { actionType, targetSeat, judgementCardId, judgementCardType, isHit, triggered, nextRecipient } = pending;
+  const target = state.players.find(p => p.seat === targetSeat);
+  state.pendingJudgement = null;
+  state.phase = "PLAY";
+  state.waitingTimer = 0;
+  
+  if (!target) return continueTurnStart(state);
+
+  const judgementCard = target.judgements?.find(c => c.id === judgementCardId);
+  if (judgementCard) {
+      target.judgements = target.judgements.filter(c => c.id !== judgementCardId);
+  }
+  
+  const cardObj = judgementCard || { id: judgementCardId, subType: judgementCardType };
+
+  if (judgementCardType === CARD_SUBTYPES.LIGHTNING) {
     if (isHit) {
-      discardCard(state, judgementCard);
-      recordAction(state, {
-        type: "LIGHTNING_HIT",
-        targetSeat,
-        cardId: judgementCard.id,
-        description: `⚡⚡⚡ [Thần Sấm Báo Ứng] phán xét ${judgeCard.suit} ${judgeCard.rank}: <b>${target.generalName}</b> chịu 3 sát thương Lôi!`
-      });
+      discardCard(state, cardObj);
       applyDamageToPlayer(state, targetSeat, 3, "Thần Sấm Báo Ứng");
-      return;
+      if (state.phase === "AWAIT_NEAR_DEATH") return;
+    } else {
+      if (nextRecipient > 0) {
+        const recipient = state.players.find(p => p.seat === nextRecipient);
+        if (recipient) {
+           recipient.judgements = recipient.judgements || [];
+           recipient.judgements.push(cardObj);
+        } else {
+           discardCard(state, cardObj);
+        }
+      } else {
+        discardCard(state, cardObj);
+      }
     }
-
-    const recipient = findNextJudgementRecipient(state, targetSeat, CARD_SUBTYPES.LIGHTNING);
-    if (recipient) recipient.judgements.push(judgementCard);
-    else discardCard(state, judgementCard);
-    recordAction(state, {
-      type: "LIGHTNING_PASSED",
-      targetSeat,
-      description: recipient
-        ? `⚡ [Thần Sấm Báo Ứng] phán xét ${judgeCard.suit} ${judgeCard.rank} không trúng, chuyển sang <b>${recipient.generalName}</b>.`
-        : `⚡ [Thần Sấm Báo Ứng] không trúng và không còn vùng phán xét hợp lệ, lá bài bị bỏ.`
-    });
-    return;
+  } else {
+    discardCard(state, cardObj);
+    if (judgementCardType === CARD_SUBTYPES.SUPPLY_SHORTAGE && triggered) {
+      if (state.turnStart) state.turnStart.skipDraw = true;
+    } else if (judgementCardType === CARD_SUBTYPES.ACEDIA && triggered) {
+      if (state.turnStart) state.turnStart.skipPlay = true;
+    }
   }
 
-  discardCard(state, judgementCard);
-  if (judgementCard.subType === CARD_SUBTYPES.SUPPLY_SHORTAGE) {
-    const triggered = judgeCard.suit !== "Club";
-    if (state.turnStart) state.turnStart.skipDraw ||= triggered;
-    recordAction(state, {
-      type: triggered ? "SUPPLY_SHORTAGE_TRIGGERED" : "SUPPLY_SHORTAGE_PASSED",
-      targetSeat,
-      description: triggered
-        ? `🌾❌ <b>${target.generalName}</b> phán xét ${judgeCard.suit} ${judgeCard.rank}, bị bỏ qua Giai đoạn Rút bài.`
-        : `🌾✅ <b>${target.generalName}</b> phán xét ra Chuồn, hóa giải Cắt Đường Lương.`
-    });
-    return;
-  }
-
-  if (judgementCard.subType === CARD_SUBTYPES.ACEDIA) {
-    const triggered = judgeCard.suit !== "Heart";
-    if (state.turnStart) state.turnStart.skipPlay ||= triggered;
-    recordAction(state, {
-      type: triggered ? "ACEDIA_TRIGGERED" : "ACEDIA_PASSED",
-      targetSeat,
-      description: triggered
-        ? `🕸️❌ <b>${target.generalName}</b> phán xét ${judgeCard.suit} ${judgeCard.rank}, bị bỏ qua Giai đoạn Ra bài.`
-        : `🕸️✅ <b>${target.generalName}</b> phán xét ra Cơ, thoát Trầm Ảo Sa Bẫy.`
-    });
-  }
+  return continueTurnStart(state);
 }
 
 function continueTurnStart(state) {
@@ -2181,6 +2293,7 @@ function continueTurnStart(state) {
       state.waitingTargetSeat = player.seat;
       state.waitingReactionType = "DISCARD";
       state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
       recordAction(state, {
         type: "DISCARD_PHASE",
         casterSeat: player.seat,
@@ -2355,16 +2468,31 @@ export function handleAIStep(state, aiSeat) {
 
 
   // J. Cẩm nang phá bài (Vườn Không / Đột Kích)
-  const snatchTarget = enemies.find((enemy) =>
-    getDistance(state, aiSeat, enemy.seat) <= 1 && buildTargetCardOptions(state, enemy.seat, true).length > 0
-  ) || null;
+  // Ưu tiên cứu đồng đội khỏi các lá Phán Xét (Trì hoãn)
+  const allies = state.players.filter(x => areTeammates(x.seat, aiSeat) && x.hp > 0);
+  const allyNeedHelp = allies.find((ally) => (ally.judgements && ally.judgements.length > 0));
+  
   const snatch = ai.hand.find((card) => card.subType === CARD_SUBTYPES.SNATCH);
+  const dismantle = ai.hand.find((card) => card.subType === CARD_SUBTYPES.DISMANTLE);
+
+  if (allyNeedHelp) {
+    if (dismantle) {
+      return handlePlayCard(state, aiSeat, dismantle.id, allyNeedHelp.seat);
+    }
+    if (snatch && getDistance(state, aiSeat, allyNeedHelp.seat) <= 1) {
+      return handlePlayCard(state, aiSeat, snatch.id, allyNeedHelp.seat);
+    }
+  }
+
+  // Nếu không có đồng đội cần cứu, dùng để phá bài kẻ địch (Chỉ Hand và Equipment)
+  const snatchTarget = enemies.find((enemy) =>
+    getDistance(state, aiSeat, enemy.seat) <= 1 && buildTargetCardOptions(state, enemy.seat, false).length > 0
+  ) || null;
   if (snatch && snatchTarget) {
     return handlePlayCard(state, aiSeat, snatch.id, snatchTarget.seat);
   }
 
   const dismantleTarget = enemies.find((enemy) => buildTargetCardOptions(state, enemy.seat, false).length > 0) || null;
-  const dismantle = ai.hand.find((card) => card.subType === CARD_SUBTYPES.DISMANTLE);
   if (dismantle && dismantleTarget) {
     return handlePlayCard(state, aiSeat, dismantle.id, dismantleTarget.seat);
   }
@@ -2501,7 +2629,7 @@ export function tickGameState(state) {
        state.waitingTimer = newTimer;
        changed = true;
        if (newTimer % 5 === 0) important = true; // Sync UI every 5s
-    } {
+    }
     const waitingSeat = state.waitingTargetSeat;
     const waitingPlayer = state.players.find(p => p.seat === waitingSeat);
 
@@ -2651,7 +2779,9 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
       desc: c.desc || ""
     })),
     nullifyChain: state.nullifyChain || null,
-    targetCardSelection: sanitizeTargetCardSelection(state.targetCardSelection, requestingSeat),
+    pendingJudgement: state.pendingJudgement || null,
+      pendingJudgement: state.pendingJudgement || null,
+      targetCardSelection: sanitizeTargetCardSelection(state.targetCardSelection, requestingSeat),
     lastAction: state.lastAction,
     actionHistory: state.actionHistory || [],
     discardTop: state.discardTop,
@@ -2740,7 +2870,7 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0) {
       
       const options = [];
       (target.equipments || []).forEach(c => {
-          options.push({ token: "equip_" + c.id, zone: "EQUIP", label: "Trang bị", card: c });
+          options.push({ token: "EQUIPMENT:" + c.id, zone: "EQUIPMENT", label: "TRANG BỊ", card: c });
       });
       if (options.length === 0) return { error: "Mục tiêu không có trang bị để hủy" };
       
@@ -2758,6 +2888,7 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0) {
       state.waitingTargetSeat = seat;
       state.waitingReactionType = "TARGET_CARD";
       state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
 
       recordAction(state, {
         type: "USE_SKILL",
@@ -2780,6 +2911,38 @@ export function handleToggleSkill(state, seat, skillId) {
   if (!player.activeSkills) player.activeSkills = {};
   player.activeSkills[skillId] = !player.activeSkills[skillId];
 
+  if (skillId === "Chế Nỏ") {
+    if (player.activeSkills[skillId]) {
+      if (player.hand) {
+        player.hand.forEach(c => {
+          if (c.suit === "Spade" && c.subType !== "WEAPON") {
+            c.originalCardId = c.id; // Just store ID and we'll use findCardByIdInDeck? No, store original stats!
+            c.orig_name = c.name;
+            c.orig_subType = c.subType;
+            c.orig_category = c.category;
+            c.orig_desc = c.desc;
+            c.name = "Nỏ Thần Kim Quy";
+            c.subType = "WEAPON";
+            c.category = "EQUIPMENT";
+            c.desc = "Tầm 1. Không giới hạn số Trảm trong lượt";
+          }
+        });
+      }
+    } else {
+      if (player.hand) {
+        player.hand.forEach(c => {
+          if (c.orig_name) {
+            c.name = c.orig_name;
+            c.subType = c.orig_subType;
+            c.category = c.orig_category;
+            c.desc = c.orig_desc;
+            delete c.orig_name; delete c.orig_subType; delete c.orig_category; delete c.orig_desc;
+          }
+        });
+      }
+    }
+  }
+
   recordAction(state, {
     type: "TOGGLE_SKILL",
     casterSeat: seat,
@@ -2789,3 +2952,11 @@ export function handleToggleSkill(state, seat, skillId) {
   refreshLastDelta(state);
   return { success: true, state };
 }
+
+
+
+
+
+
+
+

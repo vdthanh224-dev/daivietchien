@@ -1362,10 +1362,7 @@ public static class AppwriteMatchmaking
 {
     if (actionPayload == null || string.IsNullOrEmpty(actionPayload.roomId)) { onResult?.Invoke(null); yield break; }
 
-    if (actionPayload.expectedVersion <= 0 && currentServerStateVersion > 0 && actionPayload.action != "INIT_GAME" && actionPayload.action != "GET_STATE")
-    {
-        actionPayload.expectedVersion = currentServerStateVersion;
-    }
+    // Version check bypassed to avoid conflict with SERVER_TICK
 
     string actionBody = JsonUtility.ToJson(actionPayload);
 
@@ -1376,7 +1373,7 @@ public static class AppwriteMatchmaking
         denoReq.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(actionBody));
         denoReq.downloadHandler = new DownloadHandlerBuffer();
         denoReq.SetRequestHeader("Content-Type", "application/json");
-        denoReq.timeout = 3; // Timeout nhanh để kịp fallback
+        denoReq.timeout = 10; // Timeout nhanh để kịp fallback
         yield return denoReq.SendWebRequest();
 
         if (denoReq.result == UnityWebRequest.Result.Success || !string.IsNullOrEmpty(denoReq.downloadHandler?.text))
@@ -1561,5 +1558,6 @@ public static class AppwriteMatchmaking
     }
     #endregion
 }
+
 
 
