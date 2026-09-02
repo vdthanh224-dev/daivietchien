@@ -415,28 +415,32 @@ public sealed class HomeUI : MonoBehaviour
         nameGo.transform.SetParent(playerProfileGo.transform, false);
         playerNameText = nameGo.GetComponent<Text>();
         playerNameText.font = font;
-        playerNameText.fontSize = 26;
+        playerNameText.fontSize = 24;
         playerNameText.horizontalOverflow = HorizontalWrapMode.Overflow;
+        playerNameText.verticalOverflow = VerticalWrapMode.Overflow;
         playerNameText.fontStyle = FontStyle.Bold;
         playerNameText.color = new Color(1f, 0.95f, 0.75f, 1f);
         var nameRt = nameGo.GetComponent<RectTransform>();
         nameRt.anchorMin = nameRt.anchorMax = nameRt.pivot = new Vector2(0f, 1f);
-        nameRt.sizeDelta = new Vector2(440f, 32f);
+        nameRt.sizeDelta = new Vector2(320f, 32f);
         nameRt.anchoredPosition = new Vector2(70f, -4f);
-        AddShadow(nameGo);
+        ThemeUI.AddTextShadow(playerNameText);
 
-        // Quân hàm & Cấp độ lớn (22pt Bold)
+        // Quân hàm & Cấp độ lớn (20pt Bold)
         var rankGo = new GameObject("PlayerRank", typeof(RectTransform), typeof(Text));
         rankGo.transform.SetParent(playerProfileGo.transform, false);
         playerRankText = rankGo.GetComponent<Text>();
         playerRankText.font = font;
-        playerRankText.fontSize = 22;
+        playerRankText.fontSize = 18;
+        playerRankText.horizontalOverflow = HorizontalWrapMode.Overflow;
+        playerRankText.verticalOverflow = VerticalWrapMode.Overflow;
         playerRankText.color = new Color(0.6f, 0.88f, 1f, 1f);
         playerRankText.text = "⭐ Chánh Tướng • Cấp 1";
         var rankRt = rankGo.GetComponent<RectTransform>();
         rankRt.anchorMin = rankRt.anchorMax = rankRt.pivot = new Vector2(0f, 1f);
-        rankRt.sizeDelta = new Vector2(440f, 26f);
+        rankRt.sizeDelta = new Vector2(320f, 24f);
         rankRt.anchoredPosition = new Vector2(70f, -32f);
+        ThemeUI.AddTextShadow(playerRankText);
 
         // Thanh tiến độ EXP từ Appwrite
         var expBgGo = new GameObject("ExpBarBg", typeof(RectTransform), typeof(Image));
@@ -2150,6 +2154,9 @@ public sealed class HomeUI : MonoBehaviour
         t.alignment = align;
         t.text = text;
         t.raycastTarget = false;
+        t.horizontalOverflow = HorizontalWrapMode.Overflow;
+        t.verticalOverflow = VerticalWrapMode.Overflow;
+        ThemeUI.AddTextShadow(t);
         return t;
     }
 

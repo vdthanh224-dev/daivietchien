@@ -1296,10 +1296,14 @@ public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
         generalNameText.alignment = TextAnchor.MiddleCenter;
         generalNameText.color = new Color(1f, 0.88f, 0.45f, 1f);
         generalNameText.raycastTarget = false;
+        generalNameText.horizontalOverflow = HorizontalWrapMode.Overflow;
+        generalNameText.verticalOverflow = VerticalWrapMode.Overflow;
         var nameShadow = nameTextGo.AddComponent<Shadow>();
         nameShadow.effectColor = new Color(0, 0, 0, 0.95f);
         nameShadow.effectDistance = new Vector2(1.5f, -1.5f);
         FillRect(nameTextGo.GetComponent<RectTransform>());
+
+        plaqueGo.transform.SetAsLastSibling();
 
         // 4. Huy hiệu Phe (Bottom Left)
         var factionBadgeGo = new GameObject("FactionBadge", typeof(RectTransform), typeof(Image));
@@ -1331,8 +1335,14 @@ public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
         factionText.alignment = TextAnchor.MiddleCenter;
         factionText.color = new Color(1f, 0.95f, 0.85f, 1f);
         factionText.raycastTarget = false;
+        factionText.horizontalOverflow = HorizontalWrapMode.Overflow;
+        factionText.verticalOverflow = VerticalWrapMode.Overflow;
         var factionShadow = factionTextGo.AddComponent<Shadow>();
         factionShadow.effectColor = new Color(0, 0, 0, 0.95f);
+        factionShadow.effectDistance = new Vector2(1f, -1f);
+        FillRect(factionTextGo.GetComponent<RectTransform>());
+
+        factionBadgeGo.transform.SetAsLastSibling();
         factionShadow.effectDistance = new Vector2(1f, -1f);
         FillRect(factionTextGo.GetComponent<RectTransform>());
 

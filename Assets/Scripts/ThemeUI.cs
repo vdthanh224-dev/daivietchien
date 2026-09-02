@@ -95,6 +95,8 @@ public static class ThemeUI
         txt.fontStyle = style;
         txt.alignment = align;
         txt.raycastTarget = false;
+        txt.horizontalOverflow = HorizontalWrapMode.Overflow;
+        txt.verticalOverflow = VerticalWrapMode.Overflow;
 
         if (withShadow)
         {
