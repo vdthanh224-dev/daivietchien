@@ -17,6 +17,8 @@ public class DenoGameClient : MonoBehaviour
     public static DenoGameClient Instance { get; private set; }
 
     public static string ServerEndpoint = "wss://dai-viet-chien-server.deno.dev";
+    public static string LocalServerEndpoint = "ws://127.0.0.1:8082";
+    public static string ActiveConnectedEndpoint { get; private set; } = "";
     public static bool IsConnected => Instance != null && Instance.wsClient != null && Instance.wsClient.State == WebSocketState.Open;
 
     public static event Action<AppwriteMatchmaking.ServerGameState, AppwriteMatchmaking.GameStateDelta> OnGameStateUpdated;
@@ -142,88 +144,92 @@ public class DenoGameClient : MonoBehaviour
 
     private async Task ConnectAndLoop(CancellationToken token, List<AppwriteMatchmaking.GameStatePlayer> initialPlayers)
     {
-        float reconnectDelay = 2.0f;
+        string[] candidateEndpoints = new string[] { ServerEndpoint, LocalServerEndpoint };
+
         while (isRunning && !token.IsCancellationRequested)
         {
-            ClientWebSocket connectionSocket = null;
-            try
+            bool connected = false;
+
+            foreach (var ep in candidateEndpoints)
             {
-                connectionSocket = new ClientWebSocket();
-                connectionSocket.Options.KeepAliveInterval = TimeSpan.FromSeconds(15);
-                wsClient = connectionSocket;
-                var uri = new Uri(ServerEndpoint);
-                await connectionSocket.ConnectAsync(uri, token);
+                if (string.IsNullOrEmpty(ep) || !isRunning || token.IsCancellationRequested) continue;
 
-                mainThreadQueue.Enqueue(() =>
+                ClientWebSocket connectionSocket = null;
+                try
                 {
-                    Debug.Log($"<color=#00FF88>⚡ [DenoGameClient] Đã kết nối Deno Game Server thành công ({ServerEndpoint})!</color>");
-                    OnConnectionStateChanged?.Invoke(true);
-                });
+                    connectionSocket = new ClientWebSocket();
+                    connectionSocket.Options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+                    wsClient = connectionSocket;
+                    var uri = new Uri(ep);
 
-                reconnectDelay = 2.0f;
-
-                // Gửi lệnh JOIN_ROOM / INIT_GAME ngay sau khi kết nối
-                var joinPayload = new AppwriteMatchmaking.GameActionPayload
-                {
-                    action = "JOIN_ROOM",
-                    roomId = activeRoomId,
-                    seat = activeSeat,
-                    players = initialPlayers
-                };
-                await SendRawDirectAsync(JsonUtility.ToJson(joinPayload), token);
-                while (pendingMessages.TryDequeue(out var pendingJson))
-                {
-                    await SendRawDirectAsync(pendingJson, token);
-                }
-
-                var buffer = new byte[16384];
-                var messageBuilder = new StringBuilder();
-
-                while (connectionSocket.State == WebSocketState.Open && !token.IsCancellationRequested)
-                {
-                    var result = await connectionSocket.ReceiveAsync(new ArraySegment<byte>(buffer), token);
-                    if (result.MessageType == WebSocketMessageType.Close)
+                    using (var connectCts = CancellationTokenSource.CreateLinkedTokenSource(token))
                     {
-                        await connectionSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", token);
-                        break;
+                        connectCts.CancelAfter(2500); // 2.5s connect timeout
+                        await connectionSocket.ConnectAsync(uri, connectCts.Token);
                     }
 
-                    messageBuilder.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
-                    if (result.EndOfMessage)
-                    {
-                        string completeMessage = messageBuilder.ToString();
-                        messageBuilder.Clear();
-                        ProcessServerMessage(completeMessage);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                if (isRunning && !token.IsCancellationRequested)
-                {
+                    ActiveConnectedEndpoint = ep;
+                    connected = true;
+
                     mainThreadQueue.Enqueue(() =>
                     {
-                        Debug.LogWarning($"[DenoGameClient] Đang kết nối lại Deno Server sau {reconnectDelay}s ({ex.Message})");
+                        Debug.Log($"<color=#00FF88>⚡ [DenoGameClient] Đã kết nối Máy Chủ Game Server 100% Authoritative thành công ({ep})!</color>");
+                        OnConnectionStateChanged?.Invoke(true);
                     });
+
+                    // Gửi lệnh JOIN_ROOM ngay sau khi kết nối để Server chia bài & tạo GameState
+                    var joinPayload = new AppwriteMatchmaking.GameActionPayload
+                    {
+                        action = "JOIN_ROOM",
+                        roomId = activeRoomId,
+                        seat = activeSeat,
+                        players = initialPlayers
+                    };
+                    await SendRawDirectAsync(JsonUtility.ToJson(joinPayload), token);
+
+                    while (pendingMessages.TryDequeue(out var pendingJson))
+                    {
+                        await SendRawDirectAsync(pendingJson, token);
+                    }
+
+                    var buffer = new byte[16384];
+                    var messageBuilder = new StringBuilder();
+
+                    while (connectionSocket.State == WebSocketState.Open && !token.IsCancellationRequested)
+                    {
+                        var result = await connectionSocket.ReceiveAsync(new ArraySegment<byte>(buffer), token);
+                        if (result.MessageType == WebSocketMessageType.Close)
+                        {
+                            await connectionSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", token);
+                            break;
+                        }
+
+                        messageBuilder.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
+                        if (result.EndOfMessage)
+                        {
+                            string completeMessage = messageBuilder.ToString();
+                            messageBuilder.Clear();
+                            ProcessServerMessage(completeMessage);
+                        }
+                    }
                 }
-            }
-            finally
-            {
-                // A cancelled loop can finish after a replacement connection
-                // has already been installed. Only clear/dispose our own
-                // socket so an old reconnect attempt cannot kill the new one.
-                if (ReferenceEquals(wsClient, connectionSocket)) wsClient = null;
-                connectionSocket?.Dispose();
-                if (isRunning && !token.IsCancellationRequested)
+                catch (Exception)
                 {
-                    mainThreadQueue.Enqueue(() => OnConnectionStateChanged?.Invoke(false));
+                    // Thử endpoint kế tiếp
                 }
+                finally
+                {
+                    if (ReferenceEquals(wsClient, connectionSocket)) wsClient = null;
+                    connectionSocket?.Dispose();
+                }
+
+                if (connected) break;
             }
 
             if (isRunning && !token.IsCancellationRequested)
             {
-                try { await Task.Delay((int)(reconnectDelay * 1000), token); } catch { break; }
-                reconnectDelay = Math.Min(reconnectDelay * 1.5f, 10.0f);
+                mainThreadQueue.Enqueue(() => OnConnectionStateChanged?.Invoke(false));
+                try { await Task.Delay(TimeSpan.FromSeconds(2.0), token); } catch { }
             }
         }
     }

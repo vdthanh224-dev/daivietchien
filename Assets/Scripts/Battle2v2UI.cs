@@ -3785,38 +3785,24 @@ public class Battle2v2UI : MonoBehaviour
 
         isFirstTurnOfMatch = true;
 
-        if (DenoGameClient.IsConnected)
+        SetLog("🎴 Kết nối Máy Chủ Authoritative để chia bài và bắt đầu trận đấu...");
+        var initPlayers = BuildInitialServerPlayers();
+        if (DenoGameClient.Instance != null && !string.IsNullOrEmpty(currentRoomId))
         {
-            SetLog("🎴 Đang chờ máy chủ chia bài và mở lượt đầu tiên...");
-            var initPlayers = BuildInitialServerPlayers();
-            if (IsAIController())
-            {
-                DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
-                {
-                    action = "INIT_GAME",
-                    roomId = currentRoomId,
-                    seat = playerCard != null ? playerCard.SeatNumber : 1,
-                    players = initPlayers
-                }, (initState) =>
-                {
-                    if (initState != null)
-                    {
-                        ApplyServerGameState(initState);
-                    }
-                });
-            }
+            DenoGameClient.Instance.ConnectToServer(currentRoomId, playerCard != null ? playerCard.SeatNumber : 1, initPlayers);
+        }
 
-            float waitTimer = 0f;
-            while (waitTimer < 1.5f && lastAppliedStateVersion == 0)
-            {
-                waitTimer += 0.2f;
-                yield return new WaitForSecondsRealtime(0.2f);
-            }
+        float waitTimer = 0f;
+        while (waitTimer < 4.0f && lastAppliedStateVersion == 0)
+        {
+            waitTimer += 0.1f;
+            yield return new WaitForSecondsRealtime(0.1f);
+        }
 
-            if (lastAppliedStateVersion > 0)
-            {
-                yield break;
-            }
+        if (lastAppliedStateVersion > 0)
+        {
+            SetLog("👑 Trận đấu bắt đầu! 100% diễn biến do Máy Chủ Server điều phối.");
+            yield break;
         }
 
         SetLog("🎴 Phát 4 lá bài ban đầu cho toàn thể chiến tướng...");
