@@ -138,16 +138,176 @@ public sealed class AuthUI : MonoBehaviour
         scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
         scaler.matchWidthOrHeight = 0.5f;
         
-        // Add Quick Login Panel for dev
+        // 1. Hình nền & Lớp phủ đọc tốt
+        var bg = AddRawImage(canvasGo.transform, "Background", new Color(0.08f, 0.1f, 0.15f, 1f));
+        bg.raycastTarget = false;
+        Fill(bg.rectTransform);
+        var bgTex = Resources.Load<Texture2D>("UI/login_background");
+        if (bgTex != null) bgImg(bg, bgTex);
+
+        var shade = AddImage(canvasGo.transform, "ReadabilityShade", new Color(0.02f, 0.04f, 0.08f, 0.65f));
+        shade.raycastTarget = false;
+        Fill(shade.rectTransform);
+
+        // 2. Cột Thương Hiệu Ở Phía Trên Trung Tâm
+        BuildBrandHeader(canvasGo.transform);
+
+        // 3. Khung Đăng nhập / Đăng ký Trung Tâm (Auth Card)
+        BuildAuthCard(canvasGo.transform);
+
+        // 4. Thanh Quick Login rút gọn ở đáy màn hình
 #if UNITY_EDITOR || UNITY_STANDALONE_WIN
+        BuildQuickLoginBar(canvasGo.transform);
+#endif
+
+        // Áp dụng trạng thái ban đầu
+        SetRegisterMode(false);
+    }
+
+    private void bgImg(RawImage img, Texture2D tex)
+    {
+        img.texture = tex;
+        img.color = new Color(0.85f, 0.85f, 0.9f, 1f);
+    }
+
+    private void BuildBrandHeader(Transform parent)
+    {
+        brandRoot = new GameObject("BrandHeader");
+        brandRoot.transform.SetParent(parent, false);
+        var rt = brandRoot.AddComponent<RectTransform>();
+        SetRect(rt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(600, 150), new Vector2(0, -18));
+
+        // Emblem Trống Đồng / Avatar lớn (74x74)
+        var emblem = AddRawImage(brandRoot.transform, "Emblem", Color.white);
+        SetRect(emblem.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(72, 72), new Vector2(0, -4));
+        var emblemTex = Resources.Load<Texture2D>("UI/game_avatar");
+        if (emblemTex != null) emblem.texture = emblemTex;
+
+        // Tiêu đề game hoàng kim lớn (36pt)
+        var logo = AddText(brandRoot.transform, "Logo", "👑 ĐẠI VIỆT CHIẾN", 36, GameTheme.GoldBright, FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(logo.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(500, 42), new Vector2(0, -80));
+        AddTextShadow(logo);
+
+        // Khẩu hiệu (16pt)
+        var tagline = AddText(brandRoot.transform, "Tagline", "THAO LƯỢC TRANH HÙNG • SỬ THI ĐẠI VIỆT", 16, new Color(0.6f, 0.9f, 1f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(tagline.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(500, 24), new Vector2(0, -122));
+        AddTextShadow(tagline);
+    }
+
+    private void BuildAuthCard(Transform parent)
+    {
+        authCardRoot = new GameObject("AuthCard");
+        authCardRoot.transform.SetParent(parent, false);
+        authCardRt = authCardRoot.AddComponent<RectTransform>();
+        SetRect(authCardRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Center(), new Vector2(480, 440), new Vector2(0, -50));
+
+        var cardBg = authCardRoot.AddComponent<Image>();
+        var cardBgSprite = LotusHealthUI.LoadSpriteFromResources("UI/auth_card_bg");
+        if (cardBgSprite != null)
+        {
+            cardBg.sprite = cardBgSprite;
+            cardBg.type = Image.Type.Sliced;
+        }
+        cardBg.color = new Color(0.06f, 0.09f, 0.16f, 0.98f);
+
+        // Khung viền vàng Auth Card
+        var borderGo = new GameObject("OuterBorder", typeof(RectTransform), typeof(Image));
+        borderGo.transform.SetParent(authCardRoot.transform, false);
+        borderGo.transform.SetAsFirstSibling();
+        var bImg = borderGo.GetComponent<Image>();
+        var frameSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+        if (frameSpr != null) { bImg.sprite = frameSpr; bImg.type = Image.Type.Sliced; }
+        bImg.color = ThemeUI.GoldPrimary;
+        Fill(borderGo.GetComponent<RectTransform>(), new Vector2(-3, -3), new Vector2(3, 3));
+
+        var font = ThemeUI.FontMain;
+
+        // 1. Tab Bar: [ ĐĂNG NHẬP ] | [ ĐĂNG KÝ ] (Cỡ chữ 20pt)
+        var tabBarGo = new GameObject("TabBar", typeof(RectTransform));
+        tabBarGo.transform.SetParent(authCardRoot.transform, false);
+        var tabRt = tabBarGo.GetComponent<RectTransform>();
+        SetRect(tabRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(420, 48), new Vector2(0, -14));
+
+        tabLoginBtn = CreateTabButton(tabBarGo.transform, "TabLogin", "⚔️ ĐĂNG NHẬP", new Vector2(-105, 0), out tabLoginText, out tabLoginLine, font, () => SetRegisterMode(false));
+        tabRegisterBtn = CreateTabButton(tabBarGo.transform, "TabRegister", "🎖️ ĐĂNG KÝ", new Vector2(105, 0), out tabRegisterText, out tabRegisterLine, font, () => SetRegisterMode(true));
+
+        // 2. Input Fields (Rộng rãi 420px x 64px)
+        float startY = -74f;
+        float spacingY = 66f;
+
+        nameGroup = CreateInputFieldGroup(authCardRoot.transform, "NameGroup", "TÊN CHIẾN TƯỚNG", "Nhập tên hiển thị...", "UI/icon_input_user", new Vector2(0, startY), font, false, out nameInput);
+        emailGroup = CreateInputFieldGroup(authCardRoot.transform, "EmailGroup", "ĐỊA CHỈ EMAIL", "you@example.com", "UI/icon_input_mail", new Vector2(0, startY - spacingY), font, false, out emailInput);
+        passwordGroup = CreateInputFieldGroup(authCardRoot.transform, "PasswordGroup", "MẬT THƯ (MẬT KHẨU)", "Nhập mật khẩu (tối thiểu 8 ký tự)...", "UI/icon_input_lock", new Vector2(0, startY - 2 * spacingY), font, true, out passwordInput);
+
+        // 3. Nút Đăng nhập / Đăng ký chính (Golden Button lớn 420x50, chữ 20pt)
+        var submitBtnGo = new GameObject("SubmitButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        submitBtnGo.transform.SetParent(authCardRoot.transform, false);
+        var submitImg = submitBtnGo.GetComponent<Image>();
+        var btnGoldSprite = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
+        if (btnGoldSprite != null)
+        {
+            submitImg.sprite = btnGoldSprite;
+            submitImg.type = Image.Type.Sliced;
+        }
+        else submitImg.color = ThemeUI.GoldPrimary;
+
+        submitButton = submitBtnGo.GetComponent<Button>();
+        submitButton.onClick.AddListener(Submit);
+        var subRt = submitBtnGo.GetComponent<RectTransform>();
+        SetRect(subRt, Center(), Center(), Center(), new Vector2(420, 50), new Vector2(0, -95));
+
+        // Viền nút Submit
+        var subBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        subBorder.transform.SetParent(submitBtnGo.transform, false);
+        var sbbImg = subBorder.GetComponent<Image>();
+        if (frameSpr != null) { sbbImg.sprite = frameSpr; sbbImg.type = Image.Type.Sliced; }
+        sbbImg.color = ThemeUI.GoldHighlight;
+        sbbImg.raycastTarget = false;
+        Fill(subBorder.GetComponent<RectTransform>(), new Vector2(-1.5f, -1.5f), new Vector2(1.5f, 1.5f));
+
+        var subTxtGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
+        subTxtGo.transform.SetParent(submitBtnGo.transform, false);
+        submitButtonText = subTxtGo.GetComponent<Text>();
+        submitButtonText.font = font;
+        submitButtonText.fontSize = 20;
+        submitButtonText.fontStyle = FontStyle.Bold;
+        submitButtonText.text = "⚔️ XÁC NHẬN ĐĂNG NHẬP ➜";
+        submitButtonText.color = new Color(0.12f, 0.08f, 0.02f, 1f);
+        submitButtonText.alignment = TextAnchor.MiddleCenter;
+        Fill(subTxtGo.GetComponent<RectTransform>());
+
+        // 4. Link phụ: Quên mật khẩu (16pt)
+        forgotButton = AddButton(authCardRoot.transform, "Quên mật thư?", Color.clear, true);
+        forgotButton.onClick.AddListener(TriggerForgotPassword);
+        var fbTxt = forgotButton.GetComponentInChildren<Text>();
+        if (fbTxt != null) { fbTxt.fontSize = 16; fbTxt.color = new Color(0.55f, 0.85f, 1f, 1f); }
+        SetRect(forgotButton.GetComponent<RectTransform>(), Center(), Center(), Center(), new Vector2(420, 26), new Vector2(0, -135));
+
+        // 5. Dòng thông báo / Lỗi (16pt)
+        var msgGo = new GameObject("MessageText", typeof(RectTransform), typeof(Text));
+        msgGo.transform.SetParent(authCardRoot.transform, false);
+        messageText = msgGo.GetComponent<Text>();
+        messageText.font = font;
+        messageText.fontSize = 16;
+        messageText.fontStyle = FontStyle.Bold;
+        messageText.alignment = TextAnchor.MiddleCenter;
+        messageText.horizontalOverflow = HorizontalWrapMode.Wrap;
+        messageText.color = GameTheme.GoldBright;
+        var msgRt = msgGo.GetComponent<RectTransform>();
+        SetRect(msgRt, Center(), Center(), Center(), new Vector2(440, 36), new Vector2(0, -170));
+    }
+
+#if UNITY_EDITOR || UNITY_STANDALONE_WIN
+    private void BuildQuickLoginBar(Transform parent)
+    {
         var qlPanel = new GameObject("QuickLoginPanel", typeof(RectTransform), typeof(HorizontalLayoutGroup));
-        qlPanel.transform.SetParent(canvasGo.transform, false);
+        qlPanel.transform.SetParent(parent, false);
         var qlRt = qlPanel.GetComponent<RectTransform>();
-        qlRt.anchorMin = new Vector2(0.5f, 1f);
-        qlRt.anchorMax = new Vector2(0.5f, 1f);
-        qlRt.pivot = new Vector2(0.5f, 1f);
-        qlRt.sizeDelta = new Vector2(740, 32f);
-        qlRt.anchoredPosition = new Vector2(0, -6f);
+        qlRt.anchorMin = new Vector2(0.5f, 0f);
+        qlRt.anchorMax = new Vector2(0.5f, 0f);
+        qlRt.pivot = new Vector2(0.5f, 0f);
+        qlRt.sizeDelta = new Vector2(720, 32f);
+        qlRt.anchoredPosition = new Vector2(0, 10f);
         var hlg = qlPanel.GetComponent<HorizontalLayoutGroup>();
         hlg.spacing = 6;
         hlg.childAlignment = TextAnchor.MiddleCenter;
@@ -158,7 +318,7 @@ public sealed class AuthUI : MonoBehaviour
             int num = i;
             var btnGo = new GameObject("Btn_Quick" + num, typeof(RectTransform), typeof(Image), typeof(Button));
             btnGo.transform.SetParent(qlPanel.transform, false);
-            btnGo.GetComponent<RectTransform>().sizeDelta = new Vector2(74, 28);
+            btnGo.GetComponent<RectTransform>().sizeDelta = new Vector2(72, 26);
             var bImg = btnGo.GetComponent<Image>();
             var slotSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
             if (slotSpr != null) { bImg.sprite = slotSpr; bImg.type = Image.Type.Sliced; }
@@ -176,185 +336,8 @@ public sealed class AuthUI : MonoBehaviour
             Fill(txt.rectTransform);
             btnGo.GetComponent<Button>().onClick.AddListener(() => QuickLogin(num));
         }
+    }
 #endif
-        // 1. Hình nền & Lớp phủ đọc tốt
-        var bg = AddRawImage(canvasGo.transform, "Background", new Color(0.08f, 0.1f, 0.15f, 1f));
-        bg.raycastTarget = false;
-        Fill(bg.rectTransform);
-        var bgTex = Resources.Load<Texture2D>("UI/login_background");
-        if (bgTex != null) bgImg(bg, bgTex);
-
-        var shade = AddImage(canvasGo.transform, "ReadabilityShade", new Color(0.02f, 0.04f, 0.08f, 0.65f));
-        shade.raycastTarget = false;
-        Fill(shade.rectTransform);
-
-        // 2. Cột thương hiệu bên trái (Brand Column)
-        BuildBrandColumn(canvasGo.transform);
-
-        // 3. Khung Đăng nhập / Đăng ký bên phải (Auth Card)
-        BuildAuthCard(canvasGo.transform);
-
-        // Áp dụng trạng thái ban đầu
-        SetRegisterMode(false);
-    }
-
-    private void bgImg(RawImage img, Texture2D tex)
-    {
-        img.texture = tex;
-        img.color = new Color(0.85f, 0.85f, 0.9f, 1f);
-    }
-
-    private void BuildBrandColumn(Transform parent)
-    {
-        brandRoot = new GameObject("Brand");
-        brandRoot.transform.SetParent(parent, false);
-        var rt = brandRoot.AddComponent<RectTransform>();
-        SetRect(rt, new Vector2(0.24f, 0.5f), new Vector2(0.24f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(430, 520), Vector2.zero);
-
-        // Tấm nền mờ phía sau Brand
-        var plate = AddImage(brandRoot.transform, "BrandPlate", new Color(0.04f, 0.06f, 0.1f, 0.85f));
-        var cardBgSprite = LotusHealthUI.LoadSpriteFromResources("UI/auth_card_bg");
-        if (cardBgSprite != null) { plate.sprite = cardBgSprite; plate.type = Image.Type.Sliced; }
-        SetRect(plate.rectTransform, Center(), Center(), Center(), new Vector2(410, 490), Vector2.zero);
-
-        // Khung viền hoàng kim
-        var border = AddImage(brandRoot.transform, "Border", Color.white);
-        var frameSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
-        if (frameSpr != null) { border.sprite = frameSpr; border.type = Image.Type.Sliced; }
-        border.color = new Color(1f, 0.85f, 0.35f, 0.9f);
-        SetRect(border.rectTransform, Center(), Center(), Center(), new Vector2(416, 496), Vector2.zero);
-
-        // Emblem Trống Đồng / Avatar lớn (120x120)
-        var emblem = AddRawImage(brandRoot.transform, "Emblem", Color.white);
-        SetRect(emblem.rectTransform, new Vector2(0.5f, 0.77f), new Vector2(0.5f, 0.77f), Center(), new Vector2(120, 120), Vector2.zero);
-        var emblemTex = Resources.Load<Texture2D>("UI/game_avatar");
-        if (emblemTex != null) emblem.texture = emblemTex;
-
-        // Tiêu đề game hoàng kim lớn (48pt)
-        var logo = AddText(brandRoot.transform, "Logo", "ĐẠI VIỆT CHIẾN", 48, GameTheme.GoldBright, FontStyle.Bold, TextAnchor.MiddleCenter);
-        SetRect(logo.rectTransform, new Vector2(0.5f, 0.53f), new Vector2(0.5f, 0.53f), Center(), new Vector2(390, 52), Vector2.zero);
-        AddTextShadow(logo);
-
-        // Divider vàng
-        var divider = AddImage(brandRoot.transform, "Divider", Color.white);
-        var divSprite = LotusHealthUI.LoadSpriteFromResources("UI/divider_gold");
-        if (divSprite != null) divider.sprite = divSprite;
-        SetRect(divider.rectTransform, new Vector2(0.5f, 0.44f), new Vector2(0.5f, 0.44f), Center(), new Vector2(290, 16), Vector2.zero);
-
-        // Khẩu hiệu lớn (24pt)
-        var tagline = AddText(brandRoot.transform, "Tagline", "THAO LƯỢC TRANH HÙNG", 24, new Color(1f, 0.95f, 0.8f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
-        SetRect(tagline.rectTransform, new Vector2(0.5f, 0.36f), new Vector2(0.5f, 0.36f), Center(), new Vector2(390, 30), Vector2.zero);
-        AddTextShadow(tagline);
-
-        // Mô tả lớn (20pt, line spacing rộng rãi)
-        var description = AddText(brandRoot.transform, "Description", "Mỗi lá bài, một tương lai.\nBảo vệ non sông, kiến tạo đại nghiệp.", 20, new Color(0.85f, 0.90f, 0.98f, 0.98f), FontStyle.Normal, TextAnchor.MiddleCenter);
-        description.lineSpacing = 1.35f;
-        SetRect(description.rectTransform, new Vector2(0.5f, 0.19f), new Vector2(0.5f, 0.19f), Center(), new Vector2(380, 56), Vector2.zero);
-    }
-
-    private void BuildAuthCard(Transform parent)
-    {
-        authCardRoot = new GameObject("AuthCard");
-        authCardRoot.transform.SetParent(parent, false);
-        authCardRt = authCardRoot.AddComponent<RectTransform>();
-        SetRect(authCardRt, new Vector2(0.72f, 0.5f), new Vector2(0.72f, 0.5f), Center(), new Vector2(520, 590), Vector2.zero);
-
-        var cardBg = authCardRoot.AddComponent<Image>();
-        var cardBgSprite = LotusHealthUI.LoadSpriteFromResources("UI/auth_card_bg");
-        if (cardBgSprite != null)
-        {
-            cardBg.sprite = cardBgSprite;
-            cardBg.type = Image.Type.Sliced;
-        }
-        cardBg.color = Color.white;
-
-        // Khung viền vàng Auth Card
-        var borderGo = new GameObject("OuterBorder", typeof(RectTransform), typeof(Image));
-        borderGo.transform.SetParent(authCardRoot.transform, false);
-        borderGo.transform.SetAsFirstSibling();
-        var bImg = borderGo.GetComponent<Image>();
-        var frameSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
-        if (frameSpr != null) { bImg.sprite = frameSpr; bImg.type = Image.Type.Sliced; }
-        bImg.color = new Color(1f, 0.85f, 0.35f, 0.95f);
-        Fill(borderGo.GetComponent<RectTransform>(), new Vector2(-4, -4), new Vector2(4, 4));
-
-        var font = ThemeUI.FontMain;
-
-        // 1. Tab Bar: [ ĐĂNG NHẬP ] | [ ĐĂNG KÝ ] (Cỡ chữ 26pt to rõ)
-        var tabBarGo = new GameObject("TabBar", typeof(RectTransform));
-        tabBarGo.transform.SetParent(authCardRoot.transform, false);
-        var tabRt = tabBarGo.GetComponent<RectTransform>();
-        SetRect(tabRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(460, 56), new Vector2(0, -18));
-
-        tabLoginBtn = CreateTabButton(tabBarGo.transform, "TabLogin", "ĐĂNG NHẬP", new Vector2(-115, 0), out tabLoginText, out tabLoginLine, font, () => SetRegisterMode(false));
-        tabRegisterBtn = CreateTabButton(tabBarGo.transform, "TabRegister", "ĐĂNG KÝ", new Vector2(115, 0), out tabRegisterText, out tabRegisterLine, font, () => SetRegisterMode(true));
-
-        // 2. Input Fields (Rộng rãi 440px x 74px)
-        float startY = -90f;
-        float spacingY = 78f;
-
-        nameGroup = CreateInputFieldGroup(authCardRoot.transform, "NameGroup", "TÊN CHIẾN TƯỚNG", "Nhập tên hiển thị của bạn...", "UI/icon_input_user", new Vector2(0, startY), font, false, out nameInput);
-        emailGroup = CreateInputFieldGroup(authCardRoot.transform, "EmailGroup", "ĐỊA CHỈ EMAIL", "you@example.com", "UI/icon_input_mail", new Vector2(0, startY - spacingY), font, false, out emailInput);
-        passwordGroup = CreateInputFieldGroup(authCardRoot.transform, "PasswordGroup", "MẬT THƯ (MẬT KHẨU)", "Nhập mật khẩu (tối thiểu 8 ký tự)...", "UI/icon_input_lock", new Vector2(0, startY - 2 * spacingY), font, true, out passwordInput);
-
-        // 3. Nút Đăng nhập / Đăng ký chính (Golden Button lớn 440x56, chữ 26pt)
-        var submitBtnGo = new GameObject("SubmitButton", typeof(RectTransform), typeof(Image), typeof(Button));
-        submitBtnGo.transform.SetParent(authCardRoot.transform, false);
-        var submitImg = submitBtnGo.GetComponent<Image>();
-        var btnGoldSprite = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
-        if (btnGoldSprite != null)
-        {
-            submitImg.sprite = btnGoldSprite;
-            submitImg.type = Image.Type.Sliced;
-        }
-        else submitImg.color = GameTheme.Gold;
-
-        submitButton = submitBtnGo.GetComponent<Button>();
-        submitButton.onClick.AddListener(Submit);
-        var subRt = submitBtnGo.GetComponent<RectTransform>();
-        SetRect(subRt, Center(), Center(), Center(), new Vector2(440, 56), new Vector2(0, -115));
-
-        // Viền nút Submit
-        var subBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
-        subBorder.transform.SetParent(submitBtnGo.transform, false);
-        var sbbImg = subBorder.GetComponent<Image>();
-        if (frameSpr != null) { sbbImg.sprite = frameSpr; sbbImg.type = Image.Type.Sliced; }
-        sbbImg.color = new Color(1f, 0.92f, 0.45f, 0.95f);
-        sbbImg.raycastTarget = false;
-        Fill(subBorder.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
-
-        var subTxtGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
-        subTxtGo.transform.SetParent(submitBtnGo.transform, false);
-        submitButtonText = subTxtGo.GetComponent<Text>();
-        submitButtonText.font = font;
-        submitButtonText.fontSize = 26;
-        submitButtonText.fontStyle = FontStyle.Bold;
-        submitButtonText.text = "XÁC NHẬN ĐĂNG NHẬP";
-        submitButtonText.color = new Color(0.10f, 0.06f, 0.02f, 1f);
-        submitButtonText.alignment = TextAnchor.MiddleCenter;
-        Fill(subTxtGo.GetComponent<RectTransform>());
-        AddShadow(subTxtGo);
-
-        // 4. Link phụ: Quên mật khẩu (20pt)
-        forgotButton = AddButton(authCardRoot.transform, "Quên mật thư?", Color.clear, true);
-        forgotButton.onClick.AddListener(TriggerForgotPassword);
-        var fbTxt = forgotButton.GetComponentInChildren<Text>();
-        if (fbTxt != null) { fbTxt.fontSize = 20; fbTxt.color = new Color(0.55f, 0.85f, 1f, 1f); }
-        SetRect(forgotButton.GetComponent<RectTransform>(), Center(), Center(), Center(), new Vector2(440, 30), new Vector2(0, -162));
-
-        // 5. Dòng thông báo / Lỗi (20pt)
-        var msgGo = new GameObject("MessageText", typeof(RectTransform), typeof(Text));
-        msgGo.transform.SetParent(authCardRoot.transform, false);
-        messageText = msgGo.GetComponent<Text>();
-        messageText.font = font;
-        messageText.fontSize = 20;
-        messageText.fontStyle = FontStyle.Bold;
-        messageText.alignment = TextAnchor.MiddleCenter;
-        messageText.horizontalOverflow = HorizontalWrapMode.Wrap;
-        messageText.color = GameTheme.GoldBright;
-        var msgRt = msgGo.GetComponent<RectTransform>();
-        SetRect(msgRt, Center(), Center(), Center(), new Vector2(460, 44), new Vector2(0, -205));
-    }
 
     private Button CreateTabButton(Transform parent, string name, string label, Vector2 pos, out Text outText, out Image outLine, Font font, UnityEngine.Events.UnityAction onClick)
     {
@@ -516,24 +499,24 @@ public sealed class AuthUI : MonoBehaviour
         submitButtonText.text = registerMode ? "TẠO TÀI KHOẢN MỚI" : "ĐĂNG NHẬP CHIẾN TRƯỜNG";
         forgotButton.gameObject.SetActive(!registerMode);
 
-        // Bố trí lại vị trí các trường thoáng đãng
+        // Bố trí lại vị trí các trường thoáng đãng, vừa vặn khung thẻ
         if (registerMode)
         {
             nameGroup.SetActive(true);
-            SetFieldY(nameGroup, -84f);
-            SetFieldY(emailGroup, -162f);
-            SetFieldY(passwordGroup, -240f);
-            SetRect(submitButton.GetComponent<RectTransform>(), Center(), Center(), Center(), new Vector2(440, 56), new Vector2(0, -135f));
-            SetRect(messageText.rectTransform, Center(), Center(), Center(), new Vector2(460, 42), new Vector2(0, -195f));
+            SetFieldY(nameGroup, -66f);
+            SetFieldY(emailGroup, -136f);
+            SetFieldY(passwordGroup, -206f);
+            SetRect(submitButton.GetComponent<RectTransform>(), Center(), Center(), Center(), new Vector2(420, 48), new Vector2(0, -105f));
+            SetRect(messageText.rectTransform, Center(), Center(), Center(), new Vector2(440, 36), new Vector2(0, -160f));
         }
         else
         {
             nameGroup.SetActive(false);
-            SetFieldY(emailGroup, -100f);
-            SetFieldY(passwordGroup, -188f);
-            SetRect(submitButton.GetComponent<RectTransform>(), Center(), Center(), Center(), new Vector2(440, 56), new Vector2(0, -100f));
-            SetRect(forgotButton.GetComponent<RectTransform>(), Center(), Center(), Center(), new Vector2(440, 30), new Vector2(0, -155f));
-            SetRect(messageText.rectTransform, Center(), Center(), Center(), new Vector2(460, 42), new Vector2(0, -200f));
+            SetFieldY(emailGroup, -86f);
+            SetFieldY(passwordGroup, -162f);
+            SetRect(submitButton.GetComponent<RectTransform>(), Center(), Center(), Center(), new Vector2(420, 48), new Vector2(0, -78f));
+            SetRect(forgotButton.GetComponent<RectTransform>(), Center(), Center(), Center(), new Vector2(420, 26), new Vector2(0, -124f));
+            SetRect(messageText.rectTransform, Center(), Center(), Center(), new Vector2(440, 36), new Vector2(0, -160f));
         }
 
         SetMessage("");
