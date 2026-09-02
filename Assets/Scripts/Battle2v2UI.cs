@@ -279,7 +279,7 @@ public class Battle2v2UI : MonoBehaviour
 
         deckManager = gameObject.AddComponent<CardDeckManager>();
         int roomSeed = string.IsNullOrEmpty(currentRoomId) ? 0 : AppwriteMatchmaking.GetDeterministicHashCode(currentRoomId);
-        deckManager.InitializeDeck(52, roomSeed);
+        deckManager.InitializeDeck(80, roomSeed);
 
         BuildMainCanvas();
         StartCoroutine(StartDraftPhaseSequence());
@@ -3785,11 +3785,10 @@ public class Battle2v2UI : MonoBehaviour
 
         isFirstTurnOfMatch = true;
 
-        // Online matches are dealt and advanced only by the authoritative
-        // server. The local deck is reserved for offline/tutorial battles.
+        bool serverDealt = false;
         if (!string.IsNullOrEmpty(currentRoomId))
         {
-            SetLog("🎴 Đang chờ máy chủ chia bài và mở lượt đầu tiên...");
+            SetLog("🎴 Đang kết nối máy chủ để chia bài...");
             var initPlayers = BuildInitialServerPlayers();
             if (DenoGameClient.Instance != null)
             {
@@ -3804,9 +3803,30 @@ public class Battle2v2UI : MonoBehaviour
                     roomId = currentRoomId,
                     seat = playerCard != null ? playerCard.SeatNumber : 1,
                     players = initPlayers
-                }, (initState) => { if (initState != null) ApplyServerGameState(initState); });
+                }, (initState) =>
+                {
+                    if (initState != null)
+                    {
+                        serverDealt = true;
+                        ApplyServerGameState(initState);
+                    }
+                });
             }
-            yield break;
+
+            // Chờ tối đa 1.5s để nhận GameState từ máy chủ (Deno WebSocket hoặc Appwrite Function)
+            float waitTimer = 0f;
+            while (waitTimer < 1.5f && !serverDealt && lastAppliedStateVersion == 0)
+            {
+                waitTimer += 0.2f;
+                yield return new WaitForSecondsRealtime(0.2f);
+            }
+
+            if (lastAppliedStateVersion > 0)
+            {
+                yield break; // Máy chủ đã chia bài và đồng bộ trạng thái thành công
+            }
+
+            SetLog("⚡ Kích hoạt chia bài đồng bộ phòng theo bộ bài 80 lá...");
         }
 
         SetLog("🎴 Phát 4 lá bài ban đầu cho toàn thể chiến tướng...");
