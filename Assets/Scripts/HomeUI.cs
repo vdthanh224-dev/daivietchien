@@ -202,7 +202,7 @@ public sealed class HomeUI : MonoBehaviour
         scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
         scaler.matchWidthOrHeight = 0.5f;
 
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
 
         // 1. Hình nền hoàng cung đại điện lộng lẫy (Home Background)
         var bgGo = new GameObject("Background", typeof(RectTransform), typeof(RawImage));
@@ -1011,7 +1011,7 @@ public sealed class HomeUI : MonoBehaviour
 
     private void ShowRanked2v2Modal()
     {
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
         var box = CreateBaseModal("🛡️ ĐẤU TRƯỜNG 2v2 XẾP HẠNG", new Vector2(1060f, 650f), font);
 
         var r2v2 = Ranked2v2System.GetTier(AuthUI.Current2v2Points);
@@ -1758,7 +1758,7 @@ public sealed class HomeUI : MonoBehaviour
 
     private void ShowHeroDetailModal()
     {
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
         var box = CreateBaseModal("🎖️ THÔNG TIN DANH TƯỚNG ĐẠI VIỆT", new Vector2(840f, 520f), font);
 
         string activeHeroName = "Lý Thường Kiệt";
@@ -1820,7 +1820,7 @@ public sealed class HomeUI : MonoBehaviour
 
     private void ShowInventoryModal()
     {
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
         var box = CreateBaseModal("🎒 BINH KHÍ KHỐ (TÚI ĐỒ & TRANG BỊ)", new Vector2(840f, 540f), font);
 
         var subTxt = AddText(box.transform, "Sub", "Danh sách các trang bị và bảo vật đã mở khóa trong kho:", 18, new Color(0.88f, 0.94f, 1f, 0.95f), FontStyle.Normal, TextAnchor.MiddleLeft);
@@ -1889,7 +1889,7 @@ public sealed class HomeUI : MonoBehaviour
 
     private void ShowQuestModal()
     {
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
         var box = CreateBaseModal("📜 NHIỆM VỤ CHIẾN TƯỚNG", new Vector2(760f, 480f), font);
 
         var questTxt = AddText(box.transform, "Content",
@@ -1909,7 +1909,7 @@ public sealed class HomeUI : MonoBehaviour
 
     private void ShowLeaderboardModal()
     {
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
         var box = CreateBaseModal("🏆 BẢNG VÀNG QUÂN CÔNG & XẾP HẠNG (12 BẬC)", new Vector2(820f, 540f), font);
 
         // Tab Switcher
@@ -2018,7 +2018,7 @@ public sealed class HomeUI : MonoBehaviour
 
     private void ShowShopModal()
     {
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
         var box = CreateBaseModal("🛒 TRÂN BẢO CÁC (CỬA HÀNG)", new Vector2(760f, 480f), font);
 
         var shopTxt = AddText(box.transform, "Content",
@@ -2036,7 +2036,7 @@ public sealed class HomeUI : MonoBehaviour
 
     private void ShowMailModal()
     {
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
         var box = CreateBaseModal("✉️ THƯ TÍN QUÂN ĐOÀN", new Vector2(760f, 480f), font);
 
         var mailTxt = AddText(box.transform, "Content",
@@ -2052,7 +2052,7 @@ public sealed class HomeUI : MonoBehaviour
 
     private void ShowSettingsModal()
     {
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
         var box = CreateBaseModal("⚙️ CÀI ĐẶT TRÒ CHƠI", new Vector2(640f, 400f), font);
 
         var desc = AddText(box.transform, "Desc", "Âm thanh & Tùy chọn tài khoản:", 18, new Color(0.88f, 0.94f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleLeft);
@@ -2097,7 +2097,7 @@ public sealed class HomeUI : MonoBehaviour
 
     private void ShowInfoDialog(string title, string content, string actionLabel, Action onConfirm)
     {
-        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = ThemeUI.FontMain;
         var box = CreateBaseModal(title, new Vector2(720f, 420f), font);
 
         var cTxt = AddText(box.transform, "Content", content, 18, new Color(0.92f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
@@ -2143,7 +2143,7 @@ public sealed class HomeUI : MonoBehaviour
         var go = new GameObject(name, typeof(RectTransform), typeof(Text));
         go.transform.SetParent(parent, false);
         var t = go.GetComponent<Text>();
-        t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        t.font = ThemeUI.FontMain;
         t.fontSize = fontSize;
         t.color = color;
         t.fontStyle = style;

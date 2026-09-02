@@ -143,13 +143,13 @@ public sealed class AuthUI : MonoBehaviour
         var qlPanel = new GameObject("QuickLoginPanel", typeof(RectTransform), typeof(HorizontalLayoutGroup));
         qlPanel.transform.SetParent(canvasGo.transform, false);
         var qlRt = qlPanel.GetComponent<RectTransform>();
-        qlRt.anchorMin = new Vector2(0f, 1f);
-        qlRt.anchorMax = new Vector2(1f, 1f);
+        qlRt.anchorMin = new Vector2(0.5f, 1f);
+        qlRt.anchorMax = new Vector2(0.5f, 1f);
         qlRt.pivot = new Vector2(0.5f, 1f);
-        qlRt.sizeDelta = new Vector2(0, 40f);
-        qlRt.anchoredPosition = new Vector2(0, -10f);
+        qlRt.sizeDelta = new Vector2(740, 32f);
+        qlRt.anchoredPosition = new Vector2(0, -6f);
         var hlg = qlPanel.GetComponent<HorizontalLayoutGroup>();
-        hlg.spacing = 10;
+        hlg.spacing = 6;
         hlg.childAlignment = TextAnchor.MiddleCenter;
         hlg.childControlWidth = false;
         hlg.childControlHeight = false;
@@ -158,9 +158,21 @@ public sealed class AuthUI : MonoBehaviour
             int num = i;
             var btnGo = new GameObject("Btn_Quick" + num, typeof(RectTransform), typeof(Image), typeof(Button));
             btnGo.transform.SetParent(qlPanel.transform, false);
-            btnGo.GetComponent<RectTransform>().sizeDelta = new Vector2(120, 35);
-            btnGo.GetComponent<Image>().color = new Color(0.2f, 0.6f, 1f, 0.8f);
-            var txt = AddText(btnGo.transform, "Txt", "Nick " + num, 16, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+            btnGo.GetComponent<RectTransform>().sizeDelta = new Vector2(74, 28);
+            var bImg = btnGo.GetComponent<Image>();
+            var slotSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
+            if (slotSpr != null) { bImg.sprite = slotSpr; bImg.type = Image.Type.Sliced; }
+            bImg.color = new Color(0.06f, 0.10f, 0.18f, 0.90f);
+
+            var bBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
+            bBorder.transform.SetParent(btnGo.transform, false);
+            var bbImg = bBorder.GetComponent<Image>();
+            var frameSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+            if (frameSpr != null) { bbImg.sprite = frameSpr; bbImg.type = Image.Type.Sliced; }
+            bbImg.color = new Color(1f, 0.85f, 0.35f, 0.65f);
+            Fill(bBorder.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
+
+            var txt = AddText(btnGo.transform, "Txt", $"Tướng {num}", 13, new Color(1f, 0.9f, 0.6f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
             Fill(txt.rectTransform);
             btnGo.GetComponent<Button>().onClick.AddListener(() => QuickLogin(num));
         }
