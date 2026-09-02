@@ -139,7 +139,7 @@ async function persistStateToDatabase(roomId: string, state: any): Promise<void>
       timestamp: Date.now(),
     };
 
-    const permissions = [];
+    const permissions: string[] = [];
 
     const res = await fetch(`${APPWRITE_ENDPOINT}/databases/${DATABASE_ID}/collections/${COLLECTION_ID}/documents/${docId}`, {
       method: "PATCH",

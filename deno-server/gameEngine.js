@@ -1014,7 +1014,7 @@ function beginNextHarvestPicker(state) {
   state.harvestPickers = [];
   recordAction(state, {
     type: "HARVEST_EMPTY",
-    description: 🍚 Mở Kho Cứu Tế đã chia xong, các lá còn dư được bỏ vào Mộ.
+    description: "🍚 Mở Kho Cứu Tế đã chia xong, các lá còn dư được bỏ vào Mộ."
   });
   resetWaitingState(state);
   return false;
