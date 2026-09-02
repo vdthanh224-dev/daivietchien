@@ -16,7 +16,7 @@ public class DenoGameClient : MonoBehaviour
 {
     public static DenoGameClient Instance { get; private set; }
 
-    public static string ServerEndpoint = "ws://127.0.0.1:8082"; // Đổi thành ws://127.0.0.1:8082 khi test máy local
+    public static string ServerEndpoint = "wss://dai-viet-chien-server.deno.dev";
     public static bool IsConnected => Instance != null && Instance.wsClient != null && Instance.wsClient.State == WebSocketState.Open;
 
     public static event Action<AppwriteMatchmaking.ServerGameState, AppwriteMatchmaking.GameStateDelta> OnGameStateUpdated;
