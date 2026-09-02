@@ -424,7 +424,7 @@ public class TutorialBattleUI : MonoBehaviour
         txtGo.transform.SetParent(plaqueGo.transform, false);
         deckInfoText = txtGo.GetComponent<Text>();
         deckInfoText.font = font;
-        deckInfoText.fontSize = 12;
+        deckInfoText.fontSize = ThemeUI.SizeMicro;
         deckInfoText.fontStyle = FontStyle.Bold;
         deckInfoText.color = new Color(1f, 0.88f, 0.35f, 1f);
         deckInfoText.alignment = TextAnchor.MiddleCenter;
@@ -485,14 +485,14 @@ public class TutorialBattleUI : MonoBehaviour
         barRt.anchorMin = new Vector2(0.5f, 0f);
         barRt.anchorMax = new Vector2(0.5f, 0f);
         barRt.pivot = new Vector2(0.5f, 0f);
-        barRt.sizeDelta = new Vector2(680, 30);
+        barRt.sizeDelta = new Vector2(680, 48);
         barRt.anchoredPosition = new Vector2(-70f, 198f);
 
         var txtGo = new GameObject("DescText", typeof(RectTransform), typeof(Text));
         txtGo.transform.SetParent(barGo.transform, false);
         cardDescBar = txtGo.GetComponent<Text>();
         cardDescBar.font = font;
-        cardDescBar.fontSize = 12;
+        cardDescBar.fontSize = ThemeUI.SizeBody;
         cardDescBar.fontStyle = FontStyle.Bold;
         cardDescBar.color = new Color(0.92f, 0.95f, 1f, 1f);
         cardDescBar.alignment = TextAnchor.MiddleLeft;
@@ -633,7 +633,7 @@ public class TutorialBattleUI : MonoBehaviour
         tagBossGo.transform.SetParent(arrow1Go.transform, false);
         var tagBossTxt = tagBossGo.GetComponent<Text>();
         tagBossTxt.font = font;
-        tagBossTxt.fontSize = 13;
+        tagBossTxt.fontSize = ThemeUI.SizeMicro;
         tagBossTxt.fontStyle = FontStyle.Bold;
         tagBossTxt.text = "MÁU SƠN TẶC";
         tagBossTxt.color = new Color(1f, 0.45f, 0.45f, 1f);
@@ -642,7 +642,7 @@ public class TutorialBattleUI : MonoBehaviour
         tagBossRt.anchorMin = new Vector2(0f, 1f);
         tagBossRt.anchorMax = new Vector2(0f, 1f);
         tagBossRt.pivot = new Vector2(1f, 0f);
-        tagBossRt.sizeDelta = new Vector2(150, 24);
+        tagBossRt.sizeDelta = new Vector2(160, 26);
         tagBossRt.anchoredPosition = new Vector2(-6, 4);
         AddTextShadow(tagBossTxt);
 
@@ -665,7 +665,7 @@ public class TutorialBattleUI : MonoBehaviour
         tagPlayerGo.transform.SetParent(arrow2Go.transform, false);
         var tagPlayerTxt = tagPlayerGo.GetComponent<Text>();
         tagPlayerTxt.font = font;
-        tagPlayerTxt.fontSize = 13;
+        tagPlayerTxt.fontSize = ThemeUI.SizeMicro;
         tagPlayerTxt.fontStyle = FontStyle.Bold;
         tagPlayerTxt.text = "MÁU CỦA BẠN";
         tagPlayerTxt.color = new Color(0.45f, 0.95f, 0.55f, 1f);
@@ -674,7 +674,7 @@ public class TutorialBattleUI : MonoBehaviour
         tagPlayerRt.anchorMin = new Vector2(0f, 1f);
         tagPlayerRt.anchorMax = new Vector2(0f, 1f);
         tagPlayerRt.pivot = new Vector2(1f, 0f);
-        tagPlayerRt.sizeDelta = new Vector2(150, 24);
+        tagPlayerRt.sizeDelta = new Vector2(160, 26);
         tagPlayerRt.anchoredPosition = new Vector2(-6, 4);
         AddTextShadow(tagPlayerTxt);
 
@@ -690,14 +690,14 @@ public class TutorialBattleUI : MonoBehaviour
         boxRt.anchorMin = new Vector2(0.5f, 0.5f);
         boxRt.anchorMax = new Vector2(0.5f, 0.5f);
         boxRt.pivot = new Vector2(0.5f, 0.5f);
-        boxRt.sizeDelta = new Vector2(580, 310);
+        boxRt.sizeDelta = new Vector2(660, 360);
         boxRt.anchoredPosition = new Vector2(-60f, -20f);
 
         var titleGo = new GameObject("Title", typeof(RectTransform), typeof(Text));
         titleGo.transform.SetParent(dialogBoxGo.transform, false);
         var title = titleGo.GetComponent<Text>();
         title.font = font;
-        title.fontSize = 20;
+        title.fontSize = ThemeUI.SizeTitleLarge;
         title.fontStyle = FontStyle.Bold;
         title.text = "💮 HƯỚNG DẪN SINH MỆNH (HOA SEN)";
         title.alignment = TextAnchor.MiddleCenter;
@@ -706,7 +706,7 @@ public class TutorialBattleUI : MonoBehaviour
         titleRt.anchorMin = new Vector2(0, 1);
         titleRt.anchorMax = new Vector2(1, 1);
         titleRt.pivot = new Vector2(0.5f, 1);
-        titleRt.sizeDelta = new Vector2(0, 36);
+        titleRt.sizeDelta = new Vector2(0, 40);
         titleRt.anchoredPosition = new Vector2(0, -18);
         AddTextShadow(title);
 
@@ -718,14 +718,14 @@ public class TutorialBattleUI : MonoBehaviour
         divRt.anchorMin = new Vector2(0.5f, 1);
         divRt.anchorMax = new Vector2(0.5f, 1);
         divRt.pivot = new Vector2(0.5f, 1);
-        divRt.sizeDelta = new Vector2(320, 14);
-        divRt.anchoredPosition = new Vector2(0, -56);
+        divRt.sizeDelta = new Vector2(340, 14);
+        divRt.anchoredPosition = new Vector2(0, -60);
 
         var bodyGo = new GameObject("BodyText", typeof(RectTransform), typeof(Text));
         bodyGo.transform.SetParent(dialogBoxGo.transform, false);
         var bodyTxt = bodyGo.GetComponent<Text>();
         bodyTxt.font = font;
-        bodyTxt.fontSize = 14;
+        bodyTxt.fontSize = ThemeUI.SizeBody;
         bodyTxt.color = new Color(0.92f, 0.95f, 1f, 1f);
         bodyTxt.lineSpacing = 1.4f;
         bodyTxt.text = "• Mỗi tướng sở hữu các cục sinh mệnh hình <color=#FFA0C0><b>Hoa Sen</b></color> nằm bên trái.\n" +
@@ -736,8 +736,8 @@ public class TutorialBattleUI : MonoBehaviour
         bodyRt.anchorMin = Vector2.zero;
         bodyRt.anchorMax = Vector2.one;
         bodyRt.pivot = new Vector2(0.5f, 0.5f);
-        bodyRt.offsetMin = new Vector2(26, 70);
-        bodyRt.offsetMax = new Vector2(-26, -75);
+        bodyRt.offsetMin = new Vector2(26, 76);
+        bodyRt.offsetMax = new Vector2(-26, -80);
 
         var continueBtnGo = new GameObject("ContinueBtn", typeof(RectTransform), typeof(Image), typeof(Button));
         continueBtnGo.transform.SetParent(dialogBoxGo.transform, false);
@@ -753,14 +753,14 @@ public class TutorialBattleUI : MonoBehaviour
         btnRt.anchorMin = new Vector2(0.5f, 0f);
         btnRt.anchorMax = new Vector2(0.5f, 0f);
         btnRt.pivot = new Vector2(0.5f, 0f);
-        btnRt.sizeDelta = new Vector2(240, 44);
+        btnRt.sizeDelta = new Vector2(260, 48);
         btnRt.anchoredPosition = new Vector2(0, 18);
 
         var btnTxtGo = new GameObject("Label", typeof(RectTransform), typeof(Text));
         btnTxtGo.transform.SetParent(continueBtnGo.transform, false);
         var btnTxt = btnTxtGo.GetComponent<Text>();
         btnTxt.font = font;
-        btnTxt.fontSize = 15;
+        btnTxt.fontSize = ThemeUI.SizeBodyLarge;
         btnTxt.fontStyle = FontStyle.Bold;
         btnTxt.text = "VÀO TRẬN ĐẤU ➜";
         btnTxt.color = new Color(0.12f, 0.08f, 0.02f, 1f);
@@ -4421,7 +4421,7 @@ public class TutorialBattleUI : MonoBehaviour
 
         var boxRt = boxGo.GetComponent<RectTransform>();
         boxRt.anchorMin = boxRt.anchorMax = boxRt.pivot = new Vector2(0.5f, 0.5f);
-        boxRt.sizeDelta = new Vector2(580f, 320f);
+        boxRt.sizeDelta = new Vector2(720f, 420f);
         boxRt.anchoredPosition = Vector2.zero;
 
         var font = ThemeUI.FontMain;
@@ -4431,7 +4431,7 @@ public class TutorialBattleUI : MonoBehaviour
         titleGo.transform.SetParent(boxGo.transform, false);
         var title = titleGo.GetComponent<Text>();
         title.font = font;
-        title.fontSize = 24;
+        title.fontSize = ThemeUI.SizeTitleLarge;
         title.fontStyle = FontStyle.Bold;
         title.text = "🏆 CHIẾN THẮNG VANG DỘI!";
         title.alignment = TextAnchor.MiddleCenter;
@@ -4440,7 +4440,7 @@ public class TutorialBattleUI : MonoBehaviour
         titleRt.anchorMin = new Vector2(0, 1);
         titleRt.anchorMax = new Vector2(1, 1);
         titleRt.pivot = new Vector2(0.5f, 1);
-        titleRt.sizeDelta = new Vector2(0, 40);
+        titleRt.sizeDelta = new Vector2(0, 44);
         titleRt.anchoredPosition = new Vector2(0, -20);
         AddTextShadow(title);
 
@@ -4452,14 +4452,14 @@ public class TutorialBattleUI : MonoBehaviour
         divRt.anchorMin = new Vector2(0.5f, 1);
         divRt.anchorMax = new Vector2(0.5f, 1);
         divRt.pivot = new Vector2(0.5f, 1);
-        divRt.sizeDelta = new Vector2(340, 14);
-        divRt.anchoredPosition = new Vector2(0, -62);
+        divRt.sizeDelta = new Vector2(360, 14);
+        divRt.anchoredPosition = new Vector2(0, -66);
 
         var bodyGo = new GameObject("BodyText", typeof(RectTransform), typeof(Text));
         bodyGo.transform.SetParent(boxGo.transform, false);
         var bodyTxt = bodyGo.GetComponent<Text>();
         bodyTxt.font = font;
-        bodyTxt.fontSize = 14;
+        bodyTxt.fontSize = ThemeUI.SizeBodyLarge;
         bodyTxt.color = new Color(0.92f, 0.96f, 1f, 1f);
         bodyTxt.lineSpacing = 1.4f;
         bodyTxt.alignment = TextAnchor.MiddleCenter;
@@ -4467,8 +4467,8 @@ public class TutorialBattleUI : MonoBehaviour
                        "Bạn đã nắm vững toàn bộ quy tắc giao chiến trong <b>Đại Việt Chiến</b>.\n\n" +
                        "🎁 Hãy trở về Trang Chủ để nhận thưởng: <b>Tướng Lý Thường Kiệt</b> và <b>1.000 Bạc</b>!";
         var bodyRt = bodyGo.GetComponent<RectTransform>();
-        bodyRt.anchorMin = new Vector2(0.08f, 0.28f);
-        bodyRt.anchorMax = new Vector2(0.92f, 0.76f);
+        bodyRt.anchorMin = new Vector2(0.06f, 0.24f);
+        bodyRt.anchorMax = new Vector2(0.94f, 0.78f);
         bodyRt.pivot = new Vector2(0.5f, 0.5f);
         bodyRt.offsetMin = bodyRt.offsetMax = Vector2.zero;
 
@@ -4483,14 +4483,14 @@ public class TutorialBattleUI : MonoBehaviour
         btnRt.anchorMin = new Vector2(0.5f, 0f);
         btnRt.anchorMax = new Vector2(0.5f, 0f);
         btnRt.pivot = new Vector2(0.5f, 0f);
-        btnRt.sizeDelta = new Vector2(300, 46);
+        btnRt.sizeDelta = new Vector2(340, 52);
         btnRt.anchoredPosition = new Vector2(0, 22);
 
         var btnTxtGo = new GameObject("Label", typeof(RectTransform), typeof(Text));
         btnTxtGo.transform.SetParent(returnBtnGo.transform, false);
         var btnTxt = btnTxtGo.GetComponent<Text>();
         btnTxt.font = font;
-        btnTxt.fontSize = 15;
+        btnTxt.fontSize = ThemeUI.SizeBodyLarge;
         btnTxt.fontStyle = FontStyle.Bold;
         btnTxt.text = "🎁 VỀ TRANG CHỦ NHẬN THƯỞNG ➜";
         btnTxt.color = new Color(0.12f, 0.08f, 0.02f, 1f);
@@ -4528,8 +4528,8 @@ public class TutorialBattleUI : MonoBehaviour
         apRt.anchorMin = new Vector2(0.5f, 0f);
         apRt.anchorMax = new Vector2(0.5f, 0f);
         apRt.pivot = new Vector2(0.5f, 0f);
-        apRt.sizeDelta = new Vector2(680, 44);
-        apRt.anchoredPosition = new Vector2(-70f, 238f);
+        apRt.sizeDelta = new Vector2(700, 52);
+        apRt.anchoredPosition = new Vector2(-70f, 252f);
 
         // 1. NÚT DÙNG BÀI (Chính giữa, xuất hiện khi chọn bài & chọn mục tiêu)
         freePlayActionBtnGo = new GameObject("Btn_PlayCard", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -4541,14 +4541,14 @@ public class TutorialBattleUI : MonoBehaviour
 
         var playRt = freePlayActionBtnGo.GetComponent<RectTransform>();
         playRt.anchorMin = playRt.anchorMax = playRt.pivot = new Vector2(0.5f, 0.5f);
-        playRt.sizeDelta = new Vector2(280, 42);
+        playRt.sizeDelta = new Vector2(280, 46);
         playRt.anchoredPosition = new Vector2(-40f, 0);
 
         var playTxtGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
         playTxtGo.transform.SetParent(freePlayActionBtnGo.transform, false);
         freePlayActionBtnText = playTxtGo.GetComponent<Text>();
         freePlayActionBtnText.font = font;
-        freePlayActionBtnText.fontSize = 13;
+        freePlayActionBtnText.fontSize = ThemeUI.SizeBodyLarge;
         freePlayActionBtnText.fontStyle = FontStyle.Bold;
         freePlayActionBtnText.text = "⚔️ DÙNG BÀI";
         freePlayActionBtnText.color = new Color(0.12f, 0.08f, 0.02f, 1f);
@@ -4566,14 +4566,14 @@ public class TutorialBattleUI : MonoBehaviour
 
         var endRt = freePlayEndTurnBtnGo.GetComponent<RectTransform>();
         endRt.anchorMin = endRt.anchorMax = endRt.pivot = new Vector2(0.5f, 0.5f);
-        endRt.sizeDelta = new Vector2(170, 42);
+        endRt.sizeDelta = new Vector2(180, 46);
         endRt.anchoredPosition = new Vector2(200f, 0);
 
         var endTxtGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
         endTxtGo.transform.SetParent(freePlayEndTurnBtnGo.transform, false);
         var endTxt = endTxtGo.GetComponent<Text>();
         endTxt.font = font;
-        endTxt.fontSize = 13;
+        endTxt.fontSize = ThemeUI.SizeBody;
         endTxt.fontStyle = FontStyle.Bold;
         endTxt.text = "KẾT THÚC LƯỢT ➜";
         endTxt.color = Color.white;
@@ -5798,7 +5798,7 @@ public class TutorialBattleUI : MonoBehaviour
         toggleGo.transform.SetParent(transform, false);
         var toggleRt = toggleGo.GetComponent<RectTransform>();
         toggleRt.anchorMin = toggleRt.anchorMax = toggleRt.pivot = new Vector2(0f, 0f);
-        toggleRt.sizeDelta = new Vector2(128f, 34f);
+        toggleRt.sizeDelta = new Vector2(150f, 44f);
         toggleRt.anchoredPosition = new Vector2(18f, 18f);
         toggleGo.GetComponent<Image>().color = new Color(0.18f, 0.3f, 0.48f, 0.96f);
         toggleGo.GetComponent<Button>().onClick.AddListener(() =>
@@ -5811,7 +5811,7 @@ public class TutorialBattleUI : MonoBehaviour
         var toggleTxt = new GameObject("Label", typeof(RectTransform), typeof(Text)).GetComponent<Text>();
         toggleTxt.transform.SetParent(toggleGo.transform, false);
         toggleTxt.font = font;
-        toggleTxt.fontSize = 12;
+        toggleTxt.fontSize = ThemeUI.SizeBodyLarge;
         toggleTxt.fontStyle = FontStyle.Bold;
         toggleTxt.text = "📜 LỊCH SỬ";
         toggleTxt.color = Color.white;
@@ -5822,7 +5822,7 @@ public class TutorialBattleUI : MonoBehaviour
         var titleTxt = new GameObject("GuideTitle", typeof(RectTransform), typeof(Text)).GetComponent<Text>();
         titleTxt.transform.SetParent(guideGo.transform, false);
         titleTxt.font = font;
-        titleTxt.fontSize = 16;
+        titleTxt.fontSize = ThemeUI.SizeTitleLarge;
         titleTxt.fontStyle = FontStyle.Bold;
         titleTxt.text = "📜 LỊCH SỬ CHIẾN TRẬN";
         titleTxt.color = GameTheme.GoldBright;
@@ -5831,7 +5831,7 @@ public class TutorialBattleUI : MonoBehaviour
         titleRt.anchorMin = new Vector2(0, 1);
         titleRt.anchorMax = new Vector2(1, 1);
         titleRt.pivot = new Vector2(0.5f, 1);
-        titleRt.sizeDelta = new Vector2(-60, 36);
+        titleRt.sizeDelta = new Vector2(-60, 40);
         titleRt.anchoredPosition = new Vector2(0, -10);
         AddTextShadow(titleTxt);
 
@@ -5842,14 +5842,14 @@ public class TutorialBattleUI : MonoBehaviour
         cbImg.color = new Color(0.85f, 0.25f, 0.25f, 0.95f);
         var cbRt = closeBtnGo.GetComponent<RectTransform>();
         cbRt.anchorMin = cbRt.anchorMax = cbRt.pivot = new Vector2(1f, 1f);
-        cbRt.sizeDelta = new Vector2(30f, 30f);
+        cbRt.sizeDelta = new Vector2(38f, 38f);
         cbRt.anchoredPosition = new Vector2(-10f, -10f);
         closeBtnGo.GetComponent<Button>().onClick.AddListener(() => historyOverlayGo.SetActive(false));
 
         var closeTxt = new GameObject("Text", typeof(RectTransform), typeof(Text)).GetComponent<Text>();
         closeTxt.transform.SetParent(closeBtnGo.transform, false);
         closeTxt.font = font;
-        closeTxt.fontSize = 15;
+        closeTxt.fontSize = ThemeUI.SizeTitleMedium;
         closeTxt.fontStyle = FontStyle.Bold;
         closeTxt.text = "✕";
         closeTxt.color = Color.white;
@@ -5860,7 +5860,7 @@ public class TutorialBattleUI : MonoBehaviour
         var descGo = new GameObject("GuideText", typeof(RectTransform), typeof(Text));
         dialogText = descGo.GetComponent<Text>();
         dialogText.font = font;
-        dialogText.fontSize = 13;
+        dialogText.fontSize = ThemeUI.SizeBody;
         dialogText.color = new Color(0.92f, 0.95f, 1f, 1f);
         dialogText.lineSpacing = 1.35f;
         dialogText.text = "Chưa có hành động nào.";

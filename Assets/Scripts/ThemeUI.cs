@@ -12,15 +12,15 @@ using UnityEngine.UI;
 /// </summary>
 public static class ThemeUI
 {
-    #region 1. CHUẨN CỠ CHỮ & FONT (DỄ ĐỌC, RÕ RÀNG)
-    public const int SizeTitleHuge = 22;      // Tiêu đề màn hình, Đại Thắng / Thất Bại
-    public const int SizeTitleLarge = 20;     // Tiêu đề Modal, Header khu vực
-    public const int SizeTitleMedium = 18;    // Dòng chú thích lá bài, Trạng thái lượt (18pt)
-    public const int SizeBodyLarge = 18;      // Nút bấm hành động & phản ứng (18pt)
-    public const int SizeBody = 16;           // Tên lá bài (16pt)
+    #region 1. CHUẨN CỠ CHỮ & FONT (DỄ ĐỌC, RÕ RÀNG, KHÔNG BỊ NHỎ)
+    public const int SizeTitleHuge = 28;      // Tiêu đề lớn màn hình, Đại Thắng / Thất Bại (28pt)
+    public const int SizeTitleLarge = 24;     // Tiêu đề Modal, Header khu vực chính (24pt)
+    public const int SizeTitleMedium = 20;    // Tiêu đề danh mục, Tên tướng, Subtitle (20pt)
+    public const int SizeBodyLarge = 18;      // Nút bấm hành động, Nhãn chính, Tên bài (18pt)
+    public const int SizeBody = 16;           // Mô tả tác dụng lá bài, Nội dung văn bản (16pt)
     public const int SizeButton = 18;         // Chữ trên nút bấm hành động (18pt)
-    public const int SizeBadge = 17;          // Số đếm ngược ⏳40 & Huy hiệu ghế (17pt)
-    public const int SizeMicro = 11;          // Cỡ chữ tối thiểu sàn (11pt)
+    public const int SizeBadge = 16;          // Số đếm ngược ⏳40, Huy hiệu ghế, Thống kê (16pt)
+    public const int SizeMicro = 14;          // Cỡ chữ tối thiểu sàn toàn game (14pt)
 
     private static Font cachedFont;
     public static Font FontMain
@@ -243,12 +243,45 @@ public static class ThemeUI
         hImg.color = headerColor ?? new Color(0.12f, 0.35f, 0.65f, 0.98f);
 
         var hRt = headerGo.GetComponent<RectTransform>();
-        SetRect(hRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(size.x - 30f, 44f), new Vector2(0, -10f));
+        SetRect(hRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(size.x - 24f, 52f), new Vector2(0, -10f));
 
         var titleTxt = CreateText(headerGo.transform, "TitleText", title, SizeTitleLarge, GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, true);
         Fill(titleTxt.rectTransform);
 
         return overlayGo;
+    }
+
+    public static Button CreateCloseButton(Transform parent, Action onClose)
+    {
+        var btnGo = new GameObject("CloseButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        btnGo.transform.SetParent(parent, false);
+        btnGo.transform.SetAsLastSibling();
+
+        var img = btnGo.GetComponent<Image>();
+        var slotSpr = LoadSprite("UI/slot_bg");
+        if (slotSpr != null) { img.sprite = slotSpr; img.type = Image.Type.Sliced; }
+        img.color = new Color(0.35f, 0.10f, 0.10f, 0.95f);
+
+        var rt = btnGo.GetComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(1f, 1f);
+        rt.sizeDelta = new Vector2(42f, 42f);
+        rt.anchoredPosition = new Vector2(-10f, -10f);
+
+        var border = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        border.transform.SetParent(btnGo.transform, false);
+        var bImg = border.GetComponent<Image>();
+        var fSpr = LoadSprite("UI/card_frame");
+        if (fSpr != null) { bImg.sprite = fSpr; bImg.type = Image.Type.Sliced; }
+        bImg.color = GoldPrimary;
+        bImg.raycastTarget = false;
+        Fill(border.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
+
+        var txt = CreateText(btnGo.transform, "Txt", "✕", SizeTitleMedium, GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, true);
+        Fill(txt.rectTransform);
+
+        var btn = btnGo.GetComponent<Button>();
+        if (onClose != null) btn.onClick.AddListener(() => onClose.Invoke());
+        return btn;
     }
     #endregion
 

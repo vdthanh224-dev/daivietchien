@@ -598,7 +598,7 @@ public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
             txtGo.transform.SetParent(headTimerBadgeGo.transform, false);
             headTimerText = txtGo.GetComponent<Text>();
             headTimerText.font = ThemeUI.FontMain;
-            headTimerText.fontSize = 15;
+            headTimerText.fontSize = ThemeUI.SizeBody;
             headTimerText.fontStyle = FontStyle.Bold;
             headTimerText.alignment = TextAnchor.MiddleCenter;
             headTimerText.color = new Color(1f, 0.9f, 0.35f, 1f);
@@ -1291,7 +1291,7 @@ public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
         nameTextGo.transform.SetParent(plaqueGo.transform, false);
         generalNameText = nameTextGo.GetComponent<Text>();
         generalNameText.font = font;
-        generalNameText.fontSize = 15;
+        generalNameText.fontSize = ThemeUI.SizeBodyLarge;
         generalNameText.fontStyle = FontStyle.Bold;
         generalNameText.alignment = TextAnchor.MiddleCenter;
         generalNameText.color = new Color(1f, 0.88f, 0.45f, 1f);
@@ -1319,14 +1319,14 @@ public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
         badgeRt.anchorMin = new Vector2(0f, 0f);
         badgeRt.anchorMax = new Vector2(0f, 0f);
         badgeRt.pivot = new Vector2(0f, 0f);
-        badgeRt.sizeDelta = new Vector2(72f, 30f);
+        badgeRt.sizeDelta = new Vector2(74f, 30f);
         badgeRt.anchoredPosition = new Vector2(4f, 4f);
 
         var factionTextGo = new GameObject("FactionText", typeof(RectTransform), typeof(Text));
         factionTextGo.transform.SetParent(factionBadgeGo.transform, false);
         factionText = factionTextGo.GetComponent<Text>();
         factionText.font = font;
-        factionText.fontSize = 12;
+        factionText.fontSize = ThemeUI.SizeMicro;
         factionText.fontStyle = FontStyle.Bold;
         factionText.alignment = TextAnchor.MiddleCenter;
         factionText.color = new Color(1f, 0.95f, 0.85f, 1f);
@@ -1403,7 +1403,7 @@ public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
         sRt.anchorMin = new Vector2(0f, 0.5f);
         sRt.anchorMax = new Vector2(0f, 0.5f);
         sRt.pivot = new Vector2(1f, 0.5f);
-        sRt.sizeDelta = new Vector2(80f, 34f);
+        sRt.sizeDelta = new Vector2(84f, 36f);
         sRt.anchoredPosition = new Vector2(-6f, -65f);
 
         // Hào quang phát sáng khi dùng được
@@ -1431,7 +1431,7 @@ public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
         sTxtGo.transform.SetParent(skillButtonGo.transform, false);
         skillButtonText = sTxtGo.GetComponent<Text>();
         skillButtonText.font = font;
-        skillButtonText.fontSize = 11;
+        skillButtonText.fontSize = ThemeUI.SizeMicro;
         skillButtonText.fontStyle = FontStyle.Bold;
         skillButtonText.text = "⚡ KỸ NĂNG";
         skillButtonText.color = new Color(0.42f, 0.48f, 0.55f, 0.7f);
@@ -1495,7 +1495,7 @@ public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
         hcRt.anchorMin = new Vector2(1f, 0f);
         hcRt.anchorMax = new Vector2(1f, 0f);
         hcRt.pivot = new Vector2(1f, 0f);
-        hcRt.sizeDelta = new Vector2(56f, 26f);
+        hcRt.sizeDelta = new Vector2(58f, 28f);
         hcRt.anchoredPosition = new Vector2(-6f, 6f);
 
         // Icon lá bài
@@ -1517,7 +1517,7 @@ public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
         countTextGo.transform.SetParent(handCardsBadgeGo.transform, false);
         handCardsText = countTextGo.GetComponent<Text>();
         handCardsText.font = font;
-        handCardsText.fontSize = 14;
+        handCardsText.fontSize = ThemeUI.SizeBody;
         handCardsText.fontStyle = FontStyle.Bold;
         handCardsText.alignment = TextAnchor.MiddleCenter;
         handCardsText.color = new Color(1f, 0.92f, 0.65f, 1f);

@@ -1602,7 +1602,7 @@ public class Battle2v2UI : MonoBehaviour
         panelGo.transform.SetParent(modalGo.transform, false);
         var panelRt = panelGo.GetComponent<RectTransform>();
         panelRt.anchorMin = panelRt.anchorMax = panelRt.pivot = new Vector2(0.5f, 0.5f);
-        panelRt.sizeDelta = new Vector2(780f, 455f);
+        panelRt.sizeDelta = new Vector2(820f, 490f);
 
         var panelImage = panelGo.GetComponent<Image>();
         var panelSprite = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
@@ -1613,23 +1613,23 @@ public class Battle2v2UI : MonoBehaviour
         string icon = selection.operation == "STEAL" ? "🌾" : "🏚️";
         var title = AddText(panelGo.transform, "Title",
             $"{icon} {operationText} 1 LÁ CỦA {target.GeneralName.ToUpper()}",
-            16, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter);
-        SetRect(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(740f, 34f), new Vector2(0f, -12f));
+            ThemeUI.SizeTitleLarge, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(780f, 38f), new Vector2(0f, -14f));
 
         var timer = AddText(panelGo.transform, "Timer",
             $"⏳ Chọn bài trong {Mathf.Max(0, waitingTimer)}s · Lá trên tay được úp",
-            11, ThemeUI.CyanPrimary, FontStyle.Bold, TextAnchor.MiddleCenter);
-        SetRect(timer.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(720f, 24f), new Vector2(0f, -45f));
+            ThemeUI.SizeBodyLarge, ThemeUI.CyanPrimary, FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(timer.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(760f, 28f), new Vector2(0f, -52f));
 
         var targetText = AddText(panelGo.transform, "Target",
             $"Mục tiêu: <b>{target.GeneralName}</b> · Chạm chọn lá cần {operationText.ToLowerInvariant()}",
-            11, ThemeUI.TextMuted, FontStyle.Normal, TextAnchor.MiddleCenter);
-        SetRect(targetText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(720f, 24f), new Vector2(0f, -70f));
+            ThemeUI.SizeBody, ThemeUI.TextMuted, FontStyle.Normal, TextAnchor.MiddleCenter);
+        SetRect(targetText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(760f, 26f), new Vector2(0f, -80f));
 
         var viewportGo = new GameObject("CardsViewport", typeof(RectTransform), typeof(Image), typeof(RectMask2D), typeof(ScrollRect));
         viewportGo.transform.SetParent(panelGo.transform, false);
         var viewportRt = viewportGo.GetComponent<RectTransform>();
-        SetRect(viewportRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(735f, 265f), new Vector2(0f, -35f));
+        SetRect(viewportRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(770f, 280f), new Vector2(0f, -30f));
         viewportGo.GetComponent<Image>().color = new Color(0.02f, 0.04f, 0.09f, 0.35f);
 
         var cardsContainerGo = new GameObject("CardsContainer", typeof(RectTransform), typeof(HorizontalLayoutGroup));
@@ -2170,7 +2170,7 @@ public class Battle2v2UI : MonoBehaviour
         panelGo.transform.SetParent(modalGo.transform, false);
         var panelRt = panelGo.GetComponent<RectTransform>();
         panelRt.anchorMin = panelRt.anchorMax = panelRt.pivot = new Vector2(0.5f, 0.5f);
-        panelRt.sizeDelta = new Vector2(740f, 400f);
+        panelRt.sizeDelta = new Vector2(780f, 460f);
         panelRt.anchoredPosition = Vector2.zero;
 
         var pImg = panelGo.GetComponent<Image>();
@@ -2193,9 +2193,9 @@ public class Battle2v2UI : MonoBehaviour
         if (badgeSpr != null) { hImg.sprite = badgeSpr; hImg.type = Image.Type.Sliced; }
         hImg.color = new Color(0.15f, 0.58f, 0.32f, 0.98f);
         var hRt = headerGo.GetComponent<RectTransform>();
-        SetRect(hRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(680f, 48f), new Vector2(0, -12f));
+        SetRect(hRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(720f, 52f), new Vector2(0, -12f));
 
-        var titleTxt = AddText(headerGo.transform, "Title", $"🍚 MỞ KHO CỨU TẾ - LẬT {revealedCards.Count} LÁ BÀI CÔNG KHAI", 16, new Color(1f, 0.95f, 0.6f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        var titleTxt = AddText(headerGo.transform, "Title", $"🍚 MỞ KHO CỨU TẾ - LẬT {revealedCards.Count} LÁ BÀI CÔNG KHAI", ThemeUI.SizeTitleLarge, new Color(1f, 0.95f, 0.6f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(titleTxt.rectTransform);
 
         var pickerGen = GetGeneralBySeat(pickerSeat);
@@ -2203,13 +2203,13 @@ public class Battle2v2UI : MonoBehaviour
             ? "👉 <color=#FFD700><b>LƯỢT CỦA BẠN:</b></color> Chạm chọn 1 lá bài công khai dưới đây vào tay!"
             : $"⏳ <color=#55DDFF><b>[{pickerGen?.GeneralName ?? ("Ghế " + pickerSeat)}]</b></color> đang chọn 1 lá bài...";
 
-        var subTxt = AddText(panelGo.transform, "SubTitle", subMessage, 13, new Color(0.9f, 1f, 0.92f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
-        SetRect(subTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(680f, 26f), new Vector2(0, -66f));
+        var subTxt = AddText(panelGo.transform, "SubTitle", subMessage, ThemeUI.SizeBodyLarge, new Color(0.9f, 1f, 0.92f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(subTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(720f, 32f), new Vector2(0, -72f));
 
         var cardsContainerGo = new GameObject("CardsContainer", typeof(RectTransform), typeof(HorizontalLayoutGroup));
         cardsContainerGo.transform.SetParent(panelGo.transform, false);
         var cRt = cardsContainerGo.GetComponent<RectTransform>();
-        SetRect(cRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(700f, 220f), new Vector2(0, -22f));
+        SetRect(cRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(740f, 240f), new Vector2(0, -22f));
         var hlg = cardsContainerGo.GetComponent<HorizontalLayoutGroup>();
         hlg.spacing = 16f;
         hlg.childAlignment = TextAnchor.MiddleCenter;
@@ -2667,20 +2667,20 @@ public class Battle2v2UI : MonoBehaviour
         var hImg = headerGo.GetComponent<Image>();
         hImg.color = new Color(0.04f, 0.07f, 0.14f, 0.98f);
         var hRt = headerGo.GetComponent<RectTransform>();
-        SetRect(hRt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 52f), Vector2.zero);
+        SetRect(hRt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 56f), Vector2.zero);
 
-        var titleTxt = AddText(headerGo.transform, "Title", "👑 ĐẠI VIỆT CHIẾN - GIAI ĐOẠN CHỌN TƯỚNG 2v2", 15, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft);
-        SetRect(titleTxt.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(450f, 30f), new Vector2(20f, 0f));
+        var titleTxt = AddText(headerGo.transform, "Title", "👑 ĐẠI VIỆT CHIẾN - GIAI ĐOẠN CHỌN TƯỚNG 2v2", ThemeUI.SizeTitleLarge, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleLeft);
+        SetRect(titleTxt.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(520f, 36f), new Vector2(20f, 0f));
 
-        draftTurnStatusText = AddText(headerGo.transform, "Status", "⏳ Đang chuẩn bị lượt chọn 1..4...", 13, new Color(0.55f, 0.9f, 1f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
-        SetRect(draftTurnStatusText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(460f, 30f), Vector2.zero);
+        draftTurnStatusText = AddText(headerGo.transform, "Status", "⏳ Đang chuẩn bị lượt chọn 1..4...", ThemeUI.SizeBodyLarge, new Color(0.55f, 0.9f, 1f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(draftTurnStatusText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(500f, 36f), Vector2.zero);
 
         var timerBoxGo = new GameObject("TimerBox", typeof(RectTransform), typeof(Image));
         timerBoxGo.transform.SetParent(headerGo.transform, false);
         var tbImg = timerBoxGo.GetComponent<Image>();
         tbImg.color = new Color(0.08f, 0.12f, 0.22f, 0.95f);
         var tbRt = timerBoxGo.GetComponent<RectTransform>();
-        SetRect(tbRt, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(160f, 32f), new Vector2(-16f, 0f));
+        SetRect(tbRt, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(170f, 38f), new Vector2(-16f, 0f));
 
         var fillGo = new GameObject("Fill", typeof(RectTransform), typeof(Image));
         fillGo.transform.SetParent(timerBoxGo.transform, false);
@@ -2695,7 +2695,7 @@ public class Battle2v2UI : MonoBehaviour
         tTxtGo.transform.SetParent(timerBoxGo.transform, false);
         draftTimerText = tTxtGo.GetComponent<Text>();
         draftTimerText.font = font;
-        draftTimerText.fontSize = ThemeUI.SizeBody;
+        draftTimerText.fontSize = ThemeUI.SizeBodyLarge;
         draftTimerText.fontStyle = FontStyle.Bold;
         draftTimerText.alignment = TextAnchor.MiddleCenter;
         draftTimerText.color = Color.white;
@@ -2711,10 +2711,10 @@ public class Battle2v2UI : MonoBehaviour
         var leftColGo = new GameObject("LeftSlotsCol", typeof(RectTransform));
         leftColGo.transform.SetParent(draftScreenGo.transform, false);
         var lcRt = leftColGo.GetComponent<RectTransform>();
-        SetRect(lcRt, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(250f, -60f), new Vector2(16f, -30f));
+        SetRect(lcRt, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(250f, -64f), new Vector2(16f, -32f));
 
-        var titleTxt = AddText(leftColGo.transform, "Title", "⚔️ THỨ TỰ CHỌN (#1 ➜ #4):", 12, new Color(1f, 0.88f, 0.45f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft);
-        SetRect(titleTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 24f), new Vector2(0f, -4f));
+        var titleTxt = AddText(leftColGo.transform, "Title", "⚔️ THỨ TỰ CHỌN (#1 ➜ #4):", ThemeUI.SizeBody, new Color(1f, 0.88f, 0.45f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft);
+        SetRect(titleTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 26f), new Vector2(0f, -4f));
 
         float startY = -34f;
         for (int i = 0; i < draftSlots.Count; i++)
@@ -2728,8 +2728,8 @@ public class Battle2v2UI : MonoBehaviour
             sImg.color = new Color(0.06f, 0.09f, 0.16f, 0.95f);
 
             var sRt = sGo.GetComponent<RectTransform>();
-            SetRect(sRt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 130f), new Vector2(0f, startY));
-            startY -= 138f;
+            SetRect(sRt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 134f), new Vector2(0f, startY));
+            startY -= 142f;
 
             slot.slotGo = sGo;
 
@@ -2742,12 +2742,12 @@ public class Battle2v2UI : MonoBehaviour
             var fRt = frameGo.GetComponent<RectTransform>();
             Fill(fRt, new Vector2(-1, -1), new Vector2(1, 1));
 
-            var badgeTxt = AddText(sGo.transform, "Seat", $"#{slot.seatNumber}", 13, new Color(1f, 0.9f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft);
-            SetRect(badgeTxt.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(50f, 24f), new Vector2(8f, -4f));
+            var badgeTxt = AddText(sGo.transform, "Seat", $"#{slot.seatNumber}", ThemeUI.SizeBodyLarge, new Color(1f, 0.9f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft);
+            SetRect(badgeTxt.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(50f, 26f), new Vector2(8f, -4f));
 
-            string teamTag = slot.isDragon ? "<color=#55DDFF>[PHE RỒNG]</color>" : "<color=#FF6666>[PHE PHƯỢNG]</color>";
-            var nameTxt = AddText(sGo.transform, "Title", $"{teamTag} {slot.playerTitle}", 11, Color.white, FontStyle.Bold, TextAnchor.MiddleLeft);
-            SetRect(nameTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(-60f, 24f), new Vector2(50f, -4f));
+            string teamTag = slot.isDragon ? "<color=#55DDFF>[RỒNG]</color>" : "<color=#FF6666>[PHƯỢNG]</color>";
+            var nameTxt = AddText(sGo.transform, "Title", $"{teamTag} {slot.playerTitle}", ThemeUI.SizeMicro, Color.white, FontStyle.Bold, TextAnchor.MiddleLeft);
+            SetRect(nameTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(-60f, 26f), new Vector2(50f, -4f));
 
             var avGo = new GameObject("Avatar", typeof(RectTransform), typeof(Image));
             avGo.transform.SetParent(sGo.transform, false);
@@ -2755,13 +2755,13 @@ public class Battle2v2UI : MonoBehaviour
             slot.avatarImg.sprite = HeroDatabase100.GetAvatarSprite("UI/ly_thuong_kiet");
             slot.avatarImg.color = new Color(1f, 1f, 1f, 0.35f);
             var avRt = avGo.GetComponent<RectTransform>();
-            SetRect(avRt, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(68f, 90f), new Vector2(8f, 8f));
+            SetRect(avRt, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(72f, 95f), new Vector2(8f, 8f));
 
-            slot.heroNameText = AddText(sGo.transform, "HeroName", "Chưa chọn...", 12, new Color(1f, 0.88f, 0.4f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft);
-            SetRect(slot.heroNameText.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0f, 0.5f), new Vector2(-90f, 24f), new Vector2(86f, 10f));
+            slot.heroNameText = AddText(sGo.transform, "HeroName", "Chưa chọn...", ThemeUI.SizeBodyLarge, new Color(1f, 0.88f, 0.4f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft);
+            SetRect(slot.heroNameText.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0f, 0.5f), new Vector2(-90f, 26f), new Vector2(88f, 12f));
 
-            slot.statusText = AddText(sGo.transform, "Status", "Đang chờ lượt...", 10, new Color(0.7f, 0.8f, 0.9f, 0.85f), FontStyle.Italic, TextAnchor.MiddleLeft);
-            SetRect(slot.statusText.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0f, 0.5f), new Vector2(-90f, 20f), new Vector2(86f, -14f));
+            slot.statusText = AddText(sGo.transform, "Status", "Đang chờ lượt...", ThemeUI.SizeMicro, new Color(0.7f, 0.8f, 0.9f, 0.85f), FontStyle.Italic, TextAnchor.MiddleLeft);
+            SetRect(slot.statusText.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(0f, 0.5f), new Vector2(-90f, 22f), new Vector2(88f, -14f));
         }
     }
 
@@ -2772,13 +2772,13 @@ public class Battle2v2UI : MonoBehaviour
         var ccRt = centerColGo.GetComponent<RectTransform>();
         SetRect(ccRt, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f), new Vector2(-640f, -68f), new Vector2(-30f, -28f));
 
-        var subTxt = AddText(centerColGo.transform, "Sub", $"🎴 <b>DANH TƯỚNG KHẢ DỤNG ({availableHeroes.Count} TƯỚNG SỞ HỮU & FREE TUẦN)</b> • Chạm thẻ để xem tuyệt kỹ:", 11, new Color(0.9f, 0.95f, 1f, 0.95f), FontStyle.Normal, TextAnchor.MiddleLeft);
-        SetRect(subTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(0f, 22f), new Vector2(0f, 0f));
+        var subTxt = AddText(centerColGo.transform, "Sub", $"🎴 <b>DANH TƯỚNG KHẢ DỤNG ({availableHeroes.Count} TƯỚNG SỞ HỮU & FREE TUẦN)</b> • Chạm thẻ để xem tuyệt kỹ:", ThemeUI.SizeBody, new Color(0.9f, 0.95f, 1f, 0.95f), FontStyle.Bold, TextAnchor.MiddleLeft);
+        SetRect(subTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(0f, 26f), new Vector2(0f, 0f));
 
         var scrollGo = new GameObject("HeroesScrollView", typeof(RectTransform), typeof(Image), typeof(RectMask2D), typeof(ScrollRect));
         scrollGo.transform.SetParent(centerColGo.transform, false);
         var sRt = scrollGo.GetComponent<RectTransform>();
-        SetRect(sRt, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f), new Vector2(0f, -28f), new Vector2(0f, -14f));
+        SetRect(sRt, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f), new Vector2(0f, -32f), new Vector2(0f, -16f));
 
         var sImg = scrollGo.GetComponent<Image>();
         sImg.color = new Color(0.02f, 0.04f, 0.08f, 0.5f);
@@ -2798,7 +2798,7 @@ public class Battle2v2UI : MonoBehaviour
         cRt.offsetMin = cRt.offsetMax = Vector2.zero;
 
         var glg = contentGo.GetComponent<GridLayoutGroup>();
-        glg.cellSize = new Vector2(138f, 184f);
+        glg.cellSize = new Vector2(142f, 190f);
         glg.spacing = new Vector2(10f, 10f);
         glg.padding = new RectOffset(6, 6, 6, 6);
         glg.childAlignment = TextAnchor.UpperLeft;
@@ -2865,9 +2865,9 @@ public class Battle2v2UI : MonoBehaviour
         if (npSpr != null) { npImg.sprite = npSpr; npImg.type = Image.Type.Sliced; }
         npImg.color = new Color(0.12f, 0.08f, 0.05f, 0.95f);
         var npRt = npGo.GetComponent<RectTransform>();
-        SetRect(npRt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(-12f, 22f), new Vector2(0f, -4f));
+        SetRect(npRt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(-12f, 24f), new Vector2(0f, -4f));
 
-        var nameTxt = AddText(npGo.transform, "Name", hero.name, 10, new Color(1f, 0.92f, 0.45f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        var nameTxt = AddText(npGo.transform, "Name", hero.name, ThemeUI.SizeMicro, new Color(1f, 0.92f, 0.45f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(nameTxt.rectTransform);
 
         var hpContainer = new GameObject("LotusHpRow", typeof(RectTransform), typeof(HorizontalLayoutGroup));
@@ -2888,7 +2888,7 @@ public class Battle2v2UI : MonoBehaviour
             if (lotusSpr != null) lImg.sprite = lotusSpr;
             lImg.color = new Color(1f, 0.45f, 0.65f, 1f);
             var lRt = lGo.GetComponent<RectTransform>();
-            lRt.sizeDelta = new Vector2(12f, 12f);
+            lRt.sizeDelta = new Vector2(14f, 14f);
         }
 
         var facGo = new GameObject("FactionBadge", typeof(RectTransform), typeof(Image));
@@ -2898,9 +2898,9 @@ public class Battle2v2UI : MonoBehaviour
         if (facSpr != null) { fbgImg.sprite = facSpr; fbgImg.type = Image.Type.Sliced; }
         fbgImg.color = new Color(0.1f, 0.2f, 0.35f, 0.95f);
         var facRt = facGo.GetComponent<RectTransform>();
-        SetRect(facRt, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(68f, 18f), new Vector2(6f, 26f));
+        SetRect(facRt, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(68f, 20f), new Vector2(6f, 26f));
 
-        var facTxt = AddText(facGo.transform, "Txt", hero.faction, 9, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var facTxt = AddText(facGo.transform, "Txt", hero.faction, ThemeUI.SizeMicro, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(facTxt.rectTransform);
 
         var skillBarGo = new GameObject("SkillBar", typeof(RectTransform), typeof(Image));
@@ -2909,9 +2909,9 @@ public class Battle2v2UI : MonoBehaviour
         if (bgSpr != null) { sbImg.sprite = bgSpr; sbImg.type = Image.Type.Sliced; }
         sbImg.color = new Color(0.08f, 0.14f, 0.24f, 0.95f);
         var sbRt = skillBarGo.GetComponent<RectTransform>();
-        SetRect(sbRt, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(-12f, 20f), new Vector2(0f, 4f));
+        SetRect(sbRt, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(-12f, 22f), new Vector2(0f, 4f));
 
-        var skillTxt = AddText(skillBarGo.transform, "Skill", $"⚡ {hero.skillName}", 10, new Color(0.4f, 0.92f, 1f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        var skillTxt = AddText(skillBarGo.transform, "Skill", $"⚡ {hero.skillName}", ThemeUI.SizeMicro, new Color(0.4f, 0.92f, 1f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(skillTxt.rectTransform);
 
         if (isFree)
@@ -2922,9 +2922,9 @@ public class Battle2v2UI : MonoBehaviour
             if (bgSpr != null) { fbImg.sprite = bgSpr; fbImg.type = Image.Type.Sliced; }
             fbImg.color = new Color(0.75f, 0.55f, 0.1f, 0.98f);
             var fbRt = freeBadgeGo.GetComponent<RectTransform>();
-            SetRect(fbRt, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(46f, 18f), new Vector2(-6f, 26f));
+            SetRect(fbRt, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(50f, 20f), new Vector2(-6f, 26f));
 
-            var fbTxt = AddText(freeBadgeGo.transform, "Txt", "FREE", 9, new Color(1f, 0.92f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+            var fbTxt = AddText(freeBadgeGo.transform, "Txt", "FREE", ThemeUI.SizeMicro, new Color(1f, 0.92f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
             Fill(fbTxt.rectTransform);
         }
 
@@ -2948,7 +2948,7 @@ public class Battle2v2UI : MonoBehaviour
         ipImg.color = new Color(0.06f, 0.1f, 0.18f, 0.98f);
 
         var ipRt = draftInspectPanelGo.GetComponent<RectTransform>();
-        SetRect(ipRt, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(330f, -68f), new Vector2(-16f, -28f));
+        SetRect(ipRt, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(340f, -68f), new Vector2(-16f, -28f));
 
         var borderGo = new GameObject("Border", typeof(RectTransform), typeof(Image));
         borderGo.transform.SetParent(draftInspectPanelGo.transform, false);
@@ -2958,11 +2958,11 @@ public class Battle2v2UI : MonoBehaviour
         bImg.color = new Color(1f, 0.85f, 0.35f, 1f);
         Fill(borderGo.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
 
-        inspectTitleText = AddText(draftInspectPanelGo.transform, "Title", "LÝ THƯỜNG KIỆT", 16, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
-        SetRect(inspectTitleText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(300f, 26f), new Vector2(0f, -12f));
+        inspectTitleText = AddText(draftInspectPanelGo.transform, "Title", "LÝ THƯỜNG KIỆT", ThemeUI.SizeTitleLarge, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(inspectTitleText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(310f, 32f), new Vector2(0f, -12f));
 
-        inspectSubText = AddText(draftInspectPanelGo.transform, "Sub", "Thế Lực: Thời Lý • Máu: 4 đóa sen", 11, new Color(0.8f, 0.9f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
-        SetRect(inspectSubText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(300f, 20f), new Vector2(0f, -38f));
+        inspectSubText = AddText(draftInspectPanelGo.transform, "Sub", "Thế Lực: Thời Lý • Máu: 4 đóa sen", ThemeUI.SizeBody, new Color(0.8f, 0.9f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
+        SetRect(inspectSubText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(310f, 24f), new Vector2(0f, -44f));
 
         var avGo = new GameObject("InspectAvatar", typeof(RectTransform), typeof(Image));
         avGo.transform.SetParent(draftInspectPanelGo.transform, false);
@@ -2970,7 +2970,7 @@ public class Battle2v2UI : MonoBehaviour
         inspectAvatarImg.sprite = HeroDatabase100.GetAvatarSprite("UI/ly_thuong_kiet");
         inspectAvatarImg.preserveAspect = true;
         var avRt = avGo.GetComponent<RectTransform>();
-        SetRect(avRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(115f, 150f), new Vector2(0f, -60f));
+        SetRect(avRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(120f, 155f), new Vector2(0f, -70f));
 
         var avFrame = new GameObject("AvFrame", typeof(RectTransform), typeof(Image));
         avFrame.transform.SetParent(avGo.transform, false);
@@ -2982,7 +2982,7 @@ public class Battle2v2UI : MonoBehaviour
         var hpRowGo = new GameObject("LotusContainer", typeof(RectTransform), typeof(HorizontalLayoutGroup));
         hpRowGo.transform.SetParent(draftInspectPanelGo.transform, false);
         var hrRt = hpRowGo.GetComponent<RectTransform>();
-        SetRect(hrRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(180f, 20f), new Vector2(0f, -216f));
+        SetRect(hrRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(180f, 24f), new Vector2(0f, -232f));
         var hlg = hpRowGo.GetComponent<HorizontalLayoutGroup>();
         hlg.childAlignment = TextAnchor.MiddleCenter;
         hlg.spacing = 6f;
@@ -2996,13 +2996,14 @@ public class Battle2v2UI : MonoBehaviour
         if (slotSpr != null) { sbImg.sprite = slotSpr; sbImg.type = Image.Type.Sliced; }
         sbImg.color = new Color(0.04f, 0.07f, 0.14f, 0.95f);
         var sbRt = skillBoxGo.GetComponent<RectTransform>();
-        SetRect(sbRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(305f, 310f), new Vector2(0f, -242f));
+        SetRect(sbRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(315f, 290f), new Vector2(0f, -260f));
 
-        inspectSkillTitleText = AddText(skillBoxGo.transform, "SkillTitle", "⚡ TUYỆT KỸ: [TIẾN THOÁI]", 13, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft);
-        SetRect(inspectSkillTitleText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(-16f, 26f), new Vector2(10f, -8f));
+        inspectSkillTitleText = AddText(skillBoxGo.transform, "SkillTitle", "⚡ TUYỆT KỸ: [TIẾN THOÁI]", ThemeUI.SizeTitleMedium, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleLeft);
+        SetRect(inspectSkillTitleText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(-16f, 30f), new Vector2(10f, -8f));
 
-        inspectSkillDescText = AddText(skillBoxGo.transform, "SkillDesc", "Bạn có thể sử dụng lá Trảm như lá Đỡ, và sử dụng lá Đỡ như lá Trảm.", 11, new Color(0.9f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.UpperLeft);
-        Fill(inspectSkillDescText.rectTransform, new Vector2(10f, 8f), new Vector2(-10f, -34f));
+        inspectSkillDescText = AddText(skillBoxGo.transform, "SkillDesc", "Bạn có thể sử dụng lá Trảm như lá Đỡ, và sử dụng lá Đỡ như lá Trảm.", ThemeUI.SizeBody, new Color(0.9f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.UpperLeft);
+        inspectSkillDescText.lineSpacing = 1.35f;
+        Fill(inspectSkillDescText.rectTransform, new Vector2(10f, 8f), new Vector2(-10f, -38f));
 
         var confirmBtnGo = new GameObject("DraftConfirmBtn", typeof(RectTransform), typeof(Image), typeof(Button));
         confirmBtnGo.transform.SetParent(draftInspectPanelGo.transform, false);
@@ -3012,10 +3013,10 @@ public class Battle2v2UI : MonoBehaviour
         cbImg.color = new Color(0.9f, 0.65f, 0.15f, 1f);
 
         var cbRt = confirmBtnGo.GetComponent<RectTransform>();
-        SetRect(cbRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(290f, 46f), new Vector2(0f, 18f));
+        SetRect(cbRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(300f, 52f), new Vector2(0f, 18f));
 
         draftConfirmBtn = confirmBtnGo.GetComponent<Button>();
-        draftConfirmBtnText = AddText(confirmBtnGo.transform, "Txt", "👑 XÁC NHẬN CHỌN TƯỚNG", 13, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        draftConfirmBtnText = AddText(confirmBtnGo.transform, "Txt", "👑 XÁC NHẬN CHỌN TƯỚNG", ThemeUI.SizeTitleMedium, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(draftConfirmBtnText.rectTransform);
 
         draftConfirmBtn.onClick.AddListener(() =>
@@ -3261,7 +3262,7 @@ public class Battle2v2UI : MonoBehaviour
         var hImg = headerGo.GetComponent<Image>();
         hImg.color = new Color(0.04f, 0.07f, 0.14f, 0.95f);
         var hRt = headerGo.GetComponent<RectTransform>();
-        SetRect(hRt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 44f), Vector2.zero);
+        SetRect(hRt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 48f), Vector2.zero);
 
         var homeBtnGo = new GameObject("HomeBtn", typeof(RectTransform), typeof(Image), typeof(Button));
         homeBtnGo.transform.SetParent(headerGo.transform, false);
@@ -3271,10 +3272,10 @@ public class Battle2v2UI : MonoBehaviour
         hbImg.color = new Color(0.2f, 0.12f, 0.08f, 0.95f);
         var hbRt = homeBtnGo.GetComponent<RectTransform>();
         hbRt.anchorMin = hbRt.anchorMax = hbRt.pivot = new Vector2(0f, 0.5f);
-        hbRt.sizeDelta = new Vector2(130f, 32f);
+        hbRt.sizeDelta = new Vector2(160f, 38f);
         hbRt.anchoredPosition = new Vector2(12f, 0f);
 
-        var hbTxt = AddText(homeBtnGo.transform, "Txt", "🏠 VỀ TRANG CHỦ", 11, new Color(1f, 0.88f, 0.4f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        var hbTxt = AddText(homeBtnGo.transform, "Txt", "🏠 VỀ TRANG CHỦ", ThemeUI.SizeMicro, new Color(1f, 0.88f, 0.4f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(hbTxt.rectTransform);
         homeBtnGo.GetComponent<Button>().onClick.AddListener(() =>
         {
@@ -3282,11 +3283,11 @@ public class Battle2v2UI : MonoBehaviour
             ConfirmExitBattle();
         });
 
-        var titleTxt = AddText(headerGo.transform, "Title", "🛡️ ĐẤU TRƯỜNG 2v2 XẾP HẠNG (PHỐI HỢP ĐỒNG MINH)", 15, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
-        SetRect(titleTxt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(500f, 30f), Vector2.zero);
+        var titleTxt = AddText(headerGo.transform, "Title", "🛡️ ĐẤU TRƯỜNG 2v2 XẾP HẠNG (PHỐI HỢP ĐỒNG MINH)", ThemeUI.SizeTitleMedium, new Color(1f, 0.88f, 0.35f, 1f), FontStyle.Bold, TextAnchor.MiddleCenter);
+        SetRect(titleTxt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(560f, 32f), Vector2.zero);
 
-        var turnTxt = AddText(headerGo.transform, "GlobalTurn", "⏳ Đang chuẩn bị chia bài...", 12, new Color(0.6f, 0.9f, 1f, 1f), FontStyle.Bold, TextAnchor.MiddleRight);
-        SetRect(turnTxt.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(280f, 30f), new Vector2(-16f, 0f));
+        var turnTxt = AddText(headerGo.transform, "GlobalTurn", "⏳ Đang chuẩn bị chia bài...", ThemeUI.SizeBody, new Color(0.6f, 0.9f, 1f, 1f), FontStyle.Bold, TextAnchor.MiddleRight);
+        SetRect(turnTxt.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(300f, 32f), new Vector2(-16f, 0f));
         globalTurnText = turnTxt;
     }
 
@@ -3306,7 +3307,7 @@ public class Battle2v2UI : MonoBehaviour
         genContainer.transform.SetParent(battleRootGo.transform, false);
         Fill(genContainer.GetComponent<RectTransform>());
 
-        Vector2 cardSize = new Vector2(184f, 245f);
+        Vector2 cardSize = new Vector2(190f, 252f);
 
         DraftSlot pSlot = draftSlots.Find(s => s.isPlayer) ?? draftSlots[0];
         int mySeat = pSlot.seatNumber;
@@ -3418,7 +3419,7 @@ public class Battle2v2UI : MonoBehaviour
         hrRt.anchorMin = new Vector2(0.5f, 0f);
         hrRt.anchorMax = new Vector2(0.5f, 0f);
         hrRt.pivot = new Vector2(0.5f, 0f);
-        hrRt.sizeDelta = new Vector2(1280f, 250f);
+        hrRt.sizeDelta = new Vector2(1280f, 260f);
         hrRt.anchoredPosition = Vector2.zero;
 
         var phGo = new GameObject("PlayerHandUI", typeof(RectTransform), typeof(PlayerHandUI));
@@ -3429,11 +3430,11 @@ public class Battle2v2UI : MonoBehaviour
         phRt.anchorMin = new Vector2(0.5f, 0f);
         phRt.anchorMax = new Vector2(0.5f, 0f);
         phRt.pivot = new Vector2(0.5f, 0f);
-        phRt.sizeDelta = new Vector2(620f, 170f);
+        phRt.sizeDelta = new Vector2(640f, 175f);
         phRt.anchoredPosition = new Vector2(-80f, 18f);
         playerHandUI.OnCardSelected += HandlePlayerCardSelected;
 
-        // 1. Hộp Mô Tả Chi Tiết Lá Bài (Nằm cao ở y = 195f để không bao giờ che bài trên tay)
+        // 1. Hộp Mô Tả Chi Tiết Lá Bài (Nằm cao ở y = 198f để không bao giờ che bài trên tay)
         cardDescBoxGo = new GameObject("CardDescBox", typeof(RectTransform), typeof(Image));
         cardDescBoxGo.transform.SetParent(handRootGo.transform, false);
         var cdImg = cardDescBoxGo.GetComponent<Image>();
@@ -3441,7 +3442,7 @@ public class Battle2v2UI : MonoBehaviour
         if (bgSpr != null) { cdImg.sprite = bgSpr; cdImg.type = Image.Type.Sliced; }
         cdImg.color = new Color(0.04f, 0.07f, 0.14f, 0.98f);
         var cdRt = cardDescBoxGo.GetComponent<RectTransform>();
-        SetRect(cdRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(660f, 54f), new Vector2(-80f, 195f));
+        SetRect(cdRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(680f, 58f), new Vector2(-80f, 198f));
 
         var cdFrame = new GameObject("Frame", typeof(RectTransform), typeof(Image));
         cdFrame.transform.SetParent(cardDescBoxGo.transform, false);
@@ -3455,27 +3456,27 @@ public class Battle2v2UI : MonoBehaviour
         cdTxtGo.transform.SetParent(cardDescBoxGo.transform, false);
         cardDescBodyText = cdTxtGo.GetComponent<Text>();
         cardDescBodyText.font = font;
-        cardDescBodyText.fontSize = 12; // Cỡ chữ nhỏ đi 1.5 lần (từ 18 xuống 12pt)
+        cardDescBodyText.fontSize = ThemeUI.SizeBody; // Cỡ chữ 16pt chuẩn rõ nét
         cardDescBodyText.color = new Color(0.95f, 0.98f, 1f, 1f);
         cardDescBodyText.alignment = TextAnchor.MiddleLeft;
         cardDescBodyText.horizontalOverflow = HorizontalWrapMode.Wrap; // Hỗ trợ hiển thị 2 dòng
         cardDescBodyText.verticalOverflow = VerticalWrapMode.Truncate;
-        cardDescBodyText.lineSpacing = 1.2f;
+        cardDescBodyText.lineSpacing = 1.3f;
         Fill(cdTxtGo.GetComponent<RectTransform>(), new Vector2(12, 4), new Vector2(-12, -4));
         cardDescBoxGo.SetActive(false);
 
         var btnSpr = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
 
-        // 2. Nút Dùng Bài Hành Động 2 Bước (y = 245f)
+        // 2. Nút Dùng Bài Hành Động 2 Bước (y = 258f)
         actionBtnGo = new GameObject("ActionPlayBtn", typeof(RectTransform), typeof(Image), typeof(Button));
         actionBtnGo.transform.SetParent(handRootGo.transform, false);
         var abImg = actionBtnGo.GetComponent<Image>();
         if (btnSpr != null) { abImg.sprite = btnSpr; abImg.type = Image.Type.Sliced; }
         abImg.color = new Color(0.92f, 0.65f, 0.15f, 1f);
         var abRt = actionBtnGo.GetComponent<RectTransform>();
-        SetRect(abRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(260f, 38f), new Vector2(-80f, 245f));
+        SetRect(abRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(260f, 46f), new Vector2(-80f, 258f));
 
-        var abTxt = AddText(actionBtnGo.transform, "Txt", "🃏 DÙNG LÁ BÀI", 12, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var abTxt = AddText(actionBtnGo.transform, "Txt", "🃏 DÙNG LÁ BÀI", ThemeUI.SizeBodyLarge, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(abTxt.rectTransform);
         actionBtnText = abTxt;
 
@@ -3489,10 +3490,10 @@ public class Battle2v2UI : MonoBehaviour
         if (btnSpr != null) { etImg.sprite = btnSpr; etImg.type = Image.Type.Sliced; }
         etImg.color = new Color(0.9f, 0.6f, 0.15f, 1f);
         var etRt = etBtnGo.GetComponent<RectTransform>();
-        SetRect(etRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(140f, 36f), new Vector2(215f, 245f));
+        SetRect(etRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(170f, 44f), new Vector2(220f, 258f));
 
         endTurnBtn = etBtnGo.GetComponent<Button>();
-        endTurnBtnText = AddText(etBtnGo.transform, "Txt", "KẾT THÚC LƯỢT ➜", 10, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        endTurnBtnText = AddText(etBtnGo.transform, "Txt", "KẾT THÚC LƯỢT ➜", ThemeUI.SizeBody, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(endTurnBtnText.rectTransform);
         endTurnBtn.onClick.AddListener(OnPlayerEndTurnClicked);
         etBtnGo.SetActive(false);
@@ -3504,10 +3505,10 @@ public class Battle2v2UI : MonoBehaviour
         if (btnSpr != null) { dcImg.sprite = btnSpr; dcImg.type = Image.Type.Sliced; }
         dcImg.color = new Color(0.85f, 0.25f, 0.25f, 1f);
         var dcRt = dcBtnGo.GetComponent<RectTransform>();
-        SetRect(dcRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(140f, 36f), new Vector2(-345f, 245f));
+        SetRect(dcRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(170f, 44f), new Vector2(-350f, 258f));
 
         discardConfirmBtn = dcBtnGo.GetComponent<Button>();
-        discardConfirmBtnText = AddText(dcBtnGo.transform, "Txt", "BỎ BÀI (0/0)", 10, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        discardConfirmBtnText = AddText(dcBtnGo.transform, "Txt", "BỎ BÀI (0/0)", ThemeUI.SizeBody, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(discardConfirmBtnText.rectTransform);
         discardConfirmBtn.onClick.AddListener(OnPlayerConfirmDiscardClicked);
         dcBtnGo.SetActive(false);
@@ -3527,7 +3528,7 @@ public class Battle2v2UI : MonoBehaviour
         hbRt.anchorMin = Vector2.zero;
         hbRt.anchorMax = Vector2.zero;
         hbRt.pivot = Vector2.zero;
-        hbRt.sizeDelta = new Vector2(150f, 44f);
+        hbRt.sizeDelta = new Vector2(150f, 46f);
         hbRt.anchoredPosition = new Vector2(16f, 16f);
 
         var hbFrame = new GameObject("Frame", typeof(RectTransform), typeof(Image));
@@ -3539,7 +3540,7 @@ public class Battle2v2UI : MonoBehaviour
         hbfImg.raycastTarget = false;
         Fill(hbFrame.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
 
-        var hbTxt = ThemeUI.CreateText(histBtnGo.transform, "Txt", "📜 LỊCH SỬ", ThemeUI.SizeButton, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter, true);
+        var hbTxt = ThemeUI.CreateText(histBtnGo.transform, "Txt", "📜 LỊCH SỬ", ThemeUI.SizeBodyLarge, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter, true);
         Fill(hbTxt.rectTransform);
 
         histBtnGo.GetComponent<Button>().onClick.AddListener(() =>
@@ -5703,7 +5704,7 @@ public class Battle2v2UI : MonoBehaviour
         var reactionGo = new GameObject("SlashReactionPanel", typeof(RectTransform));
         reactionGo.transform.SetParent(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, false);
         var rRt = reactionGo.GetComponent<RectTransform>();
-        SetRect(rRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(680f, 52f), new Vector2(-70f, 238f));
+        SetRect(rRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(700f, 56f), new Vector2(-70f, 258f));
 
         var btnSpr = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
 
@@ -5712,11 +5713,11 @@ public class Battle2v2UI : MonoBehaviour
         var dImg = dodgeBtnGo.GetComponent<Image>();
         if (btnSpr != null) { dImg.sprite = btnSpr; dImg.type = Image.Type.Sliced; }
         var dRt = dodgeBtnGo.GetComponent<RectTransform>();
-        SetRect(dRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(270f, 44f), new Vector2(-100f, 0));
+        SetRect(dRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(300f, 48f), new Vector2(-120f, 0));
 
         string dodgeActionStr = "🛡️ ĐÁNH [ĐỠ] ĐỂ HÓA GIẢI";
-          if (hasHolyCannon) dodgeActionStr = $"🛡️ ĐỠ BẰNG LÁ KHÁC CHẤT {slashCard.GetSuitSymbol()}";
-          var dTxt = AddText(dodgeBtnGo.transform, "Txt", dodgeActionStr, 14, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        if (hasHolyCannon) dodgeActionStr = $"🛡️ ĐỠ KHÁC CHẤT {slashCard.GetSuitSymbol()}";
+        var dTxt = AddText(dodgeBtnGo.transform, "Txt", dodgeActionStr, ThemeUI.SizeBodyLarge, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(dTxt.rectTransform);
 
         var dBtn = dodgeBtnGo.GetComponent<Button>();
@@ -5729,9 +5730,9 @@ public class Battle2v2UI : MonoBehaviour
         if (btnSpr != null) { ndImg.sprite = btnSpr; ndImg.type = Image.Type.Sliced; }
         ndImg.color = ThemeUI.CrimsonRed;
         var ndRt = noDodgeBtnGo.GetComponent<RectTransform>();
-        SetRect(ndRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(220f, 44f), new Vector2(170f, 0));
+        SetRect(ndRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(250f, 48f), new Vector2(175f, 0));
 
-        var ndTxt = AddText(noDodgeBtnGo.transform, "Txt", "❌ KHÔNG NÉ (CHỊU MÁU)", 13, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var ndTxt = AddText(noDodgeBtnGo.transform, "Txt", "❌ KHÔNG NÉ (CHỊU MÁU)", ThemeUI.SizeBody, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(ndTxt.rectTransform);
 
         CardUI chosenDodgeUI = null;
@@ -8211,17 +8212,18 @@ public class Battle2v2UI : MonoBehaviour
 
         var tier = Ranked2v2System.GetTier(AuthUI.Current2v2Points);
 
-        var modal = CreateBaseModal("👑 ĐẠI THẮNG ĐẤU TRƯỜNG 2v2", new Vector2(620f, 380f));
+        var modal = CreateBaseModal("👑 ĐẠI THẮNG ĐẤU TRƯỜNG 2v2", new Vector2(780f, 480f));
         var txt = AddText(modal.transform, "Content",
-            $"<b>CHÚC MỪNG CHIẾN THẮNG 2v2!</b>\n\n" +
-            $"Bạn và đồng đội đã xuất sắc quét sạch quân địch.\n\n" +
+            $"<size=22><b>CHÚC MỪNG CHIẾN THẮNG 2v2!</b></size>\n\n" +
+            $"Bạn và đồng đội đã xuất sắc phối hợp quét sạch quân địch.\n\n" +
             $"⭐ <b>Điểm Xếp Hạng 2v2:</b> <color=#55FF55>+25 RP</color> (Tổng: {AuthUI.Current2v2Points} RP)\n" +
             $"🏆 <b>Bậc Rank 2v2 Hiện Tại:</b> <color={tier.ColorHex}>{tier.badge} {tier.name}</color> ({tier.subtitle})\n" +
             $"🪙 <b>Chiến Lợi Phẩm:</b> <color=#FFD700>+150 Bạc</color>",
-            13, new Color(0.9f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
-        SetRect(txt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(540f, 180f), new Vector2(0f, 20f));
+            ThemeUI.SizeBodyLarge, new Color(0.9f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
+        txt.lineSpacing = 1.35f;
+        SetRect(txt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(700f, 240f), new Vector2(0f, 25f));
 
-        var retBtn = CreateButton(modal.transform, "ReturnBtn", "🏠 VỀ TRANG CHỦ", new Vector2(0f, -120f), new Vector2(200f, 40f), () =>
+        var retBtn = CreateButton(modal.transform, "ReturnBtn", "🏠 VỀ TRANG CHỦ", new Vector2(0f, -175f), new Vector2(280f, 52f), () =>
         {
             ConfirmExitBattle();
         });
@@ -8238,16 +8240,17 @@ public class Battle2v2UI : MonoBehaviour
 
         var tier = Ranked2v2System.GetTier(AuthUI.Current2v2Points);
 
-        var modal = CreateBaseModal("💔 THẤT BẠI TRẬN CHIẾN", new Vector2(620f, 380f));
+        var modal = CreateBaseModal("💔 THẤT BẠI TRẬN CHIẾN", new Vector2(780f, 480f));
         var txt = AddText(modal.transform, "Content",
-            $"<b>TRẬN CHIẾN KẾT THÚC!</b>\n\n" +
-            $"Cả hai chiến tướng phe ta đã ngã xuống.\n\n" +
+            $"<size=22><b>TRẬN CHIẾN KẾT THÚC!</b></size>\n\n" +
+            $"Cả hai chiến tướng phe ta đã anh dũng ngã xuống.\n\n" +
             $"⭐ <b>Điểm Xếp Hạng 2v2:</b> <color=#FF5555>-15 RP</color> (Hiện tại: {AuthUI.Current2v2Points} RP)\n" +
             $"🏆 <b>Bậc Rank:</b> <color={tier.ColorHex}>{tier.badge} {tier.name}</color>",
-            13, new Color(0.9f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
-        SetRect(txt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(540f, 180f), new Vector2(0f, 20f));
+            ThemeUI.SizeBodyLarge, new Color(0.9f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
+        txt.lineSpacing = 1.35f;
+        SetRect(txt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(700f, 240f), new Vector2(0f, 25f));
 
-        var retBtn = CreateButton(modal.transform, "ReturnBtn", "🏠 VỀ TRANG CHỦ", new Vector2(0f, -120f), new Vector2(200f, 40f), () =>
+        var retBtn = CreateButton(modal.transform, "ReturnBtn", "🏠 VỀ TRANG CHỦ", new Vector2(0f, -175f), new Vector2(280f, 52f), () =>
         {
             ConfirmExitBattle();
         });
