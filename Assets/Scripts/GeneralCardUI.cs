@@ -20,15 +20,19 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
     public event Action<GeneralCardUI> OnGeneralClicked;
 
     
+    private string customHeroId = "";
     public string HeroId
     {
         get 
         { 
+            if (!string.IsNullOrEmpty(customHeroId)) return customHeroId;
             var heroData = HeroDatabase100.GetHeroByName(generalName);
             return heroData != null ? heroData.id.ToString() : "";
         }
+        set { customHeroId = value; }
     }
-public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
+
+    public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
     {
         OnGeneralClicked?.Invoke(this);
     }
@@ -79,7 +83,11 @@ public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
 
     private readonly Dictionary<EquipmentType, EquipmentSlotUI> slotMap = new Dictionary<EquipmentType, EquipmentSlotUI>();
 
-    public string GeneralName => generalName;
+    public string GeneralName
+    {
+        get => generalName;
+        set => generalName = value;
+    }
     public string FactionName => factionName;
     public int MaxHp => maxHp;
     public int CurrentHp => currentHp;
@@ -87,6 +95,25 @@ public void OnPointerClick(UnityEngine.EventSystems.PointerEventData eventData)
     public LotusHealthUI HealthUI => lotusHealthUI;
     public GameObject SkillButtonGo => skillButtonGo;
     public Button SkillButton => skillButton;
+
+    public bool HasAnyEquipment()
+    {
+        if (equippedCards != null)
+        {
+            foreach (var kv in equippedCards)
+            {
+                if (kv.Value != null) return true;
+            }
+        }
+        if (slotMap != null)
+        {
+            foreach (var slot in slotMap.Values)
+            {
+                if (slot != null && slot.IsEquipped) return true;
+            }
+        }
+        return false;
+    }
 
     public void SetSkill(string skillName, Action onClick)
     {
