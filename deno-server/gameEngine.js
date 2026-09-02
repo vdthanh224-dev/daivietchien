@@ -753,7 +753,11 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
   }
 
   // 5. CÁC LÁ CẨM NANG (Instant / Delayed Scroll) -> BẮT ĐẦU CHUỖI HỎI DIỆU KẾ PHÁ MƯU (AWAIT_NULLIFY)
-  if (card.subType === CARD_SUBTYPES.SNATCH || card.subType === CARD_SUBTYPES.DISMANTLE || card.subType === CARD_SUBTYPES.FLAWLESS_DEFENSE) {
+  if (card.subType === CARD_SUBTYPES.FLAWLESS_DEFENSE) {
+    return { error: "Diệu Kế Phá Mưu là lá bài phản ứng, chỉ dùng qua bảng hỏi khi có Cẩm nang được thi triển!" };
+  }
+
+  if (card.subType === CARD_SUBTYPES.SNATCH || card.subType === CARD_SUBTYPES.DISMANTLE) {
     const t = state.players.find(x => x.seat === targetSeat);
     if (t && t.hand.length === 0 && (t.equipments || []).length === 0 && (t.judgements || []).length === 0) {
        return { error: "Mục tiêu không có bài (trên tay/trang bị/phán xét) để chọn!" };

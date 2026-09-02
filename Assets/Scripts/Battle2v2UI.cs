@@ -4603,9 +4603,18 @@ public class Battle2v2UI : MonoBehaviour
                 btn.interactable = false;
                 btnImg.color = new Color(0.4f, 0.45f, 0.55f, 0.9f);
                 actionBtnText.text = "🛡️ LÁ PHẢN ỨNG (DÙNG KHI BỊ TẤN CÔNG)";
-                SetLog("🛡️ [Đỡ]: Lá này chỉ dùng để hóa giải đòn tấn công.");
+                SetLog("🛡️ [Đỡ]: Lá này chỉ dùng để hóa giải đòn tấn công khi bị Trảm.");
                 return;
             }
+        }
+
+        if (card.subType == CardSubType.FlawlessDefense || (!string.IsNullOrEmpty(card.cardName) && card.cardName.Contains("Diệu Kế")))
+        {
+            btn.interactable = false;
+            btnImg.color = new Color(0.4f, 0.45f, 0.55f, 0.9f);
+            actionBtnText.text = "🛡️ LÁ PHẢN ỨNG (HÓA GIẢI CẨM NANG)";
+            SetLog("🛡️ [Diệu Kế Phá Mưu]: Lá này tự động kích hoạt qua bảng hỏi khi có Cẩm nang được tung ra trên bàn đấu.");
+            return;
         }
 
         if (card.subType == CardSubType.Peach && playerCard.CurrentHp >= playerCard.MaxHp)
@@ -8812,7 +8821,7 @@ public void ShowCardAtCenter(CardModel card, GeneralCardUI caster, GeneralCardUI
     private bool RequiresTarget(CardModel c)
     {
         if (c == null) return false;
-        return CanActAsSlash(playerCard, c) || c.subType == CardSubType.Duel || c.subType == CardSubType.Snatch || c.subType == CardSubType.Dismantle || c.subType == CardSubType.SupplyShortage || c.subType == CardSubType.Acedia || c.subType == CardSubType.FlawlessDefense || (!string.IsNullOrEmpty(c.cardName) && c.cardName.Contains("Diệu Kế"));
+        return CanActAsSlash(playerCard, c) || c.subType == CardSubType.Duel || c.subType == CardSubType.Snatch || c.subType == CardSubType.Dismantle || c.subType == CardSubType.SupplyShortage || c.subType == CardSubType.Acedia;
     }
 
     private GameObject CreateBaseModal(string title, Vector2 size)
