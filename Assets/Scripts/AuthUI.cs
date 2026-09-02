@@ -542,7 +542,7 @@ public sealed class AuthUI : MonoBehaviour
         if (authCardRoot != null) authCardRoot.SetActive(false);
         if (brandRoot != null) brandRoot.SetActive(false);
 
-        var canvas = transform.Find("Canvas");
+        var canvas = transform.Find("AuthCanvas");
         if (canvas == null) return;
 
         onboardingModalRoot = new GameObject("OnboardingModal", typeof(RectTransform));
@@ -677,7 +677,7 @@ public sealed class AuthUI : MonoBehaviour
 
         if (onboardingModalRoot != null) Destroy(onboardingModalRoot);
 
-        var canvas = transform.Find("Canvas");
+        var canvas = transform.Find("AuthCanvas");
         if (canvas != null) canvas.gameObject.SetActive(false);
 
         TutorialBattleUI.Create(null, () =>
@@ -688,7 +688,7 @@ public sealed class AuthUI : MonoBehaviour
 
     public void CheckAndShowTutorialReward()
     {
-        var canvas = transform.Find("Canvas");
+        var canvas = transform.Find("AuthCanvas");
         if (canvas != null) canvas.gameObject.SetActive(true);
         if (authCardRoot != null) authCardRoot.SetActive(false);
         if (brandRoot != null) brandRoot.SetActive(false);
@@ -1060,7 +1060,7 @@ public sealed class AuthUI : MonoBehaviour
 
     private void ShowSignedIn()
     {
-        var canvas = transform.Find("Canvas");
+        var canvas = transform.Find("AuthCanvas");
         if (canvas != null) canvas.gameObject.SetActive(false);
         HomeUI.Open(signedInEmail);
     }
@@ -1213,7 +1213,7 @@ public sealed class AuthUI : MonoBehaviour
 
     public void Show()
     {
-        var canvas = transform.Find("Canvas");
+        var canvas = transform.Find("AuthCanvas");
         if (canvas != null) canvas.gameObject.SetActive(true);
         if (authCardRoot != null) authCardRoot.SetActive(true);
         if (brandRoot != null) brandRoot.SetActive(true);
