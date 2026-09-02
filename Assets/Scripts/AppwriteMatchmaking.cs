@@ -1327,7 +1327,7 @@ public static class AppwriteMatchmaking
 
     #region 4. SERVERLESS GAME ENGINE & STATE SYNC
     public const string GameEngineFunctionId = "game-engine";
-    public const string DenoEndpoint = "https://dai-viet-chien-server.deno.dev";
+    public const string DenoEndpoint = "http://127.0.0.1:8082";
 
     /// <summary>
     /// Legacy shim: game state is server-owned and must never be written by Unity.
@@ -1376,33 +1376,33 @@ public static class AppwriteMatchmaking
         denoReq.timeout = 10; // Timeout nhanh để kịp fallback
         yield return denoReq.SendWebRequest();
 
-        if (denoReq.result == UnityWebRequest.Result.Success || !string.IsNullOrEmpty(denoReq.downloadHandler?.text))
+        if (denoReq.result == UnityWebRequest.Result.Success && !string.IsNullOrEmpty(denoReq.downloadHandler?.text))
         {
-            try
+            string respText = denoReq.downloadHandler.text.Trim();
+            if (respText.StartsWith("{") && respText.EndsWith("}"))
             {
-                var stateResp = JsonUtility.FromJson<GameEngineResponseWrapper>(denoReq.downloadHandler.text);
-                if (stateResp != null)
+                try
                 {
-                    if (stateResp.code == "VERSION_CONFLICT")
+                    var stateResp = JsonUtility.FromJson<GameEngineResponseWrapper>(respText);
+                    if (stateResp != null)
                     {
-                        Debug.LogWarning($"[OptimisticLocking] Version conflict! Server v{stateResp.state?.version}");
-                    }
-                    if (stateResp.state != null)
-                    {
-                        currentServerStateVersion = stateResp.state.version;
-                        onResult?.Invoke(stateResp.state);
-                        yield break;
+                        if (stateResp.code == "VERSION_CONFLICT")
+                        {
+                            Debug.LogWarning($"[OptimisticLocking] Version conflict! Server v{stateResp.state?.version}");
+                        }
+                        if (stateResp.state != null)
+                        {
+                            currentServerStateVersion = stateResp.state.version;
+                            onResult?.Invoke(stateResp.state);
+                            yield break;
+                        }
                     }
                 }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[Deno] Parse error: {ex.Message}. Falling back to Appwrite.");
+                }
             }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[Deno] Parse error: {ex.Message}. Falling back to Appwrite.");
-            }
-        }
-        else
-        {
-            Debug.LogWarning($"[Deno] Request failed: {denoReq.error}. Falling back to Appwrite.");
         }
     }
 
@@ -1418,32 +1418,33 @@ public static class AppwriteMatchmaking
         req.timeout = 4;
         yield return req.SendWebRequest();
 
-        if (req.result == UnityWebRequest.Result.Success || !string.IsNullOrEmpty(req.downloadHandler?.text))
+        if (req.result == UnityWebRequest.Result.Success && !string.IsNullOrEmpty(req.downloadHandler?.text))
         {
-            try
+            string respText = req.downloadHandler.text.Trim();
+            if (respText.StartsWith("{") && respText.EndsWith("}"))
             {
-                var execResp = JsonUtility.FromJson<AppwriteFunctionExecutionResponse>(req.downloadHandler.text);
-                if (execResp != null && !string.IsNullOrEmpty(execResp.responseBody))
+                try
                 {
-                    var stateResp = JsonUtility.FromJson<GameEngineResponseWrapper>(execResp.responseBody);
-                    if (stateResp != null)
+                    var execResp = JsonUtility.FromJson<AppwriteFunctionExecutionResponse>(respText);
+                    if (execResp != null && !string.IsNullOrEmpty(execResp.responseBody))
                     {
-                        if (stateResp.code == "VERSION_CONFLICT")
+                        string bodyText = execResp.responseBody.Trim();
+                        if (bodyText.StartsWith("{") && bodyText.EndsWith("}"))
                         {
-                            Debug.LogWarning($"[OptimisticLocking] Version conflict! Server v{stateResp.state?.version}");
-                        }
-                        if (stateResp.state != null)
-                        {
-                            currentServerStateVersion = stateResp.state.version;
-                            onResult?.Invoke(stateResp.state);
-                            yield break;
+                            var stateResp = JsonUtility.FromJson<GameEngineResponseWrapper>(bodyText);
+                            if (stateResp != null && stateResp.state != null)
+                            {
+                                currentServerStateVersion = stateResp.state.version;
+                                onResult?.Invoke(stateResp.state);
+                                yield break;
+                            }
                         }
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[Appwrite Function] Parse error: {ex.Message}");
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[Appwrite Function] Parse error: {ex.Message}");
+                }
             }
         }
     }
