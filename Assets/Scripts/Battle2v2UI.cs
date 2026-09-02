@@ -3785,16 +3785,10 @@ public class Battle2v2UI : MonoBehaviour
 
         isFirstTurnOfMatch = true;
 
-        bool serverDealt = false;
-        if (!string.IsNullOrEmpty(currentRoomId))
+        if (DenoGameClient.IsConnected)
         {
-            SetLog("🎴 Đang kết nối máy chủ để chia bài...");
+            SetLog("🎴 Đang chờ máy chủ chia bài và mở lượt đầu tiên...");
             var initPlayers = BuildInitialServerPlayers();
-            if (DenoGameClient.Instance != null)
-            {
-                DenoGameClient.Instance.ConnectToServer(currentRoomId, playerCard != null ? playerCard.SeatNumber : 1, initPlayers);
-            }
-
             if (IsAIController())
             {
                 DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
@@ -3807,15 +3801,13 @@ public class Battle2v2UI : MonoBehaviour
                 {
                     if (initState != null)
                     {
-                        serverDealt = true;
                         ApplyServerGameState(initState);
                     }
                 });
             }
 
-            // Chờ tối đa 1.5s để nhận GameState từ máy chủ (Deno WebSocket hoặc Appwrite Function)
             float waitTimer = 0f;
-            while (waitTimer < 1.5f && !serverDealt && lastAppliedStateVersion == 0)
+            while (waitTimer < 1.5f && lastAppliedStateVersion == 0)
             {
                 waitTimer += 0.2f;
                 yield return new WaitForSecondsRealtime(0.2f);
@@ -3823,10 +3815,8 @@ public class Battle2v2UI : MonoBehaviour
 
             if (lastAppliedStateVersion > 0)
             {
-                yield break; // Máy chủ đã chia bài và đồng bộ trạng thái thành công
+                yield break;
             }
-
-            SetLog("⚡ Kích hoạt chia bài đồng bộ phòng theo bộ bài 80 lá...");
         }
 
         SetLog("🎴 Phát 4 lá bài ban đầu cho toàn thể chiến tướng...");
@@ -4145,9 +4135,9 @@ public class Battle2v2UI : MonoBehaviour
     private IEnumerator ExecuteCurrentTurn()
     {
         if (battleFinished) yield break;
-        if (!string.IsNullOrEmpty(currentRoomId) || DenoGameClient.IsConnected)
+        if (DenoGameClient.IsConnected)
         {
-            // Trong chế độ Online: Server chịu trách nhiệm 100% về vòng lặp lượt, phán xét và rút bài
+            // Khi máy chủ Deno WebSocket đang kết nối: Máy chủ chịu trách nhiệm điều phối lượt
             yield break;
         }
 
@@ -4940,7 +4930,7 @@ public class Battle2v2UI : MonoBehaviour
             target = null;
         }
 
-        if (!string.IsNullOrEmpty(currentRoomId))
+        if (DenoGameClient.IsConnected)
         {
             DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
             {
@@ -5336,7 +5326,7 @@ public class Battle2v2UI : MonoBehaviour
     {
         if (card == null || caster == null || battleFinished) yield break;
 
-        if (!string.IsNullOrEmpty(currentRoomId))
+        if (DenoGameClient.IsConnected)
         {
             ShowCardAtCenter(card, caster, target);
             AudioManager.Instance.PlayCardSelect();
@@ -6871,7 +6861,7 @@ public class Battle2v2UI : MonoBehaviour
 
     private IEnumerator ResolveInstantScroll(CardModel card, GeneralCardUI caster, GeneralCardUI target)
     {
-        if (!string.IsNullOrEmpty(currentRoomId)) yield break;
+        if (DenoGameClient.IsConnected) yield break;
         bool isCanceled = false;
         yield return ResolveNullificationChain(card, caster, target, res => isCanceled = res);
         if (isCanceled)
