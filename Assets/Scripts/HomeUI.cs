@@ -779,10 +779,10 @@ public sealed class HomeUI : MonoBehaviour
         });
     }
 
-    public void LaunchBattle2v2(List<Battle2v2UI.MatchmakingSlotInfo> slots = null)
+    public void LaunchBattle2v2(List<Battle2v2UI.MatchmakingSlotInfo> slots = null, string roomId = null, bool isHost = true)
     {
         Hide();
-        Battle2v2UI.CreateWithSlots(slots, null, () =>
+        Battle2v2UI.CreateWithSlots(slots, roomId, isHost, null, () =>
         {
             Show(AuthUI.CurrentUserEmail);
         });
@@ -961,7 +961,6 @@ public sealed class HomeUI : MonoBehaviour
         string myUserId = !string.IsNullOrWhiteSpace(AuthUI.CurrentUserEmail) ? AuthUI.CurrentUserEmail : ("guest_" + SystemInfo.deviceUniqueIdentifier.Substring(0, 8));
         string myUserName = !string.IsNullOrWhiteSpace(AuthUI.CurrentUserName) ? AuthUI.CurrentUserName : "Đại Tướng Quân";
         int myRankPoints = AuthUI.Current2v2Points;
-        var font = ThemeUI.FontMain;
 
         var modalRoot = new GameObject("Modal_Matchmaking2v2", typeof(RectTransform), typeof(Image));
         modalRoot.transform.SetParent(homeCanvasGo.transform, false);
@@ -1002,10 +1001,10 @@ public sealed class HomeUI : MonoBehaviour
         var tbRt = timerBoxGo.GetComponent<RectTransform>();
         SetRect(tbRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(200f, 44f), new Vector2(0f, -58f));
 
-        var timerTxt = ThemeUI.CreateText(timerBoxGo.transform, "TimerTxt", "⏳ 0s", 24, ThemeUI.GoldPrimary, FontStyle.Bold, TextAnchor.MiddleCenter, true);
+        var timerTxt = ThemeUI.CreateText(timerBoxGo.transform, "TimerTxt", "⏳ 15s", 24, ThemeUI.GoldPrimary, FontStyle.Bold, TextAnchor.MiddleCenter, true);
         Fill(timerTxt.rectTransform);
 
-        var statusTxt = ThemeUI.CreateText(boxGo.transform, "StatusTxt", "🌐 Đang quét tìm các phòng đấu trên máy chủ...", 18, new Color(0.6f, 0.88f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter, true);
+        var statusTxt = ThemeUI.CreateText(boxGo.transform, "StatusTxt", "🌐 Đang quét tìm các phòng đấu trên máy chủ...", 17, new Color(0.6f, 0.88f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter, true);
         SetRect(statusTxt.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(620f, 30f), new Vector2(0f, -108f));
 
         var slotsContainer = new GameObject("Slots", typeof(RectTransform));
@@ -1038,7 +1037,10 @@ public sealed class HomeUI : MonoBehaviour
             slotTexts[i].rectTransform.offsetMin = new Vector2(18f, 0f);
         }
 
-        // Nút Hủy Tìm Trận
+        bool isCancelled = false;
+        string activeRoomId = "";
+        bool isHost = false;
+
         var cancelBtnGo = new GameObject("CancelBtn", typeof(RectTransform), typeof(Image), typeof(Button));
         cancelBtnGo.transform.SetParent(boxGo.transform, false);
         var cBtnImg = cancelBtnGo.GetComponent<Image>();
@@ -1052,25 +1054,277 @@ public sealed class HomeUI : MonoBehaviour
         var cBtnTxt = ThemeUI.CreateText(cancelBtnGo.transform, "Text", "✕ HỦY TÌM TRẬN", 19, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter, true);
         Fill(cBtnTxt.rectTransform);
 
-        bool isCancelled = false;
         cancelBtnGo.GetComponent<Button>().onClick.AddListener(() =>
         {
             isCancelled = true;
+            if (!string.IsNullOrEmpty(activeRoomId))
+            {
+                if (isHost) StartCoroutine(AppwriteMatchmaking.DeleteRoom(activeRoomId));
+                else StartCoroutine(AppwriteMatchmaking.LeaveRoomSlot(activeRoomId, myUserId));
+            }
             if (currentActiveModal != null) Destroy(currentActiveModal);
         });
 
-        float timer = 0f;
-        while (!isCancelled && timer < 2.5f)
+        // BƯỚC 1: Quét tìm phòng đang chờ tuyển người trên Appwrite
+        AppwriteMatchmaking.RoomStatePacket currentRoom = null;
+        yield return AppwriteMatchmaking.FindBestWaitingRoom(myUserId, myRankPoints, (found) =>
         {
-            timer += Time.deltaTime;
-            if (timerTxt != null) timerTxt.text = $"⏳ {Mathf.FloorToInt(timer)}s";
-            yield return null;
+            if (found != null) currentRoom = found;
+        });
+
+        if (isCancelled) yield break;
+
+        // BƯỚC 2: Nếu có phòng thì tham gia, nếu không thì tạo phòng mới
+        if (currentRoom != null)
+        {
+            statusTxt.text = $"🌐 Đã tìm thấy phòng [{currentRoom.roomId}]. Đang ghép vào slot...";
+            bool joinSuccess = false;
+            yield return AppwriteMatchmaking.JoinRoomSlot(currentRoom, myUserId, myUserName, myRankPoints, (joined) =>
+            {
+                if (joined != null)
+                {
+                    currentRoom = joined;
+                    activeRoomId = joined.roomId;
+                    isHost = false;
+                    joinSuccess = true;
+                }
+            });
+
+            if (!joinSuccess)
+            {
+                currentRoom = null;
+            }
         }
 
-        if (!isCancelled)
+        if (currentRoom == null && !isCancelled)
         {
-            if (currentActiveModal != null) Destroy(currentActiveModal);
-            LaunchBattle2v2();
+            statusTxt.text = "👑 Đang tạo phòng thi đấu mới trên máy chủ...";
+            string newRoomId = "room_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+            var newRoom = new AppwriteMatchmaking.RoomStatePacket
+            {
+                roomId = newRoomId,
+                status = "WAITING",
+                slots = new List<AppwriteMatchmaking.RoomSlotData>
+                {
+                    new AppwriteMatchmaking.RoomSlotData { seatNumber = 1, isDragon = true, isAI = false, userId = myUserId, userName = myUserName, rankPoints = myRankPoints },
+                    new AppwriteMatchmaking.RoomSlotData { seatNumber = 2, isDragon = false, isAI = false, userId = "", userName = "", rankPoints = 0 },
+                    new AppwriteMatchmaking.RoomSlotData { seatNumber = 3, isDragon = true, isAI = false, userId = "", userName = "", rankPoints = 0 },
+                    new AppwriteMatchmaking.RoomSlotData { seatNumber = 4, isDragon = false, isAI = false, userId = "", userName = "", rankPoints = 0 }
+                }
+            };
+
+            yield return AppwriteMatchmaking.CreateWaitingRoom(newRoom, (created) =>
+            {
+                if (created)
+                {
+                    currentRoom = newRoom;
+                    activeRoomId = newRoomId;
+                    isHost = true;
+                }
+            });
+        }
+
+        if (isCancelled || currentRoom == null) yield break;
+
+        // BƯỚC 3: Vòng lặp chờ ghép trận (15s đếm ngược ngầm, reset khi có người thật mới)
+        float hostHiddenTimer = 15.0f;
+        float heartbeatTimer = 0f;
+        int lastRealPlayerCount = 1;
+        float guestWaitTimer = 0f;
+
+        while (!isCancelled)
+        {
+            hostHiddenTimer -= 0.5f;
+            heartbeatTimer -= 0.5f;
+            guestWaitTimer += 0.5f;
+
+            if (timerTxt != null)
+            {
+                int displaySec = Mathf.Max(0, Mathf.CeilToInt(hostHiddenTimer));
+                timerTxt.text = $"⏳ {displaySec}s";
+            }
+
+            if (isHost)
+            {
+                if (heartbeatTimer <= 0f)
+                {
+                    heartbeatTimer = 2.0f;
+                    StartCoroutine(AppwriteMatchmaking.SendHostHeartbeat(activeRoomId));
+                }
+
+                yield return AppwriteMatchmaking.PollRoomState(activeRoomId, (polled) =>
+                {
+                    if (polled != null) currentRoom = polled;
+                });
+
+                if (isCancelled) yield break;
+
+                int currentRealCount = 0;
+                if (currentRoom != null && currentRoom.slots != null)
+                {
+                    foreach (var s in currentRoom.slots)
+                    {
+                        if (!s.isEmpty && !s.isAI && !string.IsNullOrEmpty(s.userId)) currentRealCount++;
+                    }
+                }
+
+                if (currentRealCount > lastRealPlayerCount)
+                {
+                    hostHiddenTimer = 15.0f;
+                    lastRealPlayerCount = currentRealCount;
+                    statusTxt.text = "⚔️ <color=#55FF55>Có thêm người chơi thực tham gia!</color> Đang đợi tiếp...";
+                }
+
+                UpdateMatchmakingSlotsVisual(currentRoom, myUserId, slotImgs, slotTexts);
+
+                if (currentRealCount >= 4 || hostHiddenTimer <= 0f)
+                {
+                    yield return AppwriteMatchmaking.PollRoomState(activeRoomId, (fresh) =>
+                    {
+                        if (fresh != null) currentRoom = fresh;
+                    });
+
+                    var usedNames = new HashSet<string> { myUserName };
+                    foreach (var s in currentRoom.slots)
+                    {
+                        if (!s.isEmpty && !string.IsNullOrEmpty(s.userName)) usedNames.Add(s.userName);
+                    }
+
+                    int botSeedBase = AppwriteMatchmaking.GetDeterministicHashCode(activeRoomId);
+                    for (int i = 0; i < currentRoom.slots.Count; i++)
+                    {
+                        var s = currentRoom.slots[i];
+                        if (s.isEmpty)
+                        {
+                            s.userId = "bot_" + Guid.NewGuid().ToString("N").Substring(0, 6);
+                            s.userName = AppwriteMatchmaking.GetRealisticGamerName(botSeedBase + i * 17, usedNames);
+                            s.rankPoints = Mathf.Max(20, myRankPoints + UnityEngine.Random.Range(-15, 16));
+                            s.isAI = true;
+                        }
+                    }
+
+                    int roomSeed = AppwriteMatchmaking.GetDeterministicHashCode(activeRoomId);
+                    CardDeckManager.ShuffleList(currentRoom.slots, roomSeed);
+                    for (int i = 0; i < currentRoom.slots.Count; i++)
+                    {
+                        currentRoom.slots[i].seatNumber = i + 1;
+                    }
+
+                    currentRoom.status = "STARTED";
+                    yield return AppwriteMatchmaking.UpdateRoomState(currentRoom);
+
+                    statusTxt.text = "⚔️ <color=#55FF55>ĐÃ KẾT NỐI ĐỦ 4 CHIẾN TƯỚNG!</color> Bắt đầu chọn tướng...";
+                    if (timerTxt != null)
+                    {
+                        timerTxt.text = "⚔️ SẴN SÀNG!";
+                        timerTxt.color = new Color(0.4f, 1f, 0.4f, 1f);
+                    }
+                    UpdateMatchmakingSlotsVisual(currentRoom, myUserId, slotImgs, slotTexts);
+                    break;
+                }
+            }
+            else
+            {
+                yield return AppwriteMatchmaking.PollRoomState(activeRoomId, (polled) =>
+                {
+                    if (polled != null) currentRoom = polled;
+                });
+
+                if (isCancelled) yield break;
+
+                if (currentRoom != null)
+                {
+                    UpdateMatchmakingSlotsVisual(currentRoom, myUserId, slotImgs, slotTexts);
+
+                    if (currentRoom.status == "STARTED")
+                    {
+                        statusTxt.text = "⚔️ <color=#55FF55>PHÒNG ĐÃ BẮT ĐẦU!</color> Đang vào màn chọn tướng...";
+                        if (timerTxt != null)
+                        {
+                            timerTxt.text = "⚔️ SẴN SÀNG!";
+                            timerTxt.color = new Color(0.4f, 1f, 0.4f, 1f);
+                        }
+                        break;
+                    }
+                }
+
+                if (guestWaitTimer > 35.0f)
+                {
+                    statusTxt.text = "❌ <color=#FF5555>Mất kết nối với chủ phòng!</color>";
+                    yield return new WaitForSecondsRealtime(2.0f);
+                    if (currentActiveModal != null) Destroy(currentActiveModal);
+                    yield break;
+                }
+            }
+
+            yield return new WaitForSecondsRealtime(0.5f);
+        }
+
+        if (isCancelled) yield break;
+
+        yield return new WaitForSecondsRealtime(1.2f);
+        if (currentActiveModal != null) Destroy(currentActiveModal);
+
+        var matchedSlots = new List<Battle2v2UI.MatchmakingSlotInfo>();
+        var mySlotInRoom = currentRoom.slots.Find(s => s.userId == myUserId);
+        bool myIsDragon = mySlotInRoom != null ? mySlotInRoom.isDragon : true;
+
+        foreach (var s in currentRoom.slots)
+        {
+            bool isMe = (s.userId == myUserId);
+            bool isMyAlly = (s.isDragon == myIsDragon);
+            matchedSlots.Add(new Battle2v2UI.MatchmakingSlotInfo
+            {
+                seatNumber = s.seatNumber,
+                userId = s.userId,
+                playerName = s.userName,
+                isPlayer = isMe,
+                isAlly = isMyAlly,
+                isDragon = s.isDragon,
+                isAI = s.isAI,
+                rankPoints = s.rankPoints
+            });
+        }
+
+        matchedSlots.Sort((a, b) => a.seatNumber.CompareTo(b.seatNumber));
+        LaunchBattle2v2(matchedSlots, activeRoomId, isHost);
+    }
+
+    private void UpdateMatchmakingSlotsVisual(AppwriteMatchmaking.RoomStatePacket room, string myUserId, Image[] slotImgs, Text[] slotTexts)
+    {
+        if (room == null || room.slots == null) return;
+        for (int i = 0; i < 4 && i < room.slots.Count; i++)
+        {
+            var s = room.slots[i];
+            if (s.isEmpty)
+            {
+                slotTexts[i].text = $"<b>Ghế {i + 1} ({(s.isDragon ? "<color=#55DDFF>[RỒNG]</color>" : "<color=#FF6666>[PHƯỢNG]</color>")}):</b> <color=#8899AA>Đang tìm tướng lĩnh...</color>";
+                slotTexts[i].color = new Color(0.6f, 0.7f, 0.85f, 1f);
+                slotImgs[i].color = new Color(0.04f, 0.08f, 0.16f, 0.95f);
+            }
+            else
+            {
+                bool isMe = (s.userId == myUserId);
+                string teamTag = s.isDragon ? "<color=#55DDFF>[RỒNG]</color>" : "<color=#FF6666>[PHƯỢNG]</color>";
+                string roleTag = isMe ? " <color=#FFD700>(BẠN)</color>" : (s.isAI ? " <color=#8899AA>(AI)</color>" : " <color=#55FF55>(NGƯỜI THẬT)</color>");
+                slotTexts[i].text = $"<b>Ghế {i + 1} ({teamTag}):</b> {s.userName}{roleTag} • {s.rankPoints} RP ✅";
+
+                if (isMe)
+                {
+                    slotTexts[i].color = Color.white;
+                    slotImgs[i].color = new Color(0.12f, 0.28f, 0.45f, 0.95f);
+                }
+                else if (s.isDragon)
+                {
+                    slotTexts[i].color = new Color(0.85f, 0.95f, 1f, 1f);
+                    slotImgs[i].color = new Color(0.08f, 0.20f, 0.35f, 0.95f);
+                }
+                else
+                {
+                    slotTexts[i].color = new Color(1f, 0.85f, 0.85f, 1f);
+                    slotImgs[i].color = new Color(0.35f, 0.10f, 0.10f, 0.95f);
+                }
+            }
         }
     }
 
