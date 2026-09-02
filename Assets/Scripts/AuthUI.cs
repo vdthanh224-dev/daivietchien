@@ -126,48 +126,46 @@ public sealed class AuthUI : MonoBehaviour
         Screen.autorotateToLandscapeLeft = true;
         Screen.autorotateToLandscapeRight = true;
 
-        if (canvasGo == null)
-        {
-            canvasGo = new GameObject("AuthCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-            canvasGo.transform.SetParent(transform, false);
-            var canvas = canvasGo.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 999;
+        var canvasGo = new GameObject("AuthCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        canvasGo.transform.SetParent(transform, false);
+        var canvas = canvasGo.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 999;
 
-            scaler = canvasGo.GetComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1280, 720);
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = 0.5f;
-            
-            // Add Quick Login Panel for dev
+        scaler = canvasGo.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1280, 720);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 0.5f;
+        
+        // Add Quick Login Panel for dev
 #if UNITY_EDITOR || UNITY_STANDALONE_WIN
-            var qlPanel = new GameObject("QuickLoginPanel", typeof(RectTransform), typeof(HorizontalLayoutGroup));
-            qlPanel.transform.SetParent(canvasGo.transform, false);
-            var qlRt = qlPanel.GetComponent<RectTransform>();
-            qlRt.anchorMin = new Vector2(0f, 1f);
-            qlRt.anchorMax = new Vector2(1f, 1f);
-            qlRt.pivot = new Vector2(0.5f, 1f);
-            qlRt.sizeDelta = new Vector2(0, 40f);
-            qlRt.anchoredPosition = new Vector2(0, -10f);
-            var hlg = qlPanel.GetComponent<HorizontalLayoutGroup>();
-            hlg.spacing = 10;
-            hlg.childAlignment = TextAnchor.MiddleCenter;
-            hlg.childControlWidth = false;
-            hlg.childControlHeight = false;
+        var qlPanel = new GameObject("QuickLoginPanel", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        qlPanel.transform.SetParent(canvasGo.transform, false);
+        var qlRt = qlPanel.GetComponent<RectTransform>();
+        qlRt.anchorMin = new Vector2(0f, 1f);
+        qlRt.anchorMax = new Vector2(1f, 1f);
+        qlRt.pivot = new Vector2(0.5f, 1f);
+        qlRt.sizeDelta = new Vector2(0, 40f);
+        qlRt.anchoredPosition = new Vector2(0, -10f);
+        var hlg = qlPanel.GetComponent<HorizontalLayoutGroup>();
+        hlg.spacing = 10;
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+        hlg.childControlWidth = false;
+        hlg.childControlHeight = false;
 
-            for (int i = 1; i <= 9; i++) {
-                int num = i;
-                var btnGo = new GameObject("Btn_Quick" + num, typeof(RectTransform), typeof(Image), typeof(Button));
-                btnGo.transform.SetParent(qlPanel.transform, false);
-                btnGo.GetComponent<RectTransform>().sizeDelta = new Vector2(120, 35);
-                btnGo.GetComponent<Image>().color = new Color(0.2f, 0.6f, 1f, 0.8f);
-                var txt = AddText(btnGo.transform, "Txt", "Nick " + num, 16, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
-                Fill(txt.rectTransform);
-                btnGo.GetComponent<Button>().onClick.AddListener(() => QuickLogin(num));
-            }
+        for (int i = 1; i <= 9; i++) {
+            int num = i;
+            var btnGo = new GameObject("Btn_Quick" + num, typeof(RectTransform), typeof(Image), typeof(Button));
+            btnGo.transform.SetParent(qlPanel.transform, false);
+            btnGo.GetComponent<RectTransform>().sizeDelta = new Vector2(120, 35);
+            btnGo.GetComponent<Image>().color = new Color(0.2f, 0.6f, 1f, 0.8f);
+            var txt = AddText(btnGo.transform, "Txt", "Nick " + num, 16, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+            Fill(txt.rectTransform);
+            btnGo.GetComponent<Button>().onClick.AddListener(() => QuickLogin(num));
+        }
 #endif
-        }// 1. Hình nền & Lớp phủ đọc tốt
+        // 1. Hình nền & Lớp phủ đọc tốt
         var bg = AddRawImage(canvasGo.transform, "Background", new Color(0.08f, 0.1f, 0.15f, 1f));
         bg.raycastTarget = false;
         Fill(bg.rectTransform);
@@ -1517,4 +1515,5 @@ public static class GameTheme
     public static readonly Color Muted = new Color(0.68f, 0.72f, 0.8f, 1f);
     public static readonly Color Danger = new Color(1f, 0.42f, 0.42f, 1f);
 }
+
 
