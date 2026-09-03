@@ -10,8 +10,13 @@ extends Control
 
 @onready var btn_play: Button = $ActionPanel/BtnPlay
 @onready var btn_end_turn: Button = $ActionPanel/BtnEndTurn
+@onready var btn_dodge_response: Button = $ActionPanel/BtnDodgeResponse
+
 @onready var center_showcase = $CenterArea/CardShowcase
 @onready var showcase_label = $CenterArea/CardShowcase/Margin/VBox/ShowcaseName
+
+@onready var reward_modal = $RewardModal
+@onready var claim_reward_btn = $RewardModal/Dim/Box/Margin/VBox/ClaimBtn
 
 const CardUIScene = preload("res://scenes/components/card_ui.tscn")
 
@@ -19,9 +24,9 @@ var step_index: int = 1
 var selected_card_ui: Control = null
 var boss_hp: int = 4
 var player_hp: int = 4
+var has_slashed_this_turn: bool = false
 
 func _ready() -> void:
-	# Khởi tạo tướng người chơi và boss bằng Reusable GeneralAvatarUI
 	player_avatar.setup_general("tran_hung_dao", "Trần Hưng Đạo", "Trần", 4, 4, "BẠN")
 	boss_avatar.setup_general("thu_linh_son_tac", "Thủ Lĩnh Sơn Tặc", "Sơn Tặc", 4, 4, "ĐỐI THỦ")
 
@@ -29,6 +34,11 @@ func _ready() -> void:
 	skip_btn.pressed.connect(_on_skip_clicked)
 	btn_play.pressed.connect(_on_play_card_clicked)
 	btn_end_turn.pressed.connect(_on_end_turn_clicked)
+	btn_dodge_response.pressed.connect(_on_dodge_response_clicked)
+	claim_reward_btn.pressed.connect(_on_claim_reward_clicked)
+
+	reward_modal.visible = false
+	btn_dodge_response.visible = false
 
 	_spawn_tutorial_cards()
 	_apply_step(1)
@@ -46,10 +56,10 @@ func _spawn_tutorial_cards() -> void:
 		c.queue_free()
 
 	var cards_data = [
-		{"name": "Trảm Thường", "rank": "A", "suit": "Spade", "cat": 0, "desc": "Tấn công gây 1 sát thương"},
-		{"name": "Đỡ", "rank": "2", "suit": "Diamond", "cat": 0, "desc": "Hóa giải 1 đòn Trảm"},
-		{"name": "Bánh Chưng", "rank": "3", "suit": "Heart", "cat": 0, "desc": "Hồi phục 1 đóa sen Máu"},
-		{"name": "Khiên Mây Bện", "rank": "K", "suit": "Diamond", "cat": 1, "desc": "Phán xét Đỏ tự động Đỡ"}
+		{"name": "Trảm Thường", "rank": "A", "suit": "Spade", "cat": 0, "desc": "Tấn công gây 1 sát thương."},
+		{"name": "Đỡ", "rank": "2", "suit": "Diamond", "cat": 0, "desc": "Hóa giải 1 đòn Trảm."},
+		{"name": "Bánh Chưng", "rank": "3", "suit": "Heart", "cat": 0, "desc": "Hồi phục 1 Máu."},
+		{"name": "Khiên Mây Bện", "rank": "K", "suit": "Diamond", "cat": 1, "desc": "Phán xét Đỏ tự động Đỡ."}
 	]
 
 	for data in cards_data:
@@ -73,48 +83,61 @@ func _apply_step(step: int) -> void:
 	step_index = step
 	match step:
 		1:
-			banner_title.text = "🌟 BƯỚC 1: LÀM QUEN TƯỚNG & MÁU HOA SEN"
-			banner_desc.text = "Sinh mệnh của chiến tướng thể hiện qua các đóa hoa sen 🌸. Khi hết máu, tướng sẽ rơi vào trạng thái Hấp Hối.\nBên phải là 5 ô trang bị (Vũ khí, Giáp, Ngựa công, Ngựa thủ, Bảo vật)."
-			next_step_btn.text = "TIẾP TỤC ➜"
+			banner_title.text = "🌸 BƯỚC 1: SINH MỆNH HOA SEN & 5 DÒNG TRANG BỊ"
+			banner_desc.text = "Mỗi đóa hoa sen 🌸 đại diện cho 1 điểm máu. Khi hết máu, tướng sẽ rơi vào trạng thái Hấp Hối.\nBên hông là 5 vị trí trang bị (Vũ khí, Giáp, Ngựa công, Ngựa thủ, Bảo vật)."
+			next_step_btn.text = "BƯỚC 2: RÚT BÀI & TẤN CÔNG ➜"
 			next_step_btn.visible = true
+			btn_play.visible = true
 			btn_play.disabled = true
+			btn_end_turn.visible = true
 			btn_end_turn.disabled = true
+			btn_dodge_response.visible = false
 		2:
-			banner_title.text = "⚔️ BƯỚC 2: TẬP KÍCH TRẢM TẤN CÔNG"
-			banner_desc.text = "Mỗi lượt bạn được dùng 1 lá TRẢM. Hãy nhấp chọn lá [Trảm Thường] trên tay và bấm nút [⚔️ ĐÁNH BÀI] để tấn công Sơn Tặc!"
+			banner_title.text = "⚔️ BƯỚC 2: TẬP KÍCH TRẢM VÀO SƠN TẶC"
+			banner_desc.text = "Đầu lượt bạn được rút bài. Hãy nhấp chọn lá [TRẢM THƯỜNG] trên tay và bấm nút [⚔️ ĐÁNH BÀI] để tấn công Sơn Tặc!"
 			next_step_btn.visible = false
+			btn_play.visible = true
 			btn_play.disabled = (selected_card_ui == null)
 			btn_end_turn.disabled = true
+			btn_dodge_response.visible = false
 		3:
-			banner_title.text = "🛡️ BƯỚC 3: PHÒNG THỦ & HÓA GIẢI ĐÒN ĐÁNH"
-			banner_desc.text = "Sơn Tặc phản công bằng một lá [Trảm] hung bạo!\nHãy nhấp chọn lá [Đỡ] trên tay bạn và bấm [⚔️ ĐÁNH BÀI] để triệt tiêu đòn đánh!"
+			banner_title.text = "🛑 BƯỚC 3: QUY TẮC 1 TRẢM MỖI LƯỢT"
+			banner_desc.text = "Trong mỗi lượt, bạn chỉ được dùng tối đa 1 lá Trảm (trừ khi có Nỏ Thần).\nBạn đã dùng Trảm rồi nên không thể đánh tiếp. Hãy bấm nút [🛑 KẾT THÚC LƯỢT] để nhường lượt cho đối phương!"
 			next_step_btn.visible = false
-			btn_play.disabled = (selected_card_ui == null)
-			btn_end_turn.disabled = true
-		4:
-			banner_title.text = "🎉 BƯỚC 4: HOÀN THÀNH HUẤN LUYỆN TÂN THỦ!"
-			banner_desc.text = "Tuyệt vời! Bạn đã nắm vững các quy tắc cốt lõi: Ra chiêu, Phòng thủ và Quản lý sinh mệnh.\nChiến trường Đại Việt 2v2 đang chờ lệnh xuất chinh của bạn!"
-			next_step_btn.text = "XUẤT CHINH VÀO CHIẾN TRƯỜNG ➜"
-			next_step_btn.visible = true
 			btn_play.disabled = true
-			btn_end_turn.disabled = true
+			btn_end_turn.disabled = false
+			btn_dodge_response.visible = false
+		4:
+			banner_title.text = "🛡️ BƯỚC 4: SƠN TẶC PHẢN CÔNG - DÙNG ĐỠ NÉ TRÁNH!"
+			banner_desc.text = "⚠️ NGUY HIỂM! Sơn Tặc dùng [Trảm Hung Bạo] chém bạn!\nHãy nhấp chọn lá [ĐỠ] trên tay và bấm nút [🛡️ DÙNG ĐỠ NÉ TRÁNH] để triệt tiêu đòn đánh!"
+			next_step_btn.visible = false
+			btn_play.visible = false
+			btn_end_turn.visible = false
+			btn_dodge_response.visible = true
+			btn_dodge_response.disabled = false
+		5:
+			banner_title.text = "🎉 HOÀN THÀNH XUẤT SẮC KHÓA TÂN THỦ!"
+			banner_desc.text = "Bạn đã nắm vững toàn bộ quy tắc cốt lõi: Ra chiêu, Quy tắc lượt đấu, và Phòng thủ né đòn!"
+			next_step_btn.visible = false
+			btn_play.visible = false
+			btn_end_turn.visible = false
+			btn_dodge_response.visible = false
+			_show_reward_modal()
 
 func _on_next_step_clicked() -> void:
 	if step_index == 1:
 		_apply_step(2)
-	elif step_index == 4:
-		_finish_tutorial()
 
 func _on_play_card_clicked() -> void:
 	if not selected_card_ui:
 		return
 
-	var card_name = selected_card_ui.card_name
+	var c_name = selected_card_ui.card_name
 
 	if step_index == 2:
-		if "Trảm" in card_name:
-			# Đánh Trảm thành công
-			show_card_play(card_name, "Trần Hưng Đạo")
+		if "Trảm" in c_name:
+			has_slashed_this_turn = true
+			show_card_play(c_name, "Trần Hưng Đạo")
 			boss_hp -= 1
 			boss_avatar.update_hp(boss_hp, 4)
 			selected_card_ui.queue_free()
@@ -122,29 +145,59 @@ func _on_play_card_clicked() -> void:
 			btn_play.disabled = true
 
 			banner_title.text = "💥 TẤN CÔNG THÀNH CÔNG!"
-			banner_desc.text = "Sơn Tặc bị trúng 1 đòn Trảm và mất 1 đóa sen máu!\nChuẩn bị bước sang lượt phòng thủ..."
+			banner_desc.text = "Sơn Tặc bị trúng Trảm và mất 1 đóa hoa sen máu!\nChuẩn bị tìm hiểu quy tắc kết thúc lượt..."
 			await get_tree().create_timer(1.2).timeout
-			_boss_counter_attack()
+			_apply_step(3)
 		else:
-			banner_desc.text = "⚠️ Ở bước này bạn cần chọn lá [Trảm Thường] để tấn công!"
+			banner_desc.text = "⚠️ Ở bước này bạn cần chọn lá [Trảm Thường] có hình thanh kiếm để tấn công!"
 
-	elif step_index == 3:
-		if "Đỡ" in card_name:
-			show_card_play(card_name, "Trần Hưng Đạo")
-			selected_card_ui.queue_free()
+func _on_end_turn_clicked() -> void:
+	if step_index == 3:
+		btn_end_turn.disabled = true
+		banner_title.text = "⏳ ĐẾN LƯỢT CỦA SƠN TẶC..."
+		banner_desc.text = "Sơn Tặc rút 2 lá bài và chuẩn bị xuất chiêu..."
+		await get_tree().create_timer(1.2).timeout
+		show_card_play("Trảm Hung Bạo", "Thủ Lĩnh Sơn Tặc")
+		await get_tree().create_timer(0.8).timeout
+		_apply_step(4)
+
+func _on_dodge_response_clicked() -> void:
+	if step_index == 4:
+		# Kiểm tra xem người chơi đã chọn lá Đỡ chưa
+		var dodge_card: Control = null
+		if selected_card_ui and "Đỡ" in selected_card_ui.card_name:
+			dodge_card = selected_card_ui
+		else:
+			# Tìm lá Đỡ trên tay
+			for c in hand_container.get_children():
+				if "Đỡ" in c.card_name:
+					dodge_card = c
+					break
+
+		if dodge_card:
+			show_card_play("Đỡ", "Trần Hưng Đạo")
+			dodge_card.queue_free()
 			selected_card_ui = null
-			btn_play.disabled = true
-
 			banner_title.text = "🛡️ NÉ TRÁNH THÀNH CÔNG!"
-			banner_desc.text = "Bạn đã dùng lá [Đỡ] hóa giải hoàn toàn đòn đánh của Sơn Tặc! Máu của bạn được bảo toàn nguyên vẹn."
-			await get_tree().create_timer(1.2).timeout
-			_apply_step(4)
+			banner_desc.text = "Bạn đã dùng lá [Đỡ] hóa giải hoàn toàn đòn đánh của Sơn Tặc! Sinh mệnh 4/4 của bạn được bảo toàn."
+			await get_tree().create_timer(1.4).timeout
+			_apply_step(5)
 		else:
-			banner_desc.text = "⚠️ Sơn Tặc đang chém Trảm tới! Bạn hãy chọn lá [Đỡ] để né tránh!"
+			banner_desc.text = "⚠️ Hãy chọn lá [Đỡ] có biểu tượng khiên trên tay bạn!"
 
-func _boss_counter_attack() -> void:
-	show_card_play("Trảm Hung Bạo", "Thủ Lĩnh Sơn Tặc")
-	_apply_step(3)
+func _show_reward_modal() -> void:
+	reward_modal.visible = true
+	var box = reward_modal.get_node("Dim/Box")
+	var tw = create_tween()
+	tw.tween_property(box, "scale", Vector2(1.0, 1.0), 0.25).from(Vector2(0.7, 0.7)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func _on_claim_reward_clicked() -> void:
+	AuthManager.set_onboarding_done()
+	get_tree().change_scene_to_file("res://scenes/main_game.tscn")
+
+func _on_skip_clicked() -> void:
+	AuthManager.set_onboarding_done()
+	get_tree().change_scene_to_file("res://scenes/main_game.tscn")
 
 func show_card_play(c_name: String, source: String) -> void:
 	showcase_label.text = "%s dùng [%s]!" % [source, c_name]
@@ -154,12 +207,3 @@ func show_card_play(c_name: String, source: String) -> void:
 	tw.tween_property(center_showcase, "scale", Vector2(1.0, 1.0), 0.1)
 	await get_tree().create_timer(1.0).timeout
 	center_showcase.visible = false
-
-func _on_end_turn_clicked() -> void:
-	pass
-
-func _on_skip_clicked() -> void:
-	_finish_tutorial()
-
-func _finish_tutorial() -> void:
-	get_tree().change_scene_to_file("res://scenes/main_game.tscn")

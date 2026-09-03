@@ -16,6 +16,7 @@ var card_name: String:
 @onready var suit_rank_lbl: Label = $Panel/Margin/VBox/Header/SuitRankLabel
 @onready var cat_lbl: Label = $Panel/Margin/VBox/Header/CategoryLabel
 @onready var name_lbl: Label = $Panel/Margin/VBox/NameLabel
+@onready var artwork_rect: TextureRect = $Panel/Margin/VBox/Artwork
 @onready var desc_lbl: Label = $Panel/Margin/VBox/DescLabel
 @onready var border: ReferenceRect = $Panel/Border
 
@@ -59,6 +60,17 @@ func update_card(data: Resource) -> void:
 	cat_lbl.text = data.get_category_name()
 	name_lbl.text = data.card_name
 	desc_lbl.text = data.description
+
+	# Tải hình minh họa lá bài (Artwork)
+	if artwork_rect:
+		var art_path = ""
+		if data.has_method("get_artwork_path"):
+			art_path = data.get_artwork_path()
+		if art_path != "" and ResourceLoader.exists(art_path):
+			artwork_rect.texture = load(art_path)
+			artwork_rect.visible = true
+		else:
+			artwork_rect.visible = false
 
 func _on_mouse_entered() -> void:
 	is_hovered = true

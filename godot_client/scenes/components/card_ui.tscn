@@ -78,6 +78,12 @@ theme_override_font_sizes/font_size = 13
 text = "Trảm"
 horizontal_alignment = 1
 
+[node name="Artwork" type="TextureRect" parent="Panel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
 [node name="DescLabel" type="Label" parent="Panel/Margin/VBox"]
 layout_mode = 2
 size_flags_vertical = 3

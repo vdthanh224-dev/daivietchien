@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3 uid="uid://cl30vwxviw3w5"]
+[gd_scene load_steps=9 format=3 uid="uid://tutorialbattle123"]
 
 [ext_resource type="Theme" uid="uid://d4af37royalgold" path="res://resources/themes/royal_gold_theme.tres" id="1_theme"]
 [ext_resource type="Script" path="res://scenes/tutorial_battle.gd" id="2_script"]
@@ -22,6 +22,33 @@ shadow_offset = Vector2(0, 4)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_showcase"]
 bg_color = Color(0.1, 0.08, 0.04, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.831373, 0.686275, 0.215686, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_modal"]
+bg_color = Color(0.08, 0.11, 0.16, 0.98)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.831373, 0.686275, 0.215686, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_color = Color(0, 0, 0, 0.6)
+shadow_size = 16
+shadow_offset = Vector2(0, 8)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_reward_card"]
+bg_color = Color(0.12, 0.16, 0.24, 0.95)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
@@ -63,15 +90,15 @@ grow_vertical = 2
 color = Color(0.03, 0.05, 0.09, 0.72)
 
 [node name="TutorialBanner" type="PanelContainer" parent="."]
-custom_minimum_size = Vector2(680, 100)
+custom_minimum_size = Vector2(720, 105)
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -340.0
-offset_top = 16.0
-offset_right = 340.0
-offset_bottom = 120.0
+offset_left = -360.0
+offset_top = 14.0
+offset_right = 360.0
+offset_bottom = 122.0
 grow_horizontal = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_banner")
 
@@ -90,7 +117,7 @@ theme_override_constants/separation = 6
 layout_mode = 2
 theme_override_colors/font_color = Color(0.831373, 0.686275, 0.215686, 1)
 theme_override_font_sizes/font_size = 14
-text = "🌟 BƯỚC 1: LÀM QUEN TƯỚNG & MÁU HOA SEN"
+text = "🌸 BƯỚC 1: SINH MỆNH HOA SEN & 5 DÒNG TRANG BỊ"
 
 [node name="StepDesc" type="Label" parent="TutorialBanner/Margin/VBox"]
 layout_mode = 2
@@ -155,13 +182,13 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -260.0
-offset_top = -170.0
-offset_right = 360.0
+offset_left = -280.0
+offset_top = -180.0
+offset_right = 380.0
 offset_bottom = -10.0
 grow_horizontal = 2
 grow_vertical = 0
-theme_override_constants/separation = 14
+theme_override_constants/separation = 16
 alignment = 1
 
 [node name="ActionPanel" type="HBoxContainer" parent="."]
@@ -171,10 +198,10 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -160.0
-offset_top = -225.0
-offset_right = 260.0
-offset_bottom = -180.0
+offset_left = -200.0
+offset_top = -232.0
+offset_right = 300.0
+offset_bottom = -188.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_constants/separation = 16
@@ -190,6 +217,11 @@ layout_mode = 2
 disabled = true
 text = "🛑 KẾT THÚC LƯỢT"
 
+[node name="BtnDodgeResponse" type="Button" parent="ActionPanel"]
+visible = false
+layout_mode = 2
+text = "🛡️ DÙNG ĐỠ NÉ TRÁNH"
+
 [node name="CenterArea" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 8
@@ -198,9 +230,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -150.0
-offset_top = 10.0
+offset_top = 5.0
 offset_right = 150.0
-offset_bottom = 80.0
+offset_bottom = 75.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -238,3 +270,153 @@ theme_override_colors/font_color = Color(0.95, 0.85, 0.45, 1)
 theme_override_font_sizes/font_size = 13
 text = "Trần Hưng Đạo dùng [Trảm]!"
 horizontal_alignment = 1
+
+[node name="RewardModal" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dim" type="ColorRect" parent="RewardModal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.85)
+
+[node name="Box" type="PanelContainer" parent="RewardModal/Dim"]
+custom_minimum_size = Vector2(780, 480)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -390.0
+offset_top = -240.0
+offset_right = 390.0
+offset_bottom = 240.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
+
+[node name="Margin" type="MarginContainer" parent="RewardModal/Dim/Box"]
+layout_mode = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 18
+
+[node name="VBox" type="VBoxContainer" parent="RewardModal/Dim/Box/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Title" type="Label" parent="RewardModal/Dim/Box/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.831373, 0.686275, 0.215686, 1)
+theme_override_font_sizes/font_size = 24
+text = "🎉 PHẦN THƯỞNG KHAI MÔN TÂN THỦ"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="RewardModal/Dim/Box/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.93, 0.98, 1)
+theme_override_font_sizes/font_size = 13
+text = "Chúc mừng bạn đã hoàn thành xuất sắc khóa huấn luyện! Nhận ngay tướng lĩnh & ngân lượng khởi đầu:"
+horizontal_alignment = 1
+
+[node name="CardsHBox" type="HBoxContainer" parent="RewardModal/Dim/Box/Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="CardHero" type="PanelContainer" parent="RewardModal/Dim/Box/Margin/VBox/CardsHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_reward_card")
+
+[node name="Margin" type="MarginContainer" parent="RewardModal/Dim/Box/Margin/VBox/CardsHBox/CardHero"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="VBox" type="VBoxContainer" parent="RewardModal/Dim/Box/Margin/VBox/CardsHBox/CardHero/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Tag" type="Label" parent="RewardModal/Dim/Box/Margin/VBox/CardsHBox/CardHero/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.85, 0.45, 1)
+theme_override_font_sizes/font_size = 12
+text = "🎖️ TƯỚNG KHỞI ĐẦU"
+horizontal_alignment = 1
+
+[node name="Name" type="Label" parent="RewardModal/Dim/Box/Margin/VBox/CardsHBox/CardHero/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "LÝ THƯỜNG KIỆT"
+horizontal_alignment = 1
+
+[node name="Details" type="Label" parent="RewardModal/Dim/Box/Margin/VBox/CardsHBox/CardHero/Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.85, 0.9, 0.96, 1)
+theme_override_font_sizes/font_size = 12
+text = "• Máu: 4 đóa sen (Khác)
+• Tuyệt kỹ: [Tiến Thoái]
+• Tự do đổi Trảm ⮂ Đỡ trên tay"
+autowrap_mode = 2
+
+[node name="CardSilver" type="PanelContainer" parent="RewardModal/Dim/Box/Margin/VBox/CardsHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_reward_card")
+
+[node name="Margin" type="MarginContainer" parent="RewardModal/Dim/Box/Margin/VBox/CardsHBox/CardSilver"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="VBox" type="VBoxContainer" parent="RewardModal/Dim/Box/Margin/VBox/CardsHBox/CardSilver/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Tag" type="Label" parent="RewardModal/Dim/Box/Margin/VBox/CardsHBox/CardSilver/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "🪙 NGÂN LƯỢNG"
+horizontal_alignment = 1
+
+[node name="Name" type="Label" parent="RewardModal/Dim/Box/Margin/VBox/CardsHBox/CardSilver/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "1.000 BẠC"
+horizontal_alignment = 1
+
+[node name="Details" type="Label" parent="RewardModal/Dim/Box/Margin/VBox/CardsHBox/CardSilver/Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.85, 0.9, 0.96, 1)
+theme_override_font_sizes/font_size = 12
+text = "• Ngân lượng khởi đầu
+• Dùng để chiêu mộ danh tướng
+• Mua sắm vật phẩm & bảo vật"
+autowrap_mode = 2
+
+[node name="ClaimBtn" type="Button" parent="RewardModal/Dim/Box/Margin/VBox"]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+text = "NHẬN THƯỞNG & VÀO CHIẾN TRƯỜNG ➜"
