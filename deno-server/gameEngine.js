@@ -372,7 +372,11 @@ function buildStateDelta(state) {
       isChained: !!p.isChained,
       aoBaoCharges: Number.isFinite(Number(p.aoBaoCharges)) ? Number(p.aoBaoCharges) : 3,
       equipments: p.equipments || [],
-      judgements: p.judgements || []
+      judgements: p.judgements || [],
+      activeSkillsKeys: p.activeSkills ? Object.keys(p.activeSkills) : [],
+      activeSkillsValues: p.activeSkills ? Object.values(p.activeSkills) : [],
+      usedSkillsKeys: p.usedSkills ? Object.keys(p.usedSkills) : [],
+      usedSkillsValues: p.usedSkills ? Object.values(p.usedSkills) : []
     }))
   };
 }

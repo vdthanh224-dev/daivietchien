@@ -11,6 +11,8 @@ import {
   handleDiscardCards,
   handleAIStep,
   handleAIReaction,
+  handleToggleSkill,
+  handleUseSkill,
   tickGameState,
   hydrateGameState,
   sanitizeGameStateForClient,
@@ -344,8 +346,12 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
         let result: any = null;
 
         // E. XỬ LÝ HÀNH ĐỘNG ĐÁNH BÀI TRÊN RAM SIÊU TỐC
-        if (action === "PLAY_CARD") {
-          result = handlePlayCard(room.state, boundSeat, cardId, targetSeat);
+        if (action === "USE_SKILL") {
+          result = handleUseSkill(room.state, boundSeat, payload.skillId, targetSeat);
+        } else if (action === "TOGGLE_SKILL") {
+          result = handleToggleSkill(room.state, boundSeat, payload.skillId);
+        } else if (action === "PLAY_CARD") {
+          result = handlePlayCard(room.state, boundSeat, cardId, targetSeat, payload);
         } else if (action === "RESPOND_ACTION") {
           result = handleRespondAction(room.state, boundSeat, accepted, cardId, targetCardId, cardIds);
         } else if (action === "END_TURN") {
@@ -494,8 +500,12 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
         return new Response(JSON.stringify({ success: true, state: sanitizeGameStateForClient(room.state, requestSeat || 1) }), {
           headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
         });
+      } else if (action === "USE_SKILL") {
+        result = handleUseSkill(room.state, requestSeat, payload.skillId, targetSeat);
+      } else if (action === "TOGGLE_SKILL") {
+        result = handleToggleSkill(room.state, requestSeat, payload.skillId);
       } else if (action === "PLAY_CARD") {
-        result = handlePlayCard(room.state, requestSeat, cardId, targetSeat);
+        result = handlePlayCard(room.state, requestSeat, cardId, targetSeat, payload);
       } else if (action === "RESPOND_ACTION") {
         result = handleRespondAction(room.state, requestSeat, accepted, cardId, targetCardId, cardIds);
       } else if (action === "END_TURN") {

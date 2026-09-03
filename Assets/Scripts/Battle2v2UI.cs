@@ -3797,15 +3797,15 @@ public class Battle2v2UI : MonoBehaviour
         }
 
         float waitTimer = 0f;
-        while (waitTimer < 4.0f && lastAppliedStateVersion == 0)
+        while (waitTimer < 4.0f && lastAppliedStateVersion <= 0 && !string.IsNullOrEmpty(currentRoomId))
         {
             waitTimer += 0.1f;
             yield return new WaitForSecondsRealtime(0.1f);
         }
 
-        if (lastAppliedStateVersion > 0)
+        if (lastAppliedStateVersion > 0 || !string.IsNullOrEmpty(currentRoomId))
         {
-            SetLog("👑 Trận đấu bắt đầu! Máy chủ đã chia 4 lá bài ban đầu và mở lượt.");
+            SetLog("👑 Trận đấu bắt đầu! Máy chủ đã chia bài và mở lượt.");
             AudioManager.Instance.PlayCardDraw();
             yield break;
         }
@@ -4126,9 +4126,9 @@ public class Battle2v2UI : MonoBehaviour
     private IEnumerator ExecuteCurrentTurn()
     {
         if (battleFinished) yield break;
-        if (DenoGameClient.IsConnected)
+        if (DenoGameClient.IsConnected || !string.IsNullOrEmpty(currentRoomId))
         {
-            // Khi máy chủ Deno WebSocket đang kết nối: Máy chủ chịu trách nhiệm điều phối lượt
+            // Khi máy chủ Authoritative đang hoạt động: Máy chủ chịu trách nhiệm điều phối lượt
             yield break;
         }
 
