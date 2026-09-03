@@ -2,3 +2,6 @@ res://scripts/network/auth_manager.gd
 res://scenes/auth_login.gd
 res://scenes/components/card_ui.gd
 res://scenes/components/onboarding_modal.tscn
+res://scenes/tutorial_battle.gd
+res://scenes/components/card_ui.tscn
+res://scripts/resources/card_resource.gd

@@ -1,6 +1,7 @@
 extends Control
 
 signal clicked()
+signal skill_clicked()
 
 @onready var portrait_rect: TextureRect = $Frame/Portrait
 @onready var frame_rect: TextureRect = $Frame/CardFrame
@@ -9,6 +10,8 @@ signal clicked()
 @onready var hp_label: Label = $Frame/HpContainer/HpLabel
 @onready var hand_count_label: Label = $Frame/HandBadge/HandLabel
 @onready var role_badge: Label = $Frame/RoleBadge
+@onready var target_border: ReferenceRect = $TargetBorder
+@onready var skill_btn: Button = $SkillBtn
 
 @onready var equip_weapon: Label = $Frame/EquipSlots/Weapon
 @onready var equip_armor: Label = $Frame/EquipSlots/Armor
@@ -25,6 +28,21 @@ func _ready() -> void:
 	gui_input.connect(_on_gui_input)
 	mouse_entered.connect(_on_mouse_entered)
 	mouse_exited.connect(_on_mouse_exited)
+	if skill_btn:
+		skill_btn.pressed.connect(func(): skill_clicked.emit())
+
+func set_skill(skill_title: String) -> void:
+	if skill_btn:
+		skill_btn.text = skill_title
+		skill_btn.visible = (skill_title != "")
+
+func set_target_highlight(active: bool) -> void:
+	if target_border:
+		target_border.visible = active
+
+func set_faction_color(color: Color) -> void:
+	if faction_badge:
+		faction_badge.modulate = color
 
 func setup_general(p_id: String, p_name: String, p_faction: String = "Trần", p_hp: int = 4, p_max_hp: int = 4, p_role: String = "") -> void:
 	general_id = p_id
