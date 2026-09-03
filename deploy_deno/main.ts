@@ -244,7 +244,9 @@ function bindSocket(room: RoomData, seat: number, socket: WebSocket): void {
   room.sockets.set(seat, socket);
 }
 
-Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
+const port = Number(Deno.env.get("PORT")) || 8080;
+const hostname = Deno.env.get("HOST") || "0.0.0.0";
+Deno.serve({ port, hostname }, async (req) => {
   const upgrade = req.headers.get("upgrade") || "";
 
   // 1. WEBSOCKET REALTIME CONNECTION (<15ms)
