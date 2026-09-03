@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3 uid="uid://tutorialbattle123"]
+[gd_scene load_steps=13 format=3 uid="uid://tutorialbattle123"]
 
 [ext_resource type="Theme" uid="uid://d4af37royalgold" path="res://resources/themes/royal_gold_theme.tres" id="1_theme"]
 [ext_resource type="Script" path="res://scenes/tutorial_battle.gd" id="2_script"]
@@ -62,6 +62,20 @@ shadow_color = Color(0, 0, 0, 0.6)
 shadow_size = 18
 shadow_offset = Vector2(0, 8)
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lotus_halo"]
+bg_color = Color(0.12, 0.08, 0.04, 0.96)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.85, 0.3, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(1, 0.8, 0.2, 0.65)
+shadow_size = 14
+
 [node name="TutorialBattle" type="Control"]
 layout_mode = 3
 anchors_preset = 15
@@ -80,6 +94,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 texture = ExtResource("3_bg")
 expand_mode = 1
 stretch_mode = 6
@@ -91,6 +106,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 color = Color(0.03, 0.05, 0.09, 0.65)
 
 [node name="TableTop" type="Control" parent="."]
@@ -100,6 +116,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 
 [node name="BossArea" type="Control" parent="TableTop"]
 layout_mode = 1
@@ -111,6 +128,7 @@ offset_top = 18.0
 offset_right = 85.0
 offset_bottom = 248.0
 grow_horizontal = 2
+mouse_filter = 1
 
 [node name="BossAvatar" parent="TableTop/BossArea" instance=ExtResource("4_avatar")]
 layout_mode = 1
@@ -128,6 +146,7 @@ offset_right = -30.0
 offset_bottom = -20.0
 grow_horizontal = 0
 grow_vertical = 0
+mouse_filter = 1
 
 [node name="PlayerAvatar" parent="TableTop/PlayerArea" instance=ExtResource("4_avatar")]
 layout_mode = 1
@@ -143,10 +162,12 @@ offset_top = 18.0
 offset_right = -20.0
 offset_bottom = 110.0
 grow_horizontal = 0
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_desc_bar")
 
 [node name="DeckCardBack" type="TextureRect" parent="TableTop/DeckHUD"]
 layout_mode = 2
+mouse_filter = 2
 texture = ExtResource("7_deck_card")
 expand_mode = 1
 stretch_mode = 5
@@ -155,6 +176,7 @@ stretch_mode = 5
 custom_minimum_size = Vector2(0, 22)
 layout_mode = 2
 size_flags_vertical = 8
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_desc_bar")
 
 [node name="DeckLabel" type="Label" parent="TableTop/DeckHUD/DeckPlaque"]
@@ -164,6 +186,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 theme_override_colors/font_color = Color(1, 0.88, 0.35, 1)
 theme_override_font_sizes/font_size = 11
 text = "🎴 52"
@@ -219,7 +242,7 @@ text = "• Bắt đầu trận chiến hướng dẫn."
 scroll_following = true
 
 [node name="CardDescBar" type="PanelContainer" parent="TableTop"]
-custom_minimum_size = Vector2(640, 38)
+custom_minimum_size = Vector2(650, 38)
 layout_mode = 1
 anchors_preset = 7
 anchor_left = 0.5
@@ -228,19 +251,22 @@ anchor_right = 0.5
 anchor_bottom = 1.0
 offset_left = -440.0
 offset_top = -225.0
-offset_right = 200.0
+offset_right = 210.0
 offset_bottom = -187.0
 grow_horizontal = 2
 grow_vertical = 0
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_desc_bar")
 
 [node name="Margin" type="MarginContainer" parent="TableTop/CardDescBar"]
 layout_mode = 2
+mouse_filter = 2
 theme_override_constants/margin_left = 12
 theme_override_constants/margin_right = 12
 
 [node name="DescText" type="Label" parent="TableTop/CardDescBar/Margin"]
 layout_mode = 2
+mouse_filter = 2
 theme_override_colors/font_color = Color(0.9, 0.94, 1, 1)
 theme_override_font_sizes/font_size = 11
 text = "💡 Chạm chọn một lá bài trên tay để xem mô tả & sử dụng..."
@@ -255,15 +281,16 @@ anchor_right = 0.5
 anchor_bottom = 1.0
 offset_left = -440.0
 offset_top = -180.0
-offset_right = 200.0
-offset_bottom = -10.0
+offset_right = 210.0
+offset_bottom = -8.0
 grow_horizontal = 2
 grow_vertical = 0
+mouse_filter = 1
 theme_override_constants/separation = 12
 alignment = 1
 
 [node name="TutorialBanner" type="PanelContainer" parent="."]
-custom_minimum_size = Vector2(680, 95)
+custom_minimum_size = Vector2(680, 90)
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -273,7 +300,7 @@ anchor_bottom = 0.5
 offset_left = -340.0
 offset_top = -90.0
 offset_right = 340.0
-offset_bottom = 10.0
+offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_banner")
@@ -304,13 +331,7 @@ autowrap_mode = 2
 
 [node name="HBox" type="HBoxContainer" parent="TutorialBanner/Margin/VBox"]
 layout_mode = 2
-theme_override_constants/separation = 12
 alignment = 2
-
-[node name="SkipBtn" type="Button" parent="TutorialBanner/Margin/VBox/HBox"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 11
-text = "BỎ QUA HUẤN LUYỆN"
 
 [node name="ActionBtn" type="Button" parent="TutorialBanner/Margin/VBox/HBox"]
 layout_mode = 2
@@ -340,7 +361,7 @@ stretch_mode = 5
 layout_mode = 0
 offset_left = 22.0
 offset_top = -12.0
-offset_right = 142.0
+offset_right = 150.0
 offset_bottom = 12.0
 theme_override_colors/font_color = Color(1, 0.85, 0.35, 1)
 theme_override_font_sizes/font_size = 11
@@ -359,6 +380,7 @@ offset_right = 150.0
 offset_bottom = 80.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 
 [node name="CardShowcase" type="PanelContainer" parent="CenterArea"]
 visible = false
@@ -375,10 +397,12 @@ offset_right = 140.0
 offset_bottom = 24.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_desc_bar")
 
 [node name="ShowcaseName" type="Label" parent="CenterArea/CardShowcase"]
 layout_mode = 2
+mouse_filter = 2
 theme_override_colors/font_color = Color(0.95, 0.85, 0.45, 1)
 theme_override_font_sizes/font_size = 12
 text = "Lý Thường Kiệt dùng [Trảm]!"
@@ -400,75 +424,10 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.02, 0.03, 0.06, 0.72)
-
-[node name="ArrowBossHealth" type="Control" parent="HealthSpotlightOverlay"]
-layout_mode = 1
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -160.0
-offset_top = 220.0
-offset_right = -100.0
-offset_bottom = 260.0
-grow_horizontal = 2
-
-[node name="ArrowImg" type="TextureRect" parent="HealthSpotlightOverlay/ArrowBossHealth"]
-layout_mode = 0
-offset_left = -10.0
-offset_top = -10.0
-offset_right = 30.0
-offset_bottom = 30.0
-texture = ExtResource("5_arrow")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="TagBoss" type="Label" parent="HealthSpotlightOverlay/ArrowBossHealth"]
-layout_mode = 0
-offset_left = -120.0
-offset_top = -2.0
-offset_right = -12.0
-offset_bottom = 18.0
-theme_override_colors/font_color = Color(1, 0.45, 0.45, 1)
-theme_override_font_sizes/font_size = 11
-text = "MÁU SƠN TẶC ➜"
-
-[node name="ArrowPlayerHealth" type="Control" parent="HealthSpotlightOverlay"]
-layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -280.0
-offset_top = -50.0
-offset_right = -220.0
-offset_bottom = -10.0
-grow_horizontal = 0
-grow_vertical = 0
-
-[node name="ArrowImg" type="TextureRect" parent="HealthSpotlightOverlay/ArrowPlayerHealth"]
-layout_mode = 0
-offset_left = -10.0
-offset_top = -10.0
-offset_right = 30.0
-offset_bottom = 30.0
-texture = ExtResource("5_arrow")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="TagPlayer" type="Label" parent="HealthSpotlightOverlay/ArrowPlayerHealth"]
-layout_mode = 0
-offset_left = -110.0
-offset_top = -2.0
-offset_right = -12.0
-offset_bottom = 18.0
-theme_override_colors/font_color = Color(0.45, 0.95, 0.55, 1)
-theme_override_font_sizes/font_size = 11
-text = "MÁU CỦA BẠN ➜"
+color = Color(0.02, 0.03, 0.06, 0.76)
 
 [node name="HealthGuideBox" type="PanelContainer" parent="HealthSpotlightOverlay"]
-custom_minimum_size = Vector2(660, 340)
+custom_minimum_size = Vector2(660, 320)
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -476,9 +435,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -330.0
-offset_top = -170.0
+offset_top = -75.0
 offset_right = 330.0
-offset_bottom = 170.0
+offset_bottom = 245.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
@@ -486,13 +445,13 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
 [node name="Margin" type="MarginContainer" parent="HealthSpotlightOverlay/HealthGuideBox"]
 layout_mode = 2
 theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 20
+theme_override_constants/margin_top = 18
 theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 20
+theme_override_constants/margin_bottom = 18
 
 [node name="VBox" type="VBoxContainer" parent="HealthSpotlightOverlay/HealthGuideBox/Margin"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 10
 
 [node name="Title" type="Label" parent="HealthSpotlightOverlay/HealthGuideBox/Margin/VBox"]
 layout_mode = 2
@@ -525,6 +484,138 @@ custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "TIẾP TỤC (ĐẦU LƯỢT RÚT BÀI) ➜"
+
+[node name="BossSpotlightLotus" type="PanelContainer" parent="HealthSpotlightOverlay"]
+custom_minimum_size = Vector2(170, 42)
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -85.0
+offset_top = 206.0
+offset_right = 85.0
+offset_bottom = 248.0
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_lotus_halo")
+
+[node name="VBox" type="VBoxContainer" parent="HealthSpotlightOverlay/BossSpotlightLotus"]
+layout_mode = 2
+theme_override_constants/separation = 1
+alignment = 1
+
+[node name="Tag" type="Label" parent="HealthSpotlightOverlay/BossSpotlightLotus/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.45, 0.45, 1)
+theme_override_font_sizes/font_size = 10
+text = "MÁU SƠN TẶC"
+horizontal_alignment = 1
+
+[node name="Lotus" type="Label" parent="HealthSpotlightOverlay/BossSpotlightLotus/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.65, 0.8, 1)
+theme_override_font_sizes/font_size = 13
+text = "🌸 🌸 🌸 (3/3)"
+horizontal_alignment = 1
+
+[node name="PlayerSpotlightLotus" type="PanelContainer" parent="HealthSpotlightOverlay"]
+custom_minimum_size = Vector2(170, 42)
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -200.0
+offset_top = -62.0
+offset_right = -30.0
+offset_bottom = -20.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_lotus_halo")
+
+[node name="VBox" type="VBoxContainer" parent="HealthSpotlightOverlay/PlayerSpotlightLotus"]
+layout_mode = 2
+theme_override_constants/separation = 1
+alignment = 1
+
+[node name="Tag" type="Label" parent="HealthSpotlightOverlay/PlayerSpotlightLotus/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45, 0.95, 0.55, 1)
+theme_override_font_sizes/font_size = 10
+text = "MÁU CỦA BẠN"
+horizontal_alignment = 1
+
+[node name="Lotus" type="Label" parent="HealthSpotlightOverlay/PlayerSpotlightLotus/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.65, 0.8, 1)
+theme_override_font_sizes/font_size = 13
+text = "🌸 🌸 🌸 🌸 (4/4)"
+horizontal_alignment = 1
+
+[node name="ArrowBossHealth" type="Control" parent="HealthSpotlightOverlay"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -160.0
+offset_top = 212.0
+offset_right = -100.0
+offset_bottom = 252.0
+grow_horizontal = 2
+
+[node name="ArrowImg" type="TextureRect" parent="HealthSpotlightOverlay/ArrowBossHealth"]
+layout_mode = 0
+offset_left = -10.0
+offset_top = -10.0
+offset_right = 30.0
+offset_bottom = 30.0
+texture = ExtResource("5_arrow")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="TagBoss" type="Label" parent="HealthSpotlightOverlay/ArrowBossHealth"]
+layout_mode = 0
+offset_left = -120.0
+offset_top = -2.0
+offset_right = -12.0
+offset_bottom = 18.0
+theme_override_colors/font_color = Color(1, 0.45, 0.45, 1)
+theme_override_font_sizes/font_size = 11
+text = "MÁU SƠN TẶC ➜"
+
+[node name="ArrowPlayerHealth" type="Control" parent="HealthSpotlightOverlay"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -280.0
+offset_top = -54.0
+offset_right = -220.0
+offset_bottom = -14.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="ArrowImg" type="TextureRect" parent="HealthSpotlightOverlay/ArrowPlayerHealth"]
+layout_mode = 0
+offset_left = -10.0
+offset_top = -10.0
+offset_right = 30.0
+offset_bottom = 30.0
+texture = ExtResource("5_arrow")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="TagPlayer" type="Label" parent="HealthSpotlightOverlay/ArrowPlayerHealth"]
+layout_mode = 0
+offset_left = -110.0
+offset_top = -2.0
+offset_right = -12.0
+offset_bottom = 18.0
+theme_override_colors/font_color = Color(0.45, 0.95, 0.55, 1)
+theme_override_font_sizes/font_size = 11
+text = "MÁU CỦA BẠN ➜"
 
 [node name="RewardModal" type="Control" parent="."]
 visible = false

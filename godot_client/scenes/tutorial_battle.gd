@@ -11,7 +11,6 @@ extends Control
 @onready var banner_title: Label = $TutorialBanner/Margin/VBox/StepTitle
 @onready var banner_desc: Label = $TutorialBanner/Margin/VBox/StepDesc
 @onready var action_btn: Button = $TutorialBanner/Margin/VBox/HBox/ActionBtn
-@onready var skip_btn: Button = $TutorialBanner/Margin/VBox/HBox/SkipBtn
 
 @onready var arrow_node: Control = $TutorialArrow
 @onready var arrow_label: Label = $TutorialArrow/ArrowLabel
@@ -49,7 +48,6 @@ func _ready() -> void:
 	# 3. Kết nối các nút
 	start_tutorial_btn.pressed.connect(_on_close_health_spotlight)
 	action_btn.pressed.connect(_on_action_btn_clicked)
-	skip_btn.pressed.connect(_on_skip_clicked)
 	claim_reward_btn.pressed.connect(_on_claim_reward_clicked)
 
 	# 4. Hiển thị Bước 1: Máu hoa sen
@@ -299,9 +297,5 @@ func _show_center_card(c_name: String, source: String) -> void:
 	center_showcase.visible = false
 
 func _on_claim_reward_clicked() -> void:
-	AuthManager.set_onboarding_done()
-	get_tree().change_scene_to_file("res://scenes/main_game.tscn")
-
-func _on_skip_clicked() -> void:
 	AuthManager.set_onboarding_done()
 	get_tree().change_scene_to_file("res://scenes/main_game.tscn")

@@ -1,38 +1,39 @@
 class_name CardUI
 extends Control
 
-const CardResourceScript = preload("res://scripts/resources/card_resource.gd")
-
 signal card_clicked(card_ui: Control)
 signal card_selected_state_changed(card_ui: Control, is_selected: bool)
 
+const CardResourceScript = preload("res://scripts/resources/card_resource.gd")
+
 @export var card_data: Resource
 
-var card_name: String:
-	get:
-		return card_data.card_name if card_data else ""
-
 @onready var panel: Panel = $Panel
-@onready var suit_rank_lbl: Label = $Panel/Margin/VBox/Header/SuitRankLabel
-@onready var cat_lbl: Label = $Panel/Margin/VBox/Header/CategoryLabel
-@onready var name_lbl: Label = $Panel/Margin/VBox/NameLabel
+@onready var suit_rank_lbl: Label = $Panel/Margin/VBox/SubHeader/SuitRankLabel
+@onready var cat_lbl: Label = $Panel/Margin/VBox/SubHeader/CategoryLabel
+@onready var name_lbl: Label = $Panel/Margin/VBox/NameBanner/NameLabel
 @onready var artwork_rect: TextureRect = $Panel/Margin/VBox/Artwork
-@onready var desc_lbl: Label = $Panel/Margin/VBox/DescLabel
 @onready var border: ReferenceRect = $Panel/Border
+@onready var glow_border: ReferenceRect = $Panel/GlowBorder
+@onready var click_button: Button = $ClickButton
 
 var is_selected: bool = false
 var is_hovered: bool = false
 var original_y: float = 0.0
 var tween: Tween
+var card_name: String = ""
 
 func _ready() -> void:
-	mouse_entered.connect(_on_mouse_entered)
-	mouse_exited.connect(_on_mouse_exited)
-	gui_input.connect(_on_gui_input)
+	if click_button:
+		click_button.pressed.connect(_on_card_button_pressed)
+		click_button.mouse_entered.connect(_on_card_mouse_entered)
+		click_button.mouse_exited.connect(_on_card_mouse_exited)
+
 	if card_data:
 		update_card(card_data)
 
 func setup_card_data(id: String, p_name: String, rank_str: String, suit_str: String, cat: int, desc: String) -> void:
+	card_name = p_name
 	var res = CardResourceScript.new()
 	res.id = id
 	res.card_name = p_name
@@ -49,6 +50,7 @@ func setup_card_data(id: String, p_name: String, rank_str: String, suit_str: Str
 
 func update_card(data: Resource) -> void:
 	card_data = data
+	card_name = data.card_name
 	if not is_inside_tree():
 		return
 
@@ -59,7 +61,6 @@ func update_card(data: Resource) -> void:
 
 	cat_lbl.text = data.get_category_name()
 	name_lbl.text = data.card_name
-	desc_lbl.text = data.description
 
 	# Tải hình minh họa lá bài (Artwork)
 	if artwork_rect:
@@ -72,53 +73,45 @@ func update_card(data: Resource) -> void:
 		else:
 			artwork_rect.visible = false
 
-func _on_mouse_entered() -> void:
+func _on_card_mouse_entered() -> void:
 	is_hovered = true
+	mouse_entered.emit()
 	if not is_selected:
-		_animate_hover(true)
+		_animate_elevation(-20.0, Vector2(1.05, 1.05))
 
-func _on_mouse_exited() -> void:
+func _on_card_mouse_exited() -> void:
 	is_hovered = false
+	mouse_exited.emit()
 	if not is_selected:
-		_animate_hover(false)
+		_animate_elevation(0.0, Vector2(1.0, 1.0))
 
-func _on_gui_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		toggle_select()
-		card_clicked.emit(self)
-
-func toggle_select() -> void:
+func _on_card_button_pressed() -> void:
 	set_selected(not is_selected)
+	card_clicked.emit(self)
 
 func set_selected(selected: bool) -> void:
+	if is_selected == selected:
+		return
 	is_selected = selected
-	_update_border()
+
+	if glow_border:
+		glow_border.visible = is_selected
+
 	if is_selected:
-		_animate_lift(-35.0, 1.1)
+		_animate_elevation(-35.0, Vector2(1.1, 1.1))
+		z_index = 10
 	else:
+		z_index = 0
 		if is_hovered:
-			_animate_lift(-20.0, 1.05)
+			_animate_elevation(-20.0, Vector2(1.05, 1.05))
 		else:
-			_animate_lift(0.0, 1.0)
+			_animate_elevation(0.0, Vector2(1.0, 1.0))
+
 	card_selected_state_changed.emit(self, is_selected)
 
-func _animate_hover(hover: bool) -> void:
-	if hover:
-		_animate_lift(-20.0, 1.05)
-	else:
-		_animate_lift(0.0, 1.0)
-
-func _animate_lift(offset_y: float, scale_val: float) -> void:
-	if tween:
+func _animate_elevation(target_y: float, target_scale: Vector2) -> void:
+	if tween and tween.is_valid():
 		tween.kill()
-	tween = create_tween().set_parallel(true).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tween.tween_property(panel, "position:y", offset_y, 0.18)
-	tween.tween_property(panel, "scale", Vector2(scale_val, scale_val), 0.18)
-
-func _update_border() -> void:
-	if is_selected:
-		border.border_color = Color("#E5A93C") # Vàng hoàng tộc phát sáng
-		border.border_width = 3.0
-	else:
-		border.border_color = Color("#D4AF37") # Vàng kim tiêu chuẩn
-		border.border_width = 1.5
+	tween = create_tween().set_parallel(true).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "position:y", target_y, 0.15)
+	tween.tween_property(self, "scale", target_scale, 0.15)

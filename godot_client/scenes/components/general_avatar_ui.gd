@@ -12,6 +12,7 @@ signal skill_clicked()
 @onready var role_badge: Label = $Frame/RoleBadge
 @onready var target_border: ReferenceRect = $TargetBorder
 @onready var skill_btn: Button = $SkillBtn
+@onready var click_btn: Button = $ClickBtn
 
 @onready var equip_weapon: Label = $Frame/EquipSlots/Weapon
 @onready var equip_armor: Label = $Frame/EquipSlots/Armor
@@ -25,7 +26,8 @@ var max_hp: int = 4
 var hand_count: int = 4
 
 func _ready() -> void:
-	gui_input.connect(_on_gui_input)
+	if click_btn:
+		click_btn.pressed.connect(func(): clicked.emit())
 	mouse_entered.connect(_on_mouse_entered)
 	mouse_exited.connect(_on_mouse_exited)
 	if skill_btn:
