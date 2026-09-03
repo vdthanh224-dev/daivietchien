@@ -16,7 +16,7 @@ public class DenoGameClient : MonoBehaviour
 {
     public static DenoGameClient Instance { get; private set; }
 
-    public static string ServerEndpoint = "wss://dai-viet-chien-server.deno.dev";
+    public static string ServerEndpoint = "wss://dai-viet-chien-server.vdthanh.deno.net";
     public static string LocalServerEndpoint = "ws://127.0.0.1:8082";
     public static string ActiveConnectedEndpoint { get; private set; } = "";
     public static bool IsConnected => Instance != null && Instance.wsClient != null && Instance.wsClient.State == WebSocketState.Open;
@@ -144,7 +144,7 @@ public class DenoGameClient : MonoBehaviour
 
     private async Task ConnectAndLoop(CancellationToken token, List<AppwriteMatchmaking.GameStatePlayer> initialPlayers)
     {
-        string[] candidateEndpoints = new string[] { LocalServerEndpoint, ServerEndpoint };
+        string[] candidateEndpoints = new string[] { ServerEndpoint, LocalServerEndpoint };
 
         while (isRunning && !token.IsCancellationRequested)
         {

@@ -1327,7 +1327,7 @@ public static class AppwriteMatchmaking
 
     #region 4. SERVERLESS GAME ENGINE & STATE SYNC
     public const string GameEngineFunctionId = "game-engine";
-    public const string DenoEndpoint = "https://dai-viet-chien-server.deno.dev";
+    public const string DenoEndpoint = "https://dai-viet-chien-server.vdthanh.deno.net";
 
     /// <summary>
     /// Legacy shim: game state is server-owned and must never be written by Unity.
