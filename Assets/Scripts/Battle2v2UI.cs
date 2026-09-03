@@ -567,6 +567,23 @@ public class Battle2v2UI : MonoBehaviour
                 ApplyAuthoritativeGameFinished();
             }
         }
+
+        if (playerCard != null)
+        {
+            bool isMyTurn = (delta.turnSeat == playerCard.SeatNumber && delta.phase == "PLAY" && delta.status == "PLAYING");
+            isPlayerTurnActive = isMyTurn;
+            actionInProgress = false;
+            if (endTurnBtn != null)
+            {
+                endTurnBtn.gameObject.SetActive(isMyTurn);
+                endTurnBtn.interactable = isMyTurn;
+            }
+            if (!isMyTurn && actionBtnGo != null)
+            {
+                actionBtnGo.SetActive(false);
+            }
+            UpdatePlayerSkillButtonState();
+        }
         
 
 
@@ -4810,15 +4827,7 @@ public class Battle2v2UI : MonoBehaviour
                 SetLog($"🎯 Đã chọn {GetFormattedCardName(card)}. Hãy chạm chọn 1 mục tiêu trên bàn đấu!");
                 return;
             }
-
-            if (IsSameTeamSeat(playerCard.SeatNumber, currentSelectedTarget.SeatNumber))
-            {
-                btn.interactable = false;
-                btnImg.color = new Color(0.55f, 0.25f, 0.25f, 0.9f);
-                actionBtnText.text = "❌ KHÔNG THỂ NHẮM ĐỒNG MINH";
-                SetLog("❌ Chỉ được chọn tướng đối phương làm mục tiêu.");
-                return;
-            }
+            // Cho phép nhắm cả đồng minh để dùng cẩm nang chiến thuật / hỗ trợ
 
             if (CanActAsSlash(playerCard, card) && !IsTargetInAttackRange(playerCard, currentSelectedTarget, card))
             {
@@ -5032,8 +5041,9 @@ public class Battle2v2UI : MonoBehaviour
             target = null;
         }
 
-        if (DenoGameClient.IsConnected)
+        if (!string.IsNullOrEmpty(currentRoomId))
         {
+            actionInProgress = false;
             DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
             {
                 action = "PLAY_CARD",
@@ -5041,7 +5051,10 @@ public class Battle2v2UI : MonoBehaviour
                 seat = playerCard.SeatNumber,
                 cardId = card.id,
                 targetSeat = target != null ? target.SeatNumber : 0
-            }, (s) => { if (s != null) ApplyServerGameState(s); });
+            }, (s) => { 
+                actionInProgress = false;
+                if (s != null) ApplyServerGameState(s); 
+            });
 
             currentSelectedCardUI = null;
             playerHandUI.ClearSelection();
@@ -9326,16 +9339,6 @@ public void ShowCardAtCenter(CardModel card, GeneralCardUI caster, GeneralCardUI
     private void OnGeneralTargetClicked(GeneralCardUI clicked)
     {
         if (clicked == null || clicked.CurrentHp <= 0) return;
-        if (playerCard != null && clicked != playerCard
-            && IsSameTeamSeat(playerCard.SeatNumber, clicked.SeatNumber)
-            && currentSelectedCardUI != null
-            && RequiresTarget(currentSelectedCardUI.Data))
-        {
-            SetLog("🎯 Chỉ được chọn tướng đối phương làm mục tiêu.");
-            ClearSelectedTarget();
-            UpdateActionButtonState();
-            return;
-        }
         if (isWaitingForTrieuDangTarget)
         {
             if (clicked == playerCard)
@@ -9608,7 +9611,7 @@ public void ShowCardAtCenter(CardModel card, GeneralCardUI caster, GeneralCardUI
                 ClearSelectedTarget();
                 if (actionBtnGo != null) actionBtnGo.SetActive(false);
 
-                if (DenoGameClient.IsConnected)
+                if (!string.IsNullOrEmpty(currentRoomId))
                 {
                     DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
                     {
@@ -9619,6 +9622,13 @@ public void ShowCardAtCenter(CardModel card, GeneralCardUI caster, GeneralCardUI
                         targetSeat = target.SeatNumber,
                         cardId = discarded.id
                     }, (s) => { if (s != null) ApplyServerGameState(s); });
+                }
+                else
+                {
+                    if (GeneralCardUI.TryGetEquipmentType(discarded, out var eqType))
+                    {
+                        target.Unequip(eqType);
+                    }
                 }
             }
         }, onlyEquipment: true);

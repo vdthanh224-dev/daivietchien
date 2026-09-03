@@ -558,7 +558,7 @@ function validateTarget(state, casterSeat, targetSeat, card) {
   if (normalizedTarget === casterSeat) return { error: "Không thể chọn chính mình" };
   const target = state.players.find((player) => player.seat === normalizedTarget);
   if (!target || target.hp <= 0) return { error: "Mục tiêu không hợp lệ" };
-  if (areTeammates(casterSeat, normalizedTarget)) return { error: "Chỉ được chọn tướng đối phương" };
+  // Cho phép nhắm cả đồng minh để hỗ trợ cẩm nang chiến thuật
   if (isSlash(card) && !hasWeaponRange(state, casterSeat, normalizedTarget)) {
     return { error: "Mục tiêu ngoài tầm đánh" };
   }
@@ -604,7 +604,7 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
           card = { ...card, name: "Nỏ Thần Kim Quy", subType: CARD_SUBTYPES.WEAPON, category: CARD_CATEGORIES.EQUIPMENT, range: 1, distMod: 0, desc: "Tầm 1. Không giới hạn số Trảm trong lượt" };
       }
   }
-  if (payload) {
+  if (payload && card) {
     card.targetSeats = payload.targetSeats;
     card.targetSeat2 = payload.targetSeat2;
   }
@@ -742,6 +742,7 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
       cardName: card.name,
       description: `🍶 <b>${caster.generalName}</b> uống ${formatCardText(card)}: Đòn Trảm kế tiếp gây +1 sát thương (+2 tổng)!`
     });
+    refreshLastDelta(state);
     return { success: true, state };
   }
 
@@ -763,6 +764,7 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
       cardName: card.name,
       description: `🛡️ <b>${caster.generalName}</b> trang bị ${formatCardText(card)}: ${card.desc}`
     });
+    refreshLastDelta(state);
     return { success: true, state };
   }
 
@@ -2752,26 +2754,35 @@ export function tickGameState(state) {
     
     
     if (elapsed >= 40) {
-      if (state.phase === "AWAIT_SLASH_DEFENSE") {
-        handleRespondAction(state, waitingSeat, false, null);
-      } else if (state.phase === "AWAIT_NULLIFY") {
-        handleRespondAction(state, waitingSeat, false, null);
-      } else if (state.phase === "AWAIT_TARGET_CARD") {
-        handleRespondAction(state, waitingSeat, true, null, null);
-      } else if (state.phase === "AWAIT_AOE") {
-        handleRespondAction(state, waitingSeat, false, null);
-      } else if (state.phase === "AWAIT_DUEL") {
-        handleRespondAction(state, waitingSeat, false, null);
-      } else if (state.phase === "AWAIT_HARVEST") {
-        handleRespondAction(state, waitingSeat, true, null);
-      } else if (state.phase === "AWAIT_NEAR_DEATH") {
-        handleRespondAction(state, waitingSeat, false, null);
-      } else if (state.phase === "AWAIT_NAM_SON_FOLLOW_UP") {
-        handleRespondAction(state, waitingSeat, false, null);
-      } else if (state.phase === "AWAIT_SONG_CUNG_FOLLOW_UP") {
-        handleRespondAction(state, waitingSeat, false, null);
-      } else if (state.phase === "DISCARD") {
-        handleDiscardCards(state, waitingSeat, []);
+      // Hết 40s phản ứng: Cho AI phản ứng giúp người chơi (chống mất máu / tránh chết oan)
+      recordAction(state, {
+        type: "TIMEOUT_AI_REACTION",
+        casterSeat: waitingSeat,
+        description: `⏰ <b>${waitingPlayer ? waitingPlayer.generalName : 'Người chơi'}</b> hết 40s: AI tự động phản ứng hỗ trợ!`
+      });
+      const aiRes = handleAIReaction(state, waitingSeat);
+      if (!aiRes || aiRes.error) {
+        if (state.phase === "AWAIT_SLASH_DEFENSE") {
+          handleRespondAction(state, waitingSeat, false, null);
+        } else if (state.phase === "AWAIT_NULLIFY") {
+          handleRespondAction(state, waitingSeat, false, null);
+        } else if (state.phase === "AWAIT_TARGET_CARD") {
+          handleRespondAction(state, waitingSeat, true, null, null);
+        } else if (state.phase === "AWAIT_AOE") {
+          handleRespondAction(state, waitingSeat, false, null);
+        } else if (state.phase === "AWAIT_DUEL") {
+          handleRespondAction(state, waitingSeat, false, null);
+        } else if (state.phase === "AWAIT_HARVEST") {
+          handleRespondAction(state, waitingSeat, true, null);
+        } else if (state.phase === "AWAIT_NEAR_DEATH") {
+          handleRespondAction(state, waitingSeat, false, null);
+        } else if (state.phase === "AWAIT_NAM_SON_FOLLOW_UP") {
+          handleRespondAction(state, waitingSeat, false, null);
+        } else if (state.phase === "AWAIT_SONG_CUNG_FOLLOW_UP") {
+          handleRespondAction(state, waitingSeat, false, null);
+        } else if (state.phase === "DISCARD") {
+          handleDiscardCards(state, waitingSeat, []);
+        }
       }
       important = true;
       state.timerStartAt = Date.now();
@@ -2800,8 +2811,20 @@ export function tickGameState(state) {
     const turnPlayer = state.players.find(p => p.seat === state.turnSeat);
 
     if (elapsed >= 40) {
-      if (!turnPlayer || turnPlayer.hp <= 0) advanceTurn(state);
-      else handleEndTurn(state, state.turnSeat);
+      if (!turnPlayer || turnPlayer.hp <= 0) {
+        advanceTurn(state);
+      } else {
+        // Hết 40s ra bài: AI hành động giúp người chơi
+        recordAction(state, {
+          type: "TIMEOUT_AI_ASSIST",
+          casterSeat: state.turnSeat,
+          description: `⏰ <b>${turnPlayer.generalName}</b> hết 40s: AI tự động ra bài hỗ trợ!`
+        });
+        const res = handleAIStep(state, state.turnSeat);
+        if (!res || res.error) {
+          handleEndTurn(state, state.turnSeat);
+        }
+      }
       important = true;
       state.timerStartAt = Date.now();
       return { changed: true, important };
@@ -2970,7 +2993,7 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
 
 
 
-export function handleUseSkill(state, seat, skillId, targetSeat = 0) {
+export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = null) {
   if (state.status === "FINISHED") return { error: "Trận đấu đã kết thúc" };
   seat = Number(seat);
   const player = state.players.find(p => p.seat === seat);
@@ -2985,14 +3008,39 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0) {
       if (!target) return { error: "Mục tiêu không hợp lệ" };
       if (target.seat === seat) return { error: "Không thể chọn bản thân" };
       
-      const options = [];
-      (target.equipments || []).forEach(c => {
-          options.push({ token: "EQUIPMENT:" + c.id, zone: "EQUIPMENT", label: "TRANG BỊ", card: c });
-      });
-      if (options.length === 0) return { error: "Mục tiêu không có trang bị để hủy" };
+      if (!target.equipments || target.equipments.length === 0) return { error: "Mục tiêu không có trang bị để hủy" };
       
       if (!player.usedSkills) player.usedSkills = {};
       player.usedSkills["Triều Dâng"] = true;
+
+      // Nếu client đã chỉ định cardId hoặc đối phương chỉ có 1 trang bị -> Hủy trực tiếp ngay lập tức
+      let equipToDestroy = null;
+      if (cardId) {
+        const idx = target.equipments.findIndex(c => c.id === cardId || ("EQUIPMENT:" + c.id) === cardId);
+        if (idx >= 0) equipToDestroy = target.equipments.splice(idx, 1)[0];
+      }
+      if (!equipToDestroy && target.equipments.length === 1) {
+        equipToDestroy = target.equipments.shift();
+      }
+
+      if (equipToDestroy) {
+        discardCard(state, equipToDestroy);
+        recordAction(state, {
+          type: "USE_SKILL",
+          casterSeat: seat,
+          targetSeat: targetSeat,
+          description: `🌊 <b>${player.generalName}</b> dùng [Triều Dâng] phá hủy ${formatCardText(equipToDestroy)} của <b>${target.generalName}</b>!`
+        });
+        refreshLastDelta(state);
+        return { success: true, state };
+      }
+
+      const options = target.equipments.map(c => ({
+        token: "EQUIPMENT:" + c.id,
+        zone: "EQUIPMENT",
+        label: "TRANG BỊ",
+        card: c
+      }));
 
       state.phase = "AWAIT_TARGET_CARD";
       state.targetCardSelection = {
@@ -3005,7 +3053,7 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0) {
       state.waitingTargetSeat = seat;
       state.waitingReactionType = "TARGET_CARD";
       state.waitingTimer = 40;
-    state.timerStartAt = Date.now();
+      state.timerStartAt = Date.now();
 
       recordAction(state, {
         type: "USE_SKILL",

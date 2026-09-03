@@ -1101,7 +1101,7 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
         }
     }
 
-    private static bool TryGetEquipmentType(CardModel card, out EquipmentType equipmentType)
+    public static bool TryGetEquipmentType(CardModel card, out EquipmentType equipmentType)
     {
         equipmentType = card.subType switch
         {

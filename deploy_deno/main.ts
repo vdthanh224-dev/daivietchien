@@ -347,7 +347,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
 
         // E. XỬ LÝ HÀNH ĐỘNG ĐÁNH BÀI TRÊN RAM SIÊU TỐC
         if (action === "USE_SKILL") {
-          result = handleUseSkill(room.state, boundSeat, payload.skillId, targetSeat);
+          result = handleUseSkill(room.state, boundSeat, payload.skillId, targetSeat, cardId);
         } else if (action === "TOGGLE_SKILL") {
           result = handleToggleSkill(room.state, boundSeat, payload.skillId);
         } else if (action === "PLAY_CARD") {
@@ -501,7 +501,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
         });
       } else if (action === "USE_SKILL") {
-        result = handleUseSkill(room.state, requestSeat, payload.skillId, targetSeat);
+        result = handleUseSkill(room.state, requestSeat, payload.skillId, targetSeat, cardId);
       } else if (action === "TOGGLE_SKILL") {
         result = handleToggleSkill(room.state, requestSeat, payload.skillId);
       } else if (action === "PLAY_CARD") {
