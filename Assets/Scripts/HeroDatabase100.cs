@@ -151,7 +151,7 @@ public static class HeroDatabase100
 
         AddHero(1, "Cao Lỗ", "Âu Lạc", 4, "Chế Nỏ", "Bạn có thể dùng bất kỳ lá bài chất Bích (♠) như lá trang bị Nỏ Thần Kim Quy.", "UI/cao_lo");
         AddHero(2, "Đào Hãn", "Âu Lạc", 4, "Xạ Thuẫn", "Khoảng cách khi bạn dùng Trảm lên mục tiêu luôn được giảm 2.", "UI/dao_han");
-        AddHero(3, "Thi Sách", "Thời Trưng Vương", 4, "Hịch Nghĩa", "Khi bạn rơi vào trạng thái Cận Tử và được cứu sống, bạn lập tức rút 2 lá bài.", "UI/thi_sach");
+        AddHero(3, "Thi Sách", "Thời Trưng Vương", 4, "Hịch Nghĩa", "Khi bạn rơi vào trạng thái Cận Tử và được cứu sống, bạn lập tức rút 3 lá bài.", "UI/thi_sach");
         AddHero(4, "Lê Chân", "Thời Trưng Vương", 3, "Triều Dâng", "Một lần mỗi lượt, chỉ định hủy 1 lá trang bị của 1 người khác.", "UI/le_chan");
         AddHero(5, "Thánh Thiên", "Thời Trưng Vương", 4, "Dũng Nữ", "Đòn Trảm của bạn khiến mục tiêu phải đánh ra 2 lá Đỡ mới có thể triệt tiêu nếu mục tiêu có lượng Máu hiện tại nhiều hơn bạn.", "UI/thanh_thien");
         AddHero(6, "Bát Nàn", "Thời Trưng Vương", 3, "Trinh Liệt", "Mỗi khi chịu sát thương từ đòn đánh của người chơi khác, bạn được rút ngẫu nhiên 1 lá bài trên tay của người gây sát thương.", "UI/bat_nan");

@@ -4674,7 +4674,7 @@ public class Battle2v2UI : MonoBehaviour
             playerCard.SkillButtonGo.SetActive(true);
             playerCard.SetSkill("⚡ HỊCH NGHĨA", () =>
             {
-                SetLog("✨ <color=#FFD700><b>[Hịch Nghĩa]</b></color> (Bị động): Khi bạn rơi vào trạng thái Cận Tử và được cứu sống, bạn lập tức rút ngay 2 lá bài!");
+                SetLog("✨ <color=#FFD700><b>[Hịch Nghĩa]</b></color> (Bị động): Khi bạn rơi vào trạng thái Cận Tử và được cứu sống, bạn lập tức rút ngay 3 lá bài!");
             });
             playerCard.SetSkillState(true);
             var btnImg = playerCard.SkillButtonGo.GetComponent<UnityEngine.UI.Image>();
@@ -8671,12 +8671,12 @@ public class Battle2v2UI : MonoBehaviour
 
                         yield return new WaitForSeconds(1.0f);
 
-                        // KỸ NĂNG THI SÁCH (ID 3): HỊCH NGHĨA - RÚT 2 LÁ KHI ĐƯỢC CỨU SỐNG TỪ CẬN TỬ
+                        // KỸ NĂNG THI SÁCH (ID 3): HỊCH NGHĨA - RÚT 3 LÁ KHI ĐƯỢC CỨU SỐNG TỪ CẬN TỬ
                         if (victim.HeroId == "3" || (!string.IsNullOrEmpty(victim.GeneralName) && victim.GeneralName.Contains("Thi Sách")))
                         {
-                            SetLog($"✨ <b>{victim.GeneralName}</b> kích hoạt <color=#FFD700><b>[Hịch Nghĩa]</b></color>: Rút ngay 2 lá bài khi thoát khỏi Cận Tử!");
+                            SetLog($"✨ <b>{victim.GeneralName}</b> kích hoạt <color=#FFD700><b>[Hịch Nghĩa]</b></color>: Rút ngay 3 lá bài khi thoát khỏi Cận Tử!");
                             AudioManager.Instance.PlaySkill();
-                            for (int d = 0; d < 2; d++)
+                            for (int d = 0; d < 3; d++)
                             {
                                 var extraCard = deckManager.DrawCard();
                                 if (extraCard != null)

@@ -2001,12 +2001,12 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
           description: `💮 <b>${respondent.generalName}</b> đã dùng ${formatCardText(rescueCard)} cứu sống <b>${victim.generalName}</b> (${victim.hp}/${victim.maxHp})!`
         });
 
-        if (String(victim.heroId) === "3") {
-            drawCards(state, victim.seat, 2);
+        if (String(victim.heroId) === "3" || (victim.generalName && victim.generalName.includes("Thi Sách"))) {
+            drawCards(state, victim.seat, 3);
             recordAction(state, {
                 type: "USE_SKILL",
                 casterSeat: victim.seat,
-                description: `✨ <b>${victim.generalName}</b> kích hoạt <color=#FFD700><b>Hịch Nghĩa</b></color>: Rút 2 lá bài khi thoát khỏi Cận Tử!`
+                description: `✨ <b>${victim.generalName}</b> kích hoạt <color=#FFD700><b>Hịch Nghĩa</b></color>: Rút 3 lá bài khi thoát khỏi Cận Tử!`
             });
         }
 
