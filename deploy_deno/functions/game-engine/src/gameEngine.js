@@ -541,6 +541,18 @@ function hasEquippedZhuge(player) {
   );
 }
 
+function getEquippedKhienMay(player) {
+  if (!player || !Array.isArray(player.equipments)) return null;
+  return player.equipments.find(e =>
+    (e.subType === CARD_SUBTYPES.ARMOR) && (
+      (e.name && (e.name.includes("Khiên Mây") || e.name.includes("Khien May") || e.name.includes("Khiên"))) ||
+      (e.cardName && (e.cardName.includes("Khiên Mây") || e.cardName.includes("Khien May") || e.cardName.includes("Khiên"))) ||
+      (e.id && e.id.toLowerCase().includes("khienmay")) ||
+      (e.desc && e.desc.includes("chất Đỏ tự động Đỡ"))
+    )
+  ) || null;
+}
+
 function resetWaitingState(state, clearActiveCard = true) {
   state.phase = "PLAY";
   state.waitingTargetSeat = 0;
@@ -727,10 +739,6 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
         isWineBuff: isWine,
         description: `🗡️ <b>${caster.generalName}</b> tung chiêu ${formatCardText(card)}${isWine ? ' <color=#FFD700><b>(kèm hiệu ứng Hủ Rượu: +1 Sát thương -> 2 Tổng!)</b></color>' : ''} nhắm vào <b>${target ? target.generalName : 'đối thủ'}</b>! (Mục tiêu có 40s để Đỡ${requiredDodgeText})`
       });
-    if (tryKhienMayDefense(state, targetSeat, "đòn Trảm")) {
-      beginSlashAfterDodge(state, caster, targetSeat, "Khiên Mây Bện");
-      return { success: true, state };
-    }
     return { success: true, state };
   }
 
@@ -927,9 +935,7 @@ function drawJudgementCard(state) {
 
 function tryKhienMayDefense(state, targetSeat, sourceDescription) {
   const target = state.players.find((player) => player.seat === targetSeat);
-  const armor = target?.equipments?.find((equipment) =>
-    equipment.subType === CARD_SUBTYPES.ARMOR && equipment.name?.includes("Khiên Mây")
-  );
+  const armor = getEquippedKhienMay(target);
   if (!armor) return false;
 
   const judgeCard = drawJudgementCard(state);
@@ -939,10 +945,16 @@ function tryKhienMayDefense(state, targetSeat, sourceDescription) {
     type: isRed ? "KHIEN_MAY_SUCCESS" : "KHIEN_MAY_FAILED",
     targetSeat,
     cardId: armor.id,
-    cardName: armor.name,
+    cardName: armor.name || "Khiên Mây Bện",
+    judgeCard: {
+      id: judgeCard.id,
+      name: judgeCard.name,
+      suit: judgeCard.suit,
+      rank: judgeCard.rank
+    },
     description: isRed
-      ? `🛡️ [Khiên Mây Bện] của ${target.generalName} lật ${judgeCard.suit} ${judgeCard.rank} và tự động Đỡ ${sourceDescription}!`
-      : `🛡️ [Khiên Mây Bện] của ${target.generalName} lật ${judgeCard.suit} ${judgeCard.rank} và phán xét thất bại.`
+      ? `🛡️ [Khiên Mây Bện] của ${target.generalName} lật ${judgeCard.suit} ${judgeCard.rank} (ĐỎ) và tự động Đỡ ${sourceDescription}!`
+      : `🛡️ [Khiên Mây Bện] của ${target.generalName} lật ${judgeCard.suit} ${judgeCard.rank} (ĐEN) và phán xét thất bại.`
   });
   return isRed;
 }
@@ -1543,16 +1555,17 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
           isCanceled: chain.isCanceled
         };
 
-        // Bắt đầu vòng hỏi mới từ người bên phải của người vừa dùng Diệu Kế
+        // Bắt đầu vòng hỏi mới cho 3 người chơi còn lại (tuyệt đối KHÔNG hỏi lại người vừa dùng Diệu Kế)
         const newQuerySeats = [];
-          for (let i = 0; i < 4; i++) {
-            const s = ((respondentSeat + i) % 4) + 1;
-            const p = state.players.find(x => x.seat === s);
-            if (p && p.hp > 0) {
-              const hasNullify = p.hand && p.hand.some(c => c.subType === CARD_SUBTYPES.FLAWLESS_DEFENSE || (c.name && c.name.includes("Diệu Kế")));
-              if (hasNullify) newQuerySeats.push(s);
-            }
+        for (let i = 1; i <= 3; i++) {
+          const s = ((respondentSeat - 1 + i) % 4) + 1;
+          if (s === respondentSeat) continue;
+          const p = state.players.find(x => x.seat === s);
+          if (p && p.hp > 0) {
+            const hasNullify = p.hand && p.hand.some(c => c.subType === CARD_SUBTYPES.FLAWLESS_DEFENSE || (c.name && c.name.includes("Diệu Kế")));
+            if (hasNullify) newQuerySeats.push(s);
           }
+        }
         state.activeCard = {
           ...state.activeCard,
           nullifyRound: (Number(state.activeCard?.nullifyRound) || 0) + 1,
@@ -1612,8 +1625,8 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
                   refreshLastDelta(state);
                   return { success: true, state };
                 }
-                state.phase = "PLAY";
-                state.waitingTargetSeat = 0;
+                resetWaitingState(state);
+                refreshLastDelta(state);
                 return { success: true, state };
             } else {
                 const cont = chain.continuation;
@@ -1801,6 +1814,34 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
 
   if (state.phase === "AWAIT_SLASH_DEFENSE") {
     if (accepted && cardId) {
+      if (cardId === "KHIEN_MAY" || cardId === "KHIEN_MAY_BEN") {
+        const armor = getEquippedKhienMay(respondent);
+        if (!armor) return { error: "Không có Khiên Mây Bện để phán xét" };
+        const judgeCard = drawJudgementCard(state);
+        const isRed = judgeCard && (judgeCard.suit === "Heart" || judgeCard.suit === "Diamond");
+        recordAction(state, {
+          type: isRed ? "KHIEN_MAY_SUCCESS" : "KHIEN_MAY_FAILED",
+          targetSeat: respondentSeat,
+          cardId: armor.id,
+          cardName: armor.name || "Khiên Mây Bện",
+          judgeCard: judgeCard ? { id: judgeCard.id, name: judgeCard.name, suit: judgeCard.suit, rank: judgeCard.rank } : null,
+          description: isRed
+            ? `🛡️ [Khiên Mây Bện] của ${respondent.generalName} lật ${judgeCard.suit} ${judgeCard.rank} (ĐỎ) và tự động Đỡ đòn Trảm!`
+            : `🛡️ [Khiên Mây Bện] của ${respondent.generalName} lật ${judgeCard.suit} ${judgeCard.rank} (ĐEN) và phán xét thất bại.`
+        });
+        if (isRed) {
+          const caster = state.players.find(x => x.seat === (state.activeCard ? state.activeCard.casterSeat : 0));
+          beginSlashAfterDodge(state, caster, respondentSeat, "Khiên Mây Bện");
+          return { success: true, state };
+        } else {
+          if (!state.activeCard) state.activeCard = {};
+          if (!state.activeCard.khienMayFailedSeats) state.activeCard.khienMayFailedSeats = [];
+          state.activeCard.khienMayFailedSeats.push(respondentSeat);
+          refreshLastDelta(state);
+          return { success: true, state };
+        }
+      }
+
       const caster = state.players.find(x => x.seat === (state.activeCard ? state.activeCard.casterSeat : 0));
       const holyCannon = getEquippedWeapon(caster, "Súng Thần Công");
       const idx = respondent.hand.findIndex(c => c.id === cardId && isDodge(c)
@@ -1962,6 +2003,36 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     const isArrow = state.waitingReactionType === "DODGE"
       || state.activeCard?.reqType === "DODGE";
     let satisfied = false;
+
+    if (accepted && (cardId === "KHIEN_MAY" || cardId === "KHIEN_MAY_BEN")) {
+      if (!isArrow) return { error: "Khiên Mây Bện chỉ có tác dụng khi cần Đỡ (Né)" };
+      const armor = getEquippedKhienMay(respondent);
+      if (!armor) return { error: "Không có Khiên Mây Bện để phán xét" };
+      const judgeCard = drawJudgementCard(state);
+      const isRed = judgeCard && (judgeCard.suit === "Heart" || judgeCard.suit === "Diamond");
+      recordAction(state, {
+        type: isRed ? "KHIEN_MAY_SUCCESS" : "KHIEN_MAY_FAILED",
+        targetSeat: respondentSeat,
+        cardId: armor.id,
+        cardName: armor.name || "Khiên Mây Bện",
+        judgeCard: judgeCard ? { id: judgeCard.id, name: judgeCard.name, suit: judgeCard.suit, rank: judgeCard.rank } : null,
+        description: isRed
+          ? `🛡️ [Khiên Mây Bện] của ${respondent.generalName} lật ${judgeCard.suit} ${judgeCard.rank} (ĐỎ) và tự động né đòn diện rộng!`
+          : `🛡️ [Khiên Mây Bện] của ${respondent.generalName} lật ${judgeCard.suit} ${judgeCard.rank} (ĐEN) và phán xét thất bại.`
+      });
+      if (isRed) {
+        beginNextAoeVictim(state);
+        refreshLastDelta(state);
+        checkGameOver(state);
+        return { success: true, state };
+      } else {
+        if (!state.activeCard) state.activeCard = {};
+        if (!state.activeCard.khienMayFailedSeats) state.activeCard.khienMayFailedSeats = [];
+        state.activeCard.khienMayFailedSeats.push(respondentSeat);
+        refreshLastDelta(state);
+        return { success: true, state };
+      }
+    }
 
     if (accepted && cardId) {
       const idx = respondent.hand.findIndex(c => c.id === cardId && (isArrow ? isDodge(c) : isSlash(c)));
@@ -2663,6 +2734,11 @@ export function handleAIReaction(state, aiSeat) {
   if (!ai || (ai.hp <= 0 && state.phase !== "AWAIT_NEAR_DEATH")) return { error: "Người chơi không hợp lệ" };
 
   if (state.phase === "AWAIT_SLASH_DEFENSE" && state.waitingTargetSeat === aiSeat) {
+    const hasKhienMay = !!getEquippedKhienMay(ai);
+    const alreadyFailed = state.activeCard?.khienMayFailedSeats?.includes(aiSeat);
+    if (hasKhienMay && !alreadyFailed) {
+      return handleRespondAction(state, aiSeat, true, "KHIEN_MAY");
+    }
     const caster = state.players.find((player) => player.seat === state.activeCard?.casterSeat);
     const cannon = getEquippedWeapon(caster, "Súng Thần Công");
     const dodge = ai.hand.find(c => isDodge(c)
@@ -2676,6 +2752,12 @@ export function handleAIReaction(state, aiSeat) {
 
   if (state.phase === "AWAIT_AOE" && state.waitingTargetSeat === aiSeat) {
     const reqType = state.waitingReactionType;
+    const isArrow = reqType === "DODGE" || state.activeCard?.reqType === "DODGE";
+    const hasKhienMay = !!getEquippedKhienMay(ai);
+    const alreadyFailed = state.activeCard?.khienMayFailedSeats?.includes(aiSeat);
+    if (isArrow && hasKhienMay && !alreadyFailed) {
+      return handleRespondAction(state, aiSeat, true, "KHIEN_MAY");
+    }
     let matchingCard = null;
     if (reqType === "DODGE") matchingCard = ai.hand.find(c => isDodge(c));
     else if (reqType === "SLASH") matchingCard = ai.hand.find(c => isSlash(c));

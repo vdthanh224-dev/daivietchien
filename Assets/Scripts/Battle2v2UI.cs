@@ -2100,9 +2100,12 @@ public class Battle2v2UI : MonoBehaviour
         var bg = LotusHealthUI.LoadSpriteFromResources("UI/auth_card_bg");
         if (bg != null) { image.sprite = bg; image.type = Image.Type.Sliced; }
         image.color = new Color(0.04f, 0.08f, 0.12f, 0.98f);
+        bool hasKhienMayAoE = !needSlash && playerCard != null && playerCard.HasEquipment(EquipmentType.Armor, "Khiên Mây");
+        float modalWidth = hasKhienMayAoE ? 780f : 650f;
+
         var rect = modal.GetComponent<RectTransform>();
         rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.sizeDelta = new Vector2(650f, 165f);
+        rect.sizeDelta = new Vector2(modalWidth, 165f);
         rect.anchoredPosition = new Vector2(0f, 110f);
 
         var title = AddText(modal.transform, "Title", $"⚠️ {aoeName.ToUpperInvariant()}", 14,
@@ -2118,13 +2121,59 @@ public class Battle2v2UI : MonoBehaviour
         SetRect(timerTxt.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(300f, 24f), new Vector2(0f, -5f));
 
         var buttonSprite = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
+
+        if (hasKhienMayAoE)
+        {
+            var kmAoEGo = new GameObject("Btn_KhienMayAoE", typeof(RectTransform), typeof(Image), typeof(Button));
+            kmAoEGo.transform.SetParent(modal.transform, false);
+            var kmImg = kmAoEGo.GetComponent<Image>();
+            if (buttonSprite != null) { kmImg.sprite = buttonSprite; kmImg.type = Image.Type.Sliced; }
+            kmImg.color = new Color(0.12f, 0.55f, 0.85f, 1f);
+            SetRect(kmAoEGo.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(250f, 40f), new Vector2(-240f, 14f));
+            var kmTxt = AddText(kmAoEGo.transform, "Text", "🛡️ PHÁN XÉT KHIÊN MÂY", 11, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+            Fill(kmTxt.rectTransform);
+
+            var kmBtn = kmAoEGo.GetComponent<Button>();
+            kmBtn.onClick.AddListener(() =>
+            {
+                kmBtn.interactable = false;
+                kmImg.color = new Color(0.3f, 0.35f, 0.45f, 0.7f);
+                StartCoroutine(TryKhienMayDefense(playerCard, aoeName, (success) =>
+                {
+                    if (serverControlled)
+                    {
+                        DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
+                        {
+                            action = "RESPOND_ACTION",
+                            roomId = currentRoomId,
+                            seat = playerCard.SeatNumber,
+                            accepted = true,
+                            cardId = "KHIEN_MAY"
+                        }, (s) => { if (s != null) ApplyServerGameState(s); });
+                    }
+
+                    if (success)
+                    {
+                        var m = GameObject.Find("ServerAoEReactionModal");
+                        if (m != null) Destroy(m);
+                    }
+                    else
+                    {
+                        SetLog("🛡️ Phán xét Khiên Mây thất bại. Vui lòng chọn lá [Đỡ] trên tay hoặc chịu sát thương.");
+                    }
+                }));
+            });
+        }
+
         var useGo = new GameObject("Btn_Respond", typeof(RectTransform), typeof(Image), typeof(Button));
         useGo.transform.SetParent(modal.transform, false);
         var useImage = useGo.GetComponent<Image>();
         if (buttonSprite != null) { useImage.sprite = buttonSprite; useImage.type = Image.Type.Sliced; }
         useImage.color = new Color(0.2f, 0.75f, 0.35f, 1f);
+        float useX = hasKhienMayAoE ? 30f : -160f;
+        float useW = hasKhienMayAoE ? 240f : 300f;
         SetRect(useGo.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-            new Vector2(0.5f, 0f), new Vector2(300f, 40f), new Vector2(-160f, 14f));
+            new Vector2(0.5f, 0f), new Vector2(useW, 40f), new Vector2(useX, 14f));
         var useText = AddText(useGo.transform, "Text", $"⚔️ ĐÁNH [{reqName.ToUpperInvariant()}]", 11,
             Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(useText.rectTransform);
@@ -2134,8 +2183,10 @@ public class Battle2v2UI : MonoBehaviour
         var passImage = passGo.GetComponent<Image>();
         if (buttonSprite != null) { passImage.sprite = buttonSprite; passImage.type = Image.Type.Sliced; }
         passImage.color = ThemeUI.CrimsonRed;
+        float passX = hasKhienMayAoE ? 275f : 155f;
+        float passW = hasKhienMayAoE ? 190f : 210f;
         SetRect(passGo.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-            new Vector2(0.5f, 0f), new Vector2(210f, 40f), new Vector2(155f, 14f));
+            new Vector2(0.5f, 0f), new Vector2(passW, 40f), new Vector2(passX, 14f));
         var passText = AddText(passGo.transform, "Text", "❌ CHỊU 1 SÁT THƯƠNG", 10,
             Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(passText.rectTransform);
@@ -6324,16 +6375,66 @@ public class Battle2v2UI : MonoBehaviour
         var reactionGo = new GameObject("SlashReactionPanel", typeof(RectTransform));
         reactionGo.transform.SetParent(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, false);
         var rRt = reactionGo.GetComponent<RectTransform>();
-        SetRect(rRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(700f, 56f), new Vector2(-70f, 258f));
+        bool hasKhienMay = playerCard != null && playerCard.HasEquipment(EquipmentType.Armor, "Khiên Mây");
+        float panelW = hasKhienMay ? 950f : 700f;
+        float panelX = hasKhienMay ? -10f : -70f;
+        SetRect(rRt, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(panelW, 56f), new Vector2(panelX, 258f));
 
         var btnSpr = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
+
+        if (hasKhienMay)
+        {
+            var kmBtnGo = new GameObject("Btn_KhienMay", typeof(RectTransform), typeof(Image), typeof(Button));
+            kmBtnGo.transform.SetParent(reactionGo.transform, false);
+            var kmImg = kmBtnGo.GetComponent<Image>();
+            if (btnSpr != null) { kmImg.sprite = btnSpr; kmImg.type = Image.Type.Sliced; }
+            kmImg.color = new Color(0.12f, 0.55f, 0.88f, 1f);
+            var kmRt = kmBtnGo.GetComponent<RectTransform>();
+            SetRect(kmRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(300f, 48f), new Vector2(-310f, 0));
+
+            var kmTxt = AddText(kmBtnGo.transform, "Txt", "🛡️ PHÁN XÉT KHIÊN MÂY", ThemeUI.SizeBodyLarge, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+            Fill(kmTxt.rectTransform);
+
+            var kmBtn = kmBtnGo.GetComponent<Button>();
+            kmBtn.onClick.AddListener(() =>
+            {
+                kmBtn.interactable = false;
+                kmImg.color = new Color(0.3f, 0.35f, 0.45f, 0.7f);
+                StartCoroutine(TryKhienMayDefense(playerCard, "đòn Trảm", (success) =>
+                {
+                    if (serverControlled)
+                    {
+                        DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
+                        {
+                            action = "RESPOND_ACTION",
+                            roomId = currentRoomId,
+                            seat = playerCard.SeatNumber,
+                            accepted = true,
+                            cardId = "KHIEN_MAY"
+                        }, (s) => { if (s != null) ApplyServerGameState(s); });
+                    }
+
+                    if (success)
+                    {
+                        result = SlashDefenseResult.Dodged;
+                        defenseResolved = true;
+                    }
+                    else
+                    {
+                        SetLog("🛡️ Phán xét Khiên Mây thất bại. Vui lòng chọn lá [Đỡ] trên tay hoặc bấm [Không Né].");
+                    }
+                }));
+            });
+        }
 
         var dodgeBtnGo = new GameObject("Btn_Dodge", typeof(RectTransform), typeof(Image), typeof(Button));
         dodgeBtnGo.transform.SetParent(reactionGo.transform, false);
         var dImg = dodgeBtnGo.GetComponent<Image>();
         if (btnSpr != null) { dImg.sprite = btnSpr; dImg.type = Image.Type.Sliced; }
         var dRt = dodgeBtnGo.GetComponent<RectTransform>();
-        SetRect(dRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(300f, 48f), new Vector2(-120f, 0));
+        float dX = hasKhienMay ? 10f : -120f;
+        float dW = hasKhienMay ? 280f : 300f;
+        SetRect(dRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(dW, 48f), new Vector2(dX, 0));
 
         string dodgeActionStr = "🛡️ ĐÁNH [ĐỠ] ĐỂ HÓA GIẢI";
         if (hasHolyCannon) dodgeActionStr = $"🛡️ ĐỠ KHÁC CHẤT {slashCard.GetSuitSymbol()}";
@@ -6350,7 +6451,9 @@ public class Battle2v2UI : MonoBehaviour
         if (btnSpr != null) { ndImg.sprite = btnSpr; ndImg.type = Image.Type.Sliced; }
         ndImg.color = ThemeUI.CrimsonRed;
         var ndRt = noDodgeBtnGo.GetComponent<RectTransform>();
-        SetRect(ndRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(250f, 48f), new Vector2(175f, 0));
+        float ndX = hasKhienMay ? 280f : 175f;
+        float ndW = hasKhienMay ? 220f : 250f;
+        SetRect(ndRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(ndW, 48f), new Vector2(ndX, 0));
 
         var ndTxt = AddText(noDodgeBtnGo.transform, "Txt", "❌ KHÔNG NÉ (CHỊU MÁU)", ThemeUI.SizeBody, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
         Fill(ndTxt.rectTransform);
@@ -6505,6 +6608,11 @@ public class Battle2v2UI : MonoBehaviour
                 if (battleFinished) break;
                 var currentGen = GetGeneralBySeat(seatNum);
                 if (currentGen == null || currentGen.CurrentHp <= 0) continue;
+
+                // Tuyệt đối không bao giờ hỏi lại chính người vừa dùng Diệu Kế!
+                if (lastNullifierGen != null && seatNum == lastNullifierGen.SeatNumber) continue;
+                // Vòng đầu tiên: Người dùng cẩm nang không tự hóa giải cẩm nang của chính mình
+                if (lastNullifierGen == null && caster != null && seatNum == caster.SeatNumber) continue;
 
                 // Mở Kho Cứu Tế doesn't target just one, but we process per target
                 string targetDescText = "";
@@ -8639,12 +8747,19 @@ public class Battle2v2UI : MonoBehaviour
             if (cm != null && caster != null) {
                 ShowCardAtCenter(cm, caster, target);
             }
-        } else if (type == "NULLIFY_PLAYED" || type == "RESCUE_SUCCESS" || type == "DUEL_RESPOND" || type == "AOE_DEFENDED" || type == "KHIEN_MAY_SUCCESS") {
-            // These usually don't have activeCard in delta because activeCard is the original card.
-            // But we can just play a sound based on the type.
+        } else if (type == "KHIEN_MAY_SUCCESS" || type == "KHIEN_MAY_FAILED") {
+            int tSeat = delta != null && delta.waitingTargetSeat > 0 ? delta.waitingTargetSeat : (delta != null && delta.activeCard != null ? delta.activeCard.targetSeat : 0);
+            var defender = target != null ? target : (tSeat > 0 ? GetGeneralBySeat(tSeat) : null);
+            if (defender != null && defender != playerCard)
+            {
+                StartCoroutine(TryKhienMayDefense(defender, "đòn đánh", null));
+            }
+            if (type == "KHIEN_MAY_SUCCESS") AudioManager.Instance.PlayParry();
+            else AudioManager.Instance.PlayDamage();
+        } else if (type == "NULLIFY_PLAYED" || type == "RESCUE_SUCCESS" || type == "DUEL_RESPOND" || type == "AOE_DEFENDED") {
             if (type == "NULLIFY_PLAYED") AudioManager.Instance.PlaySkill();
             if (type == "RESCUE_SUCCESS") AudioManager.Instance.PlayHeal();
-            if (type == "AOE_DEFENDED" || type == "KHIEN_MAY_SUCCESS") AudioManager.Instance.PlayParry();
+            if (type == "AOE_DEFENDED") AudioManager.Instance.PlayParry();
         }
     }
 
