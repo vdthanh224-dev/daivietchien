@@ -1540,7 +1540,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         chain.whoUsedLast = respondentSeat;
         state.activeCard = {
           ...state.activeCard,
-          isCanceled: !chain.isCanceled
+          isCanceled: chain.isCanceled
         };
 
         // Bắt đầu vòng hỏi mới từ người bên phải của người vừa dùng Diệu Kế

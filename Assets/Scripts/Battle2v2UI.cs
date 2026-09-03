@@ -1408,20 +1408,15 @@ public class Battle2v2UI : MonoBehaviour
                 if (state.activeCard != null)
                 {
                     var rootCard = CardDatabase.GetCardById(state.activeCard.cardId);
-
                     if (rootCard == null) rootCard = new CardModel { id = state.activeCard.cardId, cardName = state.activeCard.cardName };
-                    var targetGen = GetGeneralBySeat(state.activeCard.targetSeat);
-                    string targetDesc = "";
-                    if (targetGen != null) {
-                        if (rootCard.subType == CardSubType.Harvest) targetDesc = $" việc chia bài cho #{targetGen.SeatNumber} ({targetGen.GeneralName})";
-                        else targetDesc = $" lên #{targetGen.SeatNumber} ({targetGen.GeneralName})";
-                    }
-                    var casterGen = GetGeneralBySeat(state.activeCard.casterSeat);
-                    string casterDesc = casterGen != null ? $"#{casterGen.SeatNumber} ({casterGen.GeneralName}) thực thi " : "thực thi ";
+
+                    int casterSeat = state.activeCard.casterSeat;
+                    int targetSeat = state.activeCard.targetSeat;
                     bool isCurrentlyCanceled = state.activeCard.isCanceled;
-                    string qText = !isCurrentlyCanceled
-                        ? $"Có dùng Diệu Kế Phá Mưu để ngăn chặn\n{casterDesc}{GetFormattedCardName(rootCard)}{targetDesc} không?"
-                        : $"Có dùng Diệu Kế Phá Mưu để phá giải Diệu Kế của Ghế {state.nullifyChain.whoUsedLast}\nnhằm vào {GetFormattedCardName(rootCard)}{targetDesc} không?";
+                    int whoUsedLast = state.nullifyChain != null ? state.nullifyChain.whoUsedLast : 0;
+                    bool isWaitingForMe = state.waitingTargetSeat == playerCard.SeatNumber;
+
+                    string qText = BuildNullifyPromptQuestion(rootCard, casterSeat, targetSeat, isCurrentlyCanceled, whoUsedLast, isWaitingForMe);
                     if (state.waitingTargetSeat == playerCard.SeatNumber)
                     {
                         // Xóa modal chờ cũ (nếu có)
@@ -6490,6 +6485,7 @@ public class Battle2v2UI : MonoBehaviour
         };
         AppwriteRealtimeClient.OnBattleActionReceived += onGlobalNullifyAction;
 
+        GeneralCardUI lastNullifierGen = null;
         while (!battleFinished)
         {
             bool someoneUsedInThisRound = false;
@@ -6516,12 +6512,11 @@ public class Battle2v2UI : MonoBehaviour
                     if (rootScroll.subType == CardSubType.Harvest) targetDescText = $" việc chia bài cho #{target.SeatNumber} ({target.GeneralName})";
                     else targetDescText = $" lên #{target.SeatNumber} ({target.GeneralName})";
                 }
-                string casterDesc = (caster != null) ? $"{caster.GeneralName} dùng " : "Thực thi ";
-                string questionText = !isCurrentlyCanceled
-                    ? (rootScroll.subType == CardSubType.Harvest 
-                        ? $"Có dùng Diệu Kế Phá Mưu để ngăn chặn {casterDesc}{GetFormattedCardName(rootScroll)}{targetDescText} không?" 
-                        : $"Có dùng Diệu Kế Phá Mưu để ngăn chặn {casterDesc}{GetFormattedCardName(rootScroll)}{targetDescText} không?")
-                    : $"Có dùng Diệu Kế Phá Mưu để phá giải Diệu Kế của đối phương\nnhằm vào {GetFormattedCardName(rootScroll)}{targetDescText} không?";
+                int cSeat = caster != null ? caster.SeatNumber : 1;
+                int tSeat = target != null ? target.SeatNumber : 0;
+                int lastNullifierSeat = lastNullifierGen != null ? lastNullifierGen.SeatNumber : 0;
+                bool isForMe = currentGen == playerCard;
+                string questionText = BuildNullifyPromptQuestion(rootScroll, cSeat, tSeat, isCurrentlyCanceled, lastNullifierSeat, isForMe);
                 currentGen.ShowHeadTimer(40);
                 SetLog($"⏳ Đang hỏi <b>{currentGen.GeneralName}</b> (Ghế {currentGen.SeatNumber}): <i>\"{questionText}\"</i>");
 
@@ -6725,6 +6720,7 @@ public class Battle2v2UI : MonoBehaviour
                     isCurrentlyCanceled = !isCurrentlyCanceled;
                     someoneUsedInThisRound = true;
                     whoUsedThisRound = currentGen;
+                    lastNullifierGen = currentGen;
 
                     SetLog($"🛡️ <b>{currentGen.GeneralName}</b> đã tung <color=#55FF55><b>[Diệu Kế Phá Mưu]</b></color>! Trạng thái mưu kế {GetFormattedCardName(rootScroll)}: {(isCurrentlyCanceled ? "<color=#FF5555>BỊ VÔ HIỆU HÓA</color>" : "<color=#55FF55>ĐƯỢC BẢO VỆ THÀNH CÔNG</color>")}.");
 
@@ -6961,6 +6957,100 @@ public class Battle2v2UI : MonoBehaviour
         onResolved?.Invoke(wantsFollowUp, followUpCard);
     }
 
+    private string GetGeneralDisplayNameWithRole(int seat)
+    {
+        if (playerCard == null) return $"Ghế {seat}";
+        if (seat == playerCard.SeatNumber) return "BẠN";
+        var g = GetGeneralBySeat(seat);
+        string name = g != null ? g.GeneralName : $"Ghế #{seat}";
+        bool isAlly = (seat == 1 || seat == 3) == (playerCard.SeatNumber == 1 || playerCard.SeatNumber == 3);
+        return isAlly ? $"{name} (Đồng đội)" : $"{name} (Đối thủ)";
+    }
+
+    private string BuildNullifyPromptQuestion(CardModel rootCard, int casterSeat, int targetSeat, bool isCurrentlyCanceled, int whoUsedLast, bool isWaitingForMe)
+    {
+        string cardName = rootCard != null ? GetFormattedCardName(rootCard) : "Cẩm Nang";
+        string casterDesc = GetGeneralDisplayNameWithRole(casterSeat);
+        string targetDesc = targetSeat > 0 ? GetGeneralDisplayNameWithRole(targetSeat) : "toàn bàn đấu";
+
+        // TÌNH HUỐNG 1: Chưa có ai dùng Diệu Kế (Vòng hỏi đầu tiên)
+        if (whoUsedLast <= 0 && !isCurrentlyCanceled)
+        {
+            if (isWaitingForMe)
+            {
+                if (targetSeat == playerCard.SeatNumber)
+                {
+                    return $"📜 <b>{casterDesc}</b> thi triển {cardName} nhắm vào <b>BẠN</b>!\n" +
+                           $"👉 Bạn có muốn dùng <color=#55FF55><b>[Diệu Kế Phá Mưu]</b></color> để <b>TỰ HÓA GIẢI</b> không?";
+                }
+                bool targetIsAlly = targetSeat > 0 && ((targetSeat == 1 || targetSeat == 3) == (playerCard.SeatNumber == 1 || playerCard.SeatNumber == 3));
+                if (targetIsAlly)
+                {
+                    return $"📜 <b>{casterDesc}</b> thi triển {cardName} nhắm vào <b>{targetDesc}</b>!\n" +
+                           $"👉 Bạn có muốn dùng <color=#55FF55><b>[Diệu Kế Phá Mưu]</b></color> để <b>GIẢI CỨU ĐỒNG ĐỘI</b> không?";
+                }
+                return $"📜 <b>{casterDesc}</b> thi triển {cardName} nhắm vào <b>{targetDesc}</b>.\n" +
+                       $"👉 Bạn có muốn dùng <color=#55FF55><b>[Diệu Kế Phá Mưu]</b></color> để <b>NGĂN CHẶN</b> cẩm nang này không?";
+            }
+            else
+            {
+                return $"📜 <b>{casterDesc}</b> thi triển {cardName} nhắm vào <b>{targetDesc}</b>.\n" +
+                       $"Đang chờ phản hồi Diệu Kế...";
+            }
+        }
+
+        // TÌNH HUỐNG 2: Đã có người tung Diệu Kế trước đó (Chuỗi Diệu Kế phản hồi)
+        string lastUserDesc = whoUsedLast > 0 ? GetGeneralDisplayNameWithRole(whoUsedLast) : "Đối phương";
+        bool rootCasterIsAlly = (casterSeat == 1 || casterSeat == 3) == (playerCard.SeatNumber == 1 || playerCard.SeatNumber == 3);
+
+        if (isCurrentlyCanceled)
+        {
+            // Cẩm nang gốc HIỆN ĐANG BỊ VÔ HIỆU HÓA bởi lastUserDesc!
+            if (isWaitingForMe)
+            {
+                if (rootCasterIsAlly)
+                {
+                    return $"📜 {cardName} của <b>{casterDesc}</b> (nhắm vào <b>{targetDesc}</b>)\n" +
+                           $"⚡ Đang bị <b><color=#FF5555>{lastUserDesc}</color></b> dùng [Diệu Kế] <b>HỦY BỎ</b>!\n" +
+                           $"👉 Bạn có muốn dùng <color=#55FF55><b>[Diệu Kế Phá Mưu]</b></color> để <b>HÓA GIẢI DIỆU KẾ CỦA {lastUserDesc.ToUpper()}</b> (giúp cẩm nang tiếp tục hiệu lực) không?";
+                }
+                else
+                {
+                    return $"📜 {cardName} của <b>{casterDesc}</b> (nhắm vào <b>{targetDesc}</b>)\n" +
+                           $"⚡ Đang bị <b><color=#55FF55>{lastUserDesc}</color></b> dùng [Diệu Kế] hóa giải.\n" +
+                           $"👉 Bạn có muốn dùng <color=#55FF55><b>[Diệu Kế Phá Mưu]</b></color> để <b>PHÁ GIẢI TIẾP</b> không?";
+                }
+            }
+            else
+            {
+                return $"📜 {cardName} của <b>{casterDesc}</b> nhắm vào <b>{targetDesc}</b> đang bị <b>{lastUserDesc}</b> hóa giải.";
+            }
+        }
+        else
+        {
+            // Cẩm nang gốc HIỆN ĐANG ĐƯỢC BẢO VỆ và CHUẨN BỊ CÓ HIỆU LỰC!
+            if (isWaitingForMe)
+            {
+                if (!rootCasterIsAlly)
+                {
+                    return $"📜 {cardName} của <b>{casterDesc}</b> (nhắm vào <b>{targetDesc}</b>)\n" +
+                           $"⚡ Vừa được <b><color=#FF5555>{lastUserDesc}</color></b> bảo vệ thành công và chuẩn bị giáng đòn!\n" +
+                           $"👉 Bạn có muốn dùng <color=#55FF55><b>[Diệu Kế Phá Mưu]</b></color> để <b>HỦY BỎ LẦN NỮA</b> không?";
+                }
+                else
+                {
+                    return $"📜 {cardName} của <b>{casterDesc}</b> nhắm vào <b>{targetDesc}</b>\n" +
+                           $"⚡ Đang được bảo vệ bởi [Diệu Kế] của <b>{lastUserDesc}</b>.\n" +
+                           $"👉 Bạn có muốn dùng tiếp <color=#55FF55><b>[Diệu Kế Phá Mưu]</b></color> không?";
+                }
+            }
+            else
+            {
+                return $"📜 {cardName} của <b>{casterDesc}</b> nhắm vào <b>{targetDesc}</b> đang chuẩn bị có hiệu lực.";
+            }
+        }
+    }
+
     private IEnumerator PromptPlayerCounterScroll(CardModel scrollCard, string promptTitle, List<CardModel> counterCards, Action<bool, CardModel> onResolved)
     {
         if (counterCards == null || counterCards.Count == 0)
@@ -6986,10 +7076,10 @@ public class Battle2v2UI : MonoBehaviour
         if (bgSpr != null) { pImg.sprite = bgSpr; pImg.type = Image.Type.Sliced; }
         pImg.color = new Color(0.04f, 0.07f, 0.14f, 0.98f);
 
-        float panelH = (counterCards.Count > 1) ? 260f : 210f;
+        float panelH = (counterCards.Count > 1) ? 320f : 270f;
         var pRt = panelGo.GetComponent<RectTransform>();
         pRt.anchorMin = pRt.anchorMax = pRt.pivot = new Vector2(0.5f, 0.5f);
-        pRt.sizeDelta = new Vector2(780f, panelH);
+        pRt.sizeDelta = new Vector2(840f, panelH);
         pRt.anchoredPosition = new Vector2(0f, 65f);
 
         var fGo = new GameObject("Frame", typeof(RectTransform), typeof(Image));
@@ -7009,12 +7099,12 @@ public class Battle2v2UI : MonoBehaviour
         var timerTxt = AddText(panelGo.transform, "Timer", "⏳ Còn 40s...", 16, ThemeUI.CyanPrimary, FontStyle.Bold, TextAnchor.MiddleRight);
         SetRect(timerTxt.rectTransform, new Vector2(0.7f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(0, 28f), new Vector2(-24f, -12f));
 
-        // 3. Câu hỏi cẩm nang ở giữa (y = -44f, không bị đè bởi bất cứ thành phần nào)
-        var qTxt = AddText(panelGo.transform, "Question", promptTitle, 16, new Color(0.92f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
-        qTxt.lineSpacing = 1.25f;
+        // 3. Câu hỏi cẩm nang ở giữa (y = -44f, chiều cao 115f, lineSpacing rộng rãi, không bị cắt chữ)
+        var qTxt = AddText(panelGo.transform, "Question", promptTitle, 15, new Color(0.92f, 0.95f, 1f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
+        qTxt.lineSpacing = 1.3f;
         qTxt.horizontalOverflow = HorizontalWrapMode.Wrap;
-        qTxt.verticalOverflow = VerticalWrapMode.Truncate;
-        SetRect(qTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(-48f, 54f), new Vector2(0f, -44f));
+        qTxt.verticalOverflow = VerticalWrapMode.Overflow;
+        SetRect(qTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(-48f, 115f), new Vector2(0f, -44f));
 
         var btnSpr = LotusHealthUI.LoadSpriteFromResources("UI/btn_gold");
         var slotSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
@@ -7206,7 +7296,7 @@ public class Battle2v2UI : MonoBehaviour
 
         var pRt = panelGo.GetComponent<RectTransform>();
         pRt.anchorMin = pRt.anchorMax = pRt.pivot = new Vector2(0.5f, 0.5f);
-        pRt.sizeDelta = new Vector2(740f, 160f);
+        pRt.sizeDelta = new Vector2(820f, 200f);
         pRt.anchoredPosition = new Vector2(0f, 65f);
 
         var fGo = new GameObject("Frame", typeof(RectTransform), typeof(Image));
@@ -7225,13 +7315,13 @@ public class Battle2v2UI : MonoBehaviour
         var timerTxt = AddText(panelGo.transform, "Timer", "⏳ Đang chờ (40s)...", 16, ThemeUI.CyanPrimary, FontStyle.Bold, TextAnchor.MiddleRight);
         SetRect(timerTxt.rectTransform, new Vector2(0.7f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(0, 28f), new Vector2(-24f, -12f));
 
-        var qTxt = AddText(panelGo.transform, "Question", questionText, 15, new Color(0.85f, 0.9f, 0.98f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
+        var qTxt = AddText(panelGo.transform, "Question", questionText, 14, new Color(0.85f, 0.9f, 0.98f, 1f), FontStyle.Normal, TextAnchor.MiddleCenter);
         qTxt.lineSpacing = 1.25f;
         qTxt.horizontalOverflow = HorizontalWrapMode.Wrap;
-        qTxt.verticalOverflow = VerticalWrapMode.Truncate;
-        SetRect(qTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(-48f, 60f), new Vector2(0f, -44f));
+        qTxt.verticalOverflow = VerticalWrapMode.Overflow;
+        SetRect(qTxt.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(-48f, 95f), new Vector2(0f, -44f));
 
-        var waitBadge = AddText(panelGo.transform, "Badge", "<i>Đối phương đang suy nghĩ có nên thi triển Diệu Kế Phá Mưu hay không...</i>", 13, new Color(0.6f, 0.7f, 0.85f, 0.8f), FontStyle.Italic, TextAnchor.MiddleCenter);
+        var waitBadge = AddText(panelGo.transform, "Badge", "<i>Đang đợi người chơi suy nghĩ có nên thi triển Diệu Kế Phá Mưu hay không...</i>", 13, new Color(0.6f, 0.7f, 0.85f, 0.8f), FontStyle.Italic, TextAnchor.MiddleCenter);
         SetRect(waitBadge.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 28f), new Vector2(0f, 10f));
 
         return panelGo;
