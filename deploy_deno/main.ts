@@ -81,27 +81,44 @@ async function decodePersistedState(value: string): Promise<any | null> {
 
 console.log("🎮 [Deno Server] Đại Việt Chiến 2v2 Unified Game Server is running!");
 
-// Keep timers and AI turns authoritative even when no client sends messages.
-setInterval(() => {
-  for (const [roomId, room] of rooms.entries()) {
-    if (!room?.state || room.state.status === "FINISHED") continue;
-    try {
-      if (tickGameState(room.state).important) {
-        room.lastActivity = Date.now();
-        broadcastRoom(room, {
-          type: "STATE_UPDATE",
-          state: room.state,
-          delta: room.state.lastDelta || null,
-          version: room.state.version,
-          action: "SERVER_TICK",
-        });
-        saveStateToDatabase(roomId, room.state);
+// Dynamic Tick Timer: Only runs when active rooms exist, allowing Deno to scale to 0 CPU when idle
+let tickTimer: number | null = null;
+
+function ensureTickTimer() {
+  if (tickTimer !== null) return;
+  tickTimer = setInterval(() => {
+    if (rooms.size === 0) {
+      if (tickTimer !== null) {
+        clearInterval(tickTimer);
+        tickTimer = null;
       }
-    } catch (err) {
-      console.error(`[Tick Error room ${roomId}]:`, err);
+      return;
     }
-  }
-}, 1000);
+    const now = Date.now();
+    for (const [roomId, room] of rooms.entries()) {
+      // Dọn dẹp phòng đã kết thúc hoặc không hoạt động quá 15 phút
+      if (!room?.state || room.state.status === "FINISHED" || (now - room.lastActivity > 900000)) {
+        rooms.delete(roomId);
+        continue;
+      }
+      try {
+        if (tickGameState(room.state).important) {
+          room.lastActivity = now;
+          broadcastRoom(room, {
+            type: "STATE_UPDATE",
+            state: room.state,
+            delta: room.state.lastDelta || null,
+            version: room.state.version,
+            action: "SERVER_TICK",
+          });
+          saveStateToDatabase(roomId, room.state);
+        }
+      } catch (err) {
+        console.error(`[Tick Error room ${roomId}]:`, err);
+      }
+    }
+  }, 1000);
+}
 
 
 async function loadStateFromDatabase(roomId: string) {
@@ -275,6 +292,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
               lastActivity: Date.now(),
             };
             rooms.set(roomId, room);
+            ensureTickTimer();
             console.log(`[Deno WS] Phòng mới: ${roomId}`);
             saveStateToDatabase(roomId, room.state);
           }
@@ -455,6 +473,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
         const state = initGame(roomId, players);
         room = { state, sockets: new Map(), lastActivity: Date.now() };
         rooms.set(roomId, room);
+        ensureTickTimer();
         saveStateToDatabase(roomId, state);
         return new Response(JSON.stringify({ success: true, state: sanitizeGameStateForClient(state, requestSeat || 1) }), {
           headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
@@ -466,6 +485,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
         if (dbState) {
           room = { state: dbState, sockets: new Map(), lastActivity: Date.now() };
           rooms.set(roomId, room);
+          ensureTickTimer();
         } else {
           return new Response(JSON.stringify({ success: false, error: "Phòng đấu chưa được khởi tạo" }), { status: 404 });
         }
