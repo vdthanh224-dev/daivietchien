@@ -1,0 +1,141 @@
+[gd_scene load_steps=3 format=3 uid="uid://generalseat123"]
+
+[ext_resource type="Script" path="res://scenes/components/general_seat_ui.gd" id="1_script"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_seat_bg"]
+bg_color = Color(0.972549, 0.960784, 0.92549, 0.96)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.831373, 0.686275, 0.215686, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+shadow_color = Color(0, 0, 0, 0.3)
+shadow_size = 5
+shadow_offset = Vector2(0, 3)
+
+[node name="GeneralSeatUI" type="Control"]
+custom_minimum_size = Vector2(195, 155)
+layout_mode = 3
+anchors_preset = 0
+offset_right = 195.0
+offset_bottom = 155.0
+script = ExtResource("1_script")
+
+[node name="Panel" type="Panel" parent="."]
+custom_minimum_size = Vector2(195, 155)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_seat_bg")
+
+[node name="Margin" type="MarginContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="VBox" type="VBoxContainer" parent="Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Header" type="HBoxContainer" parent="Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="NameLabel" type="Label" parent="Panel/Margin/VBox/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.109804, 0.086275, 0.047059, 1)
+theme_override_font_sizes/font_size = 12
+text = "Trần Hưng Đạo"
+clip_text = true
+
+[node name="RoleBadge" type="Label" parent="Panel/Margin/VBox/Header"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "BẠN"
+
+[node name="HPContainer" type="HBoxContainer" parent="Panel/Margin/VBox"]
+layout_mode = 2
+
+[node name="HPText" type="Label" parent="Panel/Margin/VBox/HPContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.1, 0.1, 1)
+theme_override_font_sizes/font_size = 11
+text = "🌸 🌸 🌸 🌸 (4/4)"
+
+[node name="HSeparator" type="HSeparator" parent="Panel/Margin/VBox"]
+layout_mode = 2
+
+[node name="Status" type="HBoxContainer" parent="Panel/Margin/VBox"]
+layout_mode = 2
+
+[node name="HandCountLabel" type="Label" parent="Panel/Margin/VBox/Status"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_font_sizes/font_size = 11
+text = "🎴 4 lá"
+
+[node name="TimerLabel" type="Label" parent="Panel/Margin/VBox/Status"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.5, 0.1, 1)
+theme_override_font_sizes/font_size = 11
+text = "⏳ 40s"
+
+[node name="Equips" type="VBoxContainer" parent="Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="Weapon" type="Label" parent="Panel/Margin/VBox/Equips"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 10
+text = "⚔️ Trống"
+
+[node name="Armor" type="Label" parent="Panel/Margin/VBox/Equips"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.15, 0.45, 0.7, 1)
+theme_override_font_sizes/font_size = 10
+text = "🛡️ Trống"
+
+[node name="ChainOverlay" type="ColorRect" parent="Panel"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.1, 0.1, 0.1, 0.65)
+
+[node name="ChainLabel" type="Label" parent="Panel/ChainOverlay"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -60.0
+offset_top = -12.0
+offset_right = 60.0
+offset_bottom = 12.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.8, 0.2, 1)
+theme_override_font_sizes/font_size = 11
+text = "⛓️ XÍCH LIÊN HOÀN"
+horizontal_alignment = 1
