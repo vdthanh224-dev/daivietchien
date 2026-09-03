@@ -22,13 +22,13 @@ export const CARD_SUBTYPES = {
   SNATCH: 12,
   EX_NIHILO: 13,
   DUEL: 14,
-  HARVEST: 15,
-  BARBARIAN_INVASION: 16,
-  ARROW_RAIN: 17,
-  LIGHTNING: 18,
-  SUPPLY_SHORTAGE: 19,
-  ACEDIA: 20,
-  IRON_CHAIN: 21
+  IRON_CHAIN: 15,
+  HARVEST: 16,
+  BARBARIAN_INVASION: 17,
+  ARROW_RAIN: 18,
+  LIGHTNING: 19,
+  SUPPLY_SHORTAGE: 20,
+  ACEDIA: 21
 };
 
 export function createCard(id, name, suit, rank, category, subType, desc, range = 1, distMod = 0) {
@@ -89,10 +89,10 @@ export function createDeck80() {
   list.push(createCard("D_S_Q_Ruou", "Hủ Rượu", "Spade", 12, 0, 5, "Uống trước khi Trảm hoặc tự cứu 0 máu"));
 
   // 7. XÍCH TÂM TỎA (4 lá)
-  list.push(createCard("D_S_K_Xich", "Xích Tâm Tỏa", "Spade", 13, 2, 21, "Trói tối đa 2 mục tiêu bằng Xích Liên Hoàn"));
-  list.push(createCard("D_C_A_Xich", "Xích Tâm Tỏa", "Club", 1, 2, 21, "Trói tối đa 2 mục tiêu bằng Xích Liên Hoàn"));
-  list.push(createCard("D_S_10_Xich", "Xích Tâm Tỏa", "Spade", 10, 2, 21, "Trói tối đa 2 mục tiêu bằng Xích Liên Hoàn"));
-  list.push(createCard("D_C_J_Xich", "Xích Tâm Tỏa", "Club", 11, 2, 21, "Trói tối đa 2 mục tiêu bằng Xích Liên Hoàn"));
+  list.push(createCard("D_S_K_Xich", "Xích Tâm Tỏa", "Spade", 13, 2, 15, "Trói tối đa 2 mục tiêu bằng Xích Liên Hoàn"));
+  list.push(createCard("D_C_A_Xich", "Xích Tâm Tỏa", "Club", 1, 2, 15, "Trói tối đa 2 mục tiêu bằng Xích Liên Hoàn"));
+  list.push(createCard("D_S_10_Xich", "Xích Tâm Tỏa", "Spade", 10, 2, 15, "Trói tối đa 2 mục tiêu bằng Xích Liên Hoàn"));
+  list.push(createCard("D_C_J_Xich", "Xích Tâm Tỏa", "Club", 11, 2, 15, "Trói tối đa 2 mục tiêu bằng Xích Liên Hoàn"));
 
   // 8. DIỆU KẾ PHÁ MƯU (4 lá)
   list.push(createCard("D_H_A_DieuKe", "Diệu Kế Phá Mưu", "Heart", 1, 2, 10, "Vô hiệu hóa 1 Cẩm nang bất kỳ"));
@@ -123,23 +123,23 @@ export function createDeck80() {
   list.push(createCard("D_D_A_ThachDau", "Thách Đấu", "Diamond", 1, 2, 14, "Quyết đấu luân phiên ra Trảm"));
 
   // 13. BÃI CỌC NGẦM - NAM MAN XÂM LẤN (2 lá)
-  list.push(createCard("D_C_2_BaiCoc", "Bãi Cọc Ngầm", "Club", 2, 2, 16, "Mọi người khác phải ra Trảm hoặc mất 1 máu"));
-  list.push(createCard("D_S_7_BaiCoc", "Bãi Cọc Ngầm", "Spade", 7, 2, 16, "Mọi người khác phải ra Trảm hoặc mất 1 máu"));
+  list.push(createCard("D_C_2_BaiCoc", "Bãi Cọc Ngầm", "Club", 2, 2, 17, "Mọi người khác phải ra Trảm hoặc mất 1 máu"));
+  list.push(createCard("D_S_7_BaiCoc", "Bãi Cọc Ngầm", "Spade", 7, 2, 17, "Mọi người khác phải ra Trảm hoặc mất 1 máu"));
 
   // 14. MƯA TÊN LIÊN CHÂU - VẠN TIỄN TỀ PHÁT (2 lá)
-  list.push(createCard("D_H_10_MuaTen", "Mưa Tên Liên Châu", "Heart", 10, 2, 17, "Mọi người khác phải ra Đỡ hoặc mất 1 máu"));
-  list.push(createCard("D_H_A_MuaTen", "Mưa Tên Liên Châu", "Heart", 1, 2, 17, "Mọi người khác phải ra Đỡ hoặc mất 1 máu"));
+  list.push(createCard("D_H_10_MuaTen", "Mưa Tên Liên Châu", "Heart", 10, 2, 18, "Mọi người khác phải ra Đỡ hoặc mất 1 máu"));
+  list.push(createCard("D_H_A_MuaTen", "Mưa Tên Liên Châu", "Heart", 1, 2, 18, "Mọi người khác phải ra Đỡ hoặc mất 1 máu"));
 
   // 15. MỞ KHO CỨU TẾ - NGŨ CỐC PHONG ĐĂNG (2 lá)
-  list.push(createCard("D_H_A_KhoCuuTe", "Mở Kho Cứu Tế", "Heart", 1, 2, 15, "Lật bài từ cọc cho mọi người lần lượt chọn"));
-  list.push(createCard("D_H_3_KhoCuuTe", "Mở Kho Cứu Tế", "Heart", 3, 2, 15, "Lật bài từ cọc cho mọi người lần lượt chọn"));
+  list.push(createCard("D_H_A_KhoCuuTe", "Mở Kho Cứu Tế", "Heart", 1, 2, 16, "Lật bài từ cọc cho mọi người lần lượt chọn"));
+  list.push(createCard("D_H_3_KhoCuuTe", "Mở Kho Cứu Tế", "Heart", 3, 2, 16, "Lật bài từ cọc cho mọi người lần lượt chọn"));
 
   // 16. CẨM NANG TRÌ HOÃN (5 lá)
-  list.push(createCard("D_C_A_SamSet", "Thần Sấm Báo Ứng", "Club", 1, 3, 18, "Phán xét: Bích 2-9 chịu 3 sát thương Lôi"));
-  list.push(createCard("D_D_J_CatLuong", "Cắt Đường Lương", "Diamond", 11, 3, 19, "Phán xét: không phải Chuồn -> mất lượt rút bài"));
-  list.push(createCard("D_C_J_CatLuong", "Cắt Đường Lương", "Club", 11, 3, 19, "Phán xét: không phải Chuồn -> mất lượt rút bài"));
-  list.push(createCard("D_H_6_TramAo", "Trầm Ảo Sa Bẫy", "Heart", 6, 3, 20, "Phán xét: không phải Cơ -> bỏ qua Ra bài"));
-  list.push(createCard("D_S_6_TramAo", "Trầm Ảo Sa Bẫy", "Spade", 6, 3, 20, "Phán xét: không phải Cơ -> bỏ qua Ra bài"));
+  list.push(createCard("D_C_A_SamSet", "Thần Sấm Báo Ứng", "Club", 1, 3, 19, "Phán xét: Bích 2-9 chịu 3 sát thương Lôi"));
+  list.push(createCard("D_D_J_CatLuong", "Cắt Đường Lương", "Diamond", 11, 3, 20, "Phán xét: không phải Chuồn -> mất lượt rút bài"));
+  list.push(createCard("D_C_J_CatLuong", "Cắt Đường Lương", "Club", 11, 3, 20, "Phán xét: không phải Chuồn -> mất lượt rút bài"));
+  list.push(createCard("D_H_6_TramAo", "Trầm Ảo Sa Bẫy", "Heart", 6, 3, 21, "Phán xét: không phải Cơ -> bỏ qua Ra bài"));
+  list.push(createCard("D_S_6_TramAo", "Trầm Ảo Sa Bẫy", "Spade", 6, 3, 21, "Phán xét: không phải Cơ -> bỏ qua Ra bài"));
 
   // 17. TRANG BỊ: VŨ KHÍ (4 lá)
   list.push(createCard("D_D_A_Kiem", "Kiếm Thuận Thiên", "Diamond", 1, 1, 6, "Tầm 2. Thanh bảo kiếm hộ quốc", 2));

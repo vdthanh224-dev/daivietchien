@@ -820,32 +820,50 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
             var rt = chainedOverlayGo.GetComponent<RectTransform>();
             FillRect(rt);
 
-            // Viền dây xích hoàng kim bao quanh tướng
+            // 1. Viền dây xích hoàng kim phát sáng bao quanh tướng
             var chainBorder = new GameObject("ChainBorder", typeof(RectTransform), typeof(Image));
             chainBorder.transform.SetParent(chainedOverlayGo.transform, false);
             var cbImg = chainBorder.GetComponent<Image>();
             var fSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
             if (fSpr != null) { cbImg.sprite = fSpr; cbImg.type = Image.Type.Sliced; }
-            cbImg.color = new Color(1f, 0.65f, 0.15f, 1f);
+            cbImg.color = new Color(1f, 0.72f, 0.15f, 1f);
             cbImg.raycastTarget = false;
             FillRect(chainBorder.GetComponent<RectTransform>(), new Vector2(-4, -4), new Vector2(4, 4));
 
-            // 4 biểu tượng xích nhỏ trang nhã ở 4 góc viền
-            var tl = ThemeUI.CreateText(chainedOverlayGo.transform, "TL", "⛓️", 15, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, false);
-            ThemeUI.SetRect(tl.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(22f, 22f), new Vector2(6f, -6f));
+            // 2. Hiệu ứng Dây Xích Sắt & Kim Quang đan chéo toàn thân thẻ tướng
+            var chainLinks = new GameObject("ChainLinksOverlay", typeof(RectTransform), typeof(Image));
+            chainLinks.transform.SetParent(chainedOverlayGo.transform, false);
+            var clImg = chainLinks.GetComponent<Image>();
+            var cSpr = LotusHealthUI.LoadSpriteFromResources("UI/chain_overlay");
+            if (cSpr != null)
+            {
+                clImg.sprite = cSpr;
+                clImg.color = new Color(1f, 1f, 1f, 0.92f);
+            }
+            clImg.raycastTarget = false;
+            FillRect(chainLinks.GetComponent<RectTransform>());
 
-            var tr = ThemeUI.CreateText(chainedOverlayGo.transform, "TR", "⛓️", 15, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, false);
-            ThemeUI.SetRect(tr.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(22f, 22f), new Vector2(-6f, -6f));
-
-            var bl = ThemeUI.CreateText(chainedOverlayGo.transform, "BL", "⛓️", 15, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, false);
-            ThemeUI.SetRect(bl.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(22f, 22f), new Vector2(6f, 6f));
-
-            var br = ThemeUI.CreateText(chainedOverlayGo.transform, "BR", "⛓️", 15, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, false);
-            ThemeUI.SetRect(br.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(22f, 22f), new Vector2(-6f, 6f));
+            // 3. Ổ Khóa Xích Hoàng Kim uy nghiêm ở góc trên bên phải
+            var padGo = new GameObject("ChainPadlockBadge", typeof(RectTransform), typeof(Image));
+            padGo.transform.SetParent(chainedOverlayGo.transform, false);
+            var pImg = padGo.GetComponent<Image>();
+            var pSpr = LotusHealthUI.LoadSpriteFromResources("UI/chain_padlock_icon");
+            if (pSpr != null)
+            {
+                pImg.sprite = pSpr;
+                pImg.preserveAspect = true;
+            }
+            pImg.raycastTarget = false;
+            var padRt = padGo.GetComponent<RectTransform>();
+            padRt.anchorMin = padRt.anchorMax = new Vector2(1f, 1f);
+            padRt.pivot = new Vector2(1f, 1f);
+            padRt.sizeDelta = new Vector2(44f, 46f);
+            padRt.anchoredPosition = new Vector2(-4f, -4f);
         }
 
         if (chainedOverlayGo != null)
         {
+            chainedOverlayGo.transform.SetAsLastSibling();
             chainedOverlayGo.SetActive(chained);
         }
     }

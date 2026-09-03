@@ -803,6 +803,10 @@ export function startNullifyChain(state, card, casterSeat, targetSeat = 0, conti
     const p = state.players.find(x => x.seat === s);
     // Chỉ hỏi những người CÓ Diệu Kế Phá Mưu trên tay
     if (p && p.hp > 0) {
+      // Khi vừa dùng cẩm nang ban đầu, người dùng (caster) không tự hóa giải cẩm nang của chính mình
+      if (s === casterSeat && (!state.nullifyChain || state.nullifyChain.whoUsedLast === null)) {
+        continue;
+      }
       const hasNullify = p.hand && p.hand.some(c => c.subType === CARD_SUBTYPES.FLAWLESS_DEFENSE || (c.name && c.name.includes("Diệu Kế")));
       if (hasNullify) {
         querySeats.push(s);

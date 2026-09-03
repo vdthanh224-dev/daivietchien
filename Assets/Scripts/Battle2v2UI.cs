@@ -4641,8 +4641,15 @@ public class Battle2v2UI : MonoBehaviour
         }
 
         // Mỗi lần chọn lá bài mới -> Xóa mục tiêu cũ đã chọn trước đó
+        currentSelectedIronChainTargets.Clear();
         ClearSelectedTarget();
         currentSelectedCardUI = cardUI;
+        if (cardUI.Data != null && cardUI.Data.subType == CardSubType.IronChain)
+        {
+            if (enemy1Card != null && enemy1Card.CurrentHp > 0) currentSelectedIronChainTargets.Add(enemy1Card);
+            if (enemy2Card != null && enemy2Card.CurrentHp > 0 && currentSelectedIronChainTargets.Count < 2) currentSelectedIronChainTargets.Add(enemy2Card);
+            if (currentSelectedIronChainTargets.Count == 0 && playerCard != null) currentSelectedIronChainTargets.Add(playerCard);
+        }
         UpdateActionButtonState();
     }
 
@@ -4898,13 +4905,12 @@ public class Battle2v2UI : MonoBehaviour
             {
                 if (currentSelectedIronChainTargets.Count == 0)
                 {
-                    btn.interactable = false;
-                    btnImg.color = new Color(0.45f, 0.5f, 0.55f, 0.95f);
-                    actionBtnText.text = "🎯 HÃY CHẠM 1 HOẶC 2 TƯỚNG TRÊN BÀN";
-                    SetLog("⛓️ <color=#FFD700><b>[XÍCH TÂM TỎA]</b></color>: Hãy chạm trực tiếp vào 1 hoặc 2 tướng trên bàn đấu để trói / gỡ xích!");
-                    return;
+                    if (enemy1Card != null && enemy1Card.CurrentHp > 0) currentSelectedIronChainTargets.Add(enemy1Card);
+                    if (enemy2Card != null && enemy2Card.CurrentHp > 0 && currentSelectedIronChainTargets.Count < 2) currentSelectedIronChainTargets.Add(enemy2Card);
+                    if (currentSelectedIronChainTargets.Count == 0 && playerCard != null) currentSelectedIronChainTargets.Add(playerCard);
                 }
-                else if (currentSelectedIronChainTargets.Count == 1)
+
+                if (currentSelectedIronChainTargets.Count == 1)
                 {
                     btn.interactable = true;
                     btnImg.color = new Color(0.92f, 0.65f, 0.15f, 1f);
@@ -4912,12 +4918,20 @@ public class Battle2v2UI : MonoBehaviour
                     SetLog($"💡 Nhấn [{actionBtnText.text}] hoặc chạm thêm 1 tướng nữa để chọn 2 mục tiêu!");
                     return;
                 }
-                else
+                else if (currentSelectedIronChainTargets.Count >= 2)
                 {
                     btn.interactable = true;
                     btnImg.color = new Color(0.92f, 0.65f, 0.15f, 1f);
                     actionBtnText.text = $"⛓️ KHÓA/GỠ XÍCH [{currentSelectedIronChainTargets[0].GeneralName.ToUpper()} & {currentSelectedIronChainTargets[1].GeneralName.ToUpper()}] (2/2)";
-                    SetLog($"💡 Đã chọn đủ 2 tướng. Nhấn [{actionBtnText.text}] để thi triển Xích Liên Hoàn!");
+                    SetLog($"💡 Đã chọn 2 tướng. Nhấn [{actionBtnText.text}] hoặc chạm avatar để thay đổi mục tiêu!");
+                    return;
+                }
+                else
+                {
+                    btn.interactable = true;
+                    btnImg.color = new Color(0.92f, 0.65f, 0.15f, 1f);
+                    actionBtnText.text = "⛓️ DÙNG XÍCH TÂM TỎA";
+                    SetLog("⛓️ Chạm vào 1 hoặc 2 tướng trên bàn đấu để trói/gỡ xích.");
                     return;
                 }
             }
@@ -4944,7 +4958,13 @@ public class Battle2v2UI : MonoBehaviour
         {
             if (currentSelectedIronChainTargets.Count == 0)
             {
-                SetLog("⚠️ Hãy chạm chọn 1 hoặc 2 tướng trên bàn đấu trước khi kích hoạt Xích!");
+                if (enemy1Card != null && enemy1Card.CurrentHp > 0) currentSelectedIronChainTargets.Add(enemy1Card);
+                if (enemy2Card != null && enemy2Card.CurrentHp > 0 && currentSelectedIronChainTargets.Count < 2) currentSelectedIronChainTargets.Add(enemy2Card);
+                if (currentSelectedIronChainTargets.Count == 0 && playerCard != null) currentSelectedIronChainTargets.Add(playerCard);
+            }
+            if (currentSelectedIronChainTargets.Count == 0)
+            {
+                SetLog("⚠️ Không tìm thấy mục tiêu hợp lệ để kích hoạt Xích!");
                 return;
             }
 
