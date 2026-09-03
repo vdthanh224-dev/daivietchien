@@ -313,6 +313,57 @@ theme_override_font_sizes/font_size = 10
 text = "🎴 4"
 horizontal_alignment = 1
 
+[node name="EquipContainer" type="VBoxContainer" parent="Frame"]
+layout_mode = 1
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_left = 6.0
+offset_top = 38.0
+offset_right = 168.0
+offset_bottom = -38.0
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 3
+
+[node name="WeaponSlot" type="PanelContainer" parent="Frame/EquipContainer"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_badge")
+
+[node name="Label" type="Label" parent="Frame/EquipContainer/WeaponSlot"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.88, 0.45, 1)
+theme_override_font_sizes/font_size = 9
+text = "🗡️ Kiếm Thuận Thiên"
+
+[node name="ArmorSlot" type="PanelContainer" parent="Frame/EquipContainer"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_badge")
+
+[node name="Label" type="Label" parent="Frame/EquipContainer/ArmorSlot"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.65, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 9
+text = "🛡️ Khiên Mây Bện ♦K"
+
+[node name="MountSlot" type="PanelContainer" parent="Frame/EquipContainer"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_badge")
+
+[node name="Label" type="Label" parent="Frame/EquipContainer/MountSlot"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.9, 0.75, 1, 1)
+theme_override_font_sizes/font_size = 9
+text = "🐎 Voi Chiến (+1)"
+
 [node name="TargetBorder" type="ReferenceRect" parent="."]
 visible = false
 layout_mode = 1

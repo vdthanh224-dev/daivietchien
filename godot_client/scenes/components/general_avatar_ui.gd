@@ -13,6 +13,13 @@ signal skill_clicked()
 @onready var skill_btn: Button = $SkillBtn
 @onready var click_btn: Button = $ClickBtn
 
+@onready var weapon_slot = $Frame/EquipContainer/WeaponSlot
+@onready var weapon_label = $Frame/EquipContainer/WeaponSlot/Label
+@onready var armor_slot = $Frame/EquipContainer/ArmorSlot
+@onready var armor_label = $Frame/EquipContainer/ArmorSlot/Label
+@onready var mount_slot = $Frame/EquipContainer/MountSlot
+@onready var mount_label = $Frame/EquipContainer/MountSlot/Label
+
 var general_id: String = "tran_hung_dao"
 var current_hp: int = 4
 var max_hp: int = 4
@@ -42,6 +49,27 @@ func set_target_highlight(active: bool) -> void:
 			var tw = create_tween().set_loops(4)
 			tw.tween_property(target_border, "border_color", Color(1, 1, 0.5, 1), 0.2)
 			tw.tween_property(target_border, "border_color", Color(1, 0.7, 0.1, 1), 0.2)
+
+func set_equipment(slot_type: String, item_name: String, suit_rank: String = "") -> void:
+	match slot_type:
+		"weapon":
+			if weapon_slot:
+				weapon_slot.visible = (item_name != "")
+				weapon_label.text = "🗡️ %s %s" % [item_name, suit_rank]
+		"armor":
+			if armor_slot:
+				armor_slot.visible = (item_name != "")
+				armor_label.text = "🛡️ %s %s" % [item_name, suit_rank]
+		"mount":
+			if mount_slot:
+				mount_slot.visible = (item_name != "")
+				mount_label.text = "🐎 %s %s" % [item_name, suit_rank]
+
+func has_armor() -> bool:
+	return armor_slot != null and armor_slot.visible
+
+func get_armor_name() -> String:
+	return armor_label.text if has_armor() else ""
 
 func play_damage_effect() -> void:
 	var orig_pos = position

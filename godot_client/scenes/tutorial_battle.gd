@@ -44,6 +44,7 @@ var arrow_time: float = 0.0
 var is_free_battle: bool = false
 var slashes_used_this_turn: int = 0
 var is_player_turn: bool = true
+var is_waiting_dodge_reaction: bool = false
 
 func _ready() -> void:
 	# Bắt đầu phát nhạc nền chiến trận hào hùng
@@ -113,6 +114,16 @@ func _ready() -> void:
 		var img = get_viewport().get_texture().get_image()
 		img.save_png("res://tutorial_showcase_screenshot.png")
 		print("[Screenshot] Đã lưu tutorial_showcase_screenshot.png!")
+		get_tree().quit()
+	elif "--screenshot-equip" in OS.get_cmdline_user_args():
+		_on_close_health_spotlight()
+		_start_step_3_slash()
+		player_avatar.set_equipment("armor", "Khiên Mây Bện", "♦K")
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var img = get_viewport().get_texture().get_image()
+		img.save_png("res://tutorial_equip_screenshot.png")
+		print("[Screenshot] Đã lưu tutorial_equip_screenshot.png!")
 		get_tree().quit()
 
 func _process(delta: float) -> void:
@@ -256,6 +267,10 @@ func _on_boss_avatar_clicked() -> void:
 
 func _on_card_play_btn_clicked() -> void:
 	card_play_btn.release_focus()
+	if is_waiting_dodge_reaction:
+		_execute_free_play_dodge()
+		return
+
 	if is_free_battle:
 		_execute_free_card_play()
 		return
@@ -340,19 +355,26 @@ func _on_player_skill_clicked() -> void:
 	AudioManager.play_voice("Tiến Thoái")
 	AudioManager.play_skill()
 
-	var count = 0
+	var count_tram = 0
+	var count_do = 0
 	for c in hand_container.get_children():
 		if "Trảm" in c.card_name:
-			c.setup_card_data(c.card_data.id, "Đỡ", "A", "Spade", 0, "Hóa giải 1 đòn Trảm.")
-			count += 1
+			c.setup_card_data(c.card_data.id, "Đỡ", c.card_data.rank, c.card_data.suit, 0, "Hóa giải 1 đòn Trảm.")
+			count_tram += 1
+		elif "Đỡ" in c.card_name:
+			c.setup_card_data(c.card_data.id, "Trảm Thường", c.card_data.rank, c.card_data.suit, 0, "Tấn công gây 1 sát thương.")
+			count_do += 1
 
-	_add_log("✨ LÝ THƯỜNG KIỆT THI TRIỂN [TIẾN THOÁI]! Đã hoán chuyển %d lá Trảm ⟷ Đỡ trên tay!" % count)
+	_add_log("✨ LÝ THƯỜNG KIỆT [TIẾN THOÁI]! Đã hoán chuyển %d Trảm ➜ Đỡ và %d Đỡ ➜ Trảm trên tay!" % [count_tram, count_do])
+
+	if selected_card_ui:
+		_handle_card_selected(selected_card_ui)
 
 	if current_step == 40:
 		arrow_node.visible = false
 		current_step = 41
 		banner_title.text = "🎉 BIẾN ĐỔI THÀNH CÔNG!"
-		banner_desc.text = "Toàn bộ lá Trảm trên tay đã hóa thành lá ĐỠ (NÉ) sẵn sàng phòng thủ!\nBạn đã dùng xong bài trong lượt. Hãy nhấn [KẾT THÚC LƯỢT]!"
+		banner_desc.text = "Toàn bộ lá Trảm trên tay đã hóa thành ĐỠ, và ĐỠ hóa thành TRẢM!\nBạn đã dùng xong bài trong lượt. Hãy nhấn [KẾT THÚC LƯỢT]!"
 		action_btn.visible = true
 		action_btn.disabled = false
 		action_btn.text = "KẾT THÚC LƯỢT ➜"
@@ -492,7 +514,23 @@ func _execute_free_card_play() -> void:
 		_show_center_card("Khiên Mây Bện", "Lý Thường Kiệt", "K", "Diamond", 1, "Phán xét Đỏ tự động Đỡ.")
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
-		_add_log("🛡️ Bạn đã trang bị [KHIÊN MÂY BỆN] thành công!")
+		player_avatar.set_equipment("armor", "Khiên Mây Bện", "♦K")
+		_add_log("🛡️ Bạn đã trang bị [KHIÊN MÂY BỆN] lên người! Biểu tượng giáp đã hiển thị trên tướng.")
+
+	elif "Kiếm" in c_name or "Đao" in c_name or "Cung" in c_name or "Nỏ" in c_name:
+		AudioManager.play_parry()
+		_show_center_card(c_name, "Lý Thường Kiệt", "A", "Diamond", 1, "Vũ khí trang bị.")
+		_animate_card_play_to_center(selected_card_ui)
+		selected_card_ui = null
+		player_avatar.set_equipment("weapon", c_name)
+		_add_log("🗡️ Bạn đã trang bị [%s] lên người!" % c_name)
+
+	elif "Ngựa" in c_name or "Voi" in c_name:
+		_show_center_card(c_name, "Lý Thường Kiệt", "K", "Heart", 1, "Thú cưỡi trang bị.")
+		_animate_card_play_to_center(selected_card_ui)
+		selected_card_ui = null
+		player_avatar.set_equipment("mount", c_name)
+		_add_log("🐎 Bạn đã trang bị [%s] lên người!" % c_name)
 
 	else:
 		_show_center_card(c_name, "Lý Thường Kiệt")
@@ -504,6 +542,13 @@ func _execute_free_card_play() -> void:
 
 func _on_end_turn_btn_clicked() -> void:
 	end_turn_btn.release_focus()
+	if is_waiting_dodge_reaction:
+		is_waiting_dodge_reaction = false
+		card_play_btn.visible = false
+		end_turn_btn.text = "KẾT THÚC LƯỢT ➜"
+		_player_take_boss_damage()
+		return
+
 	if not is_player_turn:
 		return
 
@@ -529,24 +574,57 @@ func _boss_turn_free_play() -> void:
 		AudioManager.play_slash()
 		_show_center_card("Trảm Hung Hãn", "Thủ Lĩnh Sơn Tặc", "7", "Club", 0, "Tấn công gây 1 sát thương.")
 		_play_slash_effect(player_avatar.global_position + Vector2(87, 119))
+		_add_log("💥 Sơn Tặc vung đao tung chiêu [TRẢM] nhắm thẳng vào bạn!")
 
-		# Kiểm tra xem người chơi có lá Đỡ trên tay không
-		var has_dodge = false
-		for c in hand_container.get_children():
-			if "Đỡ" in c.card_name:
-				has_dodge = true
-				break
+		_prompt_player_dodge_reaction()
 
-		if has_dodge:
-			_add_log("🛡️ Sơn Tặc vung đao tấn công! Nhưng bạn có lá [ĐỠ] nên đã tự động né đòn thành công!")
-			AudioManager.play_voice("Đỡ")
-			AudioManager.play_parry()
-		else:
-			player_hp = max(1, player_hp - 1)
-			player_avatar.play_damage_effect()
-			player_avatar.spawn_damage_number(1)
-			player_avatar.update_hp(player_hp, 4)
-			_add_log("💥 Bạn trúng đòn Trảm của Sơn Tặc! Mất 1 Máu (Còn %d/4)." % player_hp)
+func _prompt_player_dodge_reaction() -> void:
+	is_waiting_dodge_reaction = true
+	var has_dodge = false
+	for c in hand_container.get_children():
+		if "Đỡ" in c.card_name:
+			has_dodge = true
+			break
+
+	if has_dodge:
+		desc_text.text = "⚠️ SƠN TẶC VỪA TẤN CÔNG BẠN! Hãy bấm [🛡️ DÙNG ĐỠ (NÉ ĐÒN)] hoặc [💔 CHỊU ĐÒN]!"
+		card_play_btn.visible = true
+		card_play_btn.disabled = false
+		card_play_btn.text = "🛡️ DÙNG ĐỠ (NÉ ĐÒN)"
+
+		end_turn_btn.visible = true
+		end_turn_btn.disabled = false
+		end_turn_btn.text = "💔 CHỊU ĐÒN (-1)"
+	else:
+		desc_text.text = "⚠️ Trên tay không có lá [ĐỠ]! Bạn bị trúng đòn Trảm của Sơn Tặc!"
+		await get_tree().create_timer(1.4).timeout
+		_player_take_boss_damage()
+
+func _execute_free_play_dodge() -> void:
+	is_waiting_dodge_reaction = false
+	card_play_btn.visible = false
+	end_turn_btn.text = "KẾT THÚC LƯỢT ➜"
+
+	# Tiêu hao 1 lá Đỡ trên tay
+	for c in hand_container.get_children():
+		if "Đỡ" in c.card_name:
+			_animate_card_play_to_center(c)
+			break
+
+	AudioManager.play_voice("Đỡ")
+	AudioManager.play_parry()
+	_show_center_card("Đỡ", "Lý Thường Kiệt", "3", "Diamond", 0, "Hóa giải 1 đòn Trảm.")
+	_add_log("🛡️ BẠN ĐÃ TỰ DÙNG [ĐỠ]! Hóa giải hoàn toàn đòn Trảm của Sơn Tặc, bảo toàn sinh mệnh!")
+
+	await get_tree().create_timer(1.2).timeout
+	_player_turn_start_free_play()
+
+func _player_take_boss_damage() -> void:
+	player_hp = max(1, player_hp - 1)
+	player_avatar.play_damage_effect()
+	player_avatar.spawn_damage_number(1)
+	player_avatar.update_hp(player_hp, 4)
+	_add_log("💥 Bạn trúng đòn Trảm của Sơn Tặc! Mất 1 Máu (Còn %d/4)." % player_hp)
 
 	await get_tree().create_timer(1.2).timeout
 	_player_turn_start_free_play()
