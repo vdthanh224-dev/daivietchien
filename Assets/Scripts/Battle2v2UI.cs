@@ -5053,12 +5053,34 @@ public class Battle2v2UI : MonoBehaviour
         if (isWaitingForTrieuDangTarget && currentSelectedTarget != null && currentSelectedTarget != playerCard)
         {
             if (!isPlayerTurnActive || actionInProgress) return;
+            // Double-check authoritative server phase before sending
+            if (!string.IsNullOrEmpty(currentRoomId) && currentAuthoritativePhase != "PLAY")
+            {
+                SetLog($"⏳ Đang chờ server xử lý (Trạng thái: {currentAuthoritativePhase})...");
+                return;
+            }
             if (actionBtnGo != null) actionBtnGo.SetActive(false);
             ExecuteTrieuDangOnTarget(currentSelectedTarget);
             return;
         }
 
         if (currentSelectedCardUI == null || currentSelectedCardUI.Data == null || !isPlayerTurnActive || actionInProgress) return;
+
+        // Double-check authoritative server phase before sending - prevents "Chưa tới lượt" race condition
+        if (!string.IsNullOrEmpty(currentRoomId) && currentAuthoritativePhase != "PLAY")
+        {
+            SetLog($"⏳ Đang chờ server xử lý (Trạng thái: {currentAuthoritativePhase})...");
+            return;
+        }
+
+        // Also verify it's actually my turn on the server
+        if (!string.IsNullOrEmpty(currentRoomId) && playerCard != null && currentAuthoritativeTurnSeat != playerCard.SeatNumber)
+        {
+            var activeGen = GetGeneralBySeat(currentAuthoritativeTurnSeat);
+            string name = activeGen != null ? activeGen.GeneralName : $"Ghế #{currentAuthoritativeTurnSeat}";
+            SetLog($"⏳ Đang trong lượt của [{name}] - hãy chờ lượt của bạn!");
+            return;
+        }
 
         // Xử lý trực tiếp trên avatar tướng khi bấm nút Xích Tâm Tỏa
         if (currentSelectedCardUI.Data.subType == CardSubType.IronChain)
