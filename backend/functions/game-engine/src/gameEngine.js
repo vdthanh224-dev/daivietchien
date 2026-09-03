@@ -500,6 +500,18 @@ function getEquippedWeapon(player, nameFragment = "") {
   ) || null;
 }
 
+function hasEquippedZhuge(player) {
+  if (!player || !Array.isArray(player.equipments)) return false;
+  return player.equipments.some(e => 
+    (e.subType === CARD_SUBTYPES.WEAPON || e.category === CARD_CATEGORIES.EQUIPMENT) && (
+      (e.name && (e.name.includes("Nỏ Thần") || e.name.includes("No Than") || e.name.includes("Nỏ"))) ||
+      (e.cardName && (e.cardName.includes("Nỏ Thần") || e.cardName.includes("No Than") || e.cardName.includes("Nỏ"))) ||
+      (e.id && e.id.toLowerCase().includes("nothan")) ||
+      (e.desc && e.desc.includes("Không giới hạn số Trảm"))
+    )
+  );
+}
+
 function resetWaitingState(state, clearActiveCard = true) {
   state.phase = "PLAY";
   state.waitingTargetSeat = 0;
@@ -612,8 +624,8 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
   }
   if (isSlash(card)
       && state.slashesUsedThisTurn > 0
-      && !caster.equipments.some(e => e.name && e.name.includes("Nỏ Thần"))) {
-    return { error: "Đã dùng hết lượt Trảm" };
+      && !hasEquippedZhuge(caster)) {
+    return { error: "Đã dùng hết lượt Trảm trong lượt" };
   }
 
   const realCard = caster.hand.splice(cardIndex, 1)[0];
@@ -2401,7 +2413,7 @@ export function handleAIStep(state, aiSeat) {
   }
 
   // G. Đánh Trảm nếu chưa vượt giới hạn
-  const hasZhuge = ai.equipments.some(e => e.name && e.name.includes("Nỏ Thần"));
+  const hasZhuge = hasEquippedZhuge(ai);
   const canSlash = hasZhuge || state.slashesUsedThisTurn === 0;
   if (slash && canSlash && slashTarget) {
     return handlePlayCard(state, aiSeat, slash.id, slashTarget.seat);

@@ -770,7 +770,7 @@ public class Battle2v2UI : MonoBehaviour
         if (sc == null || sc.id == "HIDDEN") return null;
 
         // 1. Nếu thẻ bài được server định danh là Nỏ Thần Kim Quy (hoặc biến chất từ Chế Nỏ)
-        if (sc.name == "Nỏ Thần Kim Quy" || (sc.category == (int)CardCategory.Equipment && sc.subType == (int)CardSubType.Weapon))
+        if ((!string.IsNullOrEmpty(sc.name) && sc.name.Contains("Nỏ Thần")) || (!string.IsNullOrEmpty(sc.id) && sc.id.Contains("NoThan")))
         {
             CardSuit sSuit = CardSuit.Spade;
             if (!string.IsNullOrEmpty(sc.suit)) Enum.TryParse(sc.suit, true, out sSuit);
@@ -4160,7 +4160,25 @@ public class Battle2v2UI : MonoBehaviour
 
     private bool IsSlashLimitReached(GeneralCardUI caster, CardModel card)
     {
-        if (caster.HasEquipment(EquipmentType.Weapon, "Nỏ Thần")) return false;
+        if (caster == null) return slashesUsedThisTurn > 0;
+
+        // 1. Kiểm tra vũ khí trang bị (hỗ trợ nhiều cách viết, ID thẻ bài, và mô tả hiệu ứng)
+        if (caster.HasEquipment(EquipmentType.Weapon, "Nỏ Thần") ||
+            caster.HasEquipment(EquipmentType.Weapon, "NoThan") ||
+            caster.HasEquipment(EquipmentType.Weapon, "Nỏ") ||
+            caster.HasEquipment(EquipmentType.Weapon, "Không giới hạn số"))
+        {
+            return false;
+        }
+
+        var weapon = caster.GetEquippedCard(EquipmentType.Weapon);
+        if (weapon != null)
+        {
+            if (!string.IsNullOrEmpty(weapon.id) && weapon.id.IndexOf("NoThan", StringComparison.OrdinalIgnoreCase) >= 0) return false;
+            if (!string.IsNullOrEmpty(weapon.cardName) && (weapon.cardName.IndexOf("Nỏ", StringComparison.OrdinalIgnoreCase) >= 0 || weapon.cardName.IndexOf("No Than", StringComparison.OrdinalIgnoreCase) >= 0)) return false;
+            if (!string.IsNullOrEmpty(weapon.description) && weapon.description.IndexOf("Không giới hạn", StringComparison.OrdinalIgnoreCase) >= 0) return false;
+        }
+
         return slashesUsedThisTurn > 0;
     }
     #endregion

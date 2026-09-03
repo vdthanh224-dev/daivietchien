@@ -1146,13 +1146,15 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
         if (equippedCards.TryGetValue(type, out var card) && card != null)
         {
             if (string.IsNullOrEmpty(keyword)) return true;
-            return !string.IsNullOrEmpty(card.cardName) && card.cardName.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+            if (!string.IsNullOrEmpty(card.cardName) && card.cardName.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (!string.IsNullOrEmpty(card.id) && card.id.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (!string.IsNullOrEmpty(card.description) && card.description.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0) return true;
         }
 
         if (slotMap.TryGetValue(type, out var slot) && slot != null && slot.IsEquipped)
         {
             if (string.IsNullOrEmpty(keyword)) return true;
-            return slot.CurrentItemName != null && slot.CurrentItemName.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0;
+            if (slot.CurrentItemName != null && slot.CurrentItemName.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0) return true;
         }
         return false;
     }
