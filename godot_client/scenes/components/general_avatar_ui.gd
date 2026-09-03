@@ -17,8 +17,12 @@ signal skill_clicked()
 @onready var weapon_label = $Frame/EquipContainer/WeaponSlot/Label
 @onready var armor_slot = $Frame/EquipContainer/ArmorSlot
 @onready var armor_label = $Frame/EquipContainer/ArmorSlot/Label
-@onready var mount_slot = $Frame/EquipContainer/MountSlot
-@onready var mount_label = $Frame/EquipContainer/MountSlot/Label
+@onready var offensive_mount_slot = $Frame/EquipContainer/OffensiveMountSlot
+@onready var offensive_mount_label = $Frame/EquipContainer/OffensiveMountSlot/Label
+@onready var defensive_mount_slot = $Frame/EquipContainer/DefensiveMountSlot
+@onready var defensive_mount_label = $Frame/EquipContainer/DefensiveMountSlot/Label
+@onready var treasure_slot = $Frame/EquipContainer/TreasureSlot
+@onready var treasure_label = $Frame/EquipContainer/TreasureSlot/Label
 
 var general_id: String = "tran_hung_dao"
 var current_hp: int = 4
@@ -51,19 +55,27 @@ func set_target_highlight(active: bool) -> void:
 			tw.tween_property(target_border, "border_color", Color(1, 0.7, 0.1, 1), 0.2)
 
 func set_equipment(slot_type: String, item_name: String, suit_rank: String = "") -> void:
-	match slot_type:
-		"weapon":
+	match slot_type.to_lower():
+		"weapon", "vu_khi":
 			if weapon_slot:
 				weapon_slot.visible = (item_name != "")
 				weapon_label.text = "🗡️ %s %s" % [item_name, suit_rank]
-		"armor":
+		"armor", "giap":
 			if armor_slot:
 				armor_slot.visible = (item_name != "")
 				armor_label.text = "🛡️ %s %s" % [item_name, suit_rank]
-		"mount":
-			if mount_slot:
-				mount_slot.visible = (item_name != "")
-				mount_label.text = "🐎 %s %s" % [item_name, suit_rank]
+		"offensive_mount", "mount_offense", "ngua_cong":
+			if offensive_mount_slot:
+				offensive_mount_slot.visible = (item_name != "")
+				offensive_mount_label.text = "🐎⚔️ %s (-1) %s" % [item_name, suit_rank]
+		"defensive_mount", "mount_defense", "ngua_thu", "mount":
+			if defensive_mount_slot:
+				defensive_mount_slot.visible = (item_name != "")
+				defensive_mount_label.text = "🐘🛡️ %s (+1) %s" % [item_name, suit_rank]
+		"treasure", "bao_vat":
+			if treasure_slot:
+				treasure_slot.visible = (item_name != "")
+				treasure_label.text = "👑 %s %s" % [item_name, suit_rank]
 
 func has_armor() -> bool:
 	return armor_slot != null and armor_slot.visible

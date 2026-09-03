@@ -318,12 +318,12 @@ layout_mode = 1
 anchors_preset = 9
 anchor_bottom = 1.0
 offset_left = 6.0
-offset_top = 38.0
+offset_top = 37.0
 offset_right = 168.0
 offset_bottom = -38.0
 grow_vertical = 2
 mouse_filter = 2
-theme_override_constants/separation = 3
+theme_override_constants/separation = 2
 
 [node name="WeaponSlot" type="PanelContainer" parent="Frame/EquipContainer"]
 visible = false
@@ -351,18 +351,44 @@ theme_override_colors/font_color = Color(0.65, 0.88, 1, 1)
 theme_override_font_sizes/font_size = 9
 text = "🛡️ Khiên Mây Bện ♦K"
 
-[node name="MountSlot" type="PanelContainer" parent="Frame/EquipContainer"]
+[node name="OffensiveMountSlot" type="PanelContainer" parent="Frame/EquipContainer"]
 visible = false
 layout_mode = 2
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_badge")
 
-[node name="Label" type="Label" parent="Frame/EquipContainer/MountSlot"]
+[node name="Label" type="Label" parent="Frame/EquipContainer/OffensiveMountSlot"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.65, 0.55, 1)
+theme_override_font_sizes/font_size = 9
+text = "🐎⚔️ Ngựa Trắng (-1)"
+
+[node name="DefensiveMountSlot" type="PanelContainer" parent="Frame/EquipContainer"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_badge")
+
+[node name="Label" type="Label" parent="Frame/EquipContainer/DefensiveMountSlot"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.65, 0.95, 0.75, 1)
+theme_override_font_sizes/font_size = 9
+text = "🐘🛡️ Voi Chiến (+1)"
+
+[node name="TreasureSlot" type="PanelContainer" parent="Frame/EquipContainer"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_badge")
+
+[node name="Label" type="Label" parent="Frame/EquipContainer/TreasureSlot"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.9, 0.75, 1, 1)
 theme_override_font_sizes/font_size = 9
-text = "🐎 Voi Chiến (+1)"
+text = "👑 Bảo Vật"
 
 [node name="TargetBorder" type="ReferenceRect" parent="."]
 visible = false

@@ -118,7 +118,11 @@ func _ready() -> void:
 	elif "--screenshot-equip" in OS.get_cmdline_user_args():
 		_on_close_health_spotlight()
 		_start_step_3_slash()
+		player_avatar.set_equipment("weapon", "Kiếm Thuận Thiên", "♦A")
 		player_avatar.set_equipment("armor", "Khiên Mây Bện", "♦K")
+		player_avatar.set_equipment("offensive_mount", "Ngựa Trắng", "♠5")
+		player_avatar.set_equipment("defensive_mount", "Voi Chiến", "♥K")
+		player_avatar.set_equipment("treasure", "Bảo Vật Quốc Gia", "♥Q")
 		await get_tree().process_frame
 		await get_tree().process_frame
 		var img = get_viewport().get_texture().get_image()
@@ -359,10 +363,10 @@ func _on_player_skill_clicked() -> void:
 	var count_do = 0
 	for c in hand_container.get_children():
 		if "Trảm" in c.card_name:
-			c.setup_card_data(c.card_data.id, "Đỡ", c.card_data.rank, c.card_data.suit, 0, "Hóa giải 1 đòn Trảm.")
+			c.setup_card_data(c.card_data.id, "Đỡ", c.card_data.get_rank_string(), c.card_data.suit, 0, "Hóa giải 1 đòn Trảm.")
 			count_tram += 1
 		elif "Đỡ" in c.card_name:
-			c.setup_card_data(c.card_data.id, "Trảm Thường", c.card_data.rank, c.card_data.suit, 0, "Tấn công gây 1 sát thương.")
+			c.setup_card_data(c.card_data.id, "Trảm Thường", c.card_data.get_rank_string(), c.card_data.suit, 0, "Tấn công gây 1 sát thương.")
 			count_do += 1
 
 	_add_log("✨ LÝ THƯỜNG KIỆT [TIẾN THOÁI]! Đã hoán chuyển %d Trảm ➜ Đỡ và %d Đỡ ➜ Trảm trên tay!" % [count_tram, count_do])
@@ -508,29 +512,48 @@ func _execute_free_card_play() -> void:
 		else:
 			_add_log("❤️ Dùng Bánh Chưng (Máu bạn đã tối đa 4/4).")
 
-	elif "Khiên" in c_name:
+	elif "Khiên" in c_name or "Giáp" in c_name or "Áo Bào" in c_name:
+		var eq_sr = "%s%s" % [selected_card_ui.card_data.get_suit_symbol(), selected_card_ui.card_data.get_rank_string()] if selected_card_ui and selected_card_ui.card_data else ""
 		AudioManager.play_voice("Khiên Mây Bện")
 		AudioManager.play_parry()
-		_show_center_card("Khiên Mây Bện", "Lý Thường Kiệt", "K", "Diamond", 1, "Phán xét Đỏ tự động Đỡ.")
+		_show_center_card(c_name, "Lý Thường Kiệt", "K", "Diamond", 1, "Phán xét Đỏ tự động Đỡ.")
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
-		player_avatar.set_equipment("armor", "Khiên Mây Bện", "♦K")
-		_add_log("🛡️ Bạn đã trang bị [KHIÊN MÂY BỆN] lên người! Biểu tượng giáp đã hiển thị trên tướng.")
+		player_avatar.set_equipment("armor", c_name, eq_sr)
+		_add_log("🛡️ Bạn đã trang bị [%s] vào ô [GIÁP PHÒNG THỦ]!" % c_name)
 
 	elif "Kiếm" in c_name or "Đao" in c_name or "Cung" in c_name or "Nỏ" in c_name:
+		var eq_sr = "%s%s" % [selected_card_ui.card_data.get_suit_symbol(), selected_card_ui.card_data.get_rank_string()] if selected_card_ui and selected_card_ui.card_data else ""
 		AudioManager.play_parry()
 		_show_center_card(c_name, "Lý Thường Kiệt", "A", "Diamond", 1, "Vũ khí trang bị.")
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
-		player_avatar.set_equipment("weapon", c_name)
-		_add_log("🗡️ Bạn đã trang bị [%s] lên người!" % c_name)
+		player_avatar.set_equipment("weapon", c_name, eq_sr)
+		_add_log("🗡️ Bạn đã trang bị [%s] vào ô [VŨ KHÍ]!" % c_name)
 
-	elif "Ngựa" in c_name or "Voi" in c_name:
-		_show_center_card(c_name, "Lý Thường Kiệt", "K", "Heart", 1, "Thú cưỡi trang bị.")
+	elif "Voi" in c_name or "Tuyệt Ảnh" in c_name or "+1" in c_name:
+		var eq_sr = "%s%s" % [selected_card_ui.card_data.get_suit_symbol(), selected_card_ui.card_data.get_rank_string()] if selected_card_ui and selected_card_ui.card_data else ""
+		_show_center_card(c_name, "Lý Thường Kiệt", "K", "Heart", 1, "Ngựa phòng thủ (+1).")
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
-		player_avatar.set_equipment("mount", c_name)
-		_add_log("🐎 Bạn đã trang bị [%s] lên người!" % c_name)
+		player_avatar.set_equipment("defensive_mount", c_name, eq_sr)
+		_add_log("🐘🛡️ Bạn đã trang bị [%s] vào ô [NGỰA THỦ (+1)]!" % c_name)
+
+	elif "Ngựa" in c_name or "Xích Thố" in c_name or "-1" in c_name:
+		var eq_sr = "%s%s" % [selected_card_ui.card_data.get_suit_symbol(), selected_card_ui.card_data.get_rank_string()] if selected_card_ui and selected_card_ui.card_data else ""
+		_show_center_card(c_name, "Lý Thường Kiệt", "5", "Spade", 1, "Ngựa tấn công (-1).")
+		_animate_card_play_to_center(selected_card_ui)
+		selected_card_ui = null
+		player_avatar.set_equipment("offensive_mount", c_name, eq_sr)
+		_add_log("🐎⚔️ Bạn đã trang bị [%s] vào ô [NGỰA CÔNG (-1)]!" % c_name)
+
+	elif "Bảo Vật" in c_name or "Ngọc" in c_name:
+		var eq_sr = "%s%s" % [selected_card_ui.card_data.get_suit_symbol(), selected_card_ui.card_data.get_rank_string()] if selected_card_ui and selected_card_ui.card_data else ""
+		_show_center_card(c_name, "Lý Thường Kiệt", "Q", "Heart", 1, "Bảo vật hoàng gia.")
+		_animate_card_play_to_center(selected_card_ui)
+		selected_card_ui = null
+		player_avatar.set_equipment("treasure", c_name, eq_sr)
+		_add_log("👑 Bạn đã trang bị [%s] vào ô [BẢO VẬT]!" % c_name)
 
 	else:
 		_show_center_card(c_name, "Lý Thường Kiệt")

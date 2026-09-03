@@ -32,18 +32,19 @@ func _ready() -> void:
 	if card_data:
 		update_card(card_data)
 
-func setup_card_data(id: String, p_name: String, rank_str: String, suit_str: String, cat: int, desc: String) -> void:
+func setup_card_data(id: String, p_name: String, rank_val: Variant, suit_str: String, cat: int, desc: String) -> void:
 	card_name = p_name
 	var res = CardResourceScript.new()
 	res.id = id
 	res.card_name = p_name
 	res.suit = suit_str
-	match rank_str:
-		"A": res.rank = 1
-		"J": res.rank = 11
-		"Q": res.rank = 12
-		"K": res.rank = 13
-		_: res.rank = rank_str.to_int()
+	var r_str = str(rank_val).to_upper()
+	match r_str:
+		"A", "1": res.rank = 1
+		"J", "11": res.rank = 11
+		"Q", "12": res.rank = 12
+		"K", "13": res.rank = 13
+		_: res.rank = r_str.to_int()
 	res.category = cat
 	res.description = desc
 	update_card(res)
