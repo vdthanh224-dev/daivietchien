@@ -1,1 +1,1 @@
-import "./deno-server/server.js";
+import "./deploy_deno/main.ts";

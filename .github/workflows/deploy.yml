@@ -18,6 +18,6 @@ jobs:
       - name: Deploy to Deno Deploy
         uses: denoland/deployctl@v1
         with:
-          project: dai-viet-chien-server
-          entrypoint: main.ts
+          project: dai-viet-chien
+          entrypoint: deploy_deno/main.ts
           root: .
