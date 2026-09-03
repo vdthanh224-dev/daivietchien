@@ -1,0 +1,242 @@
+[gd_scene load_steps=5 format=3 uid="uid://authlogin123"]
+
+[ext_resource type="Theme" uid="uid://d4af37royalgold" path="res://resources/themes/royal_gold_theme.tres" id="1_theme"]
+[ext_resource type="Script" path="res://scenes/auth_login.gd" id="2_script"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
+bg_color = Color(0.0588235, 0.0823529, 0.12549, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]
+bg_color = Color(0.976471, 0.964706, 0.937255, 0.98)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.831373, 0.686275, 0.215686, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_color = Color(0, 0, 0, 0.45)
+shadow_size = 12
+shadow_offset = Vector2(0, 6)
+
+[node name="AuthLogin" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_theme")
+script = ExtResource("2_script")
+
+[node name="Background" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_bg")
+
+[node name="BrandHeader" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -300.0
+offset_top = 24.0
+offset_right = 300.0
+offset_bottom = 110.0
+grow_horizontal = 2
+theme_override_constants/separation = 4
+alignment = 1
+
+[node name="LogoText" type="Label" parent="BrandHeader"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.831373, 0.686275, 0.215686, 1)
+theme_override_font_sizes/font_size = 32
+text = "👑 ĐẠI VIỆT CHIẾN"
+horizontal_alignment = 1
+
+[node name="Tagline" type="Label" parent="BrandHeader"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "THAO LƯỢC TRANH HÙNG • SỬ THI ĐẠI VIỆT"
+horizontal_alignment = 1
+
+[node name="AuthCard" type="PanelContainer" parent="."]
+custom_minimum_size = Vector2(440, 480)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -220.0
+offset_top = -230.0
+offset_right = 220.0
+offset_bottom = 250.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+
+[node name="Margin" type="MarginContainer" parent="AuthCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 18
+
+[node name="VBox" type="VBoxContainer" parent="AuthCard/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TabBar" type="HBoxContainer" parent="AuthCard/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="TabLoginBtn" type="Button" parent="AuthCard/Margin/VBox/TabBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "⚔️ ĐĂNG NHẬP"
+
+[node name="ActiveLine" type="ColorRect" parent="AuthCard/Margin/VBox/TabBar/TabLoginBtn"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -3.0
+grow_horizontal = 2
+grow_vertical = 0
+color = Color(0.831373, 0.686275, 0.215686, 1)
+
+[node name="TabRegisterBtn" type="Button" parent="AuthCard/Margin/VBox/TabBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "🎖️ ĐĂNG KÝ"
+
+[node name="ActiveLine" type="ColorRect" parent="AuthCard/Margin/VBox/TabBar/TabRegisterBtn"]
+visible = false
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -3.0
+grow_horizontal = 2
+grow_vertical = 0
+color = Color(0.831373, 0.686275, 0.215686, 1)
+
+[node name="Form" type="VBoxContainer" parent="AuthCard/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="NameGroup" type="VBoxContainer" parent="AuthCard/Margin/VBox/Form"]
+visible = false
+layout_mode = 2
+
+[node name="Label" type="Label" parent="AuthCard/Margin/VBox/Form/NameGroup"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.25, 0.2, 0.12, 1)
+theme_override_font_sizes/font_size = 11
+text = "TÊN CHIẾN TƯỚNG"
+
+[node name="NameInput" type="LineEdit" parent="AuthCard/Margin/VBox/Form/NameGroup"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+placeholder_text = "Nhập tên hiển thị..."
+
+[node name="EmailGroup" type="VBoxContainer" parent="AuthCard/Margin/VBox/Form"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="AuthCard/Margin/VBox/Form/EmailGroup"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.25, 0.2, 0.12, 1)
+theme_override_font_sizes/font_size = 11
+text = "ĐỊA CHỈ EMAIL"
+
+[node name="EmailInput" type="LineEdit" parent="AuthCard/Margin/VBox/Form/EmailGroup"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+placeholder_text = "you@example.com"
+
+[node name="PassGroup" type="VBoxContainer" parent="AuthCard/Margin/VBox/Form"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="AuthCard/Margin/VBox/Form/PassGroup"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.25, 0.2, 0.12, 1)
+theme_override_font_sizes/font_size = 11
+text = "MẬT THƯ (MẬT KHẨU)"
+
+[node name="PassInput" type="LineEdit" parent="AuthCard/Margin/VBox/Form/PassGroup"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+placeholder_text = "Tối thiểu 8 ký tự..."
+secret = true
+
+[node name="StatusLabel" type="Label" parent="AuthCard/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Sẵn sàng"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="SubmitBtn" type="Button" parent="AuthCard/Margin/VBox"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "⚔️ ĐĂNG NHẬP CHIẾN TƯỚNG"
+
+[node name="GuestBtn" type="Button" parent="AuthCard/Margin/VBox"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+text = "👤 CHƠI NHANH (KHÁCH)"
+
+[node name="QuickLoginBar" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -54.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="Margin" type="MarginContainer" parent="QuickLoginBar"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 6
+
+[node name="HBox" type="HBoxContainer" parent="QuickLoginBar/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="Label" type="Label" parent="QuickLoginBar/Margin/HBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.831373, 0.686275, 0.215686, 1)
+theme_override_font_sizes/font_size = 12
+text = "⚡ ĐĂNG NHẬP NHANH (TESTER):"
+
+[node name="Quick1" type="Button" parent="QuickLoginBar/Margin/HBox"]
+layout_mode = 2
+text = "Tướng 1 (Thành 1)"
+
+[node name="Quick2" type="Button" parent="QuickLoginBar/Margin/HBox"]
+layout_mode = 2
+text = "Tướng 2 (Thành 2)"
+
+[node name="Quick3" type="Button" parent="QuickLoginBar/Margin/HBox"]
+layout_mode = 2
+text = "Tướng 3 (Thành 3)"
+
+[node name="Quick4" type="Button" parent="QuickLoginBar/Margin/HBox"]
+layout_mode = 2
+text = "Tướng 4 (Thành 4)"
