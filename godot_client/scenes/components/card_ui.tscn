@@ -17,6 +17,8 @@ shadow_color = Color(0, 0, 0, 0.3)
 shadow_size = 5
 shadow_offset = Vector2(0, 3)
 
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_btn"]
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_name_banner"]
 bg_color = Color(0.1, 0.14, 0.22, 0.95)
 border_width_left = 1
@@ -147,4 +149,10 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+focus_mode = 0
+theme_override_styles/normal = SubResource("StyleBoxEmpty_btn")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_btn")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_btn")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_btn")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_btn")
 flat = true

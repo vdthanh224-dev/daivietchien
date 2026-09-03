@@ -256,6 +256,7 @@ offset_right = 0.0
 offset_bottom = -238.0
 grow_horizontal = 2
 grow_vertical = 0
+focus_mode = 0
 theme_override_font_sizes/font_size = 13
 text = "⚔️ DÙNG BÀI ➜ SƠN TẶC"
 
@@ -353,6 +354,7 @@ alignment = 2
 
 [node name="ActionBtn" type="Button" parent="TutorialBanner/Margin/VBox/HBox"]
 layout_mode = 2
+focus_mode = 0
 theme_override_font_sizes/font_size = 11
 text = "VÀO GIAI ĐOẠN RA BÀI ➜"
 
@@ -502,6 +504,7 @@ text = "• Mỗi tướng sở hữu các đóa sinh mệnh [color=#FFA0C0][b]H
 [node name="StartTutorialBtn" type="Button" parent="HealthSpotlightOverlay/HealthGuideBox/Margin/VBox"]
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
+focus_mode = 0
 theme_override_font_sizes/font_size = 13
 text = "TIẾP TỤC (ĐẦU LƯỢT RÚT BÀI) ➜"
 
@@ -785,4 +788,5 @@ autowrap_mode = 2
 [node name="ClaimBtn" type="Button" parent="RewardModal/Dim/Box/Margin/VBox"]
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
+focus_mode = 0
 text = "NHẬN THƯỞNG & VÀO CHIẾN TRƯỜNG ➜"
