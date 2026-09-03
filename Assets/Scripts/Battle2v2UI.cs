@@ -522,6 +522,7 @@ public class Battle2v2UI : MonoBehaviour
                         && delta.nearDeathVictimSeat == p.seat;
                     g.SetDeadVisual(p.hp <= 0 && !pendingDeath);
                     g.IsWineBuffActive = p.isWineBuffActive;
+                    g.SetChained(p.isChained);
                     ApplyServerLoadout(g, new AppwriteMatchmaking.GameStatePlayer
                     {
                         seat = p.seat,
@@ -4973,7 +4974,7 @@ public class Battle2v2UI : MonoBehaviour
             int seat1 = targetSeatsList.Count > 0 ? targetSeatsList[0] : playerCard.SeatNumber;
             int seat2 = targetSeatsList.Count > 1 ? targetSeatsList[1] : 0;
 
-            if (DenoGameClient.IsConnected)
+            if (!string.IsNullOrEmpty(currentRoomId))
             {
                 DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
                 {

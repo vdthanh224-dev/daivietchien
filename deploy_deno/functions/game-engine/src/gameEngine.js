@@ -639,6 +639,8 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
   const realCard = caster.hand.splice(cardIndex, 1)[0];
   card = { ...selectedCard }; // Use the properly modified copy with Nỏ Thần
   card.originalCardId = realCard.id;
+  card.targetSeats = (payload && payload.targetSeats) ? payload.targetSeats : (card.targetSeats || []);
+  card.targetSeat2 = (payload && payload.targetSeat2) ? payload.targetSeat2 : (card.targetSeat2 || 0);
   const target = state.players.find(x => x.seat === targetSeat);
   state.turnTimer = 40;
 

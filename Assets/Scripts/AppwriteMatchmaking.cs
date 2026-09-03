@@ -233,6 +233,7 @@ public static class AppwriteMatchmaking
         public int maxHp;
         public int handCount;
         public bool isWineBuffActive;
+        public bool isChained;
         public int aoBaoCharges;
         public List<GameStateCard> equipments = new List<GameStateCard>();
         public List<GameStateCard> judgements = new List<GameStateCard>();

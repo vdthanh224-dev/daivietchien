@@ -816,7 +816,7 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
         {
             chainedOverlayGo = new GameObject("ChainedOverlay", typeof(RectTransform));
             chainedOverlayGo.transform.SetParent(transform, false);
-            chainedOverlayGo.transform.SetAsFirstSibling();
+            chainedOverlayGo.transform.SetAsLastSibling();
             var rt = chainedOverlayGo.GetComponent<RectTransform>();
             FillRect(rt);
 
