@@ -412,9 +412,9 @@ export function getNextAliveSeat(state, currentSeat) {
 /**
  * Rút N lá bài từ cọc rút cho 1 người chơi
  */
-export function drawCards(state, seat, count = 2) {
+export function drawCards(state, seat, count = 2, allowDying = false) {
   const p = state.players.find(x => x.seat === seat);
-  if (!p || p.hp <= 0) return [];
+  if (!p || (p.hp <= 0 && !allowDying)) return [];
 
   const drawn = [];
   for (let i = 0; i < count; i++) {
@@ -570,6 +570,10 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
       if (caster.activeSkills && caster.activeSkills["Chế Nỏ"] && card.suit === "Spade" && card.subType !== CARD_SUBTYPES.WEAPON) {
           card = { ...card, name: "Nỏ Thần Kim Quy", subType: CARD_SUBTYPES.WEAPON, category: CARD_CATEGORIES.EQUIPMENT, range: 1, distMod: 0, desc: "Tầm 1. Không giới hạn số Trảm trong lượt" };
       }
+  }
+  if (payload) {
+    card.targetSeats = payload.targetSeats;
+    card.targetSeat2 = payload.targetSeat2;
   }
   if (cardIndex < 0) {
      console.error("[handlePlayCard] Mismatch! Client requested cardId:", cardId, "but hand has:", caster.hand.map(c => c.id));
@@ -1593,7 +1597,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
 
   if (state.phase === "AWAIT_TARGET_CARD") {
     if (!accepted) return { error: "Cần chọn một lá bài mục tiêu" };
-    return completeTargetCardSelection(state, respondentSeat, targetCardId);
+    return completeTargetCardSelection(state, respondentSeat, targetCardId || cardId);
   }
 
   // --- 0.5. PHẢN HỒI CHỌN BÀI KHO LƯƠNG (AWAIT_HARVEST) ---

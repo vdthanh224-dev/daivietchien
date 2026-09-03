@@ -422,9 +422,9 @@ export function getNextAliveSeat(state, currentSeat) {
 /**
  * Rút N lá bài từ cọc rút cho 1 người chơi
  */
-export function drawCards(state, seat, count = 2) {
+export function drawCards(state, seat, count = 2, allowDying = false) {
   const p = state.players.find(x => x.seat === seat);
-  if (!p || p.hp <= 0) return [];
+  if (!p || (p.hp <= 0 && !allowDying)) return [];
 
   const drawn = [];
   for (let i = 0; i < count; i++) {
@@ -438,14 +438,14 @@ export function drawCards(state, seat, count = 2) {
     }
     const card = state._deck.pop();
     if (card) {
-      if (p.activeSkills && p.activeSkills["Chế Nỏ"] && card.suit === "Spade" && card.subType !== "WEAPON") {
+      if (p.activeSkills && p.activeSkills["Chế Nỏ"] && card.suit === "Spade" && card.subType !== CARD_SUBTYPES.WEAPON) {
           card.orig_name = card.name;
           card.orig_subType = card.subType;
           card.orig_category = card.category;
           card.orig_desc = card.desc;
           card.name = "Nỏ Thần Kim Quy";
-          card.subType = "WEAPON";
-          card.category = "EQUIPMENT";
+          card.subType = CARD_SUBTYPES.WEAPON;
+          card.category = CARD_CATEGORIES.EQUIPMENT;
           card.desc = "Tầm 1. Không giới hạn số Trảm trong lượt";
       }
       p.hand.push(card);
@@ -600,6 +600,10 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
           card = { ...card, name: "Nỏ Thần Kim Quy", subType: CARD_SUBTYPES.WEAPON, category: CARD_CATEGORIES.EQUIPMENT, range: 1, distMod: 0, desc: "Tầm 1. Không giới hạn số Trảm trong lượt" };
       }
   }
+  if (payload) {
+    card.targetSeats = payload.targetSeats;
+    card.targetSeat2 = payload.targetSeat2;
+  }
   if (cardIndex < 0) {
      console.error("[handlePlayCard] Mismatch! Client requested cardId:", cardId, "but hand has:", caster.hand.map(c => c.id));
      return { error: "Không tìm thấy lá bài trên tay (" + cardId + ")" };
@@ -669,6 +673,9 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
     state.activeCard = {
         cardId: card.id,
         cardName: card.name,
+        name: card.name,
+        subType: card.subType,
+        category: card.category,
         suit: card.suit,
         casterSeat,
         targetSeat,
@@ -1192,7 +1199,7 @@ function completeTargetCardSelection(state, chooserSeat, targetCardId) {
 /**
  * Thực thi hiệu ứng cẩm nang sau khi chuỗi Diệu Kế kết thúc và không bị hóa giải
  */
-export function executeCardEffect(state, card, casterSeat, targetSeat = 0) {
+export function executeCardEffect(state, card, casterSeat, targetSeat = 0, payload = {}) {
   const caster = state.players.find(x => x.seat === casterSeat);
   const target = state.players.find(x => x.seat === targetSeat);
 
@@ -1200,8 +1207,9 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0) {
   if (card.subType === CARD_SUBTYPES.IRON_CHAIN) {
     discardCard(state, card);
     const seatsToChain = [];
-    if (Array.isArray(payload.targetSeats) && payload.targetSeats.length > 0) {
-      for (const s of payload.targetSeats) {
+    const tSeats = (card && Array.isArray(card.targetSeats)) ? card.targetSeats : (payload && Array.isArray(payload.targetSeats) ? payload.targetSeats : []);
+    if (tSeats.length > 0) {
+      for (const s of tSeats) {
         const num = Number(s);
         if (num > 0 && !seatsToChain.includes(num)) seatsToChain.push(num);
       }
@@ -1209,8 +1217,9 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0) {
     if (targetSeat > 0 && !seatsToChain.includes(Number(targetSeat))) {
       seatsToChain.push(Number(targetSeat));
     }
-    if (payload.targetSeat2 > 0 && !seatsToChain.includes(Number(payload.targetSeat2))) {
-      seatsToChain.push(Number(payload.targetSeat2));
+    const tSeat2 = (card && card.targetSeat2) ? Number(card.targetSeat2) : (payload && payload.targetSeat2 ? Number(payload.targetSeat2) : 0);
+    if (tSeat2 > 0 && !seatsToChain.includes(tSeat2)) {
+      seatsToChain.push(tSeat2);
     }
     if (seatsToChain.length === 0) seatsToChain.push(casterSeat);
 
@@ -1701,7 +1710,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
 
   if (state.phase === "AWAIT_TARGET_CARD") {
     if (!accepted) return { error: "Cần chọn một lá bài mục tiêu" };
-    return completeTargetCardSelection(state, respondentSeat, targetCardId);
+    return completeTargetCardSelection(state, respondentSeat, targetCardId || cardId);
   }
 
   // --- 0.5. PHẢN HỒI CHỌN BÀI KHO LƯƠNG (AWAIT_HARVEST) ---
@@ -2088,8 +2097,8 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
 
   if (target.hp <= 0) {
     // KỸ NĂNG THI SÁCH (ID 3): HỊCH NGHĨA - RÚT 3 LÁ NGAY KHI RƠI VÀO CẬN TỬ
-    if (String(target.heroId) === "3" || (target.generalName && target.generalName.includes("Thi Sách"))) {
-      drawCards(state, target.seat, 3);
+    if (String(target.heroId) === "3" || target.heroId === "HERO_3" || (target.generalName && target.generalName.includes("Thi Sách"))) {
+      drawCards(state, target.seat, 3, true);
       recordAction(state, {
         type: "USE_SKILL",
         casterSeat: target.seat,
