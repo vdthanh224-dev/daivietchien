@@ -74,6 +74,18 @@ func _ready() -> void:
 		img.save_png("res://tutorial_gameplay_screenshot.png")
 		print("[Screenshot] Đã lưu tutorial_gameplay_screenshot.png!")
 		get_tree().quit()
+	elif "--screenshot-target" in OS.get_cmdline_user_args():
+		_on_close_health_spotlight()
+		_start_step_3_slash()
+		if hand_container.get_child_count() > 0:
+			var c = hand_container.get_child(0)
+			c.set_selected(true)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var img = get_viewport().get_texture().get_image()
+		img.save_png("res://tutorial_target_screenshot.png")
+		print("[Screenshot] Đã lưu tutorial_target_screenshot.png!")
+		get_tree().quit()
 
 func _process(delta: float) -> void:
 	# Hiệu ứng nhấp nhô mũi tên hướng dẫn
@@ -143,7 +155,7 @@ func _handle_card_selected(c_ui: Control) -> void:
 	if current_step == 3:
 		if "Trảm" in c_ui.card_name:
 			banner_desc.text = "🎯 Hãy chạm chọn THỦ LĨNH SƠN TẶC trên bàn đấu làm mục tiêu tấn công!"
-			_show_arrow(boss_avatar.global_position + Vector2(180, 80), "CHỌN MỤC TIÊU")
+			_show_arrow(boss_avatar.global_position + Vector2(-15, 115), "CHỌN MỤC TIÊU")
 			action_btn.disabled = true
 			action_btn.text = "🎯 HÃY CHỌN MỤC TIÊU SƠN TẶC"
 	elif current_step == 5:
@@ -151,7 +163,7 @@ func _handle_card_selected(c_ui: Control) -> void:
 			banner_desc.text = "Nhấn nút [🛡️ DÙNG ĐỠ (NÉ ĐÒN)] để triệt tiêu đòn Trảm của Sơn Tặc!"
 			action_btn.disabled = false
 			action_btn.text = "🛡️ DÙNG ĐỠ (NÉ ĐÒN)"
-			_show_arrow(action_btn.global_position + Vector2(-90, 10), "XÁC NHẬN NÉ")
+			_show_arrow(action_btn.global_position + Vector2(-25, 16), "XÁC NHẬN NÉ")
 
 func _on_boss_avatar_clicked() -> void:
 	if current_step == 3 and selected_card_ui and "Trảm" in selected_card_ui.card_name:
@@ -160,7 +172,7 @@ func _on_boss_avatar_clicked() -> void:
 		banner_desc.text = "🎯 Đã nhắm mục tiêu Sơn Tặc! Nhấn nút [⚔️ DÙNG BÀI ➜ SƠN TẶC] để tấn công!"
 		action_btn.disabled = false
 		action_btn.text = "⚔️ DÙNG BÀI ➜ SƠN TẶC"
-		_show_arrow(action_btn.global_position + Vector2(-90, 10), "TẤN CÔNG")
+		_show_arrow(action_btn.global_position + Vector2(-25, 16), "TẤN CÔNG")
 
 func _on_action_btn_clicked() -> void:
 	match current_step:
@@ -187,7 +199,7 @@ func _start_step_3_slash() -> void:
 	# Chỉ mũi tên vào lá Trảm đầu tiên
 	if hand_container.get_child_count() > 0:
 		var first_card = hand_container.get_child(0)
-		_show_arrow(first_card.global_position + Vector2(40, -40), "CHỌN TRẢM")
+		_show_arrow(first_card.global_position + Vector2(-15, 80), "CHỌN TRẢM")
 
 func _execute_slash() -> void:
 	boss_avatar.set_target_highlight(false)
@@ -214,7 +226,7 @@ func _start_step_4_5_skill() -> void:
 	action_btn.visible = false
 
 	# Chỉ mũi tên vào nút Tiến Thoái của Lý Thường Kiệt
-	_show_arrow(player_avatar.global_position + Vector2(-110, 50), "BẤM TIẾN THOÁI")
+	_show_arrow(player_avatar.global_position + Vector2(-115, 70), "BẤM TIẾN THOÁI")
 
 func _on_player_skill_clicked() -> void:
 	if current_step == 40:
@@ -256,7 +268,7 @@ func _start_step_5_boss_turn() -> void:
 	# Tìm lá Đỡ trên tay và chỉ mũi tên vào
 	for c in hand_container.get_children():
 		if "Đỡ" in c.card_name:
-			_show_arrow(c.global_position + Vector2(40, -40), "CHỌN ĐỠ")
+			_show_arrow(c.global_position + Vector2(-15, 80), "CHỌN ĐỠ")
 			break
 
 func _execute_dodge() -> void:

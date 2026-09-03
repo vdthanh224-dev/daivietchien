@@ -97,13 +97,13 @@ func get_rank_string() -> String:
 
 func is_red() -> bool:
 	var s = suit.to_lower()
-	return s == "heart" or s == "diamond"
+	return s == "heart" or s == "diamond" or s == "co" or s == "ro"
 
 func get_suit_color() -> Color:
 	if is_red():
-		return Color("#D32F2F") # Đỏ son
+		return Color(0.92, 0.15, 0.15, 1.0) # Đỏ son rực rỡ
 	else:
-		return Color("#1C160C") # Đen mực
+		return Color(0.12, 0.12, 0.14, 1.0) # Đen mực sắc nét
 
 func get_category_name() -> String:
 	match category:

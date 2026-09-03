@@ -1,8 +1,7 @@
-[gd_scene load_steps=7 format=3 uid="uid://bbe1i4shis2be"]
+[gd_scene load_steps=8 format=3 uid="uid://cgeneralavatar123"]
 
 [ext_resource type="Theme" uid="uid://d4af37royalgold" path="res://resources/themes/royal_gold_theme.tres" id="1_theme"]
 [ext_resource type="Script" path="res://scenes/components/general_avatar_ui.gd" id="2_script"]
-[ext_resource type="Texture2D" uid="uid://b30p775esks75" path="res://assets/ui/card_frame.png" id="3_frame"]
 [ext_resource type="Texture2D" uid="uid://c332mcgi33wje" path="res://assets/ui/game_avatar.png" id="4_avatar_def"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_avatar_bg"]
@@ -20,34 +19,48 @@ shadow_color = Color(0, 0, 0, 0.35)
 shadow_size = 5
 shadow_offset = Vector2(0, 3)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_plaque"]
-bg_color = Color(0.08, 0.06, 0.03, 0.85)
-corner_radius_top_left = 4
-corner_radius_top_right = 4
-corner_radius_bottom_right = 4
-corner_radius_bottom_left = 4
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_top_banner"]
+bg_color = Color(0.08, 0.11, 0.18, 0.95)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.831373, 0.686275, 0.215686, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bottom_banner"]
+bg_color = Color(0.06, 0.08, 0.14, 0.95)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.831373, 0.686275, 0.215686, 0.9)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_badge"]
+bg_color = Color(0.04, 0.06, 0.1, 0.9)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
 
 [node name="GeneralAvatarUI" type="Control"]
-custom_minimum_size = Vector2(170, 230)
+custom_minimum_size = Vector2(170, 235)
 layout_mode = 3
 anchors_preset = 0
 offset_right = 170.0
-offset_bottom = 230.0
-pivot_offset = Vector2(85, 115)
+offset_bottom = 235.0
+pivot_offset = Vector2(85, 117)
 theme = ExtResource("1_theme")
 script = ExtResource("2_script")
 
-[node name="ClickBtn" type="Button" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-flat = true
-
 [node name="Frame" type="Panel" parent="."]
-mouse_filter = 2
 clip_contents = true
 layout_mode = 1
 anchors_preset = 15
@@ -55,6 +68,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_avatar_bg")
 
 [node name="Portrait" type="TextureRect" parent="Frame"]
@@ -64,90 +78,101 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 texture = ExtResource("4_avatar_def")
 expand_mode = 1
 stretch_mode = 6
 
-[node name="CardFrame" type="TextureRect" parent="Frame"]
-visible = false
+[node name="TopBanner" type="PanelContainer" parent="Frame"]
+custom_minimum_size = Vector2(0, 32)
 layout_mode = 1
-anchors_preset = 15
+anchors_preset = 10
 anchor_right = 1.0
-anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = 36.0
 grow_horizontal = 2
-grow_vertical = 2
-texture = ExtResource("3_frame")
-expand_mode = 1
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_top_banner")
 
-[node name="FactionBadge" type="Label" parent="Frame"]
-layout_mode = 1
-offset_left = 6.0
-offset_top = 6.0
-offset_right = 42.0
-offset_bottom = 24.0
-theme_override_colors/font_color = Color(1, 0.9, 0.6, 1)
-theme_override_font_sizes/font_size = 11
-theme_override_styles/normal = SubResource("StyleBoxFlat_plaque")
-text = "Trần"
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="RoleBadge" type="Label" parent="Frame"]
-layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -56.0
-offset_top = 6.0
-offset_right = -6.0
-offset_bottom = 24.0
-grow_horizontal = 0
-theme_override_colors/font_color = Color(0.4, 0.9, 0.5, 1)
-theme_override_font_sizes/font_size = 11
-theme_override_styles/normal = SubResource("StyleBoxFlat_plaque")
-text = "BẠN"
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="NamePlaque" type="PanelContainer" parent="Frame"]
-layout_mode = 1
-anchors_preset = 12
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_top = -54.0
-grow_horizontal = 2
-grow_vertical = 0
-theme_override_styles/panel = SubResource("StyleBoxFlat_plaque")
-
-[node name="VBox" type="VBoxContainer" parent="Frame/NamePlaque"]
+[node name="Margin" type="MarginContainer" parent="Frame/TopBanner"]
 layout_mode = 2
-theme_override_constants/separation = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 4
+theme_override_constants/margin_right = 4
 
-[node name="NameLabel" type="Label" parent="Frame/NamePlaque/VBox"]
+[node name="HBox" type="HBoxContainer" parent="Frame/TopBanner/Margin"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.95, 0.85, 0.45, 1)
-theme_override_font_sizes/font_size = 13
-text = "Trần Hưng Đạo"
-horizontal_alignment = 1
-
-[node name="HpContainer" type="HBoxContainer" parent="Frame"]
-layout_mode = 1
-anchors_preset = 12
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_top = -28.0
-offset_bottom = -6.0
-grow_horizontal = 2
-grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = 4
 alignment = 1
 
-[node name="HpLabel" type="Label" parent="Frame/HpContainer"]
+[node name="RoleBadge" type="Label" parent="Frame/TopBanner/Margin/HBox"]
 layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.4, 0.95, 0.5, 1)
+theme_override_font_sizes/font_size = 10
+theme_override_styles/normal = SubResource("StyleBoxFlat_badge")
+text = " BẠN "
+vertical_alignment = 1
+
+[node name="NameLabel" type="Label" parent="Frame/TopBanner/Margin/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.55, 1)
 theme_override_font_sizes/font_size = 12
+text = "Lý Thường Kiệt"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BottomBanner" type="PanelContainer" parent="Frame"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = -34.0
+offset_right = -4.0
+offset_bottom = -4.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_bottom_banner")
+
+[node name="Margin" type="MarginContainer" parent="Frame/BottomBanner"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 4
+theme_override_constants/margin_right = 4
+
+[node name="HBox" type="HBoxContainer" parent="Frame/BottomBanner/Margin"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+alignment = 1
+
+[node name="FactionBadge" type="Label" parent="Frame/BottomBanner/Margin/HBox"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.45, 1)
+theme_override_font_sizes/font_size = 10
+theme_override_styles/normal = SubResource("StyleBoxFlat_badge")
+text = " Khác "
+vertical_alignment = 1
+
+[node name="HpLabel" type="Label" parent="Frame/BottomBanner/Margin/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.65, 0.8, 1)
+theme_override_font_sizes/font_size = 11
 text = "🌸 🌸 🌸 🌸 (4/4)"
 horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="HandBadge" type="PanelContainer" parent="Frame"]
 layout_mode = 1
@@ -157,56 +182,21 @@ anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = -46.0
-offset_top = -80.0
+offset_top = -62.0
 offset_right = -6.0
-offset_bottom = -58.0
+offset_bottom = -40.0
 grow_horizontal = 0
 grow_vertical = 0
-theme_override_styles/panel = SubResource("StyleBoxFlat_plaque")
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_badge")
 
 [node name="HandLabel" type="Label" parent="Frame/HandBadge"]
 layout_mode = 2
+mouse_filter = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 11
+theme_override_font_sizes/font_size = 10
 text = "🎴 4"
 horizontal_alignment = 1
-
-[node name="EquipSlots" type="VBoxContainer" parent="Frame"]
-visible = false
-layout_mode = 1
-anchors_preset = 9
-anchor_bottom = 1.0
-offset_left = 6.0
-offset_top = 30.0
-offset_right = 90.0
-offset_bottom = -60.0
-grow_vertical = 2
-theme_override_constants/separation = 2
-
-[node name="Weapon" type="Label" parent="Frame/EquipSlots"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 9
-text = "⚔️ Trống"
-
-[node name="Armor" type="Label" parent="Frame/EquipSlots"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 9
-text = "🛡️ Trống"
-
-[node name="OffMount" type="Label" parent="Frame/EquipSlots"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 9
-text = "🐎 Trống"
-
-[node name="DefMount" type="Label" parent="Frame/EquipSlots"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 9
-text = "🛡️🐎 Trống"
-
-[node name="Treasure" type="Label" parent="Frame/EquipSlots"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 9
-text = "🔮 Trống"
 
 [node name="TargetBorder" type="ReferenceRect" parent="."]
 visible = false
@@ -221,7 +211,7 @@ offset_bottom = 4.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-border_color = Color(1, 0.8, 0.2, 1)
+border_color = Color(1, 0.85, 0.2, 1)
 border_width = 3.5
 editor_only = false
 
@@ -230,9 +220,17 @@ visible = false
 layout_mode = 1
 anchors_preset = 0
 offset_left = -92.0
-offset_top = 45.0
+offset_top = 50.0
 offset_right = -6.0
-offset_bottom = 85.0
+offset_bottom = 90.0
 theme_override_font_sizes/font_size = 11
 text = "⚡ TIẾN THOÁI"
 
+[node name="ClickBtn" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+flat = true

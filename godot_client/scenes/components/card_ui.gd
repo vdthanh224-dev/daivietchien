@@ -57,7 +57,8 @@ func update_card(data: Resource) -> void:
 	var suit_sym = data.get_suit_symbol()
 	var rank_str = data.get_rank_string()
 	suit_rank_lbl.text = "%s %s" % [suit_sym, rank_str]
-	suit_rank_lbl.modulate = data.get_suit_color()
+	var s_col = data.get_suit_color()
+	suit_rank_lbl.add_theme_color_override("font_color", s_col)
 
 	cat_lbl.text = data.get_category_name()
 	name_lbl.text = data.card_name

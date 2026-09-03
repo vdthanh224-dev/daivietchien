@@ -1,0 +1,8 @@
+res://resources/themes/royal_gold_theme.tres::c927d88d93758ae66c5b42da481c3b14::1788448416::res://.godot/exported/133200997/export-eb2e1ce05653a091bfe287d8f4f30f96-royal_gold_theme.res
+res://scenes/components/card_ui.tscn::ce842086796e820f0ce31c5da23cd5de::1788451506::res://.godot/exported/133200997/export-27d4b7b2aa6270487128cd8112dace11-card_ui.scn
+res://scenes/components/general_avatar_ui.tscn::4c33eb4b2a0989dbb3bb2026f62848b2::1788451474::res://.godot/exported/133200997/export-cd0fbfbb2ae7488ddf541c820f30a0aa-general_avatar_ui.scn
+res://scenes/components/general_seat_ui.tscn::e6454ed85f16d85153144f823eac5fc0::1788448590::res://.godot/exported/133200997/export-86b4c7d10a32963a107e2b6939e921a1-general_seat_ui.scn
+res://scenes/components/onboarding_modal.tscn::1b3cf45e6bd3dcd19966737cde5bf497::1788449941::res://.godot/exported/133200997/export-e46582d6cd0152277318ae71e323bc52-onboarding_modal.scn
+res://scenes/auth_login.tscn::b5b8f90cfb6e18cd00fefdba08fdcb89::1788449596::res://.godot/exported/133200997/export-3cc290d537fcfaff59e86ab751377281-auth_login.scn
+res://scenes/main_game.tscn::f5d828b649d298c670e55c5cfe2c41b8::1788448639::res://.godot/exported/133200997/export-3a689a07f84009fde038ac878f1ae44a-main_game.scn
+res://scenes/tutorial_battle.tscn::610ab7625ef6025c846d6169c5015bca::1788451154::res://.godot/exported/133200997/export-a605e91f3f7f790dfe2a7abdea98251b-tutorial_battle.scn

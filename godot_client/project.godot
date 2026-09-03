@@ -18,8 +18,8 @@ boot_splash/bg_color=Color(0.04, 0.07, 0.12, 1)
 
 [autoload]
 
-AuthManager="*res://scripts/network/auth_manager.gd"
 NetworkClient="*res://scripts/network/network_client.gd"
+AuthManager="*res://scripts/network/auth_manager.gd"
 
 [display]
 
@@ -30,4 +30,5 @@ window/stretch/aspect="expand"
 
 [rendering]
 
+textures/vram_compression/import_etc2_astc=true
 environment/defaults/default_clear_color=Color(0.06, 0.09, 0.14, 1)
