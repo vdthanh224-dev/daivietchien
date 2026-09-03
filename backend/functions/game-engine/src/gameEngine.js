@@ -1652,8 +1652,8 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     const damage = (state.activeCard && state.activeCard.damage) ? state.activeCard.damage : 1;
     const activeCard = state.activeCard;
     let slashElement = "NORMAL";
-      if (pendingSlash && (pendingSlash.subType === CARD_SUBTYPES.ATTACK_FIRE || (pendingSlash.name && pendingSlash.name.includes("Hỏa")))) slashElement = "FIRE";
-      else if (pendingSlash && (pendingSlash.subType === CARD_SUBTYPES.ATTACK_THUNDER || (pendingSlash.name && pendingSlash.name.includes("Lôi")))) slashElement = "LIGHTNING";
+      if (activeCard && (activeCard.subType === CARD_SUBTYPES.ATTACK_FIRE || (activeCard.name && activeCard.name.includes("Hỏa")))) slashElement = "FIRE";
+      else if (activeCard && (activeCard.subType === CARD_SUBTYPES.ATTACK_THUNDER || (activeCard.name && activeCard.name.includes("Lôi")))) slashElement = "LIGHTNING";
       const damageResult = applyDamageToPlayer(state, respondentSeat, damage, "đòn Trảm", slashElement);
     const caster = state.players.find((player) => player.seat === activeCard?.casterSeat);
     const thuongNgau = getEquippedWeapon(caster, "Thương Ngâu");
