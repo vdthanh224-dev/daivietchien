@@ -2005,14 +2005,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
           description: `💮 <b>${respondent.generalName}</b> đã dùng ${formatCardText(rescueCard)} cứu sống <b>${victim.generalName}</b> (${victim.hp}/${victim.maxHp})!`
         });
 
-        if (String(victim.heroId) === "3" || (victim.generalName && victim.generalName.includes("Thi Sách"))) {
-            drawCards(state, victim.seat, 3);
-            recordAction(state, {
-                type: "USE_SKILL",
-                casterSeat: victim.seat,
-                description: `✨ <b>${victim.generalName}</b> kích hoạt <color=#FFD700><b>Hịch Nghĩa</b></color>: Rút 3 lá bài khi thoát khỏi Cận Tử!`
-            });
-        }
+
 
         const resume = resolveNearDeathResume(state);
         refreshLastDelta(state);
@@ -2094,6 +2087,16 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
   }
 
   if (target.hp <= 0) {
+    // KỸ NĂNG THI SÁCH (ID 3): HỊCH NGHĨA - RÚT 3 LÁ NGAY KHI RƠI VÀO CẬN TỬ
+    if (String(target.heroId) === "3" || (target.generalName && target.generalName.includes("Thi Sách"))) {
+      drawCards(state, target.seat, 3);
+      recordAction(state, {
+        type: "USE_SKILL",
+        casterSeat: target.seat,
+        description: `✨ <b>${target.generalName}</b> kích hoạt <color=#FFD700><b>[Hịch Nghĩa]</b></color>: Rơi vào trạng thái Cận Tử, lập tức rút 3 lá bài!`
+      });
+    }
+
     // Máu có thể âm khi sát thương lớn hơn máu hiện tại
     // target.hp = 0; // KHÔNG SET VỀ 0 NẾU ÂM! Để dành cho Bánh Chưng cộng dồn
     
