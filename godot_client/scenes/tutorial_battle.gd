@@ -18,7 +18,10 @@ extends Control
 @onready var arrow_label: Label = $TutorialArrow/ArrowLabel
 
 @onready var center_showcase = $CenterArea/CardShowcase
-@onready var showcase_label = $CenterArea/CardShowcase/ShowcaseName
+@onready var showcase_card_slot = $CenterArea/CardShowcase/CardSlot
+@onready var showcase_label = $CenterArea/CardShowcase/ActionBanner/ShowcaseName
+
+var showcase_tween: Tween = null
 
 @onready var spotlight_overlay = $HealthSpotlightOverlay
 @onready var start_tutorial_btn = $HealthSpotlightOverlay/HealthGuideBox/Margin/VBox/StartTutorialBtn
@@ -100,6 +103,16 @@ func _ready() -> void:
 		var img = get_viewport().get_texture().get_image()
 		img.save_png("res://tutorial_target_screenshot.png")
 		print("[Screenshot] Đã lưu tutorial_target_screenshot.png!")
+		get_tree().quit()
+	elif "--screenshot-showcase" in OS.get_cmdline_user_args():
+		_on_close_health_spotlight()
+		_start_step_3_slash()
+		_show_center_card("Trảm Thường", "Lý Thường Kiệt", "A", "Spade", 0, "Tấn công gây 1 sát thương.")
+		await get_tree().create_timer(0.35).timeout
+		await get_tree().process_frame
+		var img = get_viewport().get_texture().get_image()
+		img.save_png("res://tutorial_showcase_screenshot.png")
+		print("[Screenshot] Đã lưu tutorial_showcase_screenshot.png!")
 		get_tree().quit()
 
 func _process(delta: float) -> void:
@@ -303,7 +316,7 @@ func _execute_slash() -> void:
 	boss_hp -= 1
 	boss_avatar.update_hp(boss_hp, 3)
 
-	_show_center_card("Trảm Thường", "Lý Thường Kiệt")
+	_show_center_card("Trảm Thường", "Lý Thường Kiệt", "A", "Spade", 0, "Tấn công gây 1 sát thương.")
 	_add_log("⚔️ Bạn đã dùng TRẢM! Thủ Lĩnh Sơn Tặc trúng đòn mất 1 máu (%d/3)." % boss_hp)
 
 	current_step = 4
@@ -359,7 +372,7 @@ func _start_step_5_boss_turn() -> void:
 
 	AudioManager.play_voice("Trảm")
 	AudioManager.play_slash()
-	_show_center_card("Trảm Hung Bạo", "Thủ Lĩnh Sơn Tặc")
+	_show_center_card("Trảm Hung Bạo", "Thủ Lĩnh Sơn Tặc", "8", "Spade", 0, "Đòn đánh hung bạo.")
 	_play_slash_effect(player_avatar.global_position + Vector2(87, 119))
 	_add_log("💥 Sơn Tặc vung đao tung chiêu [TRẢM] nhắm thẳng vào bạn!")
 
@@ -383,7 +396,7 @@ func _execute_dodge() -> void:
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
 
-	_show_center_card("Đỡ (Hóa Giải)", "Lý Thường Kiệt")
+	_show_center_card("Đỡ", "Lý Thường Kiệt", "3", "Diamond", 0, "Hóa giải 1 đòn Trảm.")
 	_add_log("🛡️ HOÁ GIẢI THÀNH CÔNG! Bạn đã dùng Đỡ né hoàn toàn đòn Trảm của Sơn Tặc! Sinh mệnh 4/4 của bạn được bảo toàn.")
 
 	await get_tree().create_timer(1.2).timeout
@@ -462,30 +475,29 @@ func _execute_free_card_play() -> void:
 	elif "Bánh Chưng" in c_name:
 		AudioManager.play_voice("Bánh Chưng")
 		AudioManager.play_sfx("sfx_skill")
+		_show_center_card("Bánh Chưng", "Lý Thường Kiệt", "4", "Heart", 0, "Hồi phục 1 Máu.")
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
 
 		if player_hp < 4:
 			player_hp += 1
 			player_avatar.update_hp(player_hp, 4)
-			_show_center_card("Bánh Chưng", "Lý Thường Kiệt")
 			_add_log("❤️ Bạn đã dùng BÁNH CHƯNG! Hồi phục 1 Máu (%d/4)." % player_hp)
 		else:
-			_show_center_card("Bánh Chưng", "Lý Thường Kiệt")
 			_add_log("❤️ Dùng Bánh Chưng (Máu bạn đã tối đa 4/4).")
 
 	elif "Khiên" in c_name:
 		AudioManager.play_voice("Khiên Mây Bện")
 		AudioManager.play_parry()
+		_show_center_card("Khiên Mây Bện", "Lý Thường Kiệt", "K", "Diamond", 1, "Phán xét Đỏ tự động Đỡ.")
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
-		_show_center_card("Khiên Mây Bện", "Lý Thường Kiệt")
 		_add_log("🛡️ Bạn đã trang bị [KHIÊN MÂY BỆN] thành công!")
 
 	else:
+		_show_center_card(c_name, "Lý Thường Kiệt")
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
-		_show_center_card(c_name, "Lý Thường Kiệt")
 		_add_log("🃏 Bạn đã ra lá [%s]!" % c_name)
 
 	desc_text.text = "💡 Chọn lá bài khác trên tay hoặc nhấn Kết thúc lượt."
@@ -515,7 +527,7 @@ func _boss_turn_free_play() -> void:
 		# Sơn Tặc tấn công
 		AudioManager.play_voice("Trảm")
 		AudioManager.play_slash()
-		_show_center_card("Trảm Hung Hãn", "Thủ Lĩnh Sơn Tặc")
+		_show_center_card("Trảm Hung Hãn", "Thủ Lĩnh Sơn Tặc", "7", "Club", 0, "Tấn công gây 1 sát thương.")
 		_play_slash_effect(player_avatar.global_position + Vector2(87, 119))
 
 		# Kiểm tra xem người chơi có lá Đỡ trên tay không
@@ -573,14 +585,32 @@ func _show_arrow(pos: Vector2, text: String) -> void:
 	arrow_node.visible = true
 	arrow_time = 0.0
 
-func _show_center_card(c_name: String, source: String) -> void:
+func _show_center_card(c_name: String, source: String, c_rank: String = "A", c_suit: String = "Spade", c_cat: int = 0, c_desc: String = "") -> void:
+	if showcase_tween and showcase_tween.is_valid():
+		showcase_tween.kill()
+
+	# 1. Dọn dẹp lá bài cũ trong slot
+	for child in showcase_card_slot.get_children():
+		child.queue_free()
+
+	# 2. Khởi tạo lá bài sắc nét đầy đủ tại trung tâm bàn đấu
+	var card_instance = CardUIScene.instantiate()
+	showcase_card_slot.add_child(card_instance)
+	card_instance.setup_card_data("center_" + c_name, c_name, c_rank, c_suit, c_cat, c_desc)
+
+	# 3. Đặt nội dung biển hiệu
 	showcase_label.text = "%s dùng [%s]!" % [source, c_name]
 	center_showcase.visible = true
-	var tw = create_tween()
-	tw.tween_property(center_showcase, "scale", Vector2(1.15, 1.15), 0.15).from(Vector2(0.8, 0.8))
-	tw.tween_property(center_showcase, "scale", Vector2(1.0, 1.0), 0.1)
-	await get_tree().create_timer(1.2).timeout
-	center_showcase.visible = false
+	center_showcase.modulate.a = 1.0
+
+	# 4. Hoạt ảnh pop-out phóng to và giữ nguyên ở trung tâm 1.8s
+	center_showcase.scale = Vector2(0.3, 0.3)
+	showcase_tween = create_tween()
+	showcase_tween.tween_property(center_showcase, "scale", Vector2(1.15, 1.15), 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	showcase_tween.tween_property(center_showcase, "scale", Vector2(1.0, 1.0), 0.1)
+	showcase_tween.tween_interval(1.8)
+	showcase_tween.tween_property(center_showcase, "modulate:a", 0.0, 0.3)
+	showcase_tween.tween_callback(func(): center_showcase.visible = false)
 
 func _animate_card_play_to_center(card_node: Control) -> void:
 	card_node.reparent(self)
