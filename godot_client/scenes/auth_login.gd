@@ -14,10 +14,8 @@ extends Control
 @onready var guest_btn: Button = $AuthCard/Margin/VBox/GuestBtn
 @onready var status_lbl: Label = $AuthCard/Margin/VBox/StatusLabel
 
-@onready var quick_1: Button = $QuickLoginBar/Margin/HBox/Quick1
-@onready var quick_2: Button = $QuickLoginBar/Margin/HBox/Quick2
-@onready var quick_3: Button = $QuickLoginBar/Margin/HBox/Quick3
-@onready var quick_4: Button = $QuickLoginBar/Margin/HBox/Quick4
+@onready var quick_login_bar: PanelContainer = $QuickLoginBar
+@onready var quick_hbox: HBoxContainer = $QuickLoginBar/Margin/HBox
 
 var is_register_mode: bool = false
 
@@ -27,10 +25,16 @@ func _ready() -> void:
 	submit_btn.pressed.connect(_on_submit_pressed)
 	guest_btn.pressed.connect(_on_guest_pressed)
 
-	quick_1.pressed.connect(func(): _on_quick_login(1))
-	quick_2.pressed.connect(func(): _on_quick_login(2))
-	quick_3.pressed.connect(func(): _on_quick_login(3))
-	quick_4.pressed.connect(func(): _on_quick_login(4))
+	# Kiểm tra quyền: Chỉ hiển thị thanh Tester 1-9 trên máy dev của bạn
+	var is_dev = is_dev_machine()
+	quick_login_bar.visible = is_dev
+
+	if is_dev:
+		for i in range(1, 10):
+			var btn = quick_hbox.get_node_or_null("Quick" + str(i))
+			if btn:
+				var num = i
+				btn.pressed.connect(func(): _on_quick_login(num))
 
 	AuthManager.login_succeeded.connect(_on_login_succeeded)
 	AuthManager.login_failed.connect(_on_login_failed)
@@ -49,6 +53,34 @@ func _ready() -> void:
 		img.save_png("res://auth_screenshot.png")
 		print("[Screenshot] Đã lưu auth_screenshot.png!")
 		get_tree().quit()
+
+func is_dev_machine() -> bool:
+	var u = OS.get_environment("USERNAME").strip_edges().to_lower()
+	if u == "ph laptop" or u == "phlaptop":
+		return true
+	if FileAccess.file_exists("res://.dev_machine"):
+		return true
+	if OS.is_debug_build() or OS.has_feature("editor"):
+		return true
+	return false
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not is_dev_machine():
+		return
+	if email_input.has_focus() or pass_input.has_focus() or name_input.has_focus():
+		return
+
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_1, KEY_KP_1: _on_quick_login(1)
+			KEY_2, KEY_KP_2: _on_quick_login(2)
+			KEY_3, KEY_KP_3: _on_quick_login(3)
+			KEY_4, KEY_KP_4: _on_quick_login(4)
+			KEY_5, KEY_KP_5: _on_quick_login(5)
+			KEY_6, KEY_KP_6: _on_quick_login(6)
+			KEY_7, KEY_KP_7: _on_quick_login(7)
+			KEY_8, KEY_KP_8: _on_quick_login(8)
+			KEY_9, KEY_KP_9: _on_quick_login(9)
 
 func set_register_mode(register: bool) -> void:
 	is_register_mode = register
@@ -96,7 +128,7 @@ func _on_quick_login(num: int) -> void:
 func _on_login_succeeded(user_data: Dictionary) -> void:
 	_set_status("🎉 Đăng nhập thành công! Đang vào chiến trường...", Color("#10B981"))
 	submit_btn.disabled = false
-	await get_tree().create_timer(0.6).timeout
+	await get_tree().create_timer(0.5).timeout
 	get_tree().change_scene_to_file("res://scenes/main_game.tscn")
 
 func _on_login_failed(err_msg: String) -> void:

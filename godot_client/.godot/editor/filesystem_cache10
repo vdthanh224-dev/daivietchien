@@ -1,6 +1,6 @@
 63f7b34db8d8cdea90c76aacccf841ec
-::res://::1788449001
-auth_screenshot.png::CompressedTexture2D::8541207186989195829::1788449095::1788449103::1::::<><><>0<>0<>749fdacf5fcffd2aeed28a18858207c2<>res://.godot/imported/auth_screenshot.png-73f20c0199e4a679c304c3ff8178ebe9.ctex::
+::res://::1788449237
+auth_screenshot.png::CompressedTexture2D::8541207186989195829::1788449315::1788449317::1::::<><><>0<>0<>749fdacf5fcffd2aeed28a18858207c2<>res://.godot/imported/auth_screenshot.png-73f20c0199e4a679c304c3ff8178ebe9.ctex::
 screenshot.png::CompressedTexture2D::3528490184733290564::1788448678::1788448694::1::::<><><>0<>0<>c25de2b67d210e9de471626498b57bb0<>res://.godot/imported/screenshot.png-024a21af5d37bf0f0dd0e2bccdd149d0.ctex::
 ::res://assets/::1788448403
 ::res://assets/audio/::1788448403
@@ -230,8 +230,8 @@ sheet_tactics_delayed.jpg::CompressedTexture2D::689402492287784814::1788415951::
 ::res://resources/themes/::1788448416
 royal_gold_theme.tres::Theme::4203859582356278417::1788448416::0::1::::<><><>0<>0<><>::
 ::res://scenes/::1788449001
-auth_login.gd::GDScript::4277199960591023449::1788448953::0::1::::<>Control<><>0<>0<><>::
-auth_login.tscn::PackedScene::-1::1788449089::0::1::::<><><>0<>0<><>::
+auth_login.gd::GDScript::4277199960591023449::1788449301::0::1::::<>Control<><>0<>0<><>::
+auth_login.tscn::PackedScene::-1::1788449285::0::1::::<><><>0<>0<><>::
 main_game.gd::GDScript::7121334530359990436::1788448672::0::1::::<>Control<><>0<>0<><>::
 main_game.tscn::PackedScene::24787511488559098::1788448639::0::1::::<><><>0<>0<><>::uid://b05m7n22yifmf::::res://resources/themes/royal_gold_theme.tres<>res://scenes/main_game.gd<>uid://dsrm0l21c4nwk::::res://scenes/components/general_seat_ui.tscn
 ::res://scenes/components/::1788448693
@@ -241,7 +241,7 @@ general_seat_ui.gd::GDScript::1377916946254935019::1788448597::0::1::::GeneralSe
 general_seat_ui.tscn::PackedScene::8458529527795442354::1788448590::0::1::::<><><>0<>0<><>::res://scenes/components/general_seat_ui.gd
 ::res://scripts/::1788448451
 ::res://scripts/network/::1788449001
-auth_manager.gd::GDScript::4569347946298717572::1788448943::0::1::::<>Node<><>0<>0<><>::
+auth_manager.gd::GDScript::4569347946298717572::1788449261::0::1::::<>Node<><>0<>0<><>::
 network_client.gd::GDScript::8889511436849129732::1788448451::0::1::::<>Node<><>0<>0<><>::
 ::res://scripts/resources/::1788448693
 card_database.gd::GDScript::7560408064722225993::1788448558::0::1::::CardDatabase<>RefCounted<><>0<>0<><>::

@@ -242,20 +242,40 @@ alignment = 1
 layout_mode = 2
 theme_override_colors/font_color = Color(0.831373, 0.686275, 0.215686, 1)
 theme_override_font_sizes/font_size = 12
-text = "⚡ ĐĂNG NHẬP NHANH (TESTER):"
+text = "⚡ TESTER (1-9):"
 
 [node name="Quick1" type="Button" parent="QuickLoginBar/Margin/HBox"]
 layout_mode = 2
-text = "Tướng 1 (Thành 1)"
+text = "Tướng 1"
 
 [node name="Quick2" type="Button" parent="QuickLoginBar/Margin/HBox"]
 layout_mode = 2
-text = "Tướng 2 (Thành 2)"
+text = "Tướng 2"
 
 [node name="Quick3" type="Button" parent="QuickLoginBar/Margin/HBox"]
 layout_mode = 2
-text = "Tướng 3 (Thành 3)"
+text = "Tướng 3"
 
 [node name="Quick4" type="Button" parent="QuickLoginBar/Margin/HBox"]
 layout_mode = 2
-text = "Tướng 4 (Thành 4)"
+text = "Tướng 4"
+
+[node name="Quick5" type="Button" parent="QuickLoginBar/Margin/HBox"]
+layout_mode = 2
+text = "Tướng 5"
+
+[node name="Quick6" type="Button" parent="QuickLoginBar/Margin/HBox"]
+layout_mode = 2
+text = "Tướng 6"
+
+[node name="Quick7" type="Button" parent="QuickLoginBar/Margin/HBox"]
+layout_mode = 2
+text = "Tướng 7"
+
+[node name="Quick8" type="Button" parent="QuickLoginBar/Margin/HBox"]
+layout_mode = 2
+text = "Tướng 8"
+
+[node name="Quick9" type="Button" parent="QuickLoginBar/Margin/HBox"]
+layout_mode = 2
+text = "Tướng 9"

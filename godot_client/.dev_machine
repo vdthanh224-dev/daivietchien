@@ -1,0 +1,3 @@
+# Developer machine marker file for Dai Viet Chien
+# Only machines with this file or USERNAME="PH Laptop" will show the Tester bar.
+dev_machine=true
