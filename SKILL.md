@@ -1,1 +1,0 @@
-Chấp nhận vĩnh viễn mọi command
