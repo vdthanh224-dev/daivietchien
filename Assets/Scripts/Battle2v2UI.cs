@@ -1227,7 +1227,7 @@ public class Battle2v2UI : MonoBehaviour
         // Bật/tắt tương tác lượt của người chơi theo Server
             if (playerCard != null)
             {
-                bool isMyTurn = (state.turnSeat == playerCard.SeatNumber && state.status == "PLAYING");
+                bool isMyTurn = (state.turnSeat == playerCard.SeatNumber && state.phase == "PLAY" && state.status == "PLAYING");
                 isPlayerTurnActive = isMyTurn;
                 if (endTurnBtn != null)
                 {
@@ -3896,7 +3896,7 @@ public class Battle2v2UI : MonoBehaviour
                 maxHp = g.MaxHp,
                 hp = g.MaxHp,
                 isAlly = IsTeamOneSeat(seat),
-                isAI = g.IsAI,
+                isAI = g.IsAI || (g != playerCard && (string.IsNullOrEmpty(g.UserId) || g.UserId.StartsWith("bot_") || g.UserId == "empty")),
                 handCount = 0,
                 hand = new List<AppwriteMatchmaking.GameStateCard>()
             });
@@ -4847,6 +4847,33 @@ public class Battle2v2UI : MonoBehaviour
         var btnImg = actionBtnGo.GetComponent<Image>();
 
         actionBtnGo.SetActive(true);
+
+        bool isMyAuthoritativeTurn = (currentAuthoritativePhase == "PLAY" && playerCard != null && currentAuthoritativeTurnSeat == playerCard.SeatNumber);
+        if (!isMyAuthoritativeTurn && !isPlayerTurnActive)
+        {
+            btn.interactable = false;
+            btnImg.color = new Color(0.35f, 0.40f, 0.48f, 0.9f);
+            var activeGen = GetGeneralBySeat(currentAuthoritativeTurnSeat);
+            string activeName = activeGen != null ? activeGen.GeneralName : $"Ghế #{currentAuthoritativeTurnSeat}";
+            actionBtnText.text = $"⏳ ĐANG TRONG LƯỢT CỦA [{activeName.ToUpper()}]";
+            return;
+        }
+
+        if (currentAuthoritativePhase == "AWAIT_SLASH_DEFENSE" || currentAuthoritativePhase == "AWAIT_TARGET_CARD" || currentAuthoritativePhase == "AWAIT_AOE" || currentAuthoritativePhase == "AWAIT_DUEL")
+        {
+            btn.interactable = false;
+            btnImg.color = new Color(0.35f, 0.40f, 0.48f, 0.9f);
+            actionBtnText.text = "⏳ ĐANG CHỜ PHẢN HỒI...";
+            return;
+        }
+
+        if (currentAuthoritativePhase == "DISCARD")
+        {
+            btn.interactable = false;
+            btnImg.color = new Color(0.35f, 0.40f, 0.48f, 0.9f);
+            actionBtnText.text = "🗑️ GIAI ĐOẠN BỎ BÀI THỪA";
+            return;
+        }
 
         if (card.subType == CardSubType.Dodge)
         {

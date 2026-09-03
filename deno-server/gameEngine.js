@@ -589,7 +589,20 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
     targetSeat = Number.isFinite(parsedTarget) ? parsedTarget : targetSeat;
   }
   if (state.phase !== "PLAY" || state.turnSeat !== casterSeat) {
-    return { error: "Chưa tới lượt của bạn" };
+    if (state.turnSeat !== casterSeat) {
+      const turnP = state.players.find(p => p.seat === state.turnSeat);
+      return { error: `Chưa tới lượt của bạn (Đang trong lượt của ${turnP ? turnP.generalName : `Ghế ${state.turnSeat}`})` };
+    }
+    if (state.phase === "AWAIT_SLASH_DEFENSE") {
+      return { error: "Đang chờ mục tiêu phản hồi lá Đỡ" };
+    }
+    if (state.phase === "AWAIT_TARGET_CARD") {
+      return { error: "Đang chờ chọn lá bài mục tiêu" };
+    }
+    if (state.phase === "DISCARD") {
+      return { error: "Đang trong giai đoạn bỏ bài thừa" };
+    }
+    return { error: `Chưa thể ra bài lúc này (Trạng thái: ${state.phase})` };
   }
 
   const caster = state.players.find(x => x.seat === casterSeat);
@@ -2730,7 +2743,7 @@ export function handleAIReaction(state, aiSeat) {
  * Nhịp đếm thời gian và tự động hành động trên Server (Authoritative Server Loop)
  * Chạy mỗi giây (1000ms) trên Server In-Memory
  */
-export function tickGameState(state) {
+export function tickGameState(state, connectedSeats = null) {
   if (!state || state.status === "FINISHED") return { changed: false, important: false };
   let changed = false;
   let important = false;
@@ -2790,7 +2803,8 @@ export function tickGameState(state) {
       return { changed: true, important };
     }
 
-    const canAIReact = waitingPlayer && waitingPlayer.isAI
+    const isAISlot = waitingPlayer && (waitingPlayer.isAI || (Array.isArray(connectedSeats) && !connectedSeats.includes(waitingSeat)));
+    const canAIReact = isAISlot
       && (waitingPlayer.hp > 0 || state.phase === "AWAIT_NEAR_DEATH");
     if (canAIReact && elapsed >= 2 && elapsed < 40) {
         const res = handleAIReaction(state, waitingSeat);
@@ -2831,7 +2845,8 @@ export function tickGameState(state) {
       return { changed: true, important };
     }
 
-    if (turnPlayer && turnPlayer.isAI && turnPlayer.hp > 0 && elapsed >= 2 && elapsed < 40) {
+    const isAITurn = turnPlayer && (turnPlayer.isAI || (Array.isArray(connectedSeats) && !connectedSeats.includes(state.turnSeat)));
+    if (isAITurn && turnPlayer.hp > 0 && elapsed >= 2 && elapsed < 40) {
       handleAIStep(state, state.turnSeat);
       important = true;
       state.timerStartAt = Date.now();

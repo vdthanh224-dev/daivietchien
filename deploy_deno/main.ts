@@ -102,7 +102,8 @@ function ensureTickTimer() {
         continue;
       }
       try {
-        if (tickGameState(room.state).important) {
+        const connectedSeats = Array.from(room.sockets.keys());
+        if (tickGameState(room.state, connectedSeats).important) {
           room.lastActivity = now;
           broadcastRoom(room, {
             type: "STATE_UPDATE",
