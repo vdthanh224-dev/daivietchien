@@ -2,6 +2,7 @@ extends Control
 
 signal clicked()
 signal skill_clicked()
+signal info_clicked()
 
 @onready var portrait_rect: TextureRect = $Frame/Portrait
 @onready var name_label: Label = $Frame/TopBanner/Margin/HBox/NameLabel
@@ -12,6 +13,7 @@ signal skill_clicked()
 @onready var target_border: ReferenceRect = $TargetBorder
 @onready var skill_btn: Button = $SkillBtn
 @onready var click_btn: Button = $ClickBtn
+@onready var info_btn: Button = $Frame/InfoBtn
 
 @onready var weapon_slot = $Frame/EquipContainer/WeaponSlot
 @onready var weapon_label = $Frame/EquipContainer/WeaponSlot/Label
@@ -28,6 +30,13 @@ var general_id: String = "tran_hung_dao"
 var current_hp: int = 4
 var max_hp: int = 4
 var hand_count: int = 4
+var equipped_items: Dictionary = {
+	"weapon": "",
+	"armor": "",
+	"offensive_mount": "",
+	"defensive_mount": "",
+	"treasure": ""
+}
 
 func _ready() -> void:
 	if click_btn:
@@ -37,6 +46,12 @@ func _ready() -> void:
 
 	if skill_btn:
 		skill_btn.pressed.connect(func(): skill_clicked.emit())
+
+	if info_btn:
+		info_btn.pressed.connect(func():
+			AudioManager.play_card_select()
+			info_clicked.emit()
+		)
 
 func _on_avatar_clicked() -> void:
 	clicked.emit()
@@ -55,27 +70,39 @@ func set_target_highlight(active: bool) -> void:
 			tw.tween_property(target_border, "border_color", Color(1, 0.7, 0.1, 1), 0.2)
 
 func set_equipment(slot_type: String, item_name: String, suit_rank: String = "") -> void:
+	var key = ""
 	match slot_type.to_lower():
 		"weapon", "vu_khi":
+			key = "weapon"
 			if weapon_slot:
 				weapon_slot.visible = (item_name != "")
 				weapon_label.text = "🗡️ %s %s" % [item_name, suit_rank]
 		"armor", "giap":
+			key = "armor"
 			if armor_slot:
 				armor_slot.visible = (item_name != "")
 				armor_label.text = "🛡️ %s %s" % [item_name, suit_rank]
 		"offensive_mount", "mount_offense", "ngua_cong":
+			key = "offensive_mount"
 			if offensive_mount_slot:
 				offensive_mount_slot.visible = (item_name != "")
 				offensive_mount_label.text = "🐎⚔️ %s (-1) %s" % [item_name, suit_rank]
 		"defensive_mount", "mount_defense", "ngua_thu", "mount":
+			key = "defensive_mount"
 			if defensive_mount_slot:
 				defensive_mount_slot.visible = (item_name != "")
 				defensive_mount_label.text = "🐘🛡️ %s (+1) %s" % [item_name, suit_rank]
 		"treasure", "bao_vat":
+			key = "treasure"
 			if treasure_slot:
 				treasure_slot.visible = (item_name != "")
 				treasure_label.text = "👑 %s %s" % [item_name, suit_rank]
+
+	if key != "":
+		if item_name != "":
+			equipped_items[key] = ("%s %s" % [item_name, suit_rank]).strip_edges()
+		else:
+			equipped_items[key] = ""
 
 func has_armor() -> bool:
 	return armor_slot != null and armor_slot.visible

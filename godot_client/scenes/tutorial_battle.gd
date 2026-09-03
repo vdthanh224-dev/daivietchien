@@ -29,6 +29,21 @@ var showcase_tween: Tween = null
 @onready var reward_modal = $RewardModal
 @onready var claim_reward_btn = $RewardModal/Dim/Box/Margin/VBox/ClaimBtn
 
+@onready var general_info_modal = $GeneralInfoModal
+@onready var info_close_x_btn = $GeneralInfoModal/Dim/Box/Margin/VBox/HeaderHBox/CloseXBtn
+@onready var info_close_btn = $GeneralInfoModal/Dim/Box/Margin/VBox/CloseModalBtn
+@onready var info_modal_title = $GeneralInfoModal/Dim/Box/Margin/VBox/HeaderHBox/ModalTitle
+@onready var info_portrait_thumb = $GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/LeftCol/PortraitThumb
+@onready var info_hero_name = $GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/LeftCol/HeroName
+@onready var info_hero_stats = $GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/LeftCol/HeroStats
+@onready var info_skill_title = $GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/SkillBox/Margin/VBox/SkillTitle
+@onready var info_skill_desc = $GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/SkillBox/Margin/VBox/SkillDesc
+@onready var info_eq_weapon = $GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList/EqWeapon
+@onready var info_eq_armor = $GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList/EqArmor
+@onready var info_eq_off_mount = $GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList/EqOffMount
+@onready var info_eq_def_mount = $GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList/EqDefMount
+@onready var info_eq_treasure = $GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList/EqTreasure
+
 const CardUIScene = preload("res://scenes/components/card_ui.tscn")
 
 var current_step: int = 1
@@ -54,10 +69,12 @@ func _ready() -> void:
 	player_avatar.setup_general("ly_thuong_kiet", "Lý Thường Kiệt", "Khác", 4, 4, "BẠN")
 	player_avatar.set_skill("⚡ TIẾN THOÁI")
 	player_avatar.skill_clicked.connect(_on_player_skill_clicked)
+	player_avatar.info_clicked.connect(func(): _show_general_info_modal("player"))
 
 	# 2. Khởi tạo Tướng Thủ Lĩnh Sơn Tặc (Boss - Trên cùng giữa)
 	boss_avatar.setup_general("thu_linh_son_tac", "Thủ Lĩnh Sơn Tặc", "Sơn Tặc", 3, 3, "ĐỐI THỦ")
 	boss_avatar.clicked.connect(_on_boss_avatar_clicked)
+	boss_avatar.info_clicked.connect(func(): _show_general_info_modal("boss"))
 
 	# 3. Kết nối các nút
 	start_tutorial_btn.pressed.connect(_on_close_health_spotlight)
@@ -65,10 +82,13 @@ func _ready() -> void:
 	card_play_btn.pressed.connect(_on_card_play_btn_clicked)
 	end_turn_btn.pressed.connect(_on_end_turn_btn_clicked)
 	claim_reward_btn.pressed.connect(_on_claim_reward_clicked)
+	info_close_x_btn.pressed.connect(_hide_general_info_modal)
+	info_close_btn.pressed.connect(_hide_general_info_modal)
 
 	# 4. Hiển thị Bước 1: Máu hoa sen
 	spotlight_overlay.visible = true
 	reward_modal.visible = false
+	general_info_modal.visible = false
 	arrow_node.visible = false
 	center_showcase.visible = false
 	card_play_btn.visible = false
@@ -128,6 +148,19 @@ func _ready() -> void:
 		var img = get_viewport().get_texture().get_image()
 		img.save_png("res://tutorial_equip_screenshot.png")
 		print("[Screenshot] Đã lưu tutorial_equip_screenshot.png!")
+		get_tree().quit()
+	elif "--screenshot-modal" in OS.get_cmdline_user_args():
+		_on_close_health_spotlight()
+		_start_step_3_slash()
+		player_avatar.set_equipment("weapon", "Kiếm Thuận Thiên", "♦A")
+		player_avatar.set_equipment("armor", "Khiên Mây Bện", "♦K")
+		player_avatar.set_equipment("defensive_mount", "Voi Chiến", "♥K")
+		_show_general_info_modal("player")
+		await get_tree().create_timer(0.3).timeout
+		await get_tree().process_frame
+		var img = get_viewport().get_texture().get_image()
+		img.save_png("res://tutorial_modal_screenshot.png")
+		print("[Screenshot] Đã lưu tutorial_modal_screenshot.png!")
 		get_tree().quit()
 
 func _process(delta: float) -> void:
@@ -678,6 +711,50 @@ func _show_reward_modal() -> void:
 	var box = reward_modal.get_node("Dim/Box")
 	var tw = create_tween()
 	tw.tween_property(box, "scale", Vector2(1.0, 1.0), 0.25).from(Vector2(0.7, 0.7)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func _show_general_info_modal(target: String) -> void:
+	if target == "player":
+		info_modal_title.text = "🎖️ THÔNG TIN TƯỚNG: LÝ THƯỜNG KIỆT"
+		info_portrait_thumb.texture = player_avatar.portrait_rect.texture
+		info_hero_name.text = "Lý Thường Kiệt (BẠN)"
+		info_hero_stats.text = "Máu: 🌸 %d/4 | Bài: 🎴 %d" % [player_hp, hand_container.get_child_count()]
+		info_skill_title.text = "⚡ TUYỆT KỸ: [TIẾN THOÁI] (Chủ Động)"
+		info_skill_desc.text = "Hoán chuyển toàn bộ lá Trảm trên tay thành Đỡ, và toàn bộ lá Đỡ thành Trảm! Giúp danh tướng linh hoạt chuyển đổi giữa công và thủ trong trận chiến."
+
+		var w = player_avatar.equipped_items.get("weapon", "")
+		var a = player_avatar.equipped_items.get("armor", "")
+		var om = player_avatar.equipped_items.get("offensive_mount", "")
+		var dm = player_avatar.equipped_items.get("defensive_mount", "")
+		var tr = player_avatar.equipped_items.get("treasure", "")
+
+		info_eq_weapon.text = "• 🗡️ Vũ Khí: " + (w if w != "" else "(Chưa trang bị)")
+		info_eq_armor.text = "• 🛡️ Giáp Phòng Thủ: " + (a if a != "" else "(Chưa trang bị)")
+		info_eq_off_mount.text = "• 🐎⚔️ Ngựa Công (-1): " + (om if om != "" else "(Chưa trang bị)")
+		info_eq_def_mount.text = "• 🐘🛡️ Ngựa Thủ (+1): " + (dm if dm != "" else "(Chưa trang bị)")
+		info_eq_treasure.text = "• 👑 Bảo Vật: " + (tr if tr != "" else "(Chưa trang bị)")
+
+	else:
+		info_modal_title.text = "👺 THÔNG TIN ĐỐI THỦ: THỦ LĨNH SƠN TẶC"
+		info_portrait_thumb.texture = boss_avatar.portrait_rect.texture
+		info_hero_name.text = "Thủ Lĩnh Sơn Tặc (ĐỐI THỦ)"
+		info_hero_stats.text = "Máu: 🌸 %d/3 | Bài: 🎴 4" % boss_hp
+		info_skill_title.text = "🗡️ TUYỆT KỸ: [CƯỚP BÓC] (Bị Động)"
+		info_skill_desc.text = "Đầu mỗi lượt, thủ lĩnh sơn tặc tự động rút thêm 2 lá bài từ kho bài và vung đại đao tung chiêu Trảm hung bạo nhắm vào đối thủ."
+
+		info_eq_weapon.text = "• 🗡️ Vũ Khí: Đại Đao Sơn Tặc ♦8"
+		info_eq_armor.text = "• 🛡️ Giáp Phòng Thủ: (Chưa trang bị)"
+		info_eq_off_mount.text = "• 🐎⚔️ Ngựa Công (-1): (Chưa trang bị)"
+		info_eq_def_mount.text = "• 🐘🛡️ Ngựa Thủ (+1): (Chưa trang bị)"
+		info_eq_treasure.text = "• 👑 Bảo Vật: (Chưa trang bị)"
+
+	general_info_modal.visible = true
+	var box = general_info_modal.get_node("Dim/Box")
+	var tw = create_tween()
+	tw.tween_property(box, "scale", Vector2(1.0, 1.0), 0.2).from(Vector2(0.8, 0.8)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func _hide_general_info_modal() -> void:
+	AudioManager.play_card_select()
+	general_info_modal.visible = false
 
 func _show_arrow(pos: Vector2, text: String) -> void:
 	arrow_target_pos = pos
