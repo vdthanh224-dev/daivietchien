@@ -814,54 +814,39 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
         IsChained = chained;
         if (chainedOverlayGo == null && transform != null)
         {
-            chainedOverlayGo = new GameObject("ChainedOverlay", typeof(RectTransform), typeof(Image));
+            chainedOverlayGo = new GameObject("ChainedOverlay", typeof(RectTransform));
             chainedOverlayGo.transform.SetParent(transform, false);
-            chainedOverlayGo.transform.SetAsLastSibling();
-            var img = chainedOverlayGo.GetComponent<Image>();
-            img.color = new Color(0.04f, 0.02f, 0.01f, 0.65f);
-            img.raycastTarget = false;
-            FillRect(chainedOverlayGo.GetComponent<RectTransform>());
+            chainedOverlayGo.transform.SetAsFirstSibling();
+            var rt = chainedOverlayGo.GetComponent<RectTransform>();
+            FillRect(rt);
 
-            // Viền xích phát sáng màu vàng
+            // Viền dây xích hoàng kim bao quanh tướng
             var chainBorder = new GameObject("ChainBorder", typeof(RectTransform), typeof(Image));
             chainBorder.transform.SetParent(chainedOverlayGo.transform, false);
             var cbImg = chainBorder.GetComponent<Image>();
             var fSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
             if (fSpr != null) { cbImg.sprite = fSpr; cbImg.type = Image.Type.Sliced; }
-            cbImg.color = new Color(1f, 0.75f, 0.2f, 0.95f);
+            cbImg.color = new Color(1f, 0.65f, 0.15f, 1f);
             cbImg.raycastTarget = false;
-            FillRect(chainBorder.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
+            FillRect(chainBorder.GetComponent<RectTransform>(), new Vector2(-4, -4), new Vector2(4, 4));
 
-            // Dây xích chéo trên & dưới
-            var topChains = ThemeUI.CreateText(chainedOverlayGo.transform, "TopChains", "⛓️ ⛓️ ⛓️ ⛓️ ⛓️", 16, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, true);
-            ThemeUI.SetRect(topChains.rectTransform, new Vector2(0.5f, 0.75f), new Vector2(0.5f, 0.75f), new Vector2(0.5f, 0.5f), new Vector2(180f, 26f), Vector2.zero);
+            // 4 biểu tượng xích nhỏ trang nhã ở 4 góc viền
+            var tl = ThemeUI.CreateText(chainedOverlayGo.transform, "TL", "⛓️", 15, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, false);
+            ThemeUI.SetRect(tl.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(22f, 22f), new Vector2(6f, -6f));
 
-            var botChains = ThemeUI.CreateText(chainedOverlayGo.transform, "BotChains", "⛓️ ⛓️ ⛓️ ⛓️ ⛓️", 16, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, true);
-            ThemeUI.SetRect(botChains.rectTransform, new Vector2(0.5f, 0.25f), new Vector2(0.5f, 0.25f), new Vector2(0.5f, 0.5f), new Vector2(180f, 26f), Vector2.zero);
+            var tr = ThemeUI.CreateText(chainedOverlayGo.transform, "TR", "⛓️", 15, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, false);
+            ThemeUI.SetRect(tr.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(22f, 22f), new Vector2(-6f, -6f));
 
-            // Huy hiệu trung tâm
-            var badgeGo = new GameObject("ChainBadge", typeof(RectTransform), typeof(Image));
-            badgeGo.transform.SetParent(chainedOverlayGo.transform, false);
-            var bImg = badgeGo.GetComponent<Image>();
-            bImg.color = new Color(0.18f, 0.08f, 0.02f, 0.95f);
-            var bRt = badgeGo.GetComponent<RectTransform>();
-            ThemeUI.SetRect(bRt, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(150f, 32f), Vector2.zero);
+            var bl = ThemeUI.CreateText(chainedOverlayGo.transform, "BL", "⛓️", 15, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, false);
+            ThemeUI.SetRect(bl.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(22f, 22f), new Vector2(6f, 6f));
 
-            var bBorder = new GameObject("Border", typeof(RectTransform), typeof(Image));
-            bBorder.transform.SetParent(badgeGo.transform, false);
-            var bbImg = bBorder.GetComponent<Image>();
-            if (fSpr != null) { bbImg.sprite = fSpr; bbImg.type = Image.Type.Sliced; }
-            bbImg.color = ThemeUI.GoldPrimary;
-            FillRect(bBorder.GetComponent<RectTransform>(), new Vector2(-1, -1), new Vector2(1, 1));
-
-            var iconTxt = ThemeUI.CreateText(badgeGo.transform, "Icon", "⛓️ XÍCH LIÊN HOÀN", 13, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, true);
-            FillRect(iconTxt.rectTransform);
+            var br = ThemeUI.CreateText(chainedOverlayGo.transform, "BR", "⛓️", 15, ThemeUI.GoldHighlight, FontStyle.Bold, TextAnchor.MiddleCenter, false);
+            ThemeUI.SetRect(br.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(22f, 22f), new Vector2(-6f, 6f));
         }
 
         if (chainedOverlayGo != null)
         {
             chainedOverlayGo.SetActive(chained);
-            if (chained) chainedOverlayGo.transform.SetAsLastSibling();
         }
     }
 

@@ -146,6 +146,7 @@ public static class AppwriteMatchmaking
         public bool isAlly;
         public bool isAI;
         public bool isWineBuffActive;
+        public bool isChained;
         public int handCount;
         public List<GameStateCard> hand = new List<GameStateCard>();
         public List<GameStateCard> equipments = new List<GameStateCard>();

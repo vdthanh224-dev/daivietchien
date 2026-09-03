@@ -369,6 +369,7 @@ function buildStateDelta(state) {
       maxHp: p.maxHp,
       handCount: p.hand ? p.hand.length : 0,
       isWineBuffActive: !!p.isWineBuffActive,
+      isChained: !!p.isChained,
       aoBaoCharges: Number.isFinite(Number(p.aoBaoCharges)) ? Number(p.aoBaoCharges) : 3,
       equipments: p.equipments || [],
       judgements: p.judgements || []
@@ -1764,7 +1765,10 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     // Không né hoặc hết giờ -> Chịu sát thương
     const damage = (state.activeCard && state.activeCard.damage) ? state.activeCard.damage : 1;
     const activeCard = state.activeCard;
-    const damageResult = applyDamageToPlayer(state, respondentSeat, damage, "đòn Trảm");
+    let slashElement = "NORMAL";
+      if (pendingSlash && (pendingSlash.subType === CARD_SUBTYPES.ATTACK_FIRE || (pendingSlash.name && pendingSlash.name.includes("Hỏa")))) slashElement = "FIRE";
+      else if (pendingSlash && (pendingSlash.subType === CARD_SUBTYPES.ATTACK_THUNDER || (pendingSlash.name && pendingSlash.name.includes("Lôi")))) slashElement = "LIGHTNING";
+      const damageResult = applyDamageToPlayer(state, respondentSeat, damage, "đòn Trảm", slashElement);
     const caster = state.players.find((player) => player.seat === activeCard?.casterSeat);
     const thuongNgau = getEquippedWeapon(caster, "Thương Ngâu");
     if (damageResult?.finalDamage > 0 && thuongNgau) {
@@ -2059,7 +2063,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
 /**
  * Áp dụng sát thương lên người chơi và kích hoạt pha Hấp Hối (Near Death) nếu HP <= 0
  */
-export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription = "") {
+export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription = "", damageElement = "NORMAL") {
   const target = state.players.find(x => x.seat === targetSeat);
   if (!target || target.hp <= 0) return { finalDamage: 0, enteredNearDeath: false };
 
@@ -2081,6 +2085,13 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
   }
 
   target.hp -= finalDamage;
+
+  // XỬ LÝ LAN TRUYỀN SÁT THƯƠNG XÍCH LIÊN HOÀN (HỎA / LÔI)
+  const isElemental = (damageElement === "FIRE" || damageElement === "LIGHTNING");
+  const wasTargetChained = Boolean(target.isChained);
+  if (isElemental && wasTargetChained) {
+    target.isChained = false; // Gỡ xích người chịu đòn đầu tiên
+  }
 
   if (target.hp <= 0) {
     // Máu có thể âm khi sát thương lớn hơn máu hiện tại
@@ -2139,6 +2150,23 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
      damage: finalDamage,
      description: `💥 <b>${target.generalName}</b> bị mất ${finalDamage} đóa sen máu (${target.hp}/${target.maxHp})!`
   });
+
+  // Lan truyền sát thương Hỏa/Lôi sang tất cả người chơi khác đang bị xích
+  if (isElemental && wasTargetChained && finalDamage > 0) {
+    const chainedPeers = state.players.filter(p => p.seat !== targetSeat && p.isChained && p.hp > 0);
+    for (const peer of chainedPeers) {
+      peer.isChained = false; // Gỡ xích
+      recordAction(state, {
+        type: "CHAIN_DAMAGE_SPREAD",
+        sourceSeat: targetSeat,
+        targetSeat: peer.seat,
+        damage: finalDamage,
+        element: damageElement,
+        description: `⛓️⚡ <color=#FFD700><b>[XÍCH LIÊN HOÀN]</b></color>: Sát thương ${damageElement === "FIRE" ? "Hỏa" : "Lôi"} (${finalDamage} điểm) lan truyền sang <b>${peer.generalName}</b> và gỡ xích!`
+      });
+      applyDamageToPlayer(state, peer.seat, finalDamage, `sát thương xích lan truyền`, "NORMAL");
+    }
+  }
   return { finalDamage, enteredNearDeath: false };
 }
 
@@ -2301,7 +2329,7 @@ function applyPendingJudgement(state) {
   if (judgementCardType === CARD_SUBTYPES.LIGHTNING) {
     if (isHit) {
       discardCard(state, cardObj);
-      applyDamageToPlayer(state, targetSeat, 3, "Thần Sấm Báo Ứng");
+      applyDamageToPlayer(state, targetSeat, 3, "Thần Sấm Báo Ứng", "LIGHTNING");
       if (state.phase === "AWAIT_NEAR_DEATH") return;
     } else {
       if (nextRecipient > 0) {
@@ -2863,6 +2891,7 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
       isAlly: isTeamOneSeat(p.seat),
       isAI: p.isAI,
       isWineBuffActive: !!p.isWineBuffActive,
+      isChained: !!p.isChained,
       aoBaoCharges: Number.isFinite(Number(p.aoBaoCharges)) ? Number(p.aoBaoCharges) : 3,
       skills: [],
         activeSkillsKeys: p.activeSkills ? Object.keys(p.activeSkills) : [],

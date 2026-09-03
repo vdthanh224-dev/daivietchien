@@ -157,6 +157,7 @@ public class Battle2v2UI : MonoBehaviour
     private bool battleFinished = false;
     private bool isWaitingForTrieuDangTarget = false;
     private GeneralCardUI currentSelectedTarget = null;
+    private readonly System.Collections.Generic.List<GeneralCardUI> currentSelectedIronChainTargets = new System.Collections.Generic.List<GeneralCardUI>();
     private GameObject targetHighlightGo;
     private GameObject activeCardPickModal = null;
 
@@ -912,6 +913,7 @@ public class Battle2v2UI : MonoBehaviour
                         && state.nearDeathVictimSeat == p.seat;
                     g.SetDeadVisual(p.hp <= 0 && !pendingDeath);
                     g.IsWineBuffActive = p.isWineBuffActive;
+                    g.SetChained(p.isChained);
                     ApplyServerLoadout(g, p);
                     g.ActiveSkillsKeys = p.activeSkillsKeys;
                     g.UsedSkillsKeys = p.usedSkillsKeys;
@@ -4871,7 +4873,32 @@ public class Battle2v2UI : MonoBehaviour
             else if (card.subType == CardSubType.Lightning)
                 actionBtnText.text = "⚡ GÀI THẦN SẤM BÁO ỨNG";
             else if (card.subType == CardSubType.IronChain)
-                actionBtnText.text = "⛓️ XÍCH TÂM TỎA (CHỌN TỐI ĐA 2 TƯỚNG)";
+            {
+                if (currentSelectedIronChainTargets.Count == 0)
+                {
+                    btn.interactable = false;
+                    btnImg.color = new Color(0.45f, 0.5f, 0.55f, 0.95f);
+                    actionBtnText.text = "🎯 HÃY CHẠM 1 HOẶC 2 TƯỚNG TRÊN BÀN";
+                    SetLog("⛓️ <color=#FFD700><b>[XÍCH TÂM TỎA]</b></color>: Hãy chạm trực tiếp vào 1 hoặc 2 tướng trên bàn đấu để trói / gỡ xích!");
+                    return;
+                }
+                else if (currentSelectedIronChainTargets.Count == 1)
+                {
+                    btn.interactable = true;
+                    btnImg.color = new Color(0.92f, 0.65f, 0.15f, 1f);
+                    actionBtnText.text = $"⛓️ KHÓA/GỠ XÍCH [{currentSelectedIronChainTargets[0].GeneralName.ToUpper()}] (1/2)";
+                    SetLog($"💡 Nhấn [{actionBtnText.text}] hoặc chạm thêm 1 tướng nữa để chọn 2 mục tiêu!");
+                    return;
+                }
+                else
+                {
+                    btn.interactable = true;
+                    btnImg.color = new Color(0.92f, 0.65f, 0.15f, 1f);
+                    actionBtnText.text = $"⛓️ KHÓA/GỠ XÍCH [{currentSelectedIronChainTargets[0].GeneralName.ToUpper()} & {currentSelectedIronChainTargets[1].GeneralName.ToUpper()}] (2/2)";
+                    SetLog($"💡 Đã chọn đủ 2 tướng. Nhấn [{actionBtnText.text}] để thi triển Xích Liên Hoàn!");
+                    return;
+                }
+            }
             else
                 actionBtnText.text = $"🃏 DÙNG [{card.cardName.ToUpper()}]";
 
@@ -4890,63 +4917,59 @@ public class Battle2v2UI : MonoBehaviour
 
         if (currentSelectedCardUI == null || currentSelectedCardUI.Data == null || !isPlayerTurnActive || actionInProgress) return;
 
-        // Xử lý riêng lá bài Xích Tâm Tỏa: Cho phép chọn tối đa 2 mục tiêu trước khi đánh
+        // Xử lý trực tiếp trên avatar tướng khi bấm nút Xích Tâm Tỏa
         if (currentSelectedCardUI.Data.subType == CardSubType.IronChain)
         {
+            if (currentSelectedIronChainTargets.Count == 0)
+            {
+                SetLog("⚠️ Hãy chạm chọn 1 hoặc 2 tướng trên bàn đấu trước khi kích hoạt Xích!");
+                return;
+            }
+
             var chainCardUI = currentSelectedCardUI;
             var chainCard = chainCardUI.Data;
             if (actionBtnGo != null) actionBtnGo.SetActive(false);
             HideCardDescription();
 
-            ShowIronChainSelectionModal(playerCard, (chosenGenerals) =>
+            var targetSeatsList = new System.Collections.Generic.List<int>();
+            foreach (var g in currentSelectedIronChainTargets)
             {
-                if (chosenGenerals == null || chosenGenerals.Count == 0)
+                if (g != null && g.CurrentHp > 0)
                 {
-                    SetLog("⛓️ [Xích Tâm Tỏa]: Đã hủy chọn mục tiêu.");
-                    UpdateActionButtonState();
-                    return;
+                    targetSeatsList.Add(g.SeatNumber);
+                    g.SetChained(!g.IsChained);
                 }
+            }
+            AudioManager.Instance.PlaySkill();
 
-                playerHandCards.Remove(chainCard);
-                playerHandUI.RemoveCard(chainCardUI);
-                currentSelectedCardUI = null;
-                HideCardDescription();
-                ClearSelectedTarget();
-                UpdateHandCountsVisual();
+            playerHandCards.Remove(chainCard);
+            playerHandUI.RemoveCard(chainCardUI);
+            currentSelectedCardUI = null;
+            currentSelectedIronChainTargets.Clear();
+            ClearSelectedTarget();
+            UpdateHandCountsVisual();
 
-                var targetSeatsList = new System.Collections.Generic.List<int>();
-                foreach (var g in chosenGenerals)
+            int seat1 = targetSeatsList.Count > 0 ? targetSeatsList[0] : playerCard.SeatNumber;
+            int seat2 = targetSeatsList.Count > 1 ? targetSeatsList[1] : 0;
+
+            if (DenoGameClient.IsConnected)
+            {
+                DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
                 {
-                    if (g != null && g.CurrentHp > 0)
-                    {
-                        targetSeatsList.Add(g.SeatNumber);
-                        g.SetChained(!g.IsChained);
-                    }
-                }
-                AudioManager.Instance.PlaySkill();
-
-                int seat1 = targetSeatsList.Count > 0 ? targetSeatsList[0] : playerCard.SeatNumber;
-                int seat2 = targetSeatsList.Count > 1 ? targetSeatsList[1] : 0;
-
-                if (DenoGameClient.IsConnected)
-                {
-                    DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
-                    {
-                        action = "PLAY_CARD",
-                        roomId = currentRoomId,
-                        seat = playerCard.SeatNumber,
-                        cardId = chainCard.id,
-                        targetSeat = seat1,
-                        targetSeat2 = seat2,
-                        targetSeats = targetSeatsList.ToArray()
-                    }, (s) => { if (s != null) ApplyServerGameState(s); });
-                }
-                else
-                {
-                    deckManager.DiscardCard(chainCard);
-                    SetLog($"⛓️ <color=#FFD700><b>[XÍCH TÂM TỎA]</b></color>: Đã đổi trạng thái xích cho {chosenGenerals.Count} tướng!");
-                }
-            });
+                    action = "PLAY_CARD",
+                    roomId = currentRoomId,
+                    seat = playerCard.SeatNumber,
+                    cardId = chainCard.id,
+                    targetSeat = seat1,
+                    targetSeat2 = seat2,
+                    targetSeats = targetSeatsList.ToArray()
+                }, (s) => { if (s != null) ApplyServerGameState(s); });
+            }
+            else
+            {
+                deckManager.DiscardCard(chainCard);
+                SetLog($"⛓️ <color=#FFD700><b>[XÍCH TÂM TỎA]</b></color>: Đã đổi trạng thái xích cho {targetSeatsList.Count} tướng!");
+            }
             return;
         }
         var cardUI = currentSelectedCardUI;
@@ -5928,9 +5951,36 @@ public class Battle2v2UI : MonoBehaviour
 
         if (finalDamage > 0)
         {
+            bool isElemental = (card != null && (card.subType == CardSubType.AttackFire || card.subType == CardSubType.AttackThunder));
+            bool wasTargetChained = target.IsChained;
+            if (isElemental && wasTargetChained) target.SetChained(false);
+
             target.TakeDamage(finalDamage); AudioManager.Instance.PlayDamage(); StartCoroutine(ShakeCard(target)); StartCoroutine(ShowFloatingDamage(target, finalDamage));
             SetLog($"💥 <b>{target.GeneralName}</b> trúng đòn mất {finalDamage} máu! ({target.CurrentHp}/{target.MaxHp})");
             yield return CheckNearDeath(target, caster);
+
+            // Lan truyền sát thương Hỏa/Lôi sang các tướng khác đang bị xích
+            if (isElemental && wasTargetChained)
+            {
+                var chainedPeers = new System.Collections.Generic.List<GeneralCardUI>();
+                foreach (var g in allGenerals)
+                {
+                    if (g != null && g != target && g.IsChained && g.CurrentHp > 0)
+                    {
+                        chainedPeers.Add(g);
+                    }
+                }
+                foreach (var peer in chainedPeers)
+                {
+                    peer.SetChained(false);
+                    peer.TakeDamage(finalDamage);
+                    AudioManager.Instance.PlayDamage();
+                    StartCoroutine(ShakeCard(peer));
+                    StartCoroutine(ShowFloatingDamage(peer, finalDamage));
+                    SetLog($"⛓️⚡ <color=#FFD700><b>[XÍCH LIÊN HOÀN]</b></color>: Sát thương lan truyền sang <b>{peer.GeneralName}</b> ({finalDamage} máu) và gỡ xích!");
+                    yield return CheckNearDeath(peer, caster);
+                }
+            }
         }
 
         if (finalDamage > 0 && caster.HasEquipment(EquipmentType.Weapon, "Thương Ngâu") && target.CurrentHp > 0)
@@ -9264,6 +9314,34 @@ public void ShowCardAtCenter(CardModel card, GeneralCardUI caster, GeneralCardUI
             }
             UpdateActionButtonState();
             SetLog($"🌊 Đã chọn mục tiêu: <b>{clicked.GeneralName}</b>. Nhấn nút [DÙNG TRIỀU DÂNG] để phá hủy trang bị!");
+            return;
+        }
+
+        if (currentSelectedCardUI != null && currentSelectedCardUI.Data != null && currentSelectedCardUI.Data.subType == CardSubType.IronChain)
+        {
+            AudioManager.Instance.PlayCardSelect();
+            if (currentSelectedIronChainTargets.Contains(clicked))
+            {
+                currentSelectedIronChainTargets.Remove(clicked);
+                SetLog($"⛓️ Đã bỏ chọn tướng <b>{clicked.GeneralName}</b>.");
+            }
+            else
+            {
+                if (currentSelectedIronChainTargets.Count >= 2)
+                {
+                    currentSelectedIronChainTargets.RemoveAt(0); // Thay thế mục tiêu đầu tiên mượt mà
+                }
+                currentSelectedIronChainTargets.Add(clicked);
+                SetLog($"⛓️ Đã chọn tướng <b>{clicked.GeneralName}</b> ({currentSelectedIronChainTargets.Count}/2).");
+            }
+            currentSelectedTarget = clicked;
+            if (targetHighlightGo != null)
+            {
+                targetHighlightGo.transform.SetParent(clicked.transform, false);
+                targetHighlightGo.transform.SetAsLastSibling();
+                targetHighlightGo.SetActive(true);
+            }
+            UpdateActionButtonState();
             return;
         }
 
