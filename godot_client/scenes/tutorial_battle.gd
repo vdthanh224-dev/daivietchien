@@ -162,6 +162,19 @@ func _ready() -> void:
 		img.save_png("res://tutorial_modal_screenshot.png")
 		print("[Screenshot] Đã lưu tutorial_modal_screenshot.png!")
 		get_tree().quit()
+	elif "--screenshot-banh-chung" in OS.get_cmdline_user_args():
+		_on_close_health_spotlight()
+		_start_free_battle_mode()
+		for c in hand_container.get_children():
+			if "Bánh Chưng" in c.card_name:
+				c.set_selected(true)
+				break
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var img = get_viewport().get_texture().get_image()
+		img.save_png("res://tutorial_banh_chung_screenshot.png")
+		print("[Screenshot] Đã lưu tutorial_banh_chung_screenshot.png!")
+		get_tree().quit()
 
 func _process(delta: float) -> void:
 	if arrow_node and arrow_node.visible:
@@ -240,6 +253,13 @@ func _handle_card_selected(c_ui: Control) -> void:
 		_handle_free_battle_card_selected(c_ui)
 		return
 
+	if "Bánh Chưng" in c_ui.card_name and player_hp >= 4:
+		desc_text.text = "⚠️ Máu của bạn đã đầy (4/4 đóa sen), không thể sử dụng Bánh Chưng!"
+		card_play_btn.visible = true
+		card_play_btn.disabled = true
+		card_play_btn.text = "💮 MÁU ĐÃ ĐẦY (KHÔNG THỂ HỒI)"
+		return
+
 	if current_step == 3:
 		if "Trảm" in c_ui.card_name:
 			banner_desc.text = "🎯 Hãy chạm chọn THỦ LĨNH SƠN TẶC trên bàn đấu làm mục tiêu tấn công!"
@@ -271,9 +291,15 @@ func _handle_free_battle_card_selected(c_ui: Control) -> void:
 			card_play_btn.disabled = false
 			card_play_btn.text = "⚔️ DÙNG BÀI ➜ SƠN TẶC"
 	elif "Bánh Chưng" in c_name:
-		card_play_btn.visible = true
-		card_play_btn.disabled = false
-		card_play_btn.text = "❤️ DÙNG BÁNH CHƯNG (+1 MÁU)"
+		if player_hp >= 4:
+			desc_text.text = "⚠️ Máu của bạn đã đầy (4/4 đóa sen), không thể sử dụng Bánh Chưng!"
+			card_play_btn.visible = true
+			card_play_btn.disabled = true
+			card_play_btn.text = "💮 MÁU ĐÃ ĐẦY (KHÔNG THỂ HỒI)"
+		else:
+			card_play_btn.visible = true
+			card_play_btn.disabled = false
+			card_play_btn.text = "❤️ DÙNG BÁNH CHƯNG (+1 MÁU)"
 	elif "Khiên" in c_name:
 		card_play_btn.visible = true
 		card_play_btn.disabled = false
@@ -532,18 +558,20 @@ func _execute_free_card_play() -> void:
 			return
 
 	elif "Bánh Chưng" in c_name:
+		if player_hp >= 4:
+			desc_text.text = "⚠️ Máu của bạn đã đầy (4/4 đóa sen), không thể sử dụng Bánh Chưng!"
+			_add_log("💮 Máu của bạn đã đầy (4/4), không thể sử dụng thêm Bánh Chưng!")
+			return
+
 		AudioManager.play_voice("Bánh Chưng")
 		AudioManager.play_sfx("sfx_skill")
 		_show_center_card("Bánh Chưng", "Lý Thường Kiệt", "4", "Heart", 0, "Hồi phục 1 Máu.")
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
 
-		if player_hp < 4:
-			player_hp += 1
-			player_avatar.update_hp(player_hp, 4)
-			_add_log("❤️ Bạn đã dùng BÁNH CHƯNG! Hồi phục 1 Máu (%d/4)." % player_hp)
-		else:
-			_add_log("❤️ Dùng Bánh Chưng (Máu bạn đã tối đa 4/4).")
+		player_hp = min(4, player_hp + 1)
+		player_avatar.update_hp(player_hp, 4)
+		_add_log("❤️ Bạn đã dùng BÁNH CHƯNG! Hồi phục 1 Máu (%d/4)." % player_hp)
 
 	elif "Khiên" in c_name or "Giáp" in c_name or "Áo Bào" in c_name:
 		var eq_sr = "%s%s" % [selected_card_ui.card_data.get_suit_symbol(), selected_card_ui.card_data.get_rank_string()] if selected_card_ui and selected_card_ui.card_data else ""
