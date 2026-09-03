@@ -1366,41 +1366,58 @@ public static class AppwriteMatchmaking
 
     string actionBody = JsonUtility.ToJson(actionPayload);
 
-    // 1. Ưu tiên gửi Deno Deploy (Nhanh, rẻ, stateless compute)
-    string denoUrl = $"{DenoEndpoint}/api/game-engine";
-    using (var denoReq = new UnityWebRequest(denoUrl, "POST"))
+    // 1. Thử các Deno Engine Endpoints (Active Connected, Localhost, Cloud)
+    List<string> candidateDenoUrls = new List<string>();
+    if (!string.IsNullOrEmpty(DenoGameClient.ActiveConnectedEndpoint))
     {
-        denoReq.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(actionBody));
-        denoReq.downloadHandler = new DownloadHandlerBuffer();
-        denoReq.SetRequestHeader("Content-Type", "application/json");
-        denoReq.timeout = 10; // Timeout nhanh để kịp fallback
-        yield return denoReq.SendWebRequest();
+        string baseEp = DenoGameClient.ActiveConnectedEndpoint.Replace("wss://", "https://").Replace("ws://", "http://");
+        candidateDenoUrls.Add($"{baseEp}/api/game-engine");
+    }
+    if (!candidateDenoUrls.Contains("http://127.0.0.1:8082/api/game-engine"))
+    {
+        candidateDenoUrls.Add("http://127.0.0.1:8082/api/game-engine");
+    }
+    if (!string.IsNullOrEmpty(DenoEndpoint) && !candidateDenoUrls.Contains($"{DenoEndpoint}/api/game-engine"))
+    {
+        candidateDenoUrls.Add($"{DenoEndpoint}/api/game-engine");
+    }
 
-        if (denoReq.result == UnityWebRequest.Result.Success && !string.IsNullOrEmpty(denoReq.downloadHandler?.text))
+    foreach (var denoUrl in candidateDenoUrls)
+    {
+        using (var denoReq = new UnityWebRequest(denoUrl, "POST"))
         {
-            string respText = denoReq.downloadHandler.text.Trim();
-            if (respText.StartsWith("{") && respText.EndsWith("}"))
+            denoReq.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(actionBody));
+            denoReq.downloadHandler = new DownloadHandlerBuffer();
+            denoReq.SetRequestHeader("Content-Type", "application/json");
+            denoReq.timeout = 2; // Timeout 2s nhanh để kịp fallback
+            yield return denoReq.SendWebRequest();
+
+            if (denoReq.result == UnityWebRequest.Result.Success && !string.IsNullOrEmpty(denoReq.downloadHandler?.text))
             {
-                try
+                string respText = denoReq.downloadHandler.text.Trim();
+                if (respText.StartsWith("{") && respText.EndsWith("}"))
                 {
-                    var stateResp = JsonUtility.FromJson<GameEngineResponseWrapper>(respText);
-                    if (stateResp != null)
+                    try
                     {
-                        if (stateResp.code == "VERSION_CONFLICT")
+                        var stateResp = JsonUtility.FromJson<GameEngineResponseWrapper>(respText);
+                        if (stateResp != null)
                         {
-                            Debug.LogWarning($"[OptimisticLocking] Version conflict! Server v{stateResp.state?.version}");
-                        }
-                        if (stateResp.state != null)
-                        {
-                            currentServerStateVersion = stateResp.state.version;
-                            onResult?.Invoke(stateResp.state);
-                            yield break;
+                            if (stateResp.code == "VERSION_CONFLICT")
+                            {
+                                Debug.LogWarning($"[OptimisticLocking] Version conflict! Server v{stateResp.state?.version}");
+                            }
+                            if (stateResp.state != null)
+                            {
+                                currentServerStateVersion = stateResp.state.version;
+                                onResult?.Invoke(stateResp.state);
+                                yield break;
+                            }
                         }
                     }
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning($"[Deno] Parse error: {ex.Message}. Falling back to Appwrite.");
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning($"[Deno] Parse error: {ex.Message}. Falling back to Appwrite.");
+                    }
                 }
             }
         }

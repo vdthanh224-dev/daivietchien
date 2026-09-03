@@ -144,7 +144,7 @@ public class DenoGameClient : MonoBehaviour
 
     private async Task ConnectAndLoop(CancellationToken token, List<AppwriteMatchmaking.GameStatePlayer> initialPlayers)
     {
-        string[] candidateEndpoints = new string[] { ServerEndpoint, LocalServerEndpoint };
+        string[] candidateEndpoints = new string[] { LocalServerEndpoint, ServerEndpoint };
 
         while (isRunning && !token.IsCancellationRequested)
         {
