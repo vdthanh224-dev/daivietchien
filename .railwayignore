@@ -1,0 +1,7 @@
+Assets/
+Library/
+Temp/
+.github/
+backend/
+*.sln
+*.csproj
