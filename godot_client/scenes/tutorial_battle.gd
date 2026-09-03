@@ -5,8 +5,8 @@ extends Control
 @onready var hand_container = $TableTop/HandCards
 @onready var deck_label: Label = $TableTop/DeckHUD/DeckPlaque/DeckLabel
 @onready var log_text: RichTextLabel = $TableTop/LogPanel/Margin/VBox/Scroll/LogText
-@onready var desc_text: Label = $TableTop/CardDescBar/Margin/HBox/DescText
-@onready var card_play_btn: Button = $TableTop/CardDescBar/Margin/HBox/CardPlayBtn
+@onready var desc_text: Label = $TableTop/CardDescBar/Margin/DescText
+@onready var card_play_btn: Button = $TableTop/CardPlayBtn
 
 @onready var banner: PanelContainer = $TutorialBanner
 @onready var banner_title: Label = $TutorialBanner/Margin/VBox/StepTitle
@@ -173,18 +173,18 @@ func _handle_card_selected(c_ui: Control) -> void:
 			card_play_btn.disabled = false
 			card_play_btn.text = "🛡️ DÙNG ĐỠ (NÉ ĐÒN)"
 			await get_tree().process_frame
-			_show_arrow(card_play_btn.global_position + Vector2(-15, 16), "XÁC NHẬN NÉ")
+			_show_arrow(card_play_btn.global_position + Vector2(-15, 21), "XÁC NHẬN NÉ")
 
 func _on_boss_avatar_clicked() -> void:
 	if current_step == 3 and selected_card_ui and "Trảm" in selected_card_ui.card_name:
 		boss_targeted = true
 		boss_avatar.set_target_highlight(true)
-		banner_desc.text = "🎯 Đã nhắm mục tiêu Sơn Tặc! Nhấn nút [⚔️ DÙNG BÀI ➜ SƠN TẶC] ngay trên thanh mô tả để tấn công!"
+		banner_desc.text = "🎯 Đã nhắm mục tiêu Sơn Tặc! Nhấn nút [⚔️ DÙNG BÀI ➜ SƠN TẶC] sát trên thanh mô tả để tấn công!"
 		card_play_btn.visible = true
 		card_play_btn.disabled = false
 		card_play_btn.text = "⚔️ DÙNG BÀI ➜ SƠN TẶC"
 		await get_tree().process_frame
-		_show_arrow(card_play_btn.global_position + Vector2(-15, 16), "BẤM DÙNG BÀI")
+		_show_arrow(card_play_btn.global_position + Vector2(-15, 21), "BẤM DÙNG BÀI")
 
 func _on_card_play_btn_clicked() -> void:
 	card_play_btn.release_focus()
