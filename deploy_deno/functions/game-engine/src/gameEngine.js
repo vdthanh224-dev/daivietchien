@@ -3013,15 +3013,15 @@ export function handleToggleSkill(state, seat, skillId) {
     if (player.activeSkills[skillId]) {
       if (player.hand) {
         player.hand.forEach(c => {
-          if (c.suit === "Spade" && c.subType !== "WEAPON") {
-            c.originalCardId = c.id; // Just store ID and we'll use findCardByIdInDeck? No, store original stats!
+          if (c.suit === "Spade" && c.subType !== CARD_SUBTYPES.WEAPON) {
+            c.originalCardId = c.id;
             c.orig_name = c.name;
             c.orig_subType = c.subType;
             c.orig_category = c.category;
             c.orig_desc = c.desc;
             c.name = "Nỏ Thần Kim Quy";
-            c.subType = "WEAPON";
-            c.category = "EQUIPMENT";
+            c.subType = CARD_SUBTYPES.WEAPON;
+            c.category = CARD_CATEGORIES.EQUIPMENT;
             c.desc = "Tầm 1. Không giới hạn số Trảm trong lượt";
           }
         });

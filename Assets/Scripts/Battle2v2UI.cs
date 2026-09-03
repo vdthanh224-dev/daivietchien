@@ -760,7 +760,8 @@ public class Battle2v2UI : MonoBehaviour
             {
                 cm.iconPath = GetDefaultIconPath(cm.subType);
             }
-                        if (playerCard != null && playerCard.HeroId == "1") {
+                        bool isCaoLo = playerCard != null && (playerCard.HeroId == "1" || (!string.IsNullOrEmpty(playerCard.GeneralName) && playerCard.GeneralName.Contains("Cao Lỗ")));
+            if (isCaoLo) {
                 bool isCheNo = playerCard.IsSkillActive("Chế Nỏ");
                 if (isCheNo && cm.suit == CardSuit.Spade && cm.subType != CardSubType.Weapon) {
                     return new CardModel { 
@@ -951,7 +952,9 @@ public class Battle2v2UI : MonoBehaviour
                 {
                     for (int i = 0; i < playerHandCards.Count; i++)
                     {
-                        if (playerHandCards[i].id != newCards[i].id)
+                        if (playerHandCards[i].id != newCards[i].id
+                            || playerHandCards[i].subType != newCards[i].subType
+                            || playerHandCards[i].cardName != newCards[i].cardName)
                         {
                             handChanged = true;
                             break;
@@ -4643,7 +4646,7 @@ public class Battle2v2UI : MonoBehaviour
             bool hasSpade = false;
             if (playerHandCards != null) {
                 foreach(var c in playerHandCards) {
-                    if (c != null && c.suit == CardSuit.Spade && c.subType != CardSubType.Weapon) {
+                    if (c != null && (c.suit == CardSuit.Spade || c.cardName == "Nỏ Thần Kim Quy")) {
                         hasSpade = true;
                         break;
                     }
@@ -4652,10 +4655,10 @@ public class Battle2v2UI : MonoBehaviour
 
             playerCard.SkillButtonGo.SetActive(true);
             playerCard.SetSkill(isSkillActive ? "HỦY CHẾ NỎ" : "⚡ CHẾ NỎ", OnPlayerSkillCheNoClicked);
-            playerCard.SetSkillState(hasSpade || isSkillActive);
+            playerCard.SetSkillState(true); // Luôn cho phép bấm để kích hoạt hoặc xem hướng dẫn
             var btnImg = playerCard.SkillButtonGo.GetComponent<UnityEngine.UI.Image>();
             if (btnImg != null) {
-                btnImg.color = isSkillActive ? new UnityEngine.Color(0.9f, 0.25f, 0.2f, 1f) : (hasSpade ? new UnityEngine.Color(1f, 0.75f, 0.2f, 1f) : new UnityEngine.Color(0.12f, 0.16f, 0.24f, 0.7f));
+                btnImg.color = isSkillActive ? new UnityEngine.Color(0.2f, 0.75f, 1f, 1f) : (hasSpade ? new UnityEngine.Color(1f, 0.75f, 0.2f, 1f) : new UnityEngine.Color(0.35f, 0.40f, 0.48f, 0.85f));
             }
         }
         // 2. TƯỚNG 2: ĐÀO HÃN (XẠ THUẪN - BỊ ĐỘNG CỰ LY -2 KHI DÙNG TRẢM)
@@ -9415,12 +9418,46 @@ public void ShowCardAtCenter(CardModel card, GeneralCardUI caster, GeneralCardUI
             }
         }
 
+        // Lập tức biến đổi các lá bài chất Bích trên tay người chơi
+        for (int i = 0; i < playerHandCards.Count; i++)
+        {
+            var c = playerHandCards[i];
+            if (c.suit == CardSuit.Spade)
+            {
+                if (nextActive && c.subType != CardSubType.Weapon)
+                {
+                    playerHandCards[i] = new CardModel
+                    {
+                        id = c.id,
+                        cardName = "Nỏ Thần Kim Quy",
+                        suit = c.suit,
+                        rank = c.rank,
+                        subType = CardSubType.Weapon,
+                        category = CardCategory.Equipment,
+                        iconPath = "UI/icon_weapon",
+                        description = "Tầm 1. Không giới hạn số Trảm trong lượt"
+                    };
+                }
+                else if (!nextActive && c.cardName == "Nỏ Thần Kim Quy")
+                {
+                    var orig = CardDatabase.GetCardById(c.id);
+                    if (orig != null) playerHandCards[i] = orig;
+                }
+            }
+        }
+
+        if (playerHandUI != null)
+        {
+            playerHandUI.ClearHand();
+            playerHandUI.AddCards(playerHandCards);
+        }
+
         UpdatePlayerSkillButtonState();
         if (nextActive) {
-            SetLog("🏹 <color=#FFD700><b>[Chế Nỏ] KÍCH HOẠT</b></color>: Mọi lá bài chất Bích (♠) trên tay bạn có thể dùng như lá trang bị [Nỏ Thần Kim Quy]!");
+            SetLog("🏹 <color=#FFD700><b>[Chế Nỏ] KÍCH HOẠT</b></color>: Toàn bộ bài chất Bích (♠) trên tay bạn đã biến thành [Nỏ Thần Kim Quy]!");
             AudioManager.Instance.PlaySkill();
         } else {
-            SetLog("🏹 <color=#8899AA><b>[Chế Nỏ] ĐÃ TẮT</b></color>.");
+            SetLog("🏹 <color=#8899AA><b>[Chế Nỏ] ĐÃ TẮT</b></color>: Các lá bài chất Bích đã trở lại bình thường.");
         }
 
         if (!string.IsNullOrEmpty(currentRoomId))
