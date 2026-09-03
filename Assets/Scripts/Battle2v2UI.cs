@@ -950,11 +950,15 @@ public class Battle2v2UI : MonoBehaviour
                 bool handChanged = playerHandCards.Count != newCards.Count;
                 if (!handChanged)
                 {
-                    for (int i = 0; i < playerHandCards.Count; i++)
+                    var curIds = new System.Collections.Generic.List<string>();
+                    for (int i = 0; i < playerHandCards.Count; i++) curIds.Add(playerHandCards[i].id);
+                    curIds.Sort();
+                    var inIds = new System.Collections.Generic.List<string>();
+                    for (int i = 0; i < newCards.Count; i++) inIds.Add(newCards[i].id);
+                    inIds.Sort();
+                    for (int i = 0; i < curIds.Count; i++)
                     {
-                        if (playerHandCards[i].id != newCards[i].id
-                            || playerHandCards[i].subType != newCards[i].subType
-                            || playerHandCards[i].cardName != newCards[i].cardName)
+                        if (curIds[i] != inIds[i])
                         {
                             handChanged = true;
                             break;
@@ -964,12 +968,26 @@ public class Battle2v2UI : MonoBehaviour
 
                 if (handChanged)
                 {
+                    string prevSelectedId = currentSelectedCardUI != null && currentSelectedCardUI.Data != null ? currentSelectedCardUI.Data.id : null;
                     playerHandCards.Clear();
                     playerHandCards.AddRange(newCards);
                     if (playerHandUI != null)
                     {
                         playerHandUI.ClearHand();
                         playerHandUI.AddCards(playerHandCards);
+
+                        // Khôi phục lại đúng lá bài người chơi đang chọn nếu lá bài đó vẫn còn trên tay
+                        if (!string.IsNullOrEmpty(prevSelectedId))
+                        {
+                            foreach (var c in playerHandUI.Cards)
+                            {
+                                if (c != null && c.Data != null && c.Data.id == prevSelectedId)
+                                {
+                                    playerHandUI.SelectCard(c);
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1336,7 +1354,7 @@ public class Battle2v2UI : MonoBehaviour
             isAwaitingServerNearDeath = false;
             isAwaitingServerSongCung = false;
             isAwaitingServerNamSon = false; serverTargetCardSelectionInFlight = false; 
-            if (state.phase != "DISCARD") {
+            if (isDiscardPhaseActive && state.phase != "DISCARD") {
                 isDiscardPhaseActive = false; 
                 if (playerHandUI != null) { 
                     playerHandUI.IsMultiSelectMode = false; 
