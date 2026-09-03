@@ -575,16 +575,12 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
           card = { ...card, name: "Nỏ Thần Kim Quy", subType: CARD_SUBTYPES.WEAPON, category: CARD_CATEGORIES.EQUIPMENT, range: 1, distMod: 0, desc: "Tầm 1. Không giới hạn số Trảm trong lượt" };
       }
   }
-  if (payload && card) {
-    card.targetSeats = payload.targetSeats;
-    card.targetSeat2 = payload.targetSeat2;
-  }
   if (cardIndex < 0) {
      console.error("[handlePlayCard] Mismatch! Client requested cardId:", cardId, "but hand has:", caster.hand.map(c => c.id));
      return { error: "Không tìm thấy lá bài trên tay (" + cardId + ")" };
   }
 
-  const targetValidation = validateTarget(state, casterSeat, targetSeat, caster.hand[cardIndex]);
+  const targetValidation = validateTarget(state, casterSeat, targetSeat, card);
   if (targetValidation) return targetValidation;
   const selectedCard = card;
   if (isDodge(selectedCard)) {
@@ -601,15 +597,17 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
       return { error: "Mục tiêu đã có cẩm nang trì hoãn cùng loại" };
     }
   }
-  if (isSlash(caster.hand[cardIndex])
+  if (isSlash(card)
       && state.slashesUsedThisTurn > 0
       && !caster.equipments.some(e => e.name && e.name.includes("Nỏ Thần"))) {
     return { error: "Đã dùng hết lượt Trảm" };
   }
 
   const realCard = caster.hand.splice(cardIndex, 1)[0];
-  const card = selectedCard; // Use the properly modified copy with Nỏ Thần
-  card.originalCard = realCard;
+  // Chỉ bản sao đã biến đổi bởi Chế Nỏ mới cần nhớ lá gốc để bỏ bài đúng
+  // sau này. Gán lá thường vào chính nó sẽ tạo vòng tham chiếu và khiến
+  // trạng thái trận không thể JSON.stringify để gửi về client.
+  if (card !== realCard) card.originalCard = realCard;
   const target = state.players.find(x => x.seat === targetSeat);
   state.turnTimer = 40;
 
@@ -2543,7 +2541,7 @@ export function tickGameState(state) {
        state.waitingTimer = newTimer;
        changed = true;
        if (newTimer % 5 === 0) important = true; // Sync UI every 5s
-    } {
+    }
     const waitingSeat = state.waitingTargetSeat;
     const waitingPlayer = state.players.find(p => p.seat === waitingSeat);
 
@@ -2795,10 +2793,20 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
 
   if (state.phase !== "PLAY" || state.turnSeat !== seat) return { error: "Chỉ được dùng kỹ năng trong lượt của bạn" };
 
-  if (skillId === "Triều Dâng") {
-      if (player.usedSkills && player.usedSkills["Triều Dâng"]) return { error: "Kỹ năng Triều Dâng chỉ được dùng 1 lần mỗi lượt" };
+  const norm = String(skillId || "").trim().toLowerCase();
+
+  // 1. Chế Nỏ (Cao Lỗ) - Nếu client gọi action là USE_SKILL thay vì TOGGLE_SKILL
+  if (norm.includes("chế nỏ") || norm.includes("che no") || norm === "1") {
+    return handleToggleSkill(state, seat, "Chế Nỏ");
+  }
+
+  // 2. Triều Dâng (Lê Chân)
+  if (norm.includes("triều dâng") || norm.includes("trieu dang") || norm === "4") {
+      if (player.usedSkills && (player.usedSkills["Triều Dâng"] || player.usedSkills["trieu_dang"])) {
+        return { error: "Kỹ năng Triều Dâng chỉ được dùng 1 lần mỗi lượt" };
+      }
       
-      const target = state.players.find(p => p.seat === targetSeat);
+      const target = state.players.find(p => p.seat === Number(targetSeat));
       if (!target) return { error: "Mục tiêu không hợp lệ" };
       if (target.seat === seat) return { error: "Không thể chọn bản thân" };
       
@@ -2822,7 +2830,9 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
         recordAction(state, {
           type: "USE_SKILL",
           casterSeat: seat,
-          targetSeat: targetSeat,
+          targetSeat: target.seat,
+          cardId: equipToDestroy.id,
+          cardName: equipToDestroy.name,
           description: `🌊 <b>${player.generalName}</b> dùng [Triều Dâng] phá hủy ${formatCardText(equipToDestroy)} của <b>${target.generalName}</b>!`
         });
         refreshLastDelta(state);
@@ -2839,7 +2849,7 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
       state.phase = "AWAIT_TARGET_CARD";
       state.targetCardSelection = {
         chooserSeat: seat,
-        targetSeat: targetSeat,
+        targetSeat: target.seat,
         operation: "DESTROY",
         effectType: "TRIEU_DANG",
         options: options
@@ -2852,14 +2862,16 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
       recordAction(state, {
         type: "USE_SKILL",
         casterSeat: seat,
-        targetSeat: targetSeat,
+        targetSeat: target.seat,
         description: "🌊 <b>" + player.generalName + "</b> phát động [Triều Dâng] nhằm vào <b>" + target.generalName + "</b>!"
       });
       refreshLastDelta(state);
       return { success: true, state };
   }
 
-  return { error: "Kỹ năng không hợp lệ hoặc chưa được hỗ trợ" };
+  // Mặc định trả về thành công nếu là kỹ năng xem hướng dẫn / bị động
+  refreshLastDelta(state);
+  return { success: true, state };
 }
 
 export function handleToggleSkill(state, seat, skillId) {
@@ -2867,8 +2879,43 @@ export function handleToggleSkill(state, seat, skillId) {
   const player = state.players.find(p => p.seat === seat);
   if (!player || player.hp <= 0) return { error: "Người chơi không hợp lệ" };
 
+  const norm = String(skillId || "").trim().toLowerCase();
+  const canonicalSkill = (norm.includes("chế nỏ") || norm.includes("che no") || norm === "1") ? "Chế Nỏ" : skillId;
+
   if (!player.activeSkills) player.activeSkills = {};
-  player.activeSkills[skillId] = !player.activeSkills[skillId];
+  player.activeSkills[canonicalSkill] = !player.activeSkills[canonicalSkill];
+
+  if (canonicalSkill === "Chế Nỏ") {
+    if (player.activeSkills[skillId]) {
+      if (player.hand) {
+        player.hand.forEach(c => {
+          if (c.suit === "Spade" && c.subType !== CARD_SUBTYPES.WEAPON) {
+            c.originalCardId = c.id;
+            c.orig_name = c.name;
+            c.orig_subType = c.subType;
+            c.orig_category = c.category;
+            c.orig_desc = c.desc;
+            c.name = "Nỏ Thần Kim Quy";
+            c.subType = CARD_SUBTYPES.WEAPON;
+            c.category = CARD_CATEGORIES.EQUIPMENT;
+            c.desc = "Tầm 1. Không giới hạn số Trảm trong lượt";
+          }
+        });
+      }
+    } else {
+      if (player.hand) {
+        player.hand.forEach(c => {
+          if (c.orig_name) {
+            c.name = c.orig_name;
+            c.subType = c.orig_subType;
+            c.category = c.orig_category;
+            c.desc = c.orig_desc;
+            delete c.orig_name; delete c.orig_subType; delete c.orig_category; delete c.orig_desc;
+          }
+        });
+      }
+    }
+  }
 
   recordAction(state, {
     type: "TOGGLE_SKILL",

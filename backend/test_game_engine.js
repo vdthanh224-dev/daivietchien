@@ -65,6 +65,9 @@ console.log(`- Hành động AI đã làm: ${state.lastAction.type} - ${state.la
 
 console.log(`\n7. KIỂM THỬ PHA HẤP HỐI (NEAR DEATH):`);
 // Giảm máu Ghế 2 xuống 1, sau đó Ghế 1 Trảm gây 1 damage
+// Bước AI ở trên có thể vừa trang bị Áo Bào; bỏ trang bị để case này luôn
+// kiểm thử đúng luồng Hấp Hối thay vì ngẫu nhiên bị chặn sát thương.
+p2.equipments = [];
 p2.hp = 1;
 p1.hand.push({ id: "D1_S_TEST", name: "Trảm Thường", suit: "Spade", rank: 10, category: 0, subType: CARD_SUBTYPES.ATTACK_NORMAL });
 state.turnSeat = 1;

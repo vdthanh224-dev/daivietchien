@@ -159,6 +159,7 @@ public class Battle2v2UI : MonoBehaviour
     private GeneralCardUI currentSelectedTarget = null;
     private readonly System.Collections.Generic.List<GeneralCardUI> currentSelectedIronChainTargets = new System.Collections.Generic.List<GeneralCardUI>();
     private GameObject targetHighlightGo;
+    private GameObject targetHighlightGo2;
     private GameObject activeCardPickModal = null;
 
     private Action onExitCallback;
@@ -767,6 +768,25 @@ public class Battle2v2UI : MonoBehaviour
     private CardModel ConvertGameStateCardToCardModel(AppwriteMatchmaking.GameStateCard sc)
     {
         if (sc == null || sc.id == "HIDDEN") return null;
+
+        // 1. Nếu thẻ bài được server định danh là Nỏ Thần Kim Quy (hoặc biến chất từ Chế Nỏ)
+        if (sc.name == "Nỏ Thần Kim Quy" || (sc.category == (int)CardCategory.Equipment && sc.subType == (int)CardSubType.Weapon))
+        {
+            CardSuit sSuit = CardSuit.Spade;
+            if (!string.IsNullOrEmpty(sc.suit)) Enum.TryParse(sc.suit, true, out sSuit);
+            return new CardModel
+            {
+                id = sc.id,
+                cardName = "Nỏ Thần Kim Quy",
+                suit = sSuit,
+                rank = (CardRank)sc.rank,
+                subType = CardSubType.Weapon,
+                category = CardCategory.Equipment,
+                iconPath = "UI/cards/card_weapon_no_than",
+                description = "Tầm 1. Không giới hạn số Trảm trong lượt"
+            };
+        }
+
         var cm = CardDatabase.GetCardById(sc.id);
         if (cm != null)
         {
@@ -3851,6 +3871,7 @@ public class Battle2v2UI : MonoBehaviour
         }
 
         UpdateHandCountsVisual();
+        UpdatePlayerSkillButtonState();
         yield return new WaitForSeconds(1.0f);
 
         currentTurnIndex = 0;
@@ -4519,6 +4540,20 @@ public class Battle2v2UI : MonoBehaviour
     private IEnumerator StartPlayerPlayPhase()
     {
         isPlayerTurnActive = true;
+        if (playerCard != null)
+        {
+            if (playerCard.UsedSkillsKeys != null)
+            {
+                var keysList = new List<string>(playerCard.UsedSkillsKeys);
+                var valsList = new List<bool>(playerCard.UsedSkillsValues);
+                for (int i = 0; i < keysList.Count; i++)
+                {
+                    if (keysList[i] == "Triều Dâng") valsList[i] = false;
+                }
+                playerCard.UsedSkillsValues = valsList.ToArray();
+            }
+            UpdatePlayerSkillButtonState();
+        }
         turnTimer = 40.0f;
         isTimerRunning = true;
         playerCard.ShowHeadTimer(Mathf.CeilToInt(turnTimer));
@@ -4666,6 +4701,7 @@ public class Battle2v2UI : MonoBehaviour
             if (enemy1Card != null && enemy1Card.CurrentHp > 0) currentSelectedIronChainTargets.Add(enemy1Card);
             if (enemy2Card != null && enemy2Card.CurrentHp > 0 && currentSelectedIronChainTargets.Count < 2) currentSelectedIronChainTargets.Add(enemy2Card);
             if (currentSelectedIronChainTargets.Count == 0 && playerCard != null) currentSelectedIronChainTargets.Add(playerCard);
+            UpdateIronChainHighlights();
         }
         UpdateActionButtonState();
     }
@@ -4737,7 +4773,7 @@ public class Battle2v2UI : MonoBehaviour
             
             playerCard.SkillButtonGo.SetActive(true);
             playerCard.SetSkill(hasUsed ? "ĐÃ DÙNG" : "🌊 TRIỀU DÂNG", OnPlayerSkillTrieuDangClicked);
-            playerCard.SetSkillState(isMyTurn && !hasUsed);
+            playerCard.SetSkillState(true);
             var btnImg = playerCard.SkillButtonGo.GetComponent<UnityEngine.UI.Image>();
             if (btnImg != null)
             {
@@ -4766,9 +4802,43 @@ public class Battle2v2UI : MonoBehaviour
     private void UpdateActionButtonState()
     {
         UpdatePlayerSkillButtonState();
-        if (actionBtnGo == null || currentSelectedCardUI == null || currentSelectedCardUI.Data == null)
+        if (actionBtnGo == null) return;
+
+        // Triều Dâng không dùng một lá bài trên tay. Khi người chơi chọn kỹ năng,
+        // currentSelectedCardUI được xóa, vì vậy nhánh này phải được xử lý trước
+        // phần kiểm tra lá bài bên dưới để nút thi triển không bị ẩn ngay lập tức.
+        if (isWaitingForTrieuDangTarget)
         {
-            if (actionBtnGo != null) actionBtnGo.SetActive(false);
+            var skillActionButton = actionBtnGo.GetComponent<Button>();
+            var skillActionImage = actionBtnGo.GetComponent<Image>();
+            bool hasValidTarget = playerCard != null
+                && currentSelectedTarget != null
+                && currentSelectedTarget != playerCard
+                && currentSelectedTarget.CurrentHp > 0
+                && currentSelectedTarget.HasAnyEquipment();
+            bool canUseSkill = hasValidTarget && isPlayerTurnActive && !actionInProgress;
+
+            actionBtnGo.SetActive(true);
+            if (skillActionButton != null) skillActionButton.interactable = canUseSkill;
+            if (skillActionImage != null)
+            {
+                skillActionImage.color = canUseSkill
+                    ? new Color(0.15f, 0.55f, 0.95f, 1f)
+                    : new Color(0.45f, 0.50f, 0.55f, 0.95f);
+            }
+
+            if (actionBtnText != null)
+            {
+                actionBtnText.text = hasValidTarget
+                    ? $"🌊 DÙNG TRIỀU DÂNG [{currentSelectedTarget.GeneralName.ToUpper()}]"
+                    : "🌊 HÃY CHỌN MỤC TIÊU CÓ TRANG BỊ";
+            }
+            return;
+        }
+
+        if (currentSelectedCardUI == null || currentSelectedCardUI.Data == null)
+        {
+            actionBtnGo.SetActive(false);
             return;
         }
 
@@ -4955,6 +5025,7 @@ public class Battle2v2UI : MonoBehaviour
     {
         if (isWaitingForTrieuDangTarget && currentSelectedTarget != null && currentSelectedTarget != playerCard)
         {
+            if (!isPlayerTurnActive || actionInProgress) return;
             if (actionBtnGo != null) actionBtnGo.SetActive(false);
             ExecuteTrieuDangOnTarget(currentSelectedTarget);
             return;
@@ -5098,6 +5169,100 @@ public class Battle2v2UI : MonoBehaviour
         if (targetHighlightGo != null)
         {
             targetHighlightGo.SetActive(false);
+        }
+        if (targetHighlightGo2 != null)
+        {
+            targetHighlightGo2.SetActive(false);
+        }
+    }
+
+    private void EnsureTargetHighlight2Created()
+    {
+        if (targetHighlightGo2 == null)
+        {
+            targetHighlightGo2 = new GameObject("TargetHighlight2", typeof(RectTransform), typeof(UnityEngine.UI.Image));
+            var tImg = targetHighlightGo2.GetComponent<UnityEngine.UI.Image>();
+            var spr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+            if (spr != null) { tImg.sprite = spr; tImg.type = UnityEngine.UI.Image.Type.Sliced; }
+            tImg.color = new Color(1f, 0.95f, 0.15f, 1f);
+            tImg.raycastTarget = false;
+
+            var tagGo = new GameObject("TargetTag2", typeof(RectTransform), typeof(UnityEngine.UI.Image));
+            tagGo.transform.SetParent(targetHighlightGo2.transform, false);
+            var tgImg = tagGo.GetComponent<UnityEngine.UI.Image>();
+            var sSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
+            if (sSpr != null) { tgImg.sprite = sSpr; tgImg.type = UnityEngine.UI.Image.Type.Sliced; }
+            tgImg.color = new Color(0.85f, 0.2f, 0.2f, 0.98f);
+            var tgRt = tagGo.GetComponent<RectTransform>();
+            SetRect(tgRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(140f, 22f), new Vector2(0f, 14f));
+
+            var tagTxt = AddText(tagGo.transform, "Txt", "🎯 MỤC TIÊU 2", 9, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+            Fill(tagTxt.rectTransform);
+
+            var hRt = targetHighlightGo2.GetComponent<RectTransform>();
+            hRt.anchorMin = Vector2.zero; hRt.anchorMax = Vector2.one;
+            hRt.offsetMin = new Vector2(-8, -8); hRt.offsetMax = new Vector2(8, 8);
+        }
+    }
+
+    private void UpdateIronChainHighlights()
+    {
+        if (currentSelectedCardUI != null && currentSelectedCardUI.Data != null && currentSelectedCardUI.Data.subType == CardSubType.IronChain)
+        {
+            var t1 = currentSelectedIronChainTargets.Count > 0 ? currentSelectedIronChainTargets[0] : null;
+            var t2 = currentSelectedIronChainTargets.Count > 1 ? currentSelectedIronChainTargets[1] : null;
+
+            if (t1 != null)
+            {
+                if (targetHighlightGo == null)
+                {
+                    targetHighlightGo = new GameObject("TargetHighlight", typeof(RectTransform), typeof(UnityEngine.UI.Image));
+                    var tImg = targetHighlightGo.GetComponent<UnityEngine.UI.Image>();
+                    var spr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
+                    if (spr != null) { tImg.sprite = spr; tImg.type = UnityEngine.UI.Image.Type.Sliced; }
+                    tImg.color = new Color(1f, 0.95f, 0.15f, 1f);
+                    tImg.raycastTarget = false;
+
+                    var tagGo = new GameObject("TargetTag", typeof(RectTransform), typeof(UnityEngine.UI.Image));
+                    tagGo.transform.SetParent(targetHighlightGo.transform, false);
+                    var tgImg = tagGo.GetComponent<UnityEngine.UI.Image>();
+                    var sSpr = LotusHealthUI.LoadSpriteFromResources("UI/slot_bg");
+                    if (sSpr != null) { tgImg.sprite = sSpr; tgImg.type = UnityEngine.UI.Image.Type.Sliced; }
+                    tgImg.color = new Color(0.85f, 0.2f, 0.2f, 0.98f);
+                    var tgRt = tagGo.GetComponent<RectTransform>();
+                    SetRect(tgRt, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(140f, 22f), new Vector2(0f, 14f));
+
+                    var tagTxt = AddText(tagGo.transform, "Txt", "🎯 MỤC TIÊU 1", 9, Color.white, FontStyle.Bold, TextAnchor.MiddleCenter);
+                    Fill(tagTxt.rectTransform);
+
+                    var hRt = targetHighlightGo.GetComponent<RectTransform>();
+                    hRt.anchorMin = Vector2.zero; hRt.anchorMax = Vector2.one;
+                    hRt.offsetMin = new Vector2(-8, -8); hRt.offsetMax = new Vector2(8, 8);
+                }
+                targetHighlightGo.transform.SetParent(t1.transform, false);
+                targetHighlightGo.transform.SetAsLastSibling();
+                targetHighlightGo.SetActive(true);
+            }
+            else if (targetHighlightGo != null)
+            {
+                targetHighlightGo.SetActive(false);
+            }
+
+            if (t2 != null)
+            {
+                EnsureTargetHighlight2Created();
+                targetHighlightGo2.transform.SetParent(t2.transform, false);
+                targetHighlightGo2.transform.SetAsLastSibling();
+                targetHighlightGo2.SetActive(true);
+            }
+            else if (targetHighlightGo2 != null)
+            {
+                targetHighlightGo2.SetActive(false);
+            }
+        }
+        else
+        {
+            if (targetHighlightGo2 != null) targetHighlightGo2.SetActive(false);
         }
     }
     #endregion
@@ -9382,12 +9547,7 @@ public void ShowCardAtCenter(CardModel card, GeneralCardUI caster, GeneralCardUI
                 SetLog($"⛓️ Đã chọn tướng <b>{clicked.GeneralName}</b> ({currentSelectedIronChainTargets.Count}/2).");
             }
             currentSelectedTarget = clicked;
-            if (targetHighlightGo != null)
-            {
-                targetHighlightGo.transform.SetParent(clicked.transform, false);
-                targetHighlightGo.transform.SetAsLastSibling();
-                targetHighlightGo.SetActive(true);
-            }
+            UpdateIronChainHighlights();
             UpdateActionButtonState();
             return;
         }
@@ -9516,7 +9676,12 @@ public void ShowCardAtCenter(CardModel card, GeneralCardUI caster, GeneralCardUI
 
     void OnPlayerSkillTrieuDangClicked()
     {
-        if (playerCard == null || !isPlayerTurnActive) return;
+        if (playerCard == null) return;
+        if (!isPlayerTurnActive)
+        {
+            SetLog("🌊 <color=#55DDFF><b>[Triều Dâng]</b></color>: Trong lượt của bạn, hủy 1 lá trang bị của người khác.");
+            return;
+        }
 
         bool hasUsed = playerCard.HasUsedSkill("Triều Dâng");
         if (hasUsed)

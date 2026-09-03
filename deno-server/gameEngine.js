@@ -1252,6 +1252,7 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0, paylo
       cardName: card.name,
       description: `⛓️ <b>${caster ? caster.generalName : 'Người chơi'}</b> dùng [Xích Tâm Tỏa] lên ${changedDescs.join(", ")}!`
     });
+    refreshLastDelta(state);
     return { success: true, state };
   }
 
@@ -3001,10 +3002,20 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
 
   if (state.phase !== "PLAY" || state.turnSeat !== seat) return { error: "Chỉ được dùng kỹ năng trong lượt của bạn" };
 
-  if (skillId === "Triều Dâng") {
-      if (player.usedSkills && player.usedSkills["Triều Dâng"]) return { error: "Kỹ năng Triều Dâng chỉ được dùng 1 lần mỗi lượt" };
+  const norm = String(skillId || "").trim().toLowerCase();
+
+  // 1. Chế Nỏ (Cao Lỗ) - Nếu client gọi action là USE_SKILL thay vì TOGGLE_SKILL
+  if (norm.includes("chế nỏ") || norm.includes("che no") || norm === "1") {
+    return handleToggleSkill(state, seat, "Chế Nỏ");
+  }
+
+  // 2. Triều Dâng (Lê Chân)
+  if (norm.includes("triều dâng") || norm.includes("trieu dang") || norm === "4") {
+      if (player.usedSkills && (player.usedSkills["Triều Dâng"] || player.usedSkills["trieu_dang"])) {
+        return { error: "Kỹ năng Triều Dâng chỉ được dùng 1 lần mỗi lượt" };
+      }
       
-      const target = state.players.find(p => p.seat === targetSeat);
+      const target = state.players.find(p => p.seat === Number(targetSeat));
       if (!target) return { error: "Mục tiêu không hợp lệ" };
       if (target.seat === seat) return { error: "Không thể chọn bản thân" };
       
@@ -3028,7 +3039,9 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
         recordAction(state, {
           type: "USE_SKILL",
           casterSeat: seat,
-          targetSeat: targetSeat,
+          targetSeat: target.seat,
+          cardId: equipToDestroy.id,
+          cardName: equipToDestroy.name,
           description: `🌊 <b>${player.generalName}</b> dùng [Triều Dâng] phá hủy ${formatCardText(equipToDestroy)} của <b>${target.generalName}</b>!`
         });
         refreshLastDelta(state);
@@ -3045,7 +3058,7 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
       state.phase = "AWAIT_TARGET_CARD";
       state.targetCardSelection = {
         chooserSeat: seat,
-        targetSeat: targetSeat,
+        targetSeat: target.seat,
         operation: "DESTROY",
         effectType: "TRIEU_DANG",
         options: options
@@ -3058,14 +3071,16 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
       recordAction(state, {
         type: "USE_SKILL",
         casterSeat: seat,
-        targetSeat: targetSeat,
+        targetSeat: target.seat,
         description: "🌊 <b>" + player.generalName + "</b> phát động [Triều Dâng] nhằm vào <b>" + target.generalName + "</b>!"
       });
       refreshLastDelta(state);
       return { success: true, state };
   }
 
-  return { error: "Kỹ năng không hợp lệ hoặc chưa được hỗ trợ" };
+  // Mặc định trả về thành công nếu là kỹ năng xem hướng dẫn / bị động
+  refreshLastDelta(state);
+  return { success: true, state };
 }
 
 export function handleToggleSkill(state, seat, skillId) {
@@ -3073,10 +3088,13 @@ export function handleToggleSkill(state, seat, skillId) {
   const player = state.players.find(p => p.seat === seat);
   if (!player || player.hp <= 0) return { error: "Người chơi không hợp lệ" };
 
-  if (!player.activeSkills) player.activeSkills = {};
-  player.activeSkills[skillId] = !player.activeSkills[skillId];
+  const norm = String(skillId || "").trim().toLowerCase();
+  const canonicalSkill = (norm.includes("chế nỏ") || norm.includes("che no") || norm === "1") ? "Chế Nỏ" : skillId;
 
-  if (skillId === "Chế Nỏ") {
+  if (!player.activeSkills) player.activeSkills = {};
+  player.activeSkills[canonicalSkill] = !player.activeSkills[canonicalSkill];
+
+  if (canonicalSkill === "Chế Nỏ") {
     if (player.activeSkills[skillId]) {
       if (player.hand) {
         player.hand.forEach(c => {

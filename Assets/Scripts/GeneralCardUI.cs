@@ -816,7 +816,8 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
         {
             chainedOverlayGo = new GameObject("ChainedOverlay", typeof(RectTransform));
             chainedOverlayGo.transform.SetParent(transform, false);
-            chainedOverlayGo.transform.SetAsLastSibling();
+            // Đặt phía sau các ô trang bị và thanh máu sen để không che lấp
+            chainedOverlayGo.transform.SetSiblingIndex(Mathf.Max(0, transform.childCount - 3));
             var rt = chainedOverlayGo.GetComponent<RectTransform>();
             FillRect(rt);
 
@@ -826,11 +827,11 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
             var cbImg = chainBorder.GetComponent<Image>();
             var fSpr = LotusHealthUI.LoadSpriteFromResources("UI/card_frame");
             if (fSpr != null) { cbImg.sprite = fSpr; cbImg.type = Image.Type.Sliced; }
-            cbImg.color = new Color(1f, 0.72f, 0.15f, 1f);
+            cbImg.color = new Color(1f, 0.68f, 0.12f, 1f);
             cbImg.raycastTarget = false;
             FillRect(chainBorder.GetComponent<RectTransform>(), new Vector2(-4, -4), new Vector2(4, 4));
 
-            // 2. Hiệu ứng Dây Xích Sắt & Kim Quang đan chéo toàn thân thẻ tướng
+            // 2. Hiệu ứng Dây Xích quấn ngang eo tướng (chỉ quấn 40% phần thân dưới, tuyệt đối không che mặt/tên/máu)
             var chainLinks = new GameObject("ChainLinksOverlay", typeof(RectTransform), typeof(Image));
             chainLinks.transform.SetParent(chainedOverlayGo.transform, false);
             var clImg = chainLinks.GetComponent<Image>();
@@ -838,10 +839,14 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
             if (cSpr != null)
             {
                 clImg.sprite = cSpr;
-                clImg.color = new Color(1f, 1f, 1f, 0.92f);
+                clImg.color = new Color(1f, 1f, 1f, 0.65f);
             }
             clImg.raycastTarget = false;
-            FillRect(chainLinks.GetComponent<RectTransform>());
+            var clRt = chainLinks.GetComponent<RectTransform>();
+            clRt.anchorMin = new Vector2(0f, 0.08f);
+            clRt.anchorMax = new Vector2(1f, 0.50f);
+            clRt.offsetMin = Vector2.zero;
+            clRt.offsetMax = Vector2.zero;
 
             // 3. Ổ Khóa Xích Hoàng Kim uy nghiêm ở góc trên bên phải
             var padGo = new GameObject("ChainPadlockBadge", typeof(RectTransform), typeof(Image));
@@ -857,8 +862,8 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
             var padRt = padGo.GetComponent<RectTransform>();
             padRt.anchorMin = padRt.anchorMax = new Vector2(1f, 1f);
             padRt.pivot = new Vector2(1f, 1f);
-            padRt.sizeDelta = new Vector2(44f, 46f);
-            padRt.anchoredPosition = new Vector2(-4f, -4f);
+            padRt.sizeDelta = new Vector2(38f, 40f);
+            padRt.anchoredPosition = new Vector2(-2f, -2f);
         }
 
         if (chainedOverlayGo != null)
