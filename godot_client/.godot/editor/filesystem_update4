@@ -1,1 +1,3 @@
 res://scenes/tutorial_battle.gd
+res://scenes/components/card_ui.gd
+res://scenes/components/general_avatar_ui.gd

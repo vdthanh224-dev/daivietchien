@@ -79,7 +79,7 @@ func _on_card_mouse_entered() -> void:
 	is_hovered = true
 	mouse_entered.emit()
 	if not is_selected:
-		_animate_elevation(-20.0, Vector2(1.05, 1.05))
+		_animate_elevation(-4.0, Vector2(1.02, 1.02))
 
 func _on_card_mouse_exited() -> void:
 	is_hovered = false
@@ -100,12 +100,12 @@ func set_selected(selected: bool) -> void:
 		glow_border.visible = is_selected
 
 	if is_selected:
-		_animate_elevation(-35.0, Vector2(1.1, 1.1))
+		_animate_elevation(-10.0, Vector2(1.04, 1.04))
 		z_index = 10
 	else:
 		z_index = 0
 		if is_hovered:
-			_animate_elevation(-20.0, Vector2(1.05, 1.05))
+			_animate_elevation(-4.0, Vector2(1.02, 1.02))
 		else:
 			_animate_elevation(0.0, Vector2(1.0, 1.0))
 

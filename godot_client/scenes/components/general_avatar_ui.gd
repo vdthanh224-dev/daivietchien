@@ -13,16 +13,16 @@ signal info_clicked()
 @onready var target_border: ReferenceRect = $TargetBorder
 @onready var skill_btn: Button = $SkillBtn
 @onready var click_btn: Button = $ClickBtn
-@onready var info_btn: Button = $Frame/InfoBtn
+@onready var info_btn: Button = $InfoBtn
 
 @onready var weapon_slot = $Frame/EquipContainer/WeaponSlot
 @onready var weapon_label = $Frame/EquipContainer/WeaponSlot/Label
 @onready var armor_slot = $Frame/EquipContainer/ArmorSlot
 @onready var armor_label = $Frame/EquipContainer/ArmorSlot/Label
-@onready var offensive_mount_slot = $Frame/EquipContainer/OffensiveMountSlot
-@onready var offensive_mount_label = $Frame/EquipContainer/OffensiveMountSlot/Label
 @onready var defensive_mount_slot = $Frame/EquipContainer/DefensiveMountSlot
 @onready var defensive_mount_label = $Frame/EquipContainer/DefensiveMountSlot/Label
+@onready var offensive_mount_slot = $Frame/EquipContainer/OffensiveMountSlot
+@onready var offensive_mount_label = $Frame/EquipContainer/OffensiveMountSlot/Label
 @onready var treasure_slot = $Frame/EquipContainer/TreasureSlot
 @onready var treasure_label = $Frame/EquipContainer/TreasureSlot/Label
 
@@ -33,8 +33,8 @@ var hand_count: int = 4
 var equipped_items: Dictionary = {
 	"weapon": "",
 	"armor": "",
-	"offensive_mount": "",
 	"defensive_mount": "",
+	"offensive_mount": "",
 	"treasure": ""
 }
 
@@ -49,7 +49,6 @@ func _ready() -> void:
 
 	if info_btn:
 		info_btn.pressed.connect(func():
-			AudioManager.play_card_select()
 			info_clicked.emit()
 		)
 
@@ -69,6 +68,14 @@ func set_target_highlight(active: bool) -> void:
 			tw.tween_property(target_border, "border_color", Color(1, 1, 0.5, 1), 0.2)
 			tw.tween_property(target_border, "border_color", Color(1, 0.7, 0.1, 1), 0.2)
 
+func _format_equip_str(icon: String, suit_rank: String, item_name: String) -> String:
+	var sr = suit_rank.strip_edges()
+	var iname = item_name.strip_edges()
+	if sr != "":
+		return "%s %s %s" % [icon, sr, iname]
+	else:
+		return "%s %s" % [icon, iname]
+
 func set_equipment(slot_type: String, item_name: String, suit_rank: String = "") -> void:
 	var key = ""
 	match slot_type.to_lower():
@@ -76,31 +83,36 @@ func set_equipment(slot_type: String, item_name: String, suit_rank: String = "")
 			key = "weapon"
 			if weapon_slot:
 				weapon_slot.visible = (item_name != "")
-				weapon_label.text = "🗡️ %s %s" % [item_name, suit_rank]
+				weapon_label.text = _format_equip_str("🗡️", suit_rank, item_name)
 		"armor", "giap":
 			key = "armor"
 			if armor_slot:
 				armor_slot.visible = (item_name != "")
-				armor_label.text = "🛡️ %s %s" % [item_name, suit_rank]
-		"offensive_mount", "mount_offense", "ngua_cong":
-			key = "offensive_mount"
-			if offensive_mount_slot:
-				offensive_mount_slot.visible = (item_name != "")
-				offensive_mount_label.text = "🐎⚔️ %s (-1) %s" % [item_name, suit_rank]
+				armor_label.text = _format_equip_str("🛡️", suit_rank, item_name)
 		"defensive_mount", "mount_defense", "ngua_thu", "mount":
 			key = "defensive_mount"
 			if defensive_mount_slot:
 				defensive_mount_slot.visible = (item_name != "")
-				defensive_mount_label.text = "🐘🛡️ %s (+1) %s" % [item_name, suit_rank]
+				defensive_mount_label.text = _format_equip_str("🐘 (+1)", suit_rank, item_name)
+		"offensive_mount", "mount_offense", "ngua_cong":
+			key = "offensive_mount"
+			if offensive_mount_slot:
+				offensive_mount_slot.visible = (item_name != "")
+				offensive_mount_label.text = _format_equip_str("🐎 (-1)", suit_rank, item_name)
 		"treasure", "bao_vat":
 			key = "treasure"
 			if treasure_slot:
 				treasure_slot.visible = (item_name != "")
-				treasure_label.text = "👑 %s %s" % [item_name, suit_rank]
+				treasure_label.text = _format_equip_str("👑", suit_rank, item_name)
 
 	if key != "":
 		if item_name != "":
-			equipped_items[key] = ("%s %s" % [item_name, suit_rank]).strip_edges()
+			var sr = suit_rank.strip_edges()
+			var iname = item_name.strip_edges()
+			if sr != "":
+				equipped_items[key] = "%s %s" % [sr, iname]
+			else:
+				equipped_items[key] = iname
 		else:
 			equipped_items[key] = ""
 

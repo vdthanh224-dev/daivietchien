@@ -204,6 +204,22 @@ func _ready() -> void:
 		img.save_png("res://tutorial_dodge_after_skill_screenshot.png")
 		print("[Screenshot] Đã lưu tutorial_dodge_after_skill_screenshot.png!")
 		get_tree().quit()
+	elif "--test-click-info-btn" in OS.get_cmdline_user_args():
+		_on_close_health_spotlight()
+		_start_step_3_slash()
+		player_avatar.set_equipment("weapon", "Kiếm Thuận Thiên", "♦A")
+		player_avatar.set_equipment("armor", "Khiên Mây Bện", "♦K")
+		player_avatar.set_equipment("defensive_mount", "Voi Chiến", "♥K")
+		player_avatar.set_equipment("offensive_mount", "Ngựa Trắng", "♠5")
+		player_avatar.set_equipment("treasure", "Bảo Vật Quốc Gia", "♥Q")
+		await get_tree().process_frame
+		player_avatar.info_btn.emit_signal("pressed")
+		await get_tree().create_timer(0.3).timeout
+		await get_tree().process_frame
+		var img = get_viewport().get_texture().get_image()
+		img.save_png("res://tutorial_info_btn_clicked_screenshot.png")
+		print("[Screenshot] Đã lưu tutorial_info_btn_clicked_screenshot.png! Modal visible: ", general_info_modal.visible)
+		get_tree().quit()
 
 func _process(delta: float) -> void:
 	if arrow_node and arrow_node.visible:
@@ -843,8 +859,8 @@ func _show_general_info_modal(target: String) -> void:
 
 		info_eq_weapon.text = "• 🗡️ Vũ Khí: " + (w if w != "" else "(Chưa trang bị)")
 		info_eq_armor.text = "• 🛡️ Giáp Phòng Thủ: " + (a if a != "" else "(Chưa trang bị)")
-		info_eq_off_mount.text = "• 🐎⚔️ Ngựa Công (-1): " + (om if om != "" else "(Chưa trang bị)")
-		info_eq_def_mount.text = "• 🐘🛡️ Ngựa Thủ (+1): " + (dm if dm != "" else "(Chưa trang bị)")
+		info_eq_def_mount.text = "• 🐘 Ngựa Thủ (+1): " + (dm if dm != "" else "(Chưa trang bị)")
+		info_eq_off_mount.text = "• 🐎 Ngựa Công (-1): " + (om if om != "" else "(Chưa trang bị)")
 		info_eq_treasure.text = "• 👑 Bảo Vật: " + (tr if tr != "" else "(Chưa trang bị)")
 
 	else:
@@ -855,10 +871,10 @@ func _show_general_info_modal(target: String) -> void:
 		info_skill_title.text = "🗡️ TUYỆT KỸ: [CƯỚP BÓC] (Bị Động)"
 		info_skill_desc.text = "Đầu mỗi lượt, thủ lĩnh sơn tặc tự động rút thêm 2 lá bài từ kho bài và vung đại đao tung chiêu Trảm hung bạo nhắm vào đối thủ."
 
-		info_eq_weapon.text = "• 🗡️ Vũ Khí: Đại Đao Sơn Tặc ♦8"
+		info_eq_weapon.text = "• 🗡️ Vũ Khí: ♦8 Đại Đao Sơn Tặc"
 		info_eq_armor.text = "• 🛡️ Giáp Phòng Thủ: (Chưa trang bị)"
-		info_eq_off_mount.text = "• 🐎⚔️ Ngựa Công (-1): (Chưa trang bị)"
-		info_eq_def_mount.text = "• 🐘🛡️ Ngựa Thủ (+1): (Chưa trang bị)"
+		info_eq_def_mount.text = "• 🐘 Ngựa Thủ (+1): (Chưa trang bị)"
+		info_eq_off_mount.text = "• 🐎 Ngựa Công (-1): (Chưa trang bị)"
 		info_eq_treasure.text = "• 👑 Bảo Vật: (Chưa trang bị)"
 
 	general_info_modal.visible = true

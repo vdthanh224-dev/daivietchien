@@ -1040,17 +1040,17 @@ theme_override_colors/font_color = Color(0.65, 0.88, 1, 1)
 theme_override_font_sizes/font_size = 11
 text = "• 🛡️ Giáp Phòng Thủ: (Chưa trang bị)"
 
-[node name="EqOffMount" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.65, 0.55, 1)
-theme_override_font_sizes/font_size = 11
-text = "• 🐎⚔️ Ngựa Công (-1): (Chưa trang bị)"
-
 [node name="EqDefMount" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.65, 0.95, 0.75, 1)
 theme_override_font_sizes/font_size = 11
-text = "• 🐘🛡️ Ngựa Thủ (+1): (Chưa trang bị)"
+text = "• 🐘 Ngựa Thủ (+1): (Chưa trang bị)"
+
+[node name="EqOffMount" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.65, 0.55, 1)
+theme_override_font_sizes/font_size = 11
+text = "• 🐎 Ngựa Công (-1): (Chưa trang bị)"
 
 [node name="EqTreasure" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList"]
 layout_mode = 2
