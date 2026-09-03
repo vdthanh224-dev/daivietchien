@@ -576,7 +576,7 @@ function validateTarget(state, casterSeat, targetSeat, card) {
 /**
  * Xử lý khi một người chơi đánh ra 1 lá bài từ tay
  */
-export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0) {
+export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payload = {}) {
   if (state.status === "FINISHED") return { error: "Trận đấu đã kết thúc" };
   casterSeat = Number(casterSeat);
   if (targetSeat !== undefined && targetSeat !== null && targetSeat !== "") {
@@ -1195,23 +1195,40 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0) {
   const caster = state.players.find(x => x.seat === casterSeat);
   const target = state.players.find(x => x.seat === targetSeat);
 
-  // 0. XÍCH TÂM TỎA (Iron Chain)
+  // 0. XÍCH TÂM TỎA (Iron Chain - Hỗ trợ chọn tối đa 2 mục tiêu)
   if (card.subType === CARD_SUBTYPES.IRON_CHAIN) {
     discardCard(state, card);
-    const target = state.players.find(p => p.seat === targetSeat) || caster;
-    if (target) {
-      target.isChained = !target.isChained;
+    const seatsToChain = [];
+    if (Array.isArray(payload.targetSeats) && payload.targetSeats.length > 0) {
+      for (const s of payload.targetSeats) {
+        const num = Number(s);
+        if (num > 0 && !seatsToChain.includes(num)) seatsToChain.push(num);
+      }
+    }
+    if (targetSeat > 0 && !seatsToChain.includes(Number(targetSeat))) {
+      seatsToChain.push(Number(targetSeat));
+    }
+    if (payload.targetSeat2 > 0 && !seatsToChain.includes(Number(payload.targetSeat2))) {
+      seatsToChain.push(Number(payload.targetSeat2));
+    }
+    if (seatsToChain.length === 0) seatsToChain.push(casterSeat);
+
+    const changedDescs = [];
+    for (const s of seatsToChain) {
+      const p = state.players.find(x => x.seat === s);
+      if (p && p.hp > 0) {
+        p.isChained = !p.isChained;
+        changedDescs.push(`<b>${p.generalName}</b> (${p.isChained ? "⛓️ Trói" : "🔓 Gỡ"})`);
+      }
     }
     resetWaitingState(state);
     recordAction(state, {
       type: "PLAY_IRON_CHAIN",
       casterSeat,
-      targetSeat: target ? target.seat : 0,
+      targetSeats: seatsToChain,
       cardId: card.id,
       cardName: card.name,
-      description: target?.isChained
-        ? `⛓️ <b>${caster ? caster.generalName : 'Người chơi'}</b> dùng [Xích Tâm Tỏa] trói <b>${target.generalName}</b> vào Xích Liên Hoàn!`
-        : `⛓️ <b>${caster ? caster.generalName : 'Người chơi'}</b> dùng [Xích Tâm Tỏa] gỡ xích cho <b>${target.generalName}</b>!`
+      description: `⛓️ <b>${caster ? caster.generalName : 'Người chơi'}</b> dùng [Xích Tâm Tỏa] lên ${changedDescs.join(", ")}!`
     });
     return { success: true, state };
   }

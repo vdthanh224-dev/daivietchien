@@ -258,7 +258,7 @@ function applyActionToState(state, seat, payload) {
       return handleToggleSkill(state, seat, payload.skillId);
     }
     if (payload.action === "PLAY_CARD") {
-    return handlePlayCard(state, seat, payload.cardId, payload.targetSeat);
+    return handlePlayCard(state, seat, payload.cardId, payload.targetSeat, payload);
   }
   if (payload.action === "RESPOND_ACTION") {
     return handleRespondAction(
@@ -712,6 +712,8 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8082 }, async (req) => {
         cardId,
         targetCardId,
         targetSeat,
+        targetSeat2: payload.targetSeat2,
+        targetSeats: payload.targetSeats,
         accepted,
         cardIds,
         expectedVersion,

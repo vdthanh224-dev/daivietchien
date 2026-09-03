@@ -4870,6 +4870,8 @@ public class Battle2v2UI : MonoBehaviour
                     actionBtnText.text = "🏹 MƯA TÊN LIÊN CHÂU (TẤT CẢ NGƯỜI KHÁC)";
             else if (card.subType == CardSubType.Lightning)
                 actionBtnText.text = "⚡ GÀI THẦN SẤM BÁO ỨNG";
+            else if (card.subType == CardSubType.IronChain)
+                actionBtnText.text = "⛓️ XÍCH TÂM TỎA (CHỌN TỐI ĐA 2 TƯỚNG)";
             else
                 actionBtnText.text = $"🃏 DÙNG [{card.cardName.ToUpper()}]";
 
@@ -4887,6 +4889,66 @@ public class Battle2v2UI : MonoBehaviour
         }
 
         if (currentSelectedCardUI == null || currentSelectedCardUI.Data == null || !isPlayerTurnActive || actionInProgress) return;
+
+        // Xử lý riêng lá bài Xích Tâm Tỏa: Cho phép chọn tối đa 2 mục tiêu trước khi đánh
+        if (currentSelectedCardUI.Data.subType == CardSubType.IronChain)
+        {
+            var chainCardUI = currentSelectedCardUI;
+            var chainCard = chainCardUI.Data;
+            if (actionBtnGo != null) actionBtnGo.SetActive(false);
+            HideCardDescription();
+
+            ShowIronChainSelectionModal(playerCard, (chosenGenerals) =>
+            {
+                if (chosenGenerals == null || chosenGenerals.Count == 0)
+                {
+                    SetLog("⛓️ [Xích Tâm Tỏa]: Đã hủy chọn mục tiêu.");
+                    UpdateActionButtonState();
+                    return;
+                }
+
+                playerHandCards.Remove(chainCard);
+                playerHandUI.RemoveCard(chainCardUI);
+                currentSelectedCardUI = null;
+                HideCardDescription();
+                ClearSelectedTarget();
+                UpdateHandCountsVisual();
+
+                var targetSeatsList = new System.Collections.Generic.List<int>();
+                foreach (var g in chosenGenerals)
+                {
+                    if (g != null && g.CurrentHp > 0)
+                    {
+                        targetSeatsList.Add(g.SeatNumber);
+                        g.SetChained(!g.IsChained);
+                    }
+                }
+                AudioManager.Instance.PlaySkill();
+
+                int seat1 = targetSeatsList.Count > 0 ? targetSeatsList[0] : playerCard.SeatNumber;
+                int seat2 = targetSeatsList.Count > 1 ? targetSeatsList[1] : 0;
+
+                if (DenoGameClient.IsConnected)
+                {
+                    DispatchGameEngineAction(new AppwriteMatchmaking.GameActionPayload
+                    {
+                        action = "PLAY_CARD",
+                        roomId = currentRoomId,
+                        seat = playerCard.SeatNumber,
+                        cardId = chainCard.id,
+                        targetSeat = seat1,
+                        targetSeat2 = seat2,
+                        targetSeats = targetSeatsList.ToArray()
+                    }, (s) => { if (s != null) ApplyServerGameState(s); });
+                }
+                else
+                {
+                    deckManager.DiscardCard(chainCard);
+                    SetLog($"⛓️ <color=#FFD700><b>[XÍCH TÂM TỎA]</b></color>: Đã đổi trạng thái xích cho {chosenGenerals.Count} tướng!");
+                }
+            });
+            return;
+        }
         var cardUI = currentSelectedCardUI;
         var target = currentSelectedTarget != null ? currentSelectedTarget : playerCard;
 
@@ -7786,6 +7848,7 @@ public class Battle2v2UI : MonoBehaviour
             var fSpr = ThemeUI.LoadSprite("UI/card_frame");
             if (fSpr != null) { bbImg.sprite = fSpr; bbImg.type = Image.Type.Sliced; }
             bbImg.color = g.IsChained ? new Color(1f, 0.4f, 0.4f, 1f) : ThemeUI.GoldPrimary;
+            bbImg.raycastTarget = false;
             ThemeUI.Fill(bBorder.GetComponent<RectTransform>(), new Vector2(-2, -2), new Vector2(2, 2));
 
             var nameTxt = ThemeUI.CreateText(cardBtnGo.transform, "Name", $"#{g.SeatNumber} {g.GeneralName}", ThemeUI.SizeBody, ThemeUI.WhitePure, FontStyle.Bold, TextAnchor.UpperCenter, true);

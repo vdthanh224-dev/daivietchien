@@ -165,6 +165,8 @@ public static class AppwriteMatchmaking
         public string cardName;
         public int casterSeat;
         public int targetSeat;
+        public int targetSeat2;
+        public int[] targetSeats;
         public int damage;
         public bool isWineBuff;
         public string suit;
@@ -312,6 +314,8 @@ public static class AppwriteMatchmaking
         public string cardId;
         public string targetCardId;
         public int targetSeat;
+        public int targetSeat2;
+        public int[] targetSeats;
         public int damage;
         public bool isWineBuff;
         public bool accepted;
