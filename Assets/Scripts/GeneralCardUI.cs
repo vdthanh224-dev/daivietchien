@@ -868,8 +868,24 @@ public class GeneralCardUI : MonoBehaviour, UnityEngine.EventSystems.IPointerCli
 
         if (chainedOverlayGo != null)
         {
-            chainedOverlayGo.transform.SetAsLastSibling();
             chainedOverlayGo.SetActive(chained);
+            // 1. Cho lớp layer trang bị trên lớp layer xích
+            var eqSlots = transform.Find("EquipmentSlots");
+            if (eqSlots != null)
+            {
+                int eqIdx = eqSlots.GetSiblingIndex();
+                chainedOverlayGo.transform.SetSiblingIndex(Mathf.Max(0, eqIdx));
+                eqSlots.SetAsLastSibling();
+            }
+            // Đảm bảo các UI tương tác khác (số bài, nút kỹ năng, viền lượt, timer) nằm trên cùng
+            var handBadge = transform.Find("HandCardsBadge");
+            if (handBadge != null) handBadge.SetAsLastSibling();
+            var skillBtn = transform.Find("GeneralSkillButton");
+            if (skillBtn != null) skillBtn.SetAsLastSibling();
+            var turnBorder = transform.Find("TurnHighlightBorder");
+            if (turnBorder != null) turnBorder.SetAsLastSibling();
+            var timerOverlay = transform.Find("HeadTimerOverlay");
+            if (timerOverlay != null) timerOverlay.SetAsLastSibling();
         }
     }
 

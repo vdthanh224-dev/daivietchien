@@ -790,7 +790,8 @@ export function startNullifyChain(state, card, casterSeat, targetSeat = 0, conti
     if (continuation?.type === "TURN_JUDGEMENT") {
       resolveJudgementCard(state, card, continuation.seat);
       if (state.phase === "AWAIT_NEAR_DEATH") return { success: true, state };
-      return continueTurnStart(state);
+      refreshLastDelta(state);
+      return { success: true, state };
     }
     if (continuation?.type === "CONTINUE_AOE") {
       const nextVictim = targetSeat;
@@ -1511,7 +1512,8 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
                 if (cont?.type === "TURN_JUDGEMENT") {
                   resolveJudgementCard(state, effCard, cont.seat);
                   if (state.phase === "AWAIT_NEAR_DEATH") return { success: true, state };
-                  return continueTurnStart(state);
+                  refreshLastDelta(state);
+                  return { success: true, state };
                 }
                 if (cont?.type === "CONTINUE_AOE") {
                   executeCardEffect(state, effCard, effCaster, target);
@@ -1565,6 +1567,11 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         description: `🛡️ Mưu kế ${formatCardText(rootCard)} đã chính thức bị vô hiệu hóa hoàn toàn bởi Diệu Kế Phá Mưu!`
       });
       if (chain.continuation?.type === "TURN_JUDGEMENT") {
+        const target = state.players.find(p => p.seat === chain.continuation.seat);
+        if (target && target.judgements) {
+          target.judgements = target.judgements.filter(c => c.id !== rootCard.id);
+        }
+        discardCard(state, rootCard);
         return continueTurnStart(state);
       }
       if (chain.continuation?.type === "CONTINUE_AOE") {
@@ -1587,7 +1594,8 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     if (chain.continuation?.type === "TURN_JUDGEMENT") {
       resolveJudgementCard(state, rootCard, chain.continuation.seat);
       if (state.phase === "AWAIT_NEAR_DEATH") return { success: true, state };
-      return continueTurnStart(state);
+      refreshLastDelta(state);
+      return { success: true, state };
     }
     if (chain.continuation?.type === "CONTINUE_AOE") {
       // Mưu kế diện rộng không bị hóa giải cho mục tiêu này -> Bắt đầu chờ Đỡ/Trảm từ nạn nhân
@@ -2248,7 +2256,7 @@ function continueTurnStart(state) {
   recordAction(state, {
     type: "TURN_START",
     turnSeat: player.seat,
-    description: `👉 Lượt của <b>${player.generalName}</b>! ${skipDraw ? 'Bị mất Giai đoạn Rút bài' : 'Đã rút 2 lá bài'} (40s).`
+    description: `👉 Lượt của <b>${player.generalName}</b>! ${skipDraw ? '🌾 Bị Cắt Đường Lương tước quyền rút bài' : 'Đã rút 2 lá bài'} (40s).`
   });
   checkGameOver(state);
   return { success: true, state };
@@ -2289,7 +2297,7 @@ function advanceTurn(state) {
     skipDraw: false,
     skipPlay: false
   };
-  nextPlayer.judgements = [];
+  // Quét từng lá phán xét theo thứ tự ưu tiên; mỗi lá được gỡ khỏi judgements khi phán xét xong
   return continueTurnStart(state);
 }
 
@@ -2548,6 +2556,17 @@ export function tickGameState(state, connectedSeats = null) {
   }
   const elapsed = Math.floor((Date.now() - state.timerStartAt) / 1000);
   const newTimer = Math.max(0, 40 - elapsed);
+
+  // Giai đoạn chờ lật bài phán xét (AWAIT_JUDGEMENT)
+  if (state.phase === "AWAIT_JUDGEMENT") {
+    if (elapsed >= 3) {
+      applyPendingJudgement(state);
+      important = true;
+      state.timerStartAt = Date.now();
+      return { changed: true, important };
+    }
+    return { changed, important };
+  }
   
   if (state.waitingTargetSeat > 0) {
     if (state.waitingTimer !== newTimer) {
