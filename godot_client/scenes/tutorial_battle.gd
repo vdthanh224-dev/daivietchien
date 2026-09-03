@@ -7,6 +7,7 @@ extends Control
 @onready var log_text: RichTextLabel = $TableTop/LogPanel/Margin/VBox/Scroll/LogText
 @onready var desc_text: Label = $TableTop/CardDescBar/Margin/DescText
 @onready var card_play_btn: Button = $TableTop/CardPlayBtn
+@onready var end_turn_btn: Button = $TableTop/EndTurnBtn
 
 @onready var banner: PanelContainer = $TutorialBanner
 @onready var banner_title: Label = $TutorialBanner/Margin/VBox/StepTitle
@@ -36,7 +37,15 @@ var boss_targeted: bool = false
 var arrow_target_pos: Vector2 = Vector2.ZERO
 var arrow_time: float = 0.0
 
+# Chế độ thực chiến tự do (Free Play)
+var is_free_battle: bool = false
+var slashes_used_this_turn: int = 0
+var is_player_turn: bool = true
+
 func _ready() -> void:
+	# Bắt đầu phát nhạc nền chiến trận hào hùng
+	AudioManager.play_bgm("bgm_battle")
+
 	# 1. Khởi tạo Tướng Lý Thường Kiệt (Người chơi - Góc dưới phải)
 	player_avatar.setup_general("ly_thuong_kiet", "Lý Thường Kiệt", "Khác", 4, 4, "BẠN")
 	player_avatar.set_skill("⚡ TIẾN THOÁI")
@@ -50,6 +59,7 @@ func _ready() -> void:
 	start_tutorial_btn.pressed.connect(_on_close_health_spotlight)
 	action_btn.pressed.connect(_on_action_btn_clicked)
 	card_play_btn.pressed.connect(_on_card_play_btn_clicked)
+	end_turn_btn.pressed.connect(_on_end_turn_btn_clicked)
 	claim_reward_btn.pressed.connect(_on_claim_reward_clicked)
 
 	# 4. Hiển thị Bước 1: Máu hoa sen
@@ -58,6 +68,7 @@ func _ready() -> void:
 	arrow_node.visible = false
 	center_showcase.visible = false
 	card_play_btn.visible = false
+	end_turn_btn.visible = false
 
 	_add_log("• Trận chiến huấn luyện khởi động.")
 
@@ -92,7 +103,6 @@ func _ready() -> void:
 		get_tree().quit()
 
 func _process(delta: float) -> void:
-	# Hiệu ứng nhấp nhô mũi tên hướng dẫn
 	if arrow_node and arrow_node.visible:
 		arrow_time += delta * 6.0
 		var bob = sin(arrow_time) * 6.0
@@ -119,6 +129,7 @@ func _start_step_2_draw() -> void:
 	_spawn_initial_cards()
 	deck_count -= 5
 	deck_label.text = "🎴 %d" % deck_count
+	AudioManager.play_card_draw()
 	_add_log("📜 LƯỢT ĐẦU: Rút 1 lá bài từ kho bài vào tay.")
 
 func _spawn_initial_cards() -> void:
@@ -134,11 +145,15 @@ func _spawn_initial_cards() -> void:
 	]
 
 	for data in cards_data:
-		var card_node = CardUIScene.instantiate()
-		hand_container.add_child(card_node)
-		card_node.setup_card_data("card_" + data["name"], data["name"], data["rank"], data["suit"], data["cat"], data["desc"])
-		card_node.card_selected_state_changed.connect(_on_card_selected_state_changed)
-		card_node.mouse_entered.connect(func(): _on_card_hovered(card_node))
+		_create_card_in_hand(data["name"], data["rank"], data["suit"], data["cat"], data["desc"])
+
+func _create_card_in_hand(c_name: String, c_rank: String, c_suit: String, c_cat: int, c_desc: String) -> Control:
+	var card_node = CardUIScene.instantiate()
+	hand_container.add_child(card_node)
+	card_node.setup_card_data("card_" + c_name, c_name, c_rank, c_suit, c_cat, c_desc)
+	card_node.card_selected_state_changed.connect(_on_card_selected_state_changed)
+	card_node.mouse_entered.connect(func(): _on_card_hovered(card_node))
+	return card_node
 
 func _on_card_hovered(c_ui: Control) -> void:
 	if c_ui and c_ui.card_data:
@@ -146,6 +161,7 @@ func _on_card_hovered(c_ui: Control) -> void:
 		desc_text.text = "💡 [%s %s %s] %s" % [d.card_name, d.get_suit_symbol() + str(d.rank), d.get_category_name(), d.description]
 
 func _on_card_selected_state_changed(card_ui: Control, is_sel: bool) -> void:
+	AudioManager.play_card_select()
 	if is_sel:
 		if selected_card_ui and selected_card_ui != card_ui:
 			selected_card_ui.set_selected(false)
@@ -159,6 +175,10 @@ func _on_card_selected_state_changed(card_ui: Control, is_sel: bool) -> void:
 			card_play_btn.visible = false
 
 func _handle_card_selected(c_ui: Control) -> void:
+	if is_free_battle:
+		_handle_free_battle_card_selected(c_ui)
+		return
+
 	if current_step == 3:
 		if "Trảm" in c_ui.card_name:
 			banner_desc.text = "🎯 Hãy chạm chọn THỦ LĨNH SƠN TẶC trên bàn đấu làm mục tiêu tấn công!"
@@ -168,12 +188,42 @@ func _handle_card_selected(c_ui: Control) -> void:
 			card_play_btn.text = "🎯 CHỌN MỤC TIÊU SƠN TẶC"
 	elif current_step == 5:
 		if "Đỡ" in c_ui.card_name:
-			banner_desc.text = "Nhấn nút [🛡️ DÙNG ĐỠ (NÉ ĐÒN)] trên thanh mô tả để triệt tiêu đòn Trảm!"
+			banner_desc.text = "Nhấn nút [🛡️ DÙNG ĐỠ (NÉ ĐÒN)] sát trên thanh mô tả để triệt tiêu đòn Trảm!"
 			card_play_btn.visible = true
 			card_play_btn.disabled = false
 			card_play_btn.text = "🛡️ DÙNG ĐỠ (NÉ ĐÒN)"
 			await get_tree().process_frame
 			_show_arrow(card_play_btn.global_position + Vector2(-15, 21), "XÁC NHẬN NÉ")
+
+func _handle_free_battle_card_selected(c_ui: Control) -> void:
+	if not is_player_turn:
+		card_play_btn.visible = false
+		return
+
+	var c_name = c_ui.card_name
+	if "Trảm" in c_name:
+		if slashes_used_this_turn >= 1:
+			desc_text.text = "⚠️ Mỗi lượt chỉ được dùng tối đa 1 lá Trảm (Đã dùng %d/1)!" % slashes_used_this_turn
+			card_play_btn.visible = false
+		else:
+			card_play_btn.visible = true
+			card_play_btn.disabled = false
+			card_play_btn.text = "⚔️ DÙNG BÀI ➜ SƠN TẶC"
+	elif "Bánh Chưng" in c_name:
+		card_play_btn.visible = true
+		card_play_btn.disabled = false
+		card_play_btn.text = "❤️ DÙNG BÁNH CHƯNG (+1 MÁU)"
+	elif "Khiên" in c_name:
+		card_play_btn.visible = true
+		card_play_btn.disabled = false
+		card_play_btn.text = "🛡️ TRANG BỊ KHIÊN MÂY"
+	elif "Đỡ" in c_name:
+		desc_text.text = "💡 Lá [ĐỠ] dùng khi bị tấn công để né đòn Trảm của đối phương!"
+		card_play_btn.visible = false
+	else:
+		card_play_btn.visible = true
+		card_play_btn.disabled = false
+		card_play_btn.text = "🃏 DÙNG LÁ NÀY"
 
 func _on_boss_avatar_clicked() -> void:
 	if current_step == 3 and selected_card_ui and "Trảm" in selected_card_ui.card_name:
@@ -185,9 +235,18 @@ func _on_boss_avatar_clicked() -> void:
 		card_play_btn.text = "⚔️ DÙNG BÀI ➜ SƠN TẶC"
 		await get_tree().process_frame
 		_show_arrow(card_play_btn.global_position + Vector2(-15, 21), "BẤM DÙNG BÀI")
+	elif is_free_battle and selected_card_ui and "Trảm" in selected_card_ui.card_name:
+		if slashes_used_this_turn < 1:
+			card_play_btn.visible = true
+			card_play_btn.disabled = false
+			card_play_btn.text = "⚔️ DÙNG BÀI ➜ SƠN TẶC"
 
 func _on_card_play_btn_clicked() -> void:
 	card_play_btn.release_focus()
+	if is_free_battle:
+		_execute_free_card_play()
+		return
+
 	match current_step:
 		3:
 			if boss_targeted and selected_card_ui:
@@ -202,8 +261,10 @@ func _on_action_btn_clicked() -> void:
 			_start_step_3_slash()
 		4:
 			_start_step_4_5_skill()
-		41: # Sau khi thi triển kỹ năng
+		41:
 			_start_step_5_boss_turn()
+		6: # Bấm nút "BẮT ĐẦU THỰC CHIẾN ⚔️"
+			_start_free_battle_mode()
 
 func _start_step_3_slash() -> void:
 	current_step = 3
@@ -213,7 +274,6 @@ func _start_step_3_slash() -> void:
 	action_btn.visible = false
 	card_play_btn.visible = false
 
-	# Chỉ mũi tên vào lá Trảm đầu tiên
 	if hand_container.get_child_count() > 0:
 		var first_card = hand_container.get_child(0)
 		_show_arrow(first_card.global_position + Vector2(-15, 80), "CHỌN TRẢM")
@@ -223,15 +283,20 @@ func _execute_slash() -> void:
 	arrow_node.visible = false
 	card_play_btn.visible = false
 
-	# 1. Hiệu ứng bay bài từ tay lên giữa bàn đấu
+	# Âm thanh: Voice "Trảm" + Tiếng vung kiếm chém + Tiếng sát thương trúng đích
+	AudioManager.play_voice("Trảm")
+	AudioManager.play_slash()
+	AudioManager.play_damage()
+
+	# Hiệu ứng bài bay lên giữa bàn
 	if selected_card_ui:
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
 
-	# 2. Hiệu ứng chém kiếm ánh sáng vát chéo
+	# Hiệu ứng đường chém vát chéo
 	_play_slash_effect(boss_avatar.global_position + Vector2(87, 119))
 
-	# 3. Phản ứng mục tiêu (chớp đỏ + rung lắc + hiện số sát thương)
+	# Phản ứng mục tiêu (chớp đỏ + rung giật + số sát thương)
 	boss_avatar.play_damage_effect()
 	boss_avatar.spawn_damage_number(1)
 
@@ -255,21 +320,23 @@ func _start_step_4_5_skill() -> void:
 	banner_desc.text = "Tướng Lý Thường Kiệt sở hữu tuyệt kỹ TIẾN THOÁI:\nHoán chuyển tất cả lá TRẢM trên tay thành ĐỠ, và tất cả ĐỠ thành TRẢM!\nHãy click nút [⚡ TIẾN THOÁI] ở góc dưới bên trái tướng để biến đổi bài."
 	action_btn.visible = false
 
-	# Chỉ mũi tên vào nút Tiến Thoái của Lý Thường Kiệt
 	_show_arrow(player_avatar.global_position + Vector2(-115, 215), "BẤM TIẾN THOÁI")
 
 func _on_player_skill_clicked() -> void:
+	# Âm thanh: Voice "Tiến Thoái" + SFX Skill ngân vang
+	AudioManager.play_voice("Tiến Thoái")
+	AudioManager.play_skill()
+
+	var count = 0
+	for c in hand_container.get_children():
+		if "Trảm" in c.card_name:
+			c.setup_card_data(c.card_data.id, "Đỡ", "A", "Spade", 0, "Hóa giải 1 đòn Trảm.")
+			count += 1
+
+	_add_log("✨ LÝ THƯỜNG KIỆT THI TRIỂN [TIẾN THOÁI]! Đã hoán chuyển %d lá Trảm ⟷ Đỡ trên tay!" % count)
+
 	if current_step == 40:
 		arrow_node.visible = false
-		# Biến đổi Trảm thành Đỡ trên tay
-		var count = 0
-		for c in hand_container.get_children():
-			if "Trảm" in c.card_name:
-				c.setup_card_data(c.card_data.id, "Đỡ", "A", "Spade", 0, "Hóa giải 1 đòn Trảm.")
-				count += 1
-
-		_add_log("✨ LÝ THƯỜNG KIỆT THI TRIỂN [TIẾN THOÁI]! Đã hoán chuyển %d lá Trảm ⟷ Đỡ trên tay!" % count)
-
 		current_step = 41
 		banner_title.text = "🎉 BIẾN ĐỔI THÀNH CÔNG!"
 		banner_desc.text = "Toàn bộ lá Trảm trên tay đã hóa thành lá ĐỠ (NÉ) sẵn sàng phòng thủ!\nBạn đã dùng xong bài trong lượt. Hãy nhấn [KẾT THÚC LƯỢT]!"
@@ -287,8 +354,11 @@ func _start_step_5_boss_turn() -> void:
 
 	deck_count -= 2
 	deck_label.text = "🎴 %d" % deck_count
+	AudioManager.play_card_draw()
 	await get_tree().create_timer(1.2).timeout
 
+	AudioManager.play_voice("Trảm")
+	AudioManager.play_slash()
 	_show_center_card("Trảm Hung Bạo", "Thủ Lĩnh Sơn Tặc")
 	_play_slash_effect(player_avatar.global_position + Vector2(87, 119))
 	_add_log("💥 Sơn Tặc vung đao tung chiêu [TRẢM] nhắm thẳng vào bạn!")
@@ -296,7 +366,6 @@ func _start_step_5_boss_turn() -> void:
 	banner_title.text = "🛡️ CẢNH BÁO BỊ TẤN CÔNG!"
 	banner_desc.text = "Sơn Tặc vừa tung đòn TRẢM! Hãy chọn lá [ĐỠ] trên tay để vô hiệu hóa đòn đánh!"
 
-	# Tìm lá Đỡ trên tay và chỉ mũi tên vào
 	for c in hand_container.get_children():
 		if "Đỡ" in c.card_name:
 			_show_arrow(c.global_position + Vector2(-15, 80), "CHỌN ĐỠ")
@@ -305,6 +374,11 @@ func _start_step_5_boss_turn() -> void:
 func _execute_dodge() -> void:
 	arrow_node.visible = false
 	card_play_btn.visible = false
+
+	# Âm thanh: Voice "Đỡ" + Tiếng kim loại ngân vang đỡ đòn
+	AudioManager.play_voice("Đỡ")
+	AudioManager.play_parry()
+
 	if selected_card_ui:
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
@@ -313,14 +387,181 @@ func _execute_dodge() -> void:
 	_add_log("🛡️ HOÁ GIẢI THÀNH CÔNG! Bạn đã dùng Đỡ né hoàn toàn đòn Trảm của Sơn Tặc! Sinh mệnh 4/4 của bạn được bảo toàn.")
 
 	await get_tree().create_timer(1.2).timeout
+	_show_free_battle_unlocked_banner()
+
+func _show_free_battle_unlocked_banner() -> void:
+	current_step = 6
+	banner.visible = true
+	banner_title.text = "🎉 CHÚC MỪNG! BẠN ĐÃ NẮM TRỌN QUY TẮC!"
+	banner_desc.text = "• Đầu lượt: Tự động rút 2 lá bài từ kho bài.\n• Tấn công: Mỗi lượt dùng tối đa 1 lá Trảm.\n• Phòng thủ: Dùng Đỡ né đòn, Bánh Chưng hồi phục Máu!\nHãy tự do chiến đấu để tiêu diệt Thủ Lĩnh Sơn Tặc!"
+	action_btn.visible = true
+	action_btn.disabled = false
+	action_btn.text = "BẮT ĐẦU THỰC CHIẾN ⚔️"
+
+func _start_free_battle_mode() -> void:
+	is_free_battle = true
+	banner.visible = false
+	end_turn_btn.visible = true
+	_add_log("══════════════════════════════════")
+	_add_log("⚔️ MỞ KHÓA THỰC CHIẾN TỰ DO! HÃY HẠ GỤC SƠN TẶC!")
+	_add_log("══════════════════════════════════")
+	_player_turn_start_free_play()
+
+func _player_turn_start_free_play() -> void:
+	is_player_turn = true
+	slashes_used_this_turn = 0
+	card_play_btn.visible = false
+	end_turn_btn.disabled = false
+	desc_text.text = "💡 Lượt của bạn! Chọn lá bài trên tay để sử dụng hoặc nhấn Kết thúc lượt."
+	_add_log("=== LƯỢT MỚI CỦA BẠN ===")
+
+	# Rút 2 lá đầu lượt
+	deck_count -= 2
+	deck_label.text = "🎴 %d" % max(0, deck_count)
+	AudioManager.play_card_draw()
+
+	var new_cards = [
+		{"name": "Trảm Thường", "rank": "7", "suit": "Spade", "cat": 0, "desc": "Tấn công gây 1 sát thương."},
+		{"name": "Bánh Chưng", "rank": "8", "suit": "Heart", "cat": 0, "desc": "Hồi phục 1 Máu."}
+	]
+	for data in new_cards:
+		_create_card_in_hand(data["name"], data["rank"], data["suit"], data["cat"], data["desc"])
+
+	_add_log("🎴 Bạn đã rút 2 lá bài vào tay.")
+
+func _execute_free_card_play() -> void:
+	if not selected_card_ui:
+		return
+
+	var c_name = selected_card_ui.card_name
+	card_play_btn.visible = false
+
+	if "Trảm" in c_name:
+		slashes_used_this_turn += 1
+		AudioManager.play_voice("Trảm")
+		AudioManager.play_slash()
+		AudioManager.play_damage()
+
+		_animate_card_play_to_center(selected_card_ui)
+		selected_card_ui = null
+
+		_play_slash_effect(boss_avatar.global_position + Vector2(87, 119))
+		boss_avatar.play_damage_effect()
+		boss_avatar.spawn_damage_number(1)
+
+		boss_hp -= 1
+		boss_avatar.update_hp(boss_hp, 3)
+		_show_center_card(c_name, "Lý Thường Kiệt")
+		_add_log("⚔️ Bạn ra đòn [TRẢM]! Sơn Tặc mất 1 Máu (Còn %d/3)." % boss_hp)
+
+		if boss_hp <= 0:
+			await get_tree().create_timer(1.0).timeout
+			_on_boss_defeated()
+			return
+
+	elif "Bánh Chưng" in c_name:
+		AudioManager.play_voice("Bánh Chưng")
+		AudioManager.play_sfx("sfx_skill")
+		_animate_card_play_to_center(selected_card_ui)
+		selected_card_ui = null
+
+		if player_hp < 4:
+			player_hp += 1
+			player_avatar.update_hp(player_hp, 4)
+			_show_center_card("Bánh Chưng", "Lý Thường Kiệt")
+			_add_log("❤️ Bạn đã dùng BÁNH CHƯNG! Hồi phục 1 Máu (%d/4)." % player_hp)
+		else:
+			_show_center_card("Bánh Chưng", "Lý Thường Kiệt")
+			_add_log("❤️ Dùng Bánh Chưng (Máu bạn đã tối đa 4/4).")
+
+	elif "Khiên" in c_name:
+		AudioManager.play_voice("Khiên Mây Bện")
+		AudioManager.play_parry()
+		_animate_card_play_to_center(selected_card_ui)
+		selected_card_ui = null
+		_show_center_card("Khiên Mây Bện", "Lý Thường Kiệt")
+		_add_log("🛡️ Bạn đã trang bị [KHIÊN MÂY BỆN] thành công!")
+
+	else:
+		_animate_card_play_to_center(selected_card_ui)
+		selected_card_ui = null
+		_show_center_card(c_name, "Lý Thường Kiệt")
+		_add_log("🃏 Bạn đã ra lá [%s]!" % c_name)
+
+	desc_text.text = "💡 Chọn lá bài khác trên tay hoặc nhấn Kết thúc lượt."
+
+func _on_end_turn_btn_clicked() -> void:
+	end_turn_btn.release_focus()
+	if not is_player_turn:
+		return
+
+	is_player_turn = false
+	end_turn_btn.disabled = true
+	card_play_btn.visible = false
+	_add_log("⌛ Bạn đã kết thúc lượt.")
+	_boss_turn_free_play()
+
+func _boss_turn_free_play() -> void:
+	_add_log("👺 Đến lượt Thủ Lĩnh Sơn Tặc...")
+	desc_text.text = "👺 Thủ Lĩnh Sơn Tặc đang suy tính hành động..."
+
+	deck_count -= 2
+	deck_label.text = "🎴 %d" % max(0, deck_count)
+	AudioManager.play_card_draw()
+
+	await get_tree().create_timer(1.2).timeout
+
+	if boss_hp > 0:
+		# Sơn Tặc tấn công
+		AudioManager.play_voice("Trảm")
+		AudioManager.play_slash()
+		_show_center_card("Trảm Hung Hãn", "Thủ Lĩnh Sơn Tặc")
+		_play_slash_effect(player_avatar.global_position + Vector2(87, 119))
+
+		# Kiểm tra xem người chơi có lá Đỡ trên tay không
+		var has_dodge = false
+		for c in hand_container.get_children():
+			if "Đỡ" in c.card_name:
+				has_dodge = true
+				break
+
+		if has_dodge:
+			_add_log("🛡️ Sơn Tặc vung đao tấn công! Nhưng bạn có lá [ĐỠ] nên đã tự động né đòn thành công!")
+			AudioManager.play_voice("Đỡ")
+			AudioManager.play_parry()
+		else:
+			player_hp = max(1, player_hp - 1)
+			player_avatar.play_damage_effect()
+			player_avatar.spawn_damage_number(1)
+			player_avatar.update_hp(player_hp, 4)
+			_add_log("💥 Bạn trúng đòn Trảm của Sơn Tặc! Mất 1 Máu (Còn %d/4)." % player_hp)
+
+	await get_tree().create_timer(1.2).timeout
+	_player_turn_start_free_play()
+
+func _on_boss_defeated() -> void:
+	is_free_battle = false
+	end_turn_btn.visible = false
+	card_play_btn.visible = false
+	arrow_node.visible = false
+
+	# Âm thanh chiến thắng hào hùng
+	AudioManager.play_victory()
+
+	# Hiệu ứng tiêu diệt Boss
+	boss_avatar.play_damage_effect()
+	var tw = create_tween()
+	tw.tween_property(boss_avatar, "modulate:a", 0.3, 0.8)
+
+	_add_log("👑 THỦ LĨNH SƠN TẶC ĐÃ BỊ TIÊU DIỆT HOÀN TOÀN!")
+	_add_log("🏆 BẠN ĐÃ CHIẾN THẮNG TRẬN ĐẤU TẬP HUẤN!")
+
+	await get_tree().create_timer(1.0).timeout
 	_show_reward_modal()
 
 func _show_reward_modal() -> void:
-	arrow_node.visible = false
-	card_play_btn.visible = false
 	reward_modal.visible = true
 	banner.visible = false
-	_add_log("🏆 CHÚC MỪNG HOÀN THÀNH HUẤN LUYỆN TÂN THỦ!")
 	var box = reward_modal.get_node("Dim/Box")
 	var tw = create_tween()
 	tw.tween_property(box, "scale", Vector2(1.0, 1.0), 0.25).from(Vector2(0.7, 0.7)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)

@@ -7,3 +7,4 @@ res://scenes/components/card_ui.tscn
 res://scripts/resources/card_resource.gd
 res://scenes/components/general_avatar_ui.gd
 res://resources/themes/royal_gold_theme.tres
+res://scenes/auth_login.tscn

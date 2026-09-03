@@ -1,8 +1,7 @@
-[gd_scene load_steps=5 format=3 uid="uid://uthlogin123"]
+[gd_scene load_steps=6 format=3 uid="uid://jycfpv85uu5w"]
 
-[ext_resource type="Theme" uid="uid://d4af37royalgold" path="res://resources/themes/royal_gold_theme.tres" id="1_theme"]
-[ext_resource type="Script" path="res://scenes/auth_login.gd" id="2_script"]
-
+[ext_resource type="Theme" uid="uid://b05m7n22yifmf" path="res://resources/themes/royal_gold_theme.tres" id="1_theme"]
+[ext_resource type="Script" uid="uid://b1654gmj5f23n" path="res://scenes/auth_login.gd" id="2_script"]
 [ext_resource type="Texture2D" uid="uid://7cvwr40xn6ig" path="res://assets/ui/login_background.png" id="3_bg"]
 [ext_resource type="Texture2D" uid="uid://c332mcgi33wje" path="res://assets/ui/game_avatar.png" id="4_avatar"]
 

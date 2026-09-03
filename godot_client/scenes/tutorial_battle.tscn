@@ -260,6 +260,25 @@ focus_mode = 0
 theme_override_font_sizes/font_size = 13
 text = "⚔️ DÙNG BÀI ➜ SƠN TẶC"
 
+[node name="EndTurnBtn" type="Button" parent="TableTop"]
+visible = false
+custom_minimum_size = Vector2(140, 42)
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = 70.0
+offset_top = -280.0
+offset_right = 210.0
+offset_bottom = -238.0
+grow_horizontal = 2
+grow_vertical = 0
+focus_mode = 0
+theme_override_font_sizes/font_size = 12
+text = "KẾT THÚC LƯỢT ➜"
+
 [node name="CardDescBar" type="PanelContainer" parent="TableTop"]
 custom_minimum_size = Vector2(650, 40)
 layout_mode = 1
