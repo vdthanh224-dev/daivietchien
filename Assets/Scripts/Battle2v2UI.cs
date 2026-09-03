@@ -1549,10 +1549,12 @@ public class Battle2v2UI : MonoBehaviour
                 break;
 
             case "AWAIT_AOE":
-                if (state.waitingTargetSeat == playerCard.SeatNumber && state.activeCard != null && !isAwaitingServerAoE)
+                if (state.waitingTargetSeat == playerCard.SeatNumber && !isAwaitingServerAoE)
                 {
                     bool needSlash = state.waitingReactionType == "SLASH";
-                    string aoeName = state.activeCard.cardName;
+                    string aoeName = (state.activeCard != null && !string.IsNullOrEmpty(state.activeCard.cardName)) 
+                        ? state.activeCard.cardName 
+                        : (state.activeCard != null ? CardDatabase.GetCardById(state.activeCard.cardId)?.cardName : null) ?? "Cẩm Nang Diện Rộng";
                     string reqName = needSlash ? "Trảm" : "Né";
                     StartCoroutine(ResolveServerAoERequirement(needSlash, aoeName, reqName));
                 }
@@ -2093,6 +2095,8 @@ public class Battle2v2UI : MonoBehaviour
 
     private IEnumerator ShowAuthoritativeAoEPrompt(bool needSlash, string aoeName, string reqName)
     {
+        if (string.IsNullOrEmpty(aoeName)) aoeName = "Cẩm Nang Diện Rộng";
+        if (string.IsNullOrEmpty(reqName)) reqName = needSlash ? "Trảm" : "Né";
         bool serverControlled = !string.IsNullOrEmpty(currentRoomId) || DenoGameClient.IsConnected;
         var modal = new GameObject("ServerAoEReactionModal", typeof(RectTransform), typeof(Image));
         modal.transform.SetParent(battleRootGo != null ? battleRootGo.transform : canvasGo.transform, false);
