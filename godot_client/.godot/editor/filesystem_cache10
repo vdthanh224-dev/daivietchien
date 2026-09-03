@@ -1,9 +1,10 @@
-63f7b34db8d8cdea90c76aacccf841ec
-::res://::1788455229
+72322a848ab928aa5c89f0cb78209805
+::res://::1788479195
 auth_screenshot.png::CompressedTexture2D::8541207186989195829::1788449315::1788449317::1::::<><><>0<>0<>749fdacf5fcffd2aeed28a18858207c2<>res://.godot/imported/auth_screenshot.png-73f20c0199e4a679c304c3ff8178ebe9.ctex::
 export_presets.cfg::TextFile::-1::1788451535::0::1::::<><><>0<>0<><>::
 onboarding_screenshot.png::CompressedTexture2D::1332607823428976257::1788449887::1788449944::1::::<><><>0<>0<>1ac50e21efe0d2d38021e383b42ad23a<>res://.godot/imported/onboarding_screenshot.png-3465009ef35ada4a6b0720abcfcdf9a2.ctex::
 screenshot.png::CompressedTexture2D::3528490184733290564::1788448678::1788448694::1::::<><><>0<>0<>c25de2b67d210e9de471626498b57bb0<>res://.godot/imported/screenshot.png-024a21af5d37bf0f0dd0e2bccdd149d0.ctex::
+tutorial_banh_chung_screenshot.png::CompressedTexture2D::6264589419664104501::1788455380::1788455524::1::::<><><>0<>0<>9384468c3d7849206344607d0cd58dd2<>res://.godot/imported/tutorial_banh_chung_screenshot.png-fed0ec0753580cb314cdee3886195f26.ctex::
 tutorial_equip_screenshot.png::CompressedTexture2D::3671089502136742045::1788455216::1788455241::1::::<><><>0<>0<>7a4073a15d9cae5de185f758e2fe38d8<>res://.godot/imported/tutorial_equip_screenshot.png-51aa9101bb9c05f92a32fd8fc42824f1.ctex::
 tutorial_gameplay_screenshot.png::CompressedTexture2D::5651647905157742346::1788452285::1788452426::1::::<><><>0<>0<>3c419574cf422b66037ce92f3a68506e<>res://.godot/imported/tutorial_gameplay_screenshot.png-6501bef9d0542d4e6cc0d790100071b4.ctex::
 tutorial_modal_screenshot.png::CompressedTexture2D::7178693672563308667::1788455229::1788455241::1::::<><><>0<>0<>368c97f18fbe51a2f1cc691410dd968f<>res://.godot/imported/tutorial_modal_screenshot.png-315cd596fe22f5840eb906fc02432686.ctex::
@@ -250,7 +251,7 @@ auth_login.gd::GDScript::4277199960591023449::1788449607::0::1::::<>Control<><>0
 auth_login.tscn::PackedScene::681375843626197698::1788453160::0::1::::<><><>0<>0<><>::uid://b05m7n22yifmf::::res://resources/themes/royal_gold_theme.tres<>uid://b1654gmj5f23n::::res://scenes/auth_login.gd<>uid://7cvwr40xn6ig::::res://assets/ui/login_background.png<>uid://c332mcgi33wje::::res://assets/ui/game_avatar.png
 main_game.gd::GDScript::7121334530359990436::1788448672::0::1::::<>Control<><>0<>0<><>::
 main_game.tscn::PackedScene::24787511488559098::1788448639::0::1::::<><><>0<>0<><>::uid://b05m7n22yifmf::::res://resources/themes/royal_gold_theme.tres<>res://scenes/main_game.gd<>uid://dsrm0l21c4nwk::::res://scenes/components/general_seat_ui.tscn
-tutorial_battle.gd::GDScript::7904763930261655439::1788455209::0::1::::<>Control<><>0<>0<><>::
+tutorial_battle.gd::GDScript::7904763930261655439::1788455372::0::1::::<>Control<><>0<>0<><>::
 tutorial_battle.tscn::PackedScene::-1::1788455167::0::1::::<><><>0<>0<><>::
 ::res://scenes/components/::1788449941
 card_ui.gd::GDScript::2446087820484704535::1788454517::0::1::::CardUI<>Control<><>0<>0<><>::

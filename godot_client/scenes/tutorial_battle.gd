@@ -175,6 +175,35 @@ func _ready() -> void:
 		img.save_png("res://tutorial_banh_chung_screenshot.png")
 		print("[Screenshot] Đã lưu tutorial_banh_chung_screenshot.png!")
 		get_tree().quit()
+	elif "--screenshot-dodge-no-dodge" in OS.get_cmdline_user_args():
+		_on_close_health_spotlight()
+		_start_free_battle_mode()
+		# Remove any existing Đỡ cards from hand to test "no dodge" scenario
+		for c in hand_container.get_children():
+			if "Đỡ" in c.card_name:
+				c.setup_card_data(c.card_data.id, "Trảm Thường", "2", "Club", 0, "Tấn công gây 1 sát thương.")
+		_prompt_player_dodge_reaction()
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var img = get_viewport().get_texture().get_image()
+		img.save_png("res://tutorial_dodge_prompt_screenshot.png")
+		print("[Screenshot] Đã lưu tutorial_dodge_prompt_screenshot.png!")
+		get_tree().quit()
+	elif "--screenshot-dodge-after-skill" in OS.get_cmdline_user_args():
+		_on_close_health_spotlight()
+		_start_free_battle_mode()
+		for c in hand_container.get_children():
+			if "Đỡ" in c.card_name:
+				c.setup_card_data(c.card_data.id, "Trảm Thường", "2", "Club", 0, "Tấn công gây 1 sát thương.")
+		_prompt_player_dodge_reaction()
+		# Player clicks skill Tiến Thoái!
+		_on_player_skill_clicked()
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var img = get_viewport().get_texture().get_image()
+		img.save_png("res://tutorial_dodge_after_skill_screenshot.png")
+		print("[Screenshot] Đã lưu tutorial_dodge_after_skill_screenshot.png!")
+		get_tree().quit()
 
 func _process(delta: float) -> void:
 	if arrow_node and arrow_node.visible:
@@ -245,10 +274,26 @@ func _on_card_selected_state_changed(card_ui: Control, is_sel: bool) -> void:
 	else:
 		if selected_card_ui == card_ui:
 			selected_card_ui = null
-			desc_text.text = "💡 Chạm chọn một lá bài trên tay để xem mô tả & sử dụng..."
-			card_play_btn.visible = false
+			if is_waiting_dodge_reaction:
+				_update_dodge_reaction_ui()
+			else:
+				desc_text.text = "💡 Chạm chọn một lá bài trên tay để xem mô tả & sử dụng..."
+				card_play_btn.visible = false
 
 func _handle_card_selected(c_ui: Control) -> void:
+	if is_waiting_dodge_reaction:
+		if "Đỡ" in c_ui.card_name:
+			card_play_btn.visible = true
+			card_play_btn.disabled = false
+			card_play_btn.text = "🛡️ DÙNG ĐỠ (NÉ ĐÒN)"
+			desc_text.text = "🛡️ Đã chọn lá [%s]. Nhấn [🛡️ DÙNG ĐỠ (NÉ ĐÒN)] để hóa giải đòn Trảm!" % c_ui.card_name
+		else:
+			card_play_btn.visible = true
+			card_play_btn.disabled = true
+			card_play_btn.text = "🛡️ CẦN LÁ ĐỠ"
+			desc_text.text = "⚠️ Bạn đang bị Sơn Tặc tấn công! Hãy chọn lá [ĐỠ] hoặc bấm [💔 CHỊU ĐÒN (-1)]."
+		return
+
 	if is_free_battle:
 		_handle_free_battle_card_selected(c_ui)
 		return
@@ -277,6 +322,19 @@ func _handle_card_selected(c_ui: Control) -> void:
 			_show_arrow(card_play_btn.global_position + Vector2(-15, 21), "XÁC NHẬN NÉ")
 
 func _handle_free_battle_card_selected(c_ui: Control) -> void:
+	if is_waiting_dodge_reaction:
+		if "Đỡ" in c_ui.card_name:
+			card_play_btn.visible = true
+			card_play_btn.disabled = false
+			card_play_btn.text = "🛡️ DÙNG ĐỠ (NÉ ĐÒN)"
+			desc_text.text = "🛡️ Đã chọn lá [%s]. Nhấn [🛡️ DÙNG ĐỠ (NÉ ĐÒN)] để hóa giải đòn Trảm!" % c_ui.card_name
+		else:
+			card_play_btn.visible = true
+			card_play_btn.disabled = true
+			card_play_btn.text = "🛡️ CẦN LÁ ĐỠ"
+			desc_text.text = "⚠️ Bạn đang bị Sơn Tặc tấn công! Hãy chọn lá [ĐỠ] hoặc bấm [💔 CHỊU ĐÒN (-1)]."
+		return
+
 	if not is_player_turn:
 		card_play_btn.visible = false
 		return
@@ -361,7 +419,7 @@ func _start_step_3_slash() -> void:
 	current_step = 3
 	boss_targeted = false
 	banner_title.text = "⚔️ GIAI ĐOẠN 2: RA BÀI (DÙNG TRẢM)"
-	banner_desc.text = "Hãy chạm chọn lá bài [TRẢM THƯỜNG] đang phát sáng trên tay!"
+	banner_desc.text = "Hãy chạm chọn lá bài [TRẢM THƯỜNG] đang có trên tay!"
 	action_btn.visible = false
 	card_play_btn.visible = false
 
@@ -430,7 +488,9 @@ func _on_player_skill_clicked() -> void:
 
 	_add_log("✨ LÝ THƯỜNG KIỆT [TIẾN THOÁI]! Đã hoán chuyển %d Trảm ➜ Đỡ và %d Đỡ ➜ Trảm trên tay!" % [count_tram, count_do])
 
-	if selected_card_ui:
+	if is_waiting_dodge_reaction:
+		_update_dodge_reaction_ui()
+	elif selected_card_ui:
 		_handle_card_selected(selected_card_ui)
 
 	if current_step == 40:
@@ -664,40 +724,66 @@ func _boss_turn_free_play() -> void:
 
 func _prompt_player_dodge_reaction() -> void:
 	is_waiting_dodge_reaction = true
+	_update_dodge_reaction_ui()
+
+func _update_dodge_reaction_ui() -> void:
+	if not is_waiting_dodge_reaction:
+		return
+
 	var has_dodge = false
+	var dodge_count = 0
 	for c in hand_container.get_children():
 		if "Đỡ" in c.card_name:
 			has_dodge = true
+			dodge_count += 1
+
+	var has_slash = false
+	for c in hand_container.get_children():
+		if "Trảm" in c.card_name:
+			has_slash = true
 			break
 
+	card_play_btn.visible = true
+	end_turn_btn.visible = true
+	end_turn_btn.disabled = false
+	end_turn_btn.text = "💔 CHỊU ĐÒN (-1)"
+
 	if has_dodge:
-		desc_text.text = "⚠️ SƠN TẶC VỪA TẤN CÔNG BẠN! Hãy bấm [🛡️ DÙNG ĐỠ (NÉ ĐÒN)] hoặc [💔 CHỊU ĐÒN]!"
-		card_play_btn.visible = true
 		card_play_btn.disabled = false
 		card_play_btn.text = "🛡️ DÙNG ĐỠ (NÉ ĐÒN)"
-
-		end_turn_btn.visible = true
-		end_turn_btn.disabled = false
-		end_turn_btn.text = "💔 CHỊU ĐÒN (-1)"
+		desc_text.text = "⚠️ SƠN TẶC VỪA TẤN CÔNG BẠN! Bạn có %d lá [ĐỠ]. Hãy bấm [🛡️ DÙNG ĐỠ (NÉ ĐÒN)] hoặc [💔 CHỊU ĐÒN (-1)]!" % dodge_count
 	else:
-		desc_text.text = "⚠️ Trên tay không có lá [ĐỠ]! Bạn bị trúng đòn Trảm của Sơn Tặc!"
-		await get_tree().create_timer(1.4).timeout
-		_player_take_boss_damage()
+		card_play_btn.disabled = true
+		card_play_btn.text = "🛡️ CHƯA CÓ ĐỠ"
+		if has_slash:
+			desc_text.text = "⚠️ Bạn chưa có [ĐỠ], nhưng có thể bấm [⚡ TIẾN THOÁI] đổi Trảm ➜ Đỡ, hoặc bấm [💔 CHỊU ĐÒN (-1)]!"
+		else:
+			desc_text.text = "⚠️ Trên tay không có lá [ĐỠ]! Bạn hãy bấm nút [💔 CHỊU ĐÒN (-1)] để tiếp tục trận đấu."
 
 func _execute_free_play_dodge() -> void:
 	is_waiting_dodge_reaction = false
 	card_play_btn.visible = false
 	end_turn_btn.text = "KẾT THÚC LƯỢT ➜"
 
-	# Tiêu hao 1 lá Đỡ trên tay
-	for c in hand_container.get_children():
-		if "Đỡ" in c.card_name:
-			_animate_card_play_to_center(c)
-			break
+	# Tiêu hao 1 lá Đỡ trên tay:
+	var target_dodge: Control = null
+	if selected_card_ui and "Đỡ" in selected_card_ui.card_name:
+		target_dodge = selected_card_ui
+	else:
+		for c in hand_container.get_children():
+			if "Đỡ" in c.card_name:
+				target_dodge = c
+				break
+
+	if target_dodge:
+		var c_rank = target_dodge.card_data.get_rank_string() if target_dodge.card_data else "3"
+		var c_suit = target_dodge.card_data.suit if target_dodge.card_data else "Diamond"
+		_animate_card_play_to_center(target_dodge)
+		selected_card_ui = null
+		_show_center_card("Đỡ", "Lý Thường Kiệt", c_rank, c_suit, 0, "Hóa giải 1 đòn Trảm.")
 
 	AudioManager.play_voice("Đỡ")
 	AudioManager.play_parry()
-	_show_center_card("Đỡ", "Lý Thường Kiệt", "3", "Diamond", 0, "Hóa giải 1 đòn Trảm.")
 	_add_log("🛡️ BẠN ĐÃ TỰ DÙNG [ĐỠ]! Hóa giải hoàn toàn đòn Trảm của Sơn Tặc, bảo toàn sinh mệnh!")
 
 	await get_tree().create_timer(1.2).timeout
