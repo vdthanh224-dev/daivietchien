@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bkm6jjla5jnc1"
-valid=false
+uid="uid://bawdkt6fhmr6"
+path="res://.godot/imported/chu_van_an.png-6ae89e43ae280dc1bbceb6b0d3e19808.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/chu_van_an.png"
+dest_files=["res://.godot/imported/chu_van_an.png-6ae89e43ae280dc1bbceb6b0d3e19808.ctex"]
 
 [params]
 

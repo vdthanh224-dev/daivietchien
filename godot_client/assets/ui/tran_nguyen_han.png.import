@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c45dbborl4r4h"
-valid=false
+uid="uid://bxywc0jem2evp"
+path="res://.godot/imported/tran_nguyen_han.png-e9a5de1afdcb9a2b4f54b452bf00ac6b.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/tran_nguyen_han.png"
+dest_files=["res://.godot/imported/tran_nguyen_han.png-e9a5de1afdcb9a2b4f54b452bf00ac6b.ctex"]
 
 [params]
 

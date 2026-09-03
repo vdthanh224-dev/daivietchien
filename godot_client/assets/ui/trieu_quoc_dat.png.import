@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://njcgwqrb4v7w"
-valid=false
+uid="uid://bhb8wxh4yt8ya"
+path="res://.godot/imported/trieu_quoc_dat.png-c376e43909101c59280cd258a1ca413f.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/trieu_quoc_dat.png"
+dest_files=["res://.godot/imported/trieu_quoc_dat.png-c376e43909101c59280cd258a1ca413f.ctex"]
 
 [params]
 

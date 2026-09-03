@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c06vruxbitxeh"
-valid=false
+uid="uid://6e5i3ee6xm87"
+path="res://.godot/imported/do_khac_chung.png-9833d7ab27110e066c0ee7500b28f9fa.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/do_khac_chung.png"
+dest_files=["res://.godot/imported/do_khac_chung.png-9833d7ab27110e066c0ee7500b28f9fa.ctex"]
 
 [params]
 

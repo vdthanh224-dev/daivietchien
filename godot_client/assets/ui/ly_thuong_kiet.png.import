@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dy0xgd8ksgugo"
-valid=false
+uid="uid://ccswkcpd8vrn"
+path="res://.godot/imported/ly_thuong_kiet.png-97cf4f9ea251fa64fe85326d92dc9411.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/ly_thuong_kiet.png"
+dest_files=["res://.godot/imported/ly_thuong_kiet.png-97cf4f9ea251fa64fe85326d92dc9411.ctex"]
 
 [params]
 

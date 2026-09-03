@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c5wkh2u6qrtvs"
-valid=false
+uid="uid://d0r7qdhudy58q"
+path="res://.godot/imported/ho_han_thuong.png-3f8c14426feb4552fcb9d7e101d96041.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/ho_han_thuong.png"
+dest_files=["res://.godot/imported/ho_han_thuong.png-3f8c14426feb4552fcb9d7e101d96041.ctex"]
 
 [params]
 

@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dxqnh4yylh806"
-valid=false
+uid="uid://fwfvsncm1nj8"
+path="res://.godot/imported/le_chan.png-becb4ee4fe2cb845783bd919922f90da.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/le_chan.png"
+dest_files=["res://.godot/imported/le_chan.png-becb4ee4fe2cb845783bd919922f90da.ctex"]
 
 [params]
 

@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://kwwc02y0ofuo"
-valid=false
+uid="uid://n43f1uy24wat"
+path="res://.godot/imported/nguyen_bac.png-24c5c816db9d7674f3a710ab226ac31e.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/nguyen_bac.png"
+dest_files=["res://.godot/imported/nguyen_bac.png-24c5c816db9d7674f3a710ab226ac31e.ctex"]
 
 [params]
 

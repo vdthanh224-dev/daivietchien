@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bd17a8nxvngw2"
-valid=false
+uid="uid://dftrwnsgdfbo"
+path="res://.godot/imported/tran_binh_trong.png-179ecf226bc2e79956058ba0f841f2f9.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/tran_binh_trong.png"
+dest_files=["res://.godot/imported/tran_binh_trong.png-179ecf226bc2e79956058ba0f841f2f9.ctex"]
 
 [params]
 

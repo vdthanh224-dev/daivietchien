@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cx2c3m31tu2qa"
-valid=false
+uid="uid://cgknkwimc16mn"
+path="res://.godot/imported/tran_nghe_tong.png-08ad21cc763cd1d58ec0c61b56e305d7.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/tran_nghe_tong.png"
+dest_files=["res://.godot/imported/tran_nghe_tong.png-08ad21cc763cd1d58ec0c61b56e305d7.ctex"]
 
 [params]
 

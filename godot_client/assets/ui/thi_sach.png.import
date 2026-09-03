@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://6tlfkyhm88yf"
-valid=false
+uid="uid://bgnr71xcbgtbx"
+path="res://.godot/imported/thi_sach.png-0adfe83f6a745d9c53439dd93c25a7cc.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/thi_sach.png"
+dest_files=["res://.godot/imported/thi_sach.png-0adfe83f6a745d9c53439dd93c25a7cc.ctex"]
 
 [params]
 

@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dlwac850mv6vh"
-valid=false
+uid="uid://cdj2g5fifr654"
+path="res://.godot/imported/khuc_hao.png-260e1ad58452a68be3efbcc1f947d928.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/khuc_hao.png"
+dest_files=["res://.godot/imported/khuc_hao.png-260e1ad58452a68be3efbcc1f947d928.ctex"]
 
 [params]
 

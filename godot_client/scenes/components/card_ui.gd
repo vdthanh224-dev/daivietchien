@@ -8,6 +8,10 @@ signal card_selected_state_changed(card_ui: Control, is_selected: bool)
 
 @export var card_data: Resource
 
+var card_name: String:
+	get:
+		return card_data.card_name if card_data else ""
+
 @onready var panel: Panel = $Panel
 @onready var suit_rank_lbl: Label = $Panel/Margin/VBox/Header/SuitRankLabel
 @onready var cat_lbl: Label = $Panel/Margin/VBox/Header/CategoryLabel
@@ -26,6 +30,21 @@ func _ready() -> void:
 	gui_input.connect(_on_gui_input)
 	if card_data:
 		update_card(card_data)
+
+func setup_card_data(id: String, p_name: String, rank_str: String, suit_str: String, cat: int, desc: String) -> void:
+	var res = CardResourceScript.new()
+	res.id = id
+	res.card_name = p_name
+	res.suit = suit_str
+	match rank_str:
+		"A": res.rank = 1
+		"J": res.rank = 11
+		"Q": res.rank = 12
+		"K": res.rank = 13
+		_: res.rank = rank_str.to_int()
+	res.category = cat
+	res.description = desc
+	update_card(res)
 
 func update_card(data: Resource) -> void:
 	card_data = data

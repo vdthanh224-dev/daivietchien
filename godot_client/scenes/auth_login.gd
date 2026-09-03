@@ -1,5 +1,7 @@
 extends Control
 
+const OnboardingModalScene = preload("res://scenes/components/onboarding_modal.tscn")
+
 @onready var tab_login_btn: Button = $AuthCard/Margin/VBox/TabBar/TabLoginBtn
 @onready var tab_register_btn: Button = $AuthCard/Margin/VBox/TabBar/TabRegisterBtn
 @onready var tab_login_line: ColorRect = $AuthCard/Margin/VBox/TabBar/TabLoginBtn/ActiveLine
@@ -35,6 +37,12 @@ func _ready() -> void:
 			if btn:
 				var num = i
 				btn.pressed.connect(func(): _on_quick_login(num))
+
+		var btn_tut = quick_hbox.get_node_or_null("BtnTutorialDirect")
+		if btn_tut:
+			btn_tut.pressed.connect(func():
+				get_tree().change_scene_to_file("res://scenes/tutorial_battle.tscn")
+			)
 
 	AuthManager.login_succeeded.connect(_on_login_succeeded)
 	AuthManager.login_failed.connect(_on_login_failed)
@@ -126,10 +134,26 @@ func _on_quick_login(num: int) -> void:
 	AuthManager.quick_login(num)
 
 func _on_login_succeeded(user_data: Dictionary) -> void:
-	_set_status("🎉 Đăng nhập thành công! Đang vào chiến trường...", Color("#10B981"))
 	submit_btn.disabled = false
-	await get_tree().create_timer(0.5).timeout
-	get_tree().change_scene_to_file("res://scenes/main_game.tscn")
+	if is_register_mode or AuthManager.should_show_onboarding():
+		_set_status("Chào mừng tân chiến tướng!", Color("#10B981"))
+		_show_onboarding_modal()
+	else:
+		_set_status("🎉 Đăng nhập thành công! Đang vào chiến trường...", Color("#10B981"))
+		await get_tree().create_timer(0.5).timeout
+		get_tree().change_scene_to_file("res://scenes/main_game.tscn")
+
+func _show_onboarding_modal() -> void:
+	var modal = OnboardingModalScene.instantiate()
+	add_child(modal)
+	modal.tutorial_chosen.connect(func():
+		AuthManager.set_onboarding_done()
+		get_tree().change_scene_to_file("res://scenes/tutorial_battle.tscn")
+	)
+	modal.veteran_chosen.connect(func():
+		AuthManager.set_onboarding_done()
+		get_tree().change_scene_to_file("res://scenes/main_game.tscn")
+	)
 
 func _on_login_failed(err_msg: String) -> void:
 	_set_status("❌ " + err_msg, Color("#EF4444"))

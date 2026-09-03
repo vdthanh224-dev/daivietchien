@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://d35ncpofuid1a"
-valid=false
+uid="uid://dgvsfnjwflbww"
+path="res://.godot/imported/tran_kham.png-6b82b6b87d0eda7e66e4f6243e69d244.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/tran_kham.png"
+dest_files=["res://.godot/imported/tran_kham.png-6b82b6b87d0eda7e66e4f6243e69d244.ctex"]
 
 [params]
 

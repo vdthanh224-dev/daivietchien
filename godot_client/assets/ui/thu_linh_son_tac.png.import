@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b4pdrent7f2lh"
-valid=false
+uid="uid://c0133kd1ped2y"
+path="res://.godot/imported/thu_linh_son_tac.png-c8ecbd4be3a5c4c2fe22bb58df29f78f.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/thu_linh_son_tac.png"
+dest_files=["res://.godot/imported/thu_linh_son_tac.png-c8ecbd4be3a5c4c2fe22bb58df29f78f.ctex"]
 
 [params]
 

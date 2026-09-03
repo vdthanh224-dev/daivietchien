@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bvcfot51kyeqb"
-valid=false
+uid="uid://cwnx60osdjg76"
+path="res://.godot/imported/le_ngan.png-88224dceaaf9f44553b3e9617ea04927.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/le_ngan.png"
+dest_files=["res://.godot/imported/le_ngan.png-88224dceaaf9f44553b3e9617ea04927.ctex"]
 
 [params]
 

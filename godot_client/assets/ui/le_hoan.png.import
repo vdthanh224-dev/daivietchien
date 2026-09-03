@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dqvdx2gu13vql"
-valid=false
+uid="uid://bnrjvxuxkmi6i"
+path="res://.godot/imported/le_hoan.png-c200c19cc2fbc6ae314659b5b9388823.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/le_hoan.png"
+dest_files=["res://.godot/imported/le_hoan.png-c200c19cc2fbc6ae314659b5b9388823.ctex"]
 
 [params]
 

@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cnh3ntwe44n7v"
-valid=false
+uid="uid://behw5ppjv0hbx"
+path="res://.godot/imported/le_khoi.png-2e47356153daf961dd1f75e5b59a8bc8.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/le_khoi.png"
+dest_files=["res://.godot/imported/le_khoi.png-2e47356153daf961dd1f75e5b59a8bc8.ctex"]
 
 [params]
 

@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://by16i4cx3qwsp"
-valid=false
+uid="uid://c0w1yc6j42r4e"
+path="res://.godot/imported/dinh_dien.png-84455c13d1ab57fa481487af984a6ceb.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/dinh_dien.png"
+dest_files=["res://.godot/imported/dinh_dien.png-84455c13d1ab57fa481487af984a6ceb.ctex"]
 
 [params]
 

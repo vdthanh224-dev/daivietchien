@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bi36qlf0mqoyu"
-valid=false
+uid="uid://cyan3lx8mr2r8"
+path="res://.godot/imported/tran_hoang.png-bfcb925f49eb20ca7254e8bee869e55c.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/tran_hoang.png"
+dest_files=["res://.godot/imported/tran_hoang.png-bfcb925f49eb20ca7254e8bee869e55c.ctex"]
 
 [params]
 

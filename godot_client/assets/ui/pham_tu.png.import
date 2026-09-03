@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cbxx66sfk6em5"
-valid=false
+uid="uid://cyqfidoouoyen"
+path="res://.godot/imported/pham_tu.png-2d6593ddb91ad02a580eb83ea106a542.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/pham_tu.png"
+dest_files=["res://.godot/imported/pham_tu.png-2d6593ddb91ad02a580eb83ea106a542.ctex"]
 
 [params]
 

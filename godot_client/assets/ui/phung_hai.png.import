@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dawhpv6sabe3i"
-valid=false
+uid="uid://cq7njp2o4xhqn"
+path="res://.godot/imported/phung_hai.png-f3e7d00ac118f5ed82ac8a036fd9f44b.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/phung_hai.png"
+dest_files=["res://.godot/imported/phung_hai.png-f3e7d00ac118f5ed82ac8a036fd9f44b.ctex"]
 
 [params]
 

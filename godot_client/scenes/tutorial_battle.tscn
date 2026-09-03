@@ -1,0 +1,240 @@
+[gd_scene load_steps=7 format=3 uid="uid://cl30vwxviw3w5"]
+
+[ext_resource type="Theme" uid="uid://d4af37royalgold" path="res://resources/themes/royal_gold_theme.tres" id="1_theme"]
+[ext_resource type="Script" path="res://scenes/tutorial_battle.gd" id="2_script"]
+[ext_resource type="Texture2D" uid="uid://7cvwr40xn6ig" path="res://assets/ui/login_background.png" id="3_bg"]
+[ext_resource type="PackedScene" uid="uid://cgeneralavatar123" path="res://scenes/components/general_avatar_ui.tscn" id="4_avatar"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_banner"]
+bg_color = Color(0.08, 0.11, 0.16, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.831373, 0.686275, 0.215686, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(0, 0, 0, 0.4)
+shadow_size = 8
+shadow_offset = Vector2(0, 4)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_showcase"]
+bg_color = Color(0.1, 0.08, 0.04, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.831373, 0.686275, 0.215686, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="TutorialBattle" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_theme")
+script = ExtResource("2_script")
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3_bg")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="DarkShade" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.03, 0.05, 0.09, 0.72)
+
+[node name="TutorialBanner" type="PanelContainer" parent="."]
+custom_minimum_size = Vector2(680, 100)
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -340.0
+offset_top = 16.0
+offset_right = 340.0
+offset_bottom = 120.0
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_banner")
+
+[node name="Margin" type="MarginContainer" parent="TutorialBanner"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="TutorialBanner/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="StepTitle" type="Label" parent="TutorialBanner/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.831373, 0.686275, 0.215686, 1)
+theme_override_font_sizes/font_size = 14
+text = "🌟 BƯỚC 1: LÀM QUEN TƯỚNG & MÁU HOA SEN"
+
+[node name="StepDesc" type="Label" parent="TutorialBanner/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.93, 0.98, 1)
+theme_override_font_sizes/font_size = 12
+text = "Sinh mệnh của chiến tướng thể hiện qua các đóa hoa sen. Khi hết máu, tướng sẽ rơi vào trạng thái Hấp Hối."
+autowrap_mode = 2
+
+[node name="HBox" type="HBoxContainer" parent="TutorialBanner/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 2
+
+[node name="SkipBtn" type="Button" parent="TutorialBanner/Margin/VBox/HBox"]
+layout_mode = 2
+text = "BỎ QUA HUẤN LUYỆN"
+
+[node name="NextStepBtn" type="Button" parent="TutorialBanner/Margin/VBox/HBox"]
+layout_mode = 2
+text = "TIẾP TỤC ➜"
+
+[node name="TableTop" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BossArea" type="Control" parent="TableTop"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -85.0
+offset_top = 135.0
+offset_right = 85.0
+offset_bottom = 365.0
+grow_horizontal = 2
+
+[node name="BossAvatar" parent="TableTop/BossArea" instance=ExtResource("4_avatar")]
+layout_mode = 1
+
+[node name="PlayerArea" type="Control" parent="TableTop"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 30.0
+offset_top = -250.0
+offset_right = 200.0
+offset_bottom = -20.0
+grow_vertical = 0
+
+[node name="PlayerAvatar" parent="TableTop/PlayerArea" instance=ExtResource("4_avatar")]
+layout_mode = 1
+
+[node name="HandCards" type="HBoxContainer" parent="TableTop"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -260.0
+offset_top = -170.0
+offset_right = 360.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="ActionPanel" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -160.0
+offset_top = -225.0
+offset_right = 260.0
+offset_bottom = -180.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="BtnPlay" type="Button" parent="ActionPanel"]
+layout_mode = 2
+disabled = true
+text = "⚔️ ĐÁNH BÀI"
+
+[node name="BtnEndTurn" type="Button" parent="ActionPanel"]
+layout_mode = 2
+disabled = true
+text = "🛑 KẾT THÚC LƯỢT"
+
+[node name="CenterArea" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -150.0
+offset_top = 10.0
+offset_right = 150.0
+offset_bottom = 80.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CardShowcase" type="PanelContainer" parent="CenterArea"]
+visible = false
+custom_minimum_size = Vector2(280, 50)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -140.0
+offset_top = -25.0
+offset_right = 140.0
+offset_bottom = 25.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_showcase")
+
+[node name="Margin" type="MarginContainer" parent="CenterArea/CardShowcase"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="VBox" type="VBoxContainer" parent="CenterArea/CardShowcase/Margin"]
+layout_mode = 2
+alignment = 1
+
+[node name="ShowcaseName" type="Label" parent="CenterArea/CardShowcase/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.85, 0.45, 1)
+theme_override_font_sizes/font_size = 13
+text = "Trần Hưng Đạo dùng [Trảm]!"
+horizontal_alignment = 1

@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ddte8nlm68q2g"
-valid=false
+uid="uid://cc1os03fan6je"
+path="res://.godot/imported/tran_due_tong.png-ffe0d75e8a3b22cc94fc1a93d074593b.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/tran_due_tong.png"
+dest_files=["res://.godot/imported/tran_due_tong.png-ffe0d75e8a3b22cc94fc1a93d074593b.ctex"]
 
 [params]
 

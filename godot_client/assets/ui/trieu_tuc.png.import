@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://5u4hwiveuxda"
-valid=false
+uid="uid://cgyib8hddh7f2"
+path="res://.godot/imported/trieu_tuc.png-b8e865ac0183cf9366e07abb24eda7e3.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/trieu_tuc.png"
+dest_files=["res://.godot/imported/trieu_tuc.png-b8e865ac0183cf9366e07abb24eda7e3.ctex"]
 
 [params]
 

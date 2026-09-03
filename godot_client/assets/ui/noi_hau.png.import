@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dclernqx7pg8f"
-valid=false
+uid="uid://b75xdtrb8u67x"
+path="res://.godot/imported/noi_hau.png-eeea6fe0543220f89952087640368f69.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/noi_hau.png"
+dest_files=["res://.godot/imported/noi_hau.png-eeea6fe0543220f89952087640368f69.ctex"]
 
 [params]
 

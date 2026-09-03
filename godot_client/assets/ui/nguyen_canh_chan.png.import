@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bsf6hljn70ej8"
-valid=false
+uid="uid://8ukkg4vgt6hw"
+path="res://.godot/imported/nguyen_canh_chan.png-cf48d6809c61820213bdbff8cf9583ed.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/nguyen_canh_chan.png"
+dest_files=["res://.godot/imported/nguyen_canh_chan.png-cf48d6809c61820213bdbff8cf9583ed.ctex"]
 
 [params]
 

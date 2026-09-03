@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cfdqn7e7pifne"
-valid=false
+uid="uid://dfi2si7cjfq37"
+path="res://.godot/imported/tong_dan.png-824c6f6dd334e9b4802620cc7f4b4839.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/tong_dan.png"
+dest_files=["res://.godot/imported/tong_dan.png-824c6f6dd334e9b4802620cc7f4b4839.ctex"]
 
 [params]
 

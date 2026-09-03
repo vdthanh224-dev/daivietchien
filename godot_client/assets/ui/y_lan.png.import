@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://d2v7enualghay"
-valid=false
+uid="uid://cwgd36ndyep8y"
+path="res://.godot/imported/y_lan.png-c7afe4e73863025be22105302c7e6484.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/y_lan.png"
+dest_files=["res://.godot/imported/y_lan.png-c7afe4e73863025be22105302c7e6484.ctex"]
 
 [params]
 

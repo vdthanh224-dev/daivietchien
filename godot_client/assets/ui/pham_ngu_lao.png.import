@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dgsrgkjp810gq"
-valid=false
+uid="uid://cw7qepdtk0do8"
+path="res://.godot/imported/pham_ngu_lao.png-48199c9ddfb5e8d54cbdc96df7e9c554.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/pham_ngu_lao.png"
+dest_files=["res://.godot/imported/pham_ngu_lao.png-48199c9ddfb5e8d54cbdc96df7e9c554.ctex"]
 
 [params]
 

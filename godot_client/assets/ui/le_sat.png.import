@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c6cs28it4bjvb"
-valid=false
+uid="uid://b24vsu02nsg4j"
+path="res://.godot/imported/le_sat.png-cb40cd28ed11d690fbefbf1352b92bdf.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/le_sat.png"
+dest_files=["res://.godot/imported/le_sat.png-cb40cd28ed11d690fbefbf1352b92bdf.ctex"]
 
 [params]
 

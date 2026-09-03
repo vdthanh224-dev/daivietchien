@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cvm5xdhx7rrgc"
-valid=false
+uid="uid://e1ya0o6vjnw7"
+path="res://.godot/imported/ha_dac.png-0d62dcf48d5033922113d90770dfe3f9.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/ha_dac.png"
+dest_files=["res://.godot/imported/ha_dac.png-0d62dcf48d5033922113d90770dfe3f9.ctex"]
 
 [params]
 

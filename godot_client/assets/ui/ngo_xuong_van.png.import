@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bo0oqskjav440"
-valid=false
+uid="uid://dk2mcv5esudc"
+path="res://.godot/imported/ngo_xuong_van.png-40555bc8eeb372116fd74aac2f181e80.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/ngo_xuong_van.png"
+dest_files=["res://.godot/imported/ngo_xuong_van.png-40555bc8eeb372116fd74aac2f181e80.ctex"]
 
 [params]
 

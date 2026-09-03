@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://br0x8g46p642o"
-valid=false
+uid="uid://1bys2r54x3vu"
+path="res://.godot/imported/truong_han_sieu.png-00fd632b870d5c9063ca83e1736307ba.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/truong_han_sieu.png"
+dest_files=["res://.godot/imported/truong_han_sieu.png-00fd632b870d5c9063ca83e1736307ba.ctex"]
 
 [params]
 

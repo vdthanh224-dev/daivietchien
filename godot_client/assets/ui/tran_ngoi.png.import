@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://me160xtrwhmi"
-valid=false
+uid="uid://cpxx37ncfd8vh"
+path="res://.godot/imported/tran_ngoi.png-43091118ec2d24737bdbde4c10460ec7.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/tran_ngoi.png"
+dest_files=["res://.godot/imported/tran_ngoi.png-43091118ec2d24737bdbde4c10460ec7.ctex"]
 
 [params]
 

@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cywlowhsnqhj6"
-valid=false
+uid="uid://d1s4u1fjik3r7"
+path="res://.godot/imported/than_canh_phuc.png-c5114067984add6bee2d1cada4ced522.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/than_canh_phuc.png"
+dest_files=["res://.godot/imported/than_canh_phuc.png-c5114067984add6bee2d1cada4ced522.ctex"]
 
 [params]
 

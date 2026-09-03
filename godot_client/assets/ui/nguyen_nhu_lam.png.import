@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://d1gvi4ccr1pw0"
-valid=false
+uid="uid://b2bpc7tx1k0lk"
+path="res://.godot/imported/nguyen_nhu_lam.png-aacd998aa7d05cbef016754aa609b60c.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/nguyen_nhu_lam.png"
+dest_files=["res://.godot/imported/nguyen_nhu_lam.png-aacd998aa7d05cbef016754aa609b60c.ctex"]
 
 [params]
 

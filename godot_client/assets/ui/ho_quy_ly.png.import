@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dgsq10phuuiej"
-valid=false
+uid="uid://y5hn4fii35bh"
+path="res://.godot/imported/ho_quy_ly.png-84b9e9c6819c7825b7f65766e46aa417.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/ho_quy_ly.png"
+dest_files=["res://.godot/imported/ho_quy_ly.png-84b9e9c6819c7825b7f65766e46aa417.ctex"]
 
 [params]
 

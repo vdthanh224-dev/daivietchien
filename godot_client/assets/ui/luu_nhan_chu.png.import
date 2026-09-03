@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bphvy8lntgmp4"
-valid=false
+uid="uid://bp4k4uyvnjob3"
+path="res://.godot/imported/luu_nhan_chu.png-59e636c4bcfd9e5d8528ea691e786345.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/luu_nhan_chu.png"
+dest_files=["res://.godot/imported/luu_nhan_chu.png-59e636c4bcfd9e5d8528ea691e786345.ctex"]
 
 [params]
 

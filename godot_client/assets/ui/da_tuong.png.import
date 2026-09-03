@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://su4w4jiv3m32"
-valid=false
+uid="uid://br2jrga5t8doq"
+path="res://.godot/imported/da_tuong.png-b45260ab410fe1d03f64e0662edfe99a.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/da_tuong.png"
+dest_files=["res://.godot/imported/da_tuong.png-b45260ab410fe1d03f64e0662edfe99a.ctex"]
 
 [params]
 

@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bjrre6b1605hu"
-valid=false
+uid="uid://c1mji38ya7prx"
+path="res://.godot/imported/le_lai.png-bacce5c34a58f5c4de65ea3051c4540e.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/le_lai.png"
+dest_files=["res://.godot/imported/le_lai.png-bacce5c34a58f5c4de65ea3051c4540e.ctex"]
 
 [params]
 

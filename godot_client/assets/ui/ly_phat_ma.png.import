@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cw00isqs7hn1r"
-valid=false
+uid="uid://cjbo2u8bitcji"
+path="res://.godot/imported/ly_phat_ma.png-329d89fd3f258411437dccc24bf4a39a.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/ly_phat_ma.png"
+dest_files=["res://.godot/imported/ly_phat_ma.png-329d89fd3f258411437dccc24bf4a39a.ctex"]
 
 [params]
 

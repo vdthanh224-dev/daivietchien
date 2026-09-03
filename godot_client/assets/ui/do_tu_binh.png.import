@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dg62nlawpwyub"
-valid=false
+uid="uid://di2gm4owisa6"
+path="res://.godot/imported/do_tu_binh.png-b6aeae247914552adafadc77ff05b9c8.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/do_tu_binh.png"
+dest_files=["res://.godot/imported/do_tu_binh.png-b6aeae247914552adafadc77ff05b9c8.ctex"]
 
 [params]
 

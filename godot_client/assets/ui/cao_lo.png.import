@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b1fcfeocqkd2n"
-valid=false
+uid="uid://vqnbh8v21yi6"
+path="res://.godot/imported/cao_lo.png-b4d7fc21538d2afd33d39f81bf2370fe.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/cao_lo.png"
+dest_files=["res://.godot/imported/cao_lo.png-b4d7fc21538d2afd33d39f81bf2370fe.ctex"]
 
 [params]
 

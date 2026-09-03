@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ftt5b8l7j5mj"
-valid=false
+uid="uid://b4prf7ujm4c45"
+path="res://.godot/imported/mac_dinh_chi.png-9b7e24f5ed54af405f72ec8bc239d4c7.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/mac_dinh_chi.png"
+dest_files=["res://.godot/imported/mac_dinh_chi.png-9b7e24f5ed54af405f72ec8bc239d4c7.ctex"]
 
 [params]
 

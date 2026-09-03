@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b7dxru454ycqa"
-valid=false
+uid="uid://djytr0bve54wa"
+path="res://.godot/imported/nguyen_chich.png-2c539118187380b21ba60efc8e827d8e.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/nguyen_chich.png"
+dest_files=["res://.godot/imported/nguyen_chich.png-2c539118187380b21ba60efc8e827d8e.ctex"]
 
 [params]
 

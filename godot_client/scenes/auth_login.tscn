@@ -279,3 +279,7 @@ text = "Tướng 8"
 [node name="Quick9" type="Button" parent="QuickLoginBar/Margin/HBox"]
 layout_mode = 2
 text = "Tướng 9"
+
+[node name="BtnTutorialDirect" type="Button" parent="QuickLoginBar/Margin/HBox"]
+layout_mode = 2
+text = "🎓 TẬP HUẤN TÂN THỦ"

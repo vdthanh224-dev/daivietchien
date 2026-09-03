@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://do16bktctc6o8"
-valid=false
+uid="uid://dovqmtb5euhu7"
+path="res://.godot/imported/tran_thi_kien.png-1b94c72427d169d21d36a6030b7c90d7.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/tran_thi_kien.png"
+dest_files=["res://.godot/imported/tran_thi_kien.png-1b94c72427d169d21d36a6030b7c90d7.ctex"]
 
 [params]
 

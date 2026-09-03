@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b04wnurisdron"
-valid=false
+uid="uid://dy4c38xh60xbu"
+path="res://.godot/imported/yet_kieu.png-539644f29373d78ff3ada0d8321ee176.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/yet_kieu.png"
+dest_files=["res://.godot/imported/yet_kieu.png-539644f29373d78ff3ada0d8321ee176.ctex"]
 
 [params]
 

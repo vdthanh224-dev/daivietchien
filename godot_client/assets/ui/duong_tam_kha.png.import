@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bx7wl58yt2jq8"
-valid=false
+uid="uid://bx2i7uy1d78cr"
+path="res://.godot/imported/duong_tam_kha.png-92bde9f0722310574813502987828873.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/duong_tam_kha.png"
+dest_files=["res://.godot/imported/duong_tam_kha.png-92bde9f0722310574813502987828873.ctex"]
 
 [params]
 

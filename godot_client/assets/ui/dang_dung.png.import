@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cds83pjysx8up"
-valid=false
+uid="uid://qpefpj3ghwsn"
+path="res://.godot/imported/dang_dung.png-1726ca3cbec4495b2e217a5c14377b23.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/dang_dung.png"
+dest_files=["res://.godot/imported/dang_dung.png-1726ca3cbec4495b2e217a5c14377b23.ctex"]
 
 [params]
 

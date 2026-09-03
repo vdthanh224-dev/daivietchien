@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dbi3upmk53xqe"
-valid=false
+uid="uid://3fo11gl512b1"
+path="res://.godot/imported/doan_nhu_hai.png-49e9aa68c8cd2d9065f28d859f48eba8.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/doan_nhu_hai.png"
+dest_files=["res://.godot/imported/doan_nhu_hai.png-49e9aa68c8cd2d9065f28d859f48eba8.ctex"]
 
 [params]
 

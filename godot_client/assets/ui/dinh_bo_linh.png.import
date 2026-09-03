@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ch4gh1a6crech"
-valid=false
+uid="uid://dkq8qx3tj568e"
+path="res://.godot/imported/dinh_bo_linh.png-7be292a3d2515a9fcdeda0f78d795650.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/dinh_bo_linh.png"
+dest_files=["res://.godot/imported/dinh_bo_linh.png-7be292a3d2515a9fcdeda0f78d795650.ctex"]
 
 [params]
 

@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://btc5qhnf08huw"
-valid=false
+uid="uid://bb8i0hokfspe2"
+path="res://.godot/imported/ly_bi.png-3c2f7561a149dc506eee9eab04dded14.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/ly_bi.png"
+dest_files=["res://.godot/imported/ly_bi.png-3c2f7561a149dc506eee9eab04dded14.ctex"]
 
 [params]
 

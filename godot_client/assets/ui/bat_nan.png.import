@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cdoawvvhxvwwe"
-valid=false
+uid="uid://c2t2focn2h0ys"
+path="res://.godot/imported/bat_nan.png-9750bec52be4a4b801dbc65886f04d42.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/bat_nan.png"
+dest_files=["res://.godot/imported/bat_nan.png-9750bec52be4a4b801dbc65886f04d42.ctex"]
 
 [params]
 

@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dlmo7ubi1jt4c"
-valid=false
+uid="uid://oh6tnc6wxeb8"
+path="res://.godot/imported/dao_han.png-066601c1275c63bfe17b288e00cc4705.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/dao_han.png"
+dest_files=["res://.godot/imported/dao_han.png-066601c1275c63bfe17b288e00cc4705.ctex"]
 
 [params]
 

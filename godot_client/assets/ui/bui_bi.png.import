@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bg3v3md21770i"
-valid=false
+uid="uid://c4csaph7ho2os"
+path="res://.godot/imported/bui_bi.png-367211355a33c106d0743c00576d84a0.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/bui_bi.png"
+dest_files=["res://.godot/imported/bui_bi.png-367211355a33c106d0743c00576d84a0.ctex"]
 
 [params]
 

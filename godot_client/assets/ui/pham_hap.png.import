@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://617if5dx72g4"
-valid=false
+uid="uid://buq8h40vxjba5"
+path="res://.godot/imported/pham_hap.png-70d687e457bd3e972febc17bbb1c33b9.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/pham_hap.png"
+dest_files=["res://.godot/imported/pham_hap.png-70d687e457bd3e972febc17bbb1c33b9.ctex"]
 
 [params]
 

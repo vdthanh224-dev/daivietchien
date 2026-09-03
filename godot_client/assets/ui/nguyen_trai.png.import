@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ymwincaosujt"
-valid=false
+uid="uid://c6n24ouvn31og"
+path="res://.godot/imported/nguyen_trai.png-3a372fda504c548d208706df5990e0a9.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/nguyen_trai.png"
+dest_files=["res://.godot/imported/nguyen_trai.png-3a372fda504c548d208706df5990e0a9.ctex"]
 
 [params]
 

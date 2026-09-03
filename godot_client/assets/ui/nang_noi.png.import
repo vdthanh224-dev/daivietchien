@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://x725gbw187xi"
-valid=false
+uid="uid://5k6pvipejg7s"
+path="res://.godot/imported/nang_noi.png-9f127865c9034b855144e25bc01bf51d.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/nang_noi.png"
+dest_files=["res://.godot/imported/nang_noi.png-9f127865c9034b855144e25bc01bf51d.ctex"]
 
 [params]
 

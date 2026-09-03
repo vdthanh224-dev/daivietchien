@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cuuvr8i1g4lxx"
-valid=false
+uid="uid://bgwbbl7gqp1k5"
+path="res://.godot/imported/nguyen_sieu.png-1bb69adf012dd260acf36a7f71a45144.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/nguyen_sieu.png"
+dest_files=["res://.godot/imported/nguyen_sieu.png-1bb69adf012dd260acf36a7f71a45144.ctex"]
 
 [params]
 

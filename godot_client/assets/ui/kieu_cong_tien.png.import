@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dilte3vuhcbld"
-valid=false
+uid="uid://ciqn3msg1pvt5"
+path="res://.godot/imported/kieu_cong_tien.png-cef6229bae6481cdcc1739fdd8ff1f3b.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/kieu_cong_tien.png"
+dest_files=["res://.godot/imported/kieu_cong_tien.png-cef6229bae6481cdcc1739fdd8ff1f3b.ctex"]
 
 [params]
 

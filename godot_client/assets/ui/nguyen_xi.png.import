@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://d1myj5eqlopws"
-valid=false
+uid="uid://beouhidsgav8c"
+path="res://.godot/imported/nguyen_xi.png-621a92b470735dd7d7c9637cf138e8e2.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/nguyen_xi.png"
+dest_files=["res://.godot/imported/nguyen_xi.png-621a92b470735dd7d7c9637cf138e8e2.ctex"]
 
 [params]
 

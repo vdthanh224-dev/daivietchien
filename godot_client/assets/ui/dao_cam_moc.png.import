@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bmjjc3176d4dr"
-valid=false
+uid="uid://dsqsioh8y87lt"
+path="res://.godot/imported/dao_cam_moc.png-ec9d56b4aff12a16d1558ebfaa69540a.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/dao_cam_moc.png"
+dest_files=["res://.godot/imported/dao_cam_moc.png-ec9d56b4aff12a16d1558ebfaa69540a.ctex"]
 
 [params]
 

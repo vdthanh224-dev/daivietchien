@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cn5606aulswey"
-valid=false
+uid="uid://dqqo1pi3l0mcf"
+path="res://.godot/imported/tran_lieu.png-6d0320a3273bcd93fcaea3d400c17434.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/tran_lieu.png"
+dest_files=["res://.godot/imported/tran_lieu.png-6d0320a3273bcd93fcaea3d400c17434.ctex"]
 
 [params]
 

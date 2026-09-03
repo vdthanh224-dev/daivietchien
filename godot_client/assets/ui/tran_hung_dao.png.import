@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://djkobldin8kbb"
-valid=false
+uid="uid://ukce7sxrpv2x"
+path="res://.godot/imported/tran_hung_dao.png-040a20181be5df4156d3325464d10299.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/tran_hung_dao.png"
+dest_files=["res://.godot/imported/tran_hung_dao.png-040a20181be5df4156d3325464d10299.ctex"]
 
 [params]
 

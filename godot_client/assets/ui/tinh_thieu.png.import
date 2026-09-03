@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://doypavvot121u"
-valid=false
+uid="uid://gyvndy4ov2ne"
+path="res://.godot/imported/tinh_thieu.png-64b9700830b3b1fdd5bf1179f0c1d447.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/tinh_thieu.png"
+dest_files=["res://.godot/imported/tinh_thieu.png-64b9700830b3b1fdd5bf1179f0c1d447.ctex"]
 
 [params]
 

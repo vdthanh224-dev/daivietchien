@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://g2mqcjxooda0"
-valid=false
+uid="uid://cjlmp1xrj2gn4"
+path="res://.godot/imported/tran_quoc_toan.png-ea916514945c5b7e627ba6dca647f005.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/tran_quoc_toan.png"
+dest_files=["res://.godot/imported/tran_quoc_toan.png-ea916514945c5b7e627ba6dca647f005.ctex"]
 
 [params]
 

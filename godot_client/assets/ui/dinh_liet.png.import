@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://caw3uxmh3ldg5"
-valid=false
+uid="uid://bbiomty0d3o8s"
+path="res://.godot/imported/dinh_liet.png-1a020d86f2d73e857fef2d244a22e7e3.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/dinh_liet.png"
+dest_files=["res://.godot/imported/dinh_liet.png-1a020d86f2d73e857fef2d244a22e7e3.ctex"]
 
 [params]
 

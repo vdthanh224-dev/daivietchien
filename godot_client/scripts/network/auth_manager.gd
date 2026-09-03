@@ -236,6 +236,43 @@ func save_session() -> void:
 		}
 		file.store_string(JSON.stringify(data))
 
+func should_show_onboarding() -> bool:
+	if current_user_email == "": return false
+	var key = "onboarding_" + current_user_email
+	if FileAccess.file_exists(SAVE_PATH):
+		var file = FileAccess.open(SAVE_PATH, FileAccess.READ)
+		if file:
+			var json = JSON.new()
+			if json.parse(file.get_as_text()) == OK:
+				var data = json.get_data()
+				if data is Dictionary and data.get(key, 0) == 2:
+					return false
+	return true
+
+func set_onboarding_done() -> void:
+	if current_user_email == "": return
+	var key = "onboarding_" + current_user_email
+	var data = {
+		"name": current_user_name,
+		"email": current_user_email,
+		"userId": current_user_id,
+		"secret": session_secret,
+		"cookie": session_cookie
+	}
+	if FileAccess.file_exists(SAVE_PATH):
+		var file = FileAccess.open(SAVE_PATH, FileAccess.READ)
+		if file:
+			var json = JSON.new()
+			if json.parse(file.get_as_text()) == OK:
+				var d = json.get_data()
+				if d is Dictionary:
+					for k in d:
+						data[k] = d[k]
+	data[key] = 2
+	var wfile = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if wfile:
+		wfile.store_string(JSON.stringify(data))
+
 func load_saved_session() -> void:
 	if FileAccess.file_exists(SAVE_PATH):
 		var file = FileAccess.open(SAVE_PATH, FileAccess.READ)

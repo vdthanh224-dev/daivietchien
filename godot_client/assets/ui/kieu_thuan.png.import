@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c1akn73lel6vt"
-valid=false
+uid="uid://dryig5rnxsfsa"
+path="res://.godot/imported/kieu_thuan.png-0d1910a259d75ea00525e1e9919a9d6b.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/kieu_thuan.png"
+dest_files=["res://.godot/imported/kieu_thuan.png-0d1910a259d75ea00525e1e9919a9d6b.ctex"]
 
 [params]
 

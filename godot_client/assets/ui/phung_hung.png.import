@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://tclfrfymy173"
-valid=false
+uid="uid://bboq2u2p72soj"
+path="res://.godot/imported/phung_hung.png-9859434361decb8301aff03a09011f57.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/phung_hung.png"
+dest_files=["res://.godot/imported/phung_hung.png-9859434361decb8301aff03a09011f57.ctex"]
 
 [params]
 

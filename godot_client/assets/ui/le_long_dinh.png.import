@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bscwvodtaxef3"
-valid=false
+uid="uid://cmylodlvbwv2i"
+path="res://.godot/imported/le_long_dinh.png-5ae4516c7106df3440b54b5aa193daad.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/le_long_dinh.png"
+dest_files=["res://.godot/imported/le_long_dinh.png-5ae4516c7106df3440b54b5aa193daad.ctex"]
 
 [params]
 

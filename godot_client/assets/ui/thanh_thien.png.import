@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ciq7e1pe1162y"
-valid=false
+uid="uid://dg5ow1cgpvnf0"
+path="res://.godot/imported/thanh_thien.png-b1238cd2dfcc1d776f732061d0d89a96.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/thanh_thien.png"
+dest_files=["res://.godot/imported/thanh_thien.png-b1238cd2dfcc1d776f732061d0d89a96.ctex"]
 
 [params]
 

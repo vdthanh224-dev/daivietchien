@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c0esfn05tn3oh"
-valid=false
+uid="uid://bg7prih8vk2nk"
+path="res://.godot/imported/mai_thuc_loan.png-e079ea40e842246d45606025fc3ea1a1.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/mai_thuc_loan.png"
+dest_files=["res://.godot/imported/mai_thuc_loan.png-e079ea40e842246d45606025fc3ea1a1.ctex"]
 
 [params]
 

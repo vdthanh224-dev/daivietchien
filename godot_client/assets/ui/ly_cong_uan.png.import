@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cm76uscg7diy6"
-valid=false
+uid="uid://d4dm3dbf8k251"
+path="res://.godot/imported/ly_cong_uan.png-f3aa60cde5172d4b5158226a8daad40e.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/ly_cong_uan.png"
+dest_files=["res://.godot/imported/ly_cong_uan.png-f3aa60cde5172d4b5158226a8daad40e.ctex"]
 
 [params]
 

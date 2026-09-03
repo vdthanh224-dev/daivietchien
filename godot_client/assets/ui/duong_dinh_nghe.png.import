@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bxmiuniu1ra5f"
-valid=false
+uid="uid://cwt8kkthib3nh"
+path="res://.godot/imported/duong_dinh_nghe.png-a4da47f846513df1d398a16bf3b20bb6.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/duong_dinh_nghe.png"
+dest_files=["res://.godot/imported/duong_dinh_nghe.png-a4da47f846513df1d398a16bf3b20bb6.ctex"]
 
 [params]
 

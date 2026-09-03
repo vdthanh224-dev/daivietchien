@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bihk57q4jbxvp"
-valid=false
+uid="uid://3kdxmbtx2e25"
+path="res://.godot/imported/dinh_lien.png-c983f5d830ade684a79d0396befb16db.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/dinh_lien.png"
+dest_files=["res://.godot/imported/dinh_lien.png-c983f5d830ade684a79d0396befb16db.ctex"]
 
 [params]
 

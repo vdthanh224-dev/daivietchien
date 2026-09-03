@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b332gsexkf6uv"
-valid=false
+uid="uid://c41wjwh1hwslu"
+path="res://.godot/imported/ngo_quyen.png-4ac9d487fc5d27d5882f003c673043f4.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/ngo_quyen.png"
+dest_files=["res://.godot/imported/ngo_quyen.png-4ac9d487fc5d27d5882f003c673043f4.ctex"]
 
 [params]
 

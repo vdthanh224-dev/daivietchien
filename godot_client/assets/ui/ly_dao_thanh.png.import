@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cj7sde17d0ei7"
-valid=false
+uid="uid://d4cit57rfxdl5"
+path="res://.godot/imported/ly_dao_thanh.png-e62ad88a9cec47f02a4ea6fb8c0d657b.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/ly_dao_thanh.png"
+dest_files=["res://.godot/imported/ly_dao_thanh.png-e62ad88a9cec47f02a4ea6fb8c0d657b.ctex"]
 
 [params]
 

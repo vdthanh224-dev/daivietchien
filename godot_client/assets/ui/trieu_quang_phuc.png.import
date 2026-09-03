@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cnyrkdcgxkvgv"
-valid=false
+uid="uid://c0iedl2365vis"
+path="res://.godot/imported/trieu_quang_phuc.png-9d1377b7e02927cf6f010a67b0189472.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/trieu_quang_phuc.png"
+dest_files=["res://.godot/imported/trieu_quang_phuc.png-9d1377b7e02927cf6f010a67b0189472.ctex"]
 
 [params]
 

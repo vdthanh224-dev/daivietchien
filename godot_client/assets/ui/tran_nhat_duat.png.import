@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://53op7u5tit5t"
-valid=false
+uid="uid://b11805btmx4pp"
+path="res://.godot/imported/tran_nhat_duat.png-00275d36b451817ca4590123fa4a57e3.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/tran_nhat_duat.png"
+dest_files=["res://.godot/imported/tran_nhat_duat.png-00275d36b451817ca4590123fa4a57e3.ctex"]
 
 [params]
 

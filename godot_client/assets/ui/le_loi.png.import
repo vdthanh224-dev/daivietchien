@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bh5o1st1l772j"
-valid=false
+uid="uid://bmmoglbou7cpr"
+path="res://.godot/imported/le_loi.png-90c5628333b4adbf9ee117bc70b9ee5e.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/le_loi.png"
+dest_files=["res://.godot/imported/le_loi.png-90c5628333b4adbf9ee117bc70b9ee5e.ctex"]
 
 [params]
 

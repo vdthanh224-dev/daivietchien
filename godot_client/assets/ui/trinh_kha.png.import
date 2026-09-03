@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bqn4uavuww8ib"
-valid=false
+uid="uid://bqy6hmjlnlbn1"
+path="res://.godot/imported/trinh_kha.png-99821e91f6f1164ed73cea2d26eec13d.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/trinh_kha.png"
+dest_files=["res://.godot/imported/trinh_kha.png-99821e91f6f1164ed73cea2d26eec13d.ctex"]
 
 [params]
 

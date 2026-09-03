@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c4f4wbyddp6m4"
-valid=false
+uid="uid://b0giv24hf8qlb"
+path="res://.godot/imported/khuc_thua_du.png-88543fa489ae1c7c8137f3dcc36fd108.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/khuc_thua_du.png"
+dest_files=["res://.godot/imported/khuc_thua_du.png-88543fa489ae1c7c8137f3dcc36fd108.ctex"]
 
 [params]
 

@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cvgdg42a4ek37"
-valid=false
+uid="uid://dw2yk0tusxdjc"
+path="res://.godot/imported/to_hien_thanh.png-80f4760069f6b4c533e2cfb072f51512.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/to_hien_thanh.png"
+dest_files=["res://.godot/imported/to_hien_thanh.png-80f4760069f6b4c533e2cfb072f51512.ctex"]
 
 [params]
 

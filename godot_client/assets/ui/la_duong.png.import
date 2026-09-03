@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bhnb6quw2woa5"
-valid=false
+uid="uid://cilv50opu1m0a"
+path="res://.godot/imported/la_duong.png-5a9d221847a1af0eaa8c4ee2164c3316.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/ui/la_duong.png"
+dest_files=["res://.godot/imported/la_duong.png-5a9d221847a1af0eaa8c4ee2164c3316.ctex"]
 
 [params]
 
