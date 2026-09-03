@@ -38,6 +38,35 @@ func set_skill(skill_title: String) -> void:
 func set_target_highlight(active: bool) -> void:
 	if target_border:
 		target_border.visible = active
+		if active:
+			var tw = create_tween().set_loops(4)
+			tw.tween_property(target_border, "border_color", Color(1, 1, 0.5, 1), 0.2)
+			tw.tween_property(target_border, "border_color", Color(1, 0.7, 0.1, 1), 0.2)
+
+func play_damage_effect() -> void:
+	var orig_pos = position
+	var tw = create_tween()
+	tw.tween_property(portrait_rect, "modulate", Color(2.2, 0.35, 0.35, 1.0), 0.08)
+	tw.tween_property(portrait_rect, "modulate", Color.WHITE, 0.25)
+
+	var shake_tw = create_tween()
+	shake_tw.tween_property(self, "position:x", orig_pos.x - 10.0, 0.05)
+	shake_tw.tween_property(self, "position:x", orig_pos.x + 10.0, 0.05)
+	shake_tw.tween_property(self, "position:x", orig_pos.x - 5.0, 0.05)
+	shake_tw.tween_property(self, "position:x", orig_pos.x, 0.05)
+
+func spawn_damage_number(amount: int) -> void:
+	var lbl = Label.new()
+	lbl.text = "-%d 🌸" % amount
+	lbl.add_theme_font_size_override("font_size", 24)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2, 1.0))
+	lbl.position = Vector2(size.x * 0.5 - 32, size.y * 0.5 - 25)
+	lbl.z_index = 50
+	add_child(lbl)
+	var tw = create_tween().set_parallel(true)
+	tw.tween_property(lbl, "position:y", lbl.position.y - 60.0, 0.75).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(lbl, "modulate:a", 0.0, 0.75)
+	tw.chain().tween_callback(lbl.queue_free)
 
 func set_faction_color(color: Color) -> void:
 	if faction_badge:

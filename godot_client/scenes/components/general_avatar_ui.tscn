@@ -1,62 +1,100 @@
-[gd_scene load_steps=8 format=3 uid="uid://cgeneralavatar123"]
+[gd_scene load_steps=10 format=3 uid="uid://cgeneralavatar123"]
 
 [ext_resource type="Theme" uid="uid://d4af37royalgold" path="res://resources/themes/royal_gold_theme.tres" id="1_theme"]
 [ext_resource type="Script" path="res://scenes/components/general_avatar_ui.gd" id="2_script"]
 [ext_resource type="Texture2D" uid="uid://c332mcgi33wje" path="res://assets/ui/game_avatar.png" id="4_avatar_def"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_avatar_bg"]
-bg_color = Color(0.97, 0.955, 0.92, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.831373, 0.686275, 0.215686, 1)
+bg_color = Color(0.12, 0.09, 0.07, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.9, 0.75, 0.28, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+shadow_color = Color(0.9, 0.7, 0.2, 0.45)
+shadow_size = 10
+shadow_offset = Vector2(0, 4)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_inner_rim"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.9, 0.55, 0.5)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
-shadow_color = Color(0, 0, 0, 0.35)
-shadow_size = 5
-shadow_offset = Vector2(0, 3)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_top_banner"]
-bg_color = Color(0.08, 0.11, 0.18, 0.95)
+bg_color = Color(0.07, 0.09, 0.15, 0.96)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.831373, 0.686275, 0.215686, 1)
-corner_radius_top_left = 5
-corner_radius_top_right = 5
-corner_radius_bottom_right = 5
-corner_radius_bottom_left = 5
+border_color = Color(0.9, 0.75, 0.28, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+shadow_color = Color(0, 0, 0, 0.5)
+shadow_size = 3
+shadow_offset = Vector2(0, 2)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bottom_banner"]
-bg_color = Color(0.06, 0.08, 0.14, 0.95)
+bg_color = Color(0.06, 0.08, 0.14, 0.96)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.831373, 0.686275, 0.215686, 0.9)
-corner_radius_top_left = 5
-corner_radius_top_right = 5
-corner_radius_bottom_right = 5
-corner_radius_bottom_left = 5
+border_color = Color(0.9, 0.75, 0.28, 0.95)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+shadow_color = Color(0, 0, 0, 0.5)
+shadow_size = 3
+shadow_offset = Vector2(0, -2)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_badge"]
-bg_color = Color(0.04, 0.06, 0.1, 0.9)
-corner_radius_top_left = 3
-corner_radius_top_right = 3
-corner_radius_bottom_right = 3
-corner_radius_bottom_left = 3
+bg_color = Color(0.05, 0.07, 0.12, 0.92)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.85, 0.7, 0.25, 0.8)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_skill_btn"]
+bg_color = Color(0.1, 0.14, 0.22, 0.96)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.85, 0.35, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+shadow_color = Color(0, 0, 0, 0.4)
+shadow_size = 4
+shadow_offset = Vector2(0, 2)
 
 [node name="GeneralAvatarUI" type="Control"]
-custom_minimum_size = Vector2(170, 235)
+custom_minimum_size = Vector2(174, 238)
 layout_mode = 3
 anchors_preset = 0
-offset_right = 170.0
-offset_bottom = 235.0
-pivot_offset = Vector2(85, 117)
+offset_right = 174.0
+offset_bottom = 238.0
+pivot_offset = Vector2(87, 119)
 theme = ExtResource("1_theme")
 script = ExtResource("2_script")
 
@@ -83,15 +121,90 @@ texture = ExtResource("4_avatar_def")
 expand_mode = 1
 stretch_mode = 6
 
+[node name="InnerRim" type="Panel" parent="Frame"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 3.0
+offset_top = 3.0
+offset_right = -3.0
+offset_bottom = -3.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_inner_rim")
+
+[node name="CornerTL" type="Label" parent="Frame"]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 3.0
+offset_right = 18.0
+offset_bottom = 19.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.4, 0.8)
+theme_override_font_sizes/font_size = 9
+text = "❖"
+
+[node name="CornerTR" type="Label" parent="Frame"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -16.0
+offset_top = 3.0
+offset_right = -2.0
+offset_bottom = 19.0
+grow_horizontal = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.4, 0.8)
+theme_override_font_sizes/font_size = 9
+text = "❖"
+horizontal_alignment = 2
+
+[node name="CornerBL" type="Label" parent="Frame"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = -20.0
+offset_right = 18.0
+offset_bottom = -4.0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.4, 0.8)
+theme_override_font_sizes/font_size = 9
+text = "❖"
+
+[node name="CornerBR" type="Label" parent="Frame"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -16.0
+offset_top = -20.0
+offset_right = -2.0
+offset_bottom = -4.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.4, 0.8)
+theme_override_font_sizes/font_size = 9
+text = "❖"
+horizontal_alignment = 2
+
 [node name="TopBanner" type="PanelContainer" parent="Frame"]
-custom_minimum_size = Vector2(0, 32)
+custom_minimum_size = Vector2(0, 30)
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_left = 4.0
-offset_top = 4.0
-offset_right = -4.0
-offset_bottom = 36.0
+offset_left = 5.0
+offset_top = 5.0
+offset_right = -5.0
+offset_bottom = 35.0
 grow_horizontal = 2
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_top_banner")
@@ -121,23 +234,23 @@ vertical_alignment = 1
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
-theme_override_colors/font_color = Color(1, 0.9, 0.55, 1)
+theme_override_colors/font_color = Color(1, 0.92, 0.58, 1)
 theme_override_font_sizes/font_size = 12
 text = "Lý Thường Kiệt"
 horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="BottomBanner" type="PanelContainer" parent="Frame"]
-custom_minimum_size = Vector2(0, 30)
+custom_minimum_size = Vector2(0, 28)
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 4.0
-offset_top = -34.0
-offset_right = -4.0
-offset_bottom = -4.0
+offset_left = 5.0
+offset_top = -33.0
+offset_right = -5.0
+offset_bottom = -5.0
 grow_horizontal = 2
 grow_vertical = 0
 mouse_filter = 2
@@ -181,10 +294,10 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -46.0
-offset_top = -62.0
+offset_left = -44.0
+offset_top = -58.0
 offset_right = -6.0
-offset_bottom = -40.0
+offset_bottom = -38.0
 grow_horizontal = 0
 grow_vertical = 0
 mouse_filter = 2
@@ -218,12 +331,22 @@ editor_only = false
 [node name="SkillBtn" type="Button" parent="."]
 visible = false
 layout_mode = 1
-anchors_preset = 0
-offset_left = -92.0
-offset_top = 50.0
-offset_right = -6.0
-offset_bottom = 90.0
-theme_override_font_sizes/font_size = 11
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = -105.0
+offset_top = -32.0
+offset_right = -5.0
+offset_bottom = -2.0
+grow_vertical = 0
+theme_override_font_sizes/font_size = 10
+theme_override_styles/normal = SubResource("StyleBoxFlat_skill_btn")
+theme_override_styles/hover = SubResource("StyleBoxFlat_skill_btn")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_skill_btn")
+theme_override_colors/font_color = Color(1, 0.9, 0.55, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 0.8, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.85, 0.35, 1)
+theme_override_colors/font_focus_color = Color(1, 0.9, 0.55, 1)
 text = "⚡ TIẾN THOÁI"
 
 [node name="ClickBtn" type="Button" parent="."]

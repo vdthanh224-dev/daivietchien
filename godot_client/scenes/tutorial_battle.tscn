@@ -242,7 +242,7 @@ text = "• Bắt đầu trận chiến hướng dẫn."
 scroll_following = true
 
 [node name="CardDescBar" type="PanelContainer" parent="TableTop"]
-custom_minimum_size = Vector2(650, 38)
+custom_minimum_size = Vector2(650, 42)
 layout_mode = 1
 anchors_preset = 7
 anchor_left = 0.5
@@ -250,27 +250,43 @@ anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
 offset_left = -440.0
-offset_top = -225.0
+offset_top = -228.0
 offset_right = 210.0
-offset_bottom = -187.0
+offset_bottom = -186.0
 grow_horizontal = 2
 grow_vertical = 0
-mouse_filter = 2
+mouse_filter = 1
 theme_override_styles/panel = SubResource("StyleBoxFlat_desc_bar")
 
 [node name="Margin" type="MarginContainer" parent="TableTop/CardDescBar"]
 layout_mode = 2
-mouse_filter = 2
+mouse_filter = 1
 theme_override_constants/margin_left = 12
-theme_override_constants/margin_right = 12
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 4
 
-[node name="DescText" type="Label" parent="TableTop/CardDescBar/Margin"]
+[node name="HBox" type="HBoxContainer" parent="TableTop/CardDescBar/Margin"]
 layout_mode = 2
+mouse_filter = 1
+theme_override_constants/separation = 10
+
+[node name="DescText" type="Label" parent="TableTop/CardDescBar/Margin/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
 mouse_filter = 2
-theme_override_colors/font_color = Color(0.9, 0.94, 1, 1)
+theme_override_colors/font_color = Color(0.92, 0.95, 1, 1)
 theme_override_font_sizes/font_size = 11
 text = "💡 Chạm chọn một lá bài trên tay để xem mô tả & sử dụng..."
 vertical_alignment = 1
+
+[node name="CardPlayBtn" type="Button" parent="TableTop/CardDescBar/Margin/HBox"]
+visible = false
+custom_minimum_size = Vector2(175, 32)
+layout_mode = 2
+mouse_filter = 0
+theme_override_font_sizes/font_size = 11
+text = "⚔️ DÙNG BÀI ➜ SƠN TẶC"
 
 [node name="HandCards" type="HBoxContainer" parent="TableTop"]
 layout_mode = 1

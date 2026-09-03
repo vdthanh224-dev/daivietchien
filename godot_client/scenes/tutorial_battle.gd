@@ -5,7 +5,8 @@ extends Control
 @onready var hand_container = $TableTop/HandCards
 @onready var deck_label: Label = $TableTop/DeckHUD/DeckPlaque/DeckLabel
 @onready var log_text: RichTextLabel = $TableTop/LogPanel/Margin/VBox/Scroll/LogText
-@onready var desc_text: Label = $TableTop/CardDescBar/Margin/DescText
+@onready var desc_text: Label = $TableTop/CardDescBar/Margin/HBox/DescText
+@onready var card_play_btn: Button = $TableTop/CardDescBar/Margin/HBox/CardPlayBtn
 
 @onready var banner: PanelContainer = $TutorialBanner
 @onready var banner_title: Label = $TutorialBanner/Margin/VBox/StepTitle
@@ -48,6 +49,7 @@ func _ready() -> void:
 	# 3. Kết nối các nút
 	start_tutorial_btn.pressed.connect(_on_close_health_spotlight)
 	action_btn.pressed.connect(_on_action_btn_clicked)
+	card_play_btn.pressed.connect(_on_card_play_btn_clicked)
 	claim_reward_btn.pressed.connect(_on_claim_reward_clicked)
 
 	# 4. Hiển thị Bước 1: Máu hoa sen
@@ -55,6 +57,7 @@ func _ready() -> void:
 	reward_modal.visible = false
 	arrow_node.visible = false
 	center_showcase.visible = false
+	card_play_btn.visible = false
 
 	_add_log("• Trận chiến huấn luyện khởi động.")
 
@@ -80,6 +83,7 @@ func _ready() -> void:
 		if hand_container.get_child_count() > 0:
 			var c = hand_container.get_child(0)
 			c.set_selected(true)
+			_on_boss_avatar_clicked()
 		await get_tree().process_frame
 		await get_tree().process_frame
 		var img = get_viewport().get_texture().get_image()
@@ -106,8 +110,10 @@ func _start_step_2_draw() -> void:
 	current_step = 2
 	banner_title.text = "📜 GIAI ĐOẠN 1: RÚT BÀI ĐẦU LƯỢT"
 	banner_desc.text = "Người đầu tiên chơi sẽ BỐC 1 LÁ BÀI; các lượt sau tự động bốc 2 lá từ kho bài!"
+	action_btn.visible = true
 	action_btn.text = "VÀO GIAI ĐOẠN RA BÀI ➜"
 	action_btn.disabled = false
+	card_play_btn.visible = false
 
 	# Chia 4 lá ban đầu + 1 lá rút đầu lượt
 	_spawn_initial_cards()
@@ -150,51 +156,62 @@ func _on_card_selected_state_changed(card_ui: Control, is_sel: bool) -> void:
 		if selected_card_ui == card_ui:
 			selected_card_ui = null
 			desc_text.text = "💡 Chạm chọn một lá bài trên tay để xem mô tả & sử dụng..."
+			card_play_btn.visible = false
 
 func _handle_card_selected(c_ui: Control) -> void:
 	if current_step == 3:
 		if "Trảm" in c_ui.card_name:
 			banner_desc.text = "🎯 Hãy chạm chọn THỦ LĨNH SƠN TẶC trên bàn đấu làm mục tiêu tấn công!"
 			_show_arrow(boss_avatar.global_position + Vector2(-15, 115), "CHỌN MỤC TIÊU")
-			action_btn.disabled = true
-			action_btn.text = "🎯 HÃY CHỌN MỤC TIÊU SƠN TẶC"
+			card_play_btn.visible = true
+			card_play_btn.disabled = true
+			card_play_btn.text = "🎯 CHỌN MỤC TIÊU SƠN TẶC"
 	elif current_step == 5:
 		if "Đỡ" in c_ui.card_name:
-			banner_desc.text = "Nhấn nút [🛡️ DÙNG ĐỠ (NÉ ĐÒN)] để triệt tiêu đòn Trảm của Sơn Tặc!"
-			action_btn.disabled = false
-			action_btn.text = "🛡️ DÙNG ĐỠ (NÉ ĐÒN)"
-			_show_arrow(action_btn.global_position + Vector2(-25, 16), "XÁC NHẬN NÉ")
+			banner_desc.text = "Nhấn nút [🛡️ DÙNG ĐỠ (NÉ ĐÒN)] trên thanh mô tả để triệt tiêu đòn Trảm!"
+			card_play_btn.visible = true
+			card_play_btn.disabled = false
+			card_play_btn.text = "🛡️ DÙNG ĐỠ (NÉ ĐÒN)"
+			await get_tree().process_frame
+			_show_arrow(card_play_btn.global_position + Vector2(-15, 16), "XÁC NHẬN NÉ")
 
 func _on_boss_avatar_clicked() -> void:
 	if current_step == 3 and selected_card_ui and "Trảm" in selected_card_ui.card_name:
 		boss_targeted = true
 		boss_avatar.set_target_highlight(true)
-		banner_desc.text = "🎯 Đã nhắm mục tiêu Sơn Tặc! Nhấn nút [⚔️ DÙNG BÀI ➜ SƠN TẶC] để tấn công!"
-		action_btn.disabled = false
-		action_btn.text = "⚔️ DÙNG BÀI ➜ SƠN TẶC"
-		_show_arrow(action_btn.global_position + Vector2(-25, 16), "TẤN CÔNG")
+		banner_desc.text = "🎯 Đã nhắm mục tiêu Sơn Tặc! Nhấn nút [⚔️ DÙNG BÀI ➜ SƠN TẶC] ngay trên thanh mô tả để tấn công!"
+		card_play_btn.visible = true
+		card_play_btn.disabled = false
+		card_play_btn.text = "⚔️ DÙNG BÀI ➜ SƠN TẶC"
+		await get_tree().process_frame
+		_show_arrow(card_play_btn.global_position + Vector2(-15, 16), "BẤM DÙNG BÀI")
 
-func _on_action_btn_clicked() -> void:
+func _on_card_play_btn_clicked() -> void:
+	card_play_btn.release_focus()
 	match current_step:
-		2:
-			_start_step_3_slash()
 		3:
 			if boss_targeted and selected_card_ui:
 				_execute_slash()
+		5:
+			_execute_dodge()
+
+func _on_action_btn_clicked() -> void:
+	action_btn.release_focus()
+	match current_step:
+		2:
+			_start_step_3_slash()
 		4:
 			_start_step_4_5_skill()
 		41: # Sau khi thi triển kỹ năng
 			_start_step_5_boss_turn()
-		5:
-			_execute_dodge()
 
 func _start_step_3_slash() -> void:
 	current_step = 3
 	boss_targeted = false
 	banner_title.text = "⚔️ GIAI ĐOẠN 2: RA BÀI (DÙNG TRẢM)"
 	banner_desc.text = "Hãy chạm chọn lá bài [TRẢM THƯỜNG] đang phát sáng trên tay!"
-	action_btn.text = "⚔️ CHỌN LÁ TRẢM"
-	action_btn.disabled = true
+	action_btn.visible = false
+	card_play_btn.visible = false
 
 	# Chỉ mũi tên vào lá Trảm đầu tiên
 	if hand_container.get_child_count() > 0:
@@ -204,8 +221,19 @@ func _start_step_3_slash() -> void:
 func _execute_slash() -> void:
 	boss_avatar.set_target_highlight(false)
 	arrow_node.visible = false
-	selected_card_ui.queue_free()
-	selected_card_ui = null
+	card_play_btn.visible = false
+
+	# 1. Hiệu ứng bay bài từ tay lên giữa bàn đấu
+	if selected_card_ui:
+		_animate_card_play_to_center(selected_card_ui)
+		selected_card_ui = null
+
+	# 2. Hiệu ứng chém kiếm ánh sáng vát chéo
+	_play_slash_effect(boss_avatar.global_position + Vector2(87, 119))
+
+	# 3. Phản ứng mục tiêu (chớp đỏ + rung lắc + hiện số sát thương)
+	boss_avatar.play_damage_effect()
+	boss_avatar.spawn_damage_number(1)
 
 	boss_hp -= 1
 	boss_avatar.update_hp(boss_hp, 3)
@@ -214,19 +242,21 @@ func _execute_slash() -> void:
 	_add_log("⚔️ Bạn đã dùng TRẢM! Thủ Lĩnh Sơn Tặc trúng đòn mất 1 máu (%d/3)." % boss_hp)
 
 	current_step = 4
+	banner.visible = true
 	banner_title.text = "⚠️ QUY TẮC: MỖI TURN CHỈ ĐƯỢC DÙNG 1 LÁ TRẢM"
 	banner_desc.text = "Trong cùng một lượt, mỗi người chơi chỉ được ra TỐI ĐA 1 LÁ TRẢM (trừ khi trang bị Nỏ Thần Kim Quy)!\nBây giờ, hãy tìm hiểu kỹ năng độc quyền của tướng."
+	action_btn.visible = true
 	action_btn.disabled = false
 	action_btn.text = "TÌM HIỂU KỸ NĂNG TƯỚNG ➜"
 
 func _start_step_4_5_skill() -> void:
 	current_step = 40
 	banner_title.text = "⚡ KỸ NĂNG ĐẶC BIỆT: [TIẾN THOÁI]"
-	banner_desc.text = "Tướng Lý Thường Kiệt sở hữu tuyệt kỹ TIẾN THOÁI:\nHoán chuyển tất cả lá TRẢM trên tay thành ĐỠ, và tất cả ĐỠ thành TRẢM!\nHãy click nút [⚡ TIẾN THOÁI] bên cạnh tướng để biến đổi bài."
+	banner_desc.text = "Tướng Lý Thường Kiệt sở hữu tuyệt kỹ TIẾN THOÁI:\nHoán chuyển tất cả lá TRẢM trên tay thành ĐỠ, và tất cả ĐỠ thành TRẢM!\nHãy click nút [⚡ TIẾN THOÁI] ở góc dưới bên trái tướng để biến đổi bài."
 	action_btn.visible = false
 
 	# Chỉ mũi tên vào nút Tiến Thoái của Lý Thường Kiệt
-	_show_arrow(player_avatar.global_position + Vector2(-115, 70), "BẤM TIẾN THOÁI")
+	_show_arrow(player_avatar.global_position + Vector2(-115, 215), "BẤM TIẾN THOÁI")
 
 func _on_player_skill_clicked() -> void:
 	if current_step == 40:
@@ -249,8 +279,8 @@ func _on_player_skill_clicked() -> void:
 
 func _start_step_5_boss_turn() -> void:
 	current_step = 5
-	action_btn.visible = true
-	action_btn.disabled = true
+	action_btn.visible = false
+	card_play_btn.visible = false
 	banner_title.text = "👺 ĐẾN LƯỢT THỦ LĨNH SƠN TẶC!"
 	banner_desc.text = "Sơn Tặc tự động rút 2 lá bài và chuẩn bị ra đòn..."
 	_add_log("👺 Đến lượt Thủ Lĩnh Sơn Tặc.")
@@ -260,6 +290,7 @@ func _start_step_5_boss_turn() -> void:
 	await get_tree().create_timer(1.2).timeout
 
 	_show_center_card("Trảm Hung Bạo", "Thủ Lĩnh Sơn Tặc")
+	_play_slash_effect(player_avatar.global_position + Vector2(87, 119))
 	_add_log("💥 Sơn Tặc vung đao tung chiêu [TRẢM] nhắm thẳng vào bạn!")
 
 	banner_title.text = "🛡️ CẢNH BÁO BỊ TẤN CÔNG!"
@@ -273,11 +304,12 @@ func _start_step_5_boss_turn() -> void:
 
 func _execute_dodge() -> void:
 	arrow_node.visible = false
+	card_play_btn.visible = false
 	if selected_card_ui:
-		selected_card_ui.queue_free()
+		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
 
-	_show_center_card("Đỡ", "Lý Thường Kiệt")
+	_show_center_card("Đỡ (Hóa Giải)", "Lý Thường Kiệt")
 	_add_log("🛡️ HOÁ GIẢI THÀNH CÔNG! Bạn đã dùng Đỡ né hoàn toàn đòn Trảm của Sơn Tặc! Sinh mệnh 4/4 của bạn được bảo toàn.")
 
 	await get_tree().create_timer(1.2).timeout
@@ -285,6 +317,7 @@ func _execute_dodge() -> void:
 
 func _show_reward_modal() -> void:
 	arrow_node.visible = false
+	card_play_btn.visible = false
 	reward_modal.visible = true
 	banner.visible = false
 	_add_log("🏆 CHÚC MỪNG HOÀN THÀNH HUẤN LUYỆN TÂN THỦ!")
@@ -308,6 +341,38 @@ func _show_center_card(c_name: String, source: String) -> void:
 	await get_tree().create_timer(1.2).timeout
 	center_showcase.visible = false
 
+func _animate_card_play_to_center(card_node: Control) -> void:
+	card_node.reparent(self)
+	card_node.z_index = 45
+	var target_center = Vector2(get_viewport_rect().size.x * 0.5 - 59, get_viewport_rect().size.y * 0.5 - 50)
+	var tw = create_tween().set_parallel(true)
+	tw.tween_property(card_node, "position", target_center, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(card_node, "scale", Vector2(1.25, 1.25), 0.25)
+	tw.tween_property(card_node, "rotation_degrees", -6.0, 0.25)
+	await get_tree().create_timer(0.45).timeout
+	var fade_tw = create_tween().set_parallel(true)
+	fade_tw.tween_property(card_node, "modulate:a", 0.0, 0.2)
+	fade_tw.tween_property(card_node, "scale", Vector2(1.4, 1.4), 0.2)
+	fade_tw.chain().tween_callback(card_node.queue_free)
+
+func _play_slash_effect(target_center: Vector2) -> void:
+	var slash_line = Line2D.new()
+	slash_line.width = 16.0
+	slash_line.default_color = Color(1.8, 1.6, 0.7, 1.0)
+	slash_line.points = PackedVector2Array([
+		target_center + Vector2(-95, -110),
+		target_center + Vector2(95, 110)
+	])
+	slash_line.z_index = 60
+	add_child(slash_line)
+
+	var tw = create_tween()
+	tw.tween_property(slash_line, "width", 26.0, 0.06)
+	tw.parallel().tween_property(slash_line, "default_color", Color(2.5, 0.5, 0.4, 0.95), 0.1)
+	tw.chain().tween_property(slash_line, "width", 0.0, 0.1)
+	tw.chain().tween_callback(slash_line.queue_free)
+
 func _on_claim_reward_clicked() -> void:
+	claim_reward_btn.release_focus()
 	AuthManager.set_onboarding_done()
 	get_tree().change_scene_to_file("res://scenes/main_game.tscn")
