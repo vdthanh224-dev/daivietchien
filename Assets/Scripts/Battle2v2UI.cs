@@ -674,7 +674,7 @@ public class Battle2v2UI : MonoBehaviour
                     }
                 }, playerCard != null ? playerCard.SeatNumber : 1);
             }
-            yield return new WaitForSeconds(AppwriteRealtimeClient.IsConnected ? 2.5f : 0.4f);
+            yield return new WaitForSeconds(AppwriteRealtimeClient.IsConnected ? 2.5f : 1.5f);
         }
     }
 
@@ -3841,7 +3841,7 @@ public class Battle2v2UI : MonoBehaviour
             yield return new WaitForSecondsRealtime(0.1f);
         }
 
-        if (lastAppliedStateVersion > 0 || !string.IsNullOrEmpty(currentRoomId))
+        if (lastAppliedStateVersion > 0)
         {
             SetLog("👑 Trận đấu bắt đầu! Máy chủ đã chia bài và mở lượt.");
             AudioManager.Instance.PlayCardDraw();

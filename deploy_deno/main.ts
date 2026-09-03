@@ -192,7 +192,7 @@ function broadcastRoom(room: RoomData, messageObj: any) {
           const personalized = {
             ...messageObj,
             state: sanitizedState,
-            delta: sanitizedState.delta,
+            delta: messageObj.delta || room.state.lastDelta || null,
           };
           ws.send(JSON.stringify(personalized));
         } else {

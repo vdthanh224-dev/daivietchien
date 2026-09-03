@@ -1372,13 +1372,15 @@ public static class AppwriteMatchmaking
 
     string actionBody = JsonUtility.ToJson(actionPayload);
 
-    // 1. Thử các Cloud Deno Engine Endpoints (Active Connected, Cloud)
+    // 1. Thử các Cloud Deno Engine Endpoints (Active Connected, Local, Cloud)
     List<string> candidateDenoUrls = new List<string>();
     if (!string.IsNullOrEmpty(DenoGameClient.ActiveConnectedEndpoint))
     {
         string baseEp = DenoGameClient.ActiveConnectedEndpoint.Replace("wss://", "https://").Replace("ws://", "http://");
         candidateDenoUrls.Add($"{baseEp}/api/game-engine");
     }
+    candidateDenoUrls.Add("http://127.0.0.1:8080/api/game-engine");
+    candidateDenoUrls.Add("http://localhost:8080/api/game-engine");
     if (!string.IsNullOrEmpty(DenoEndpoint) && !candidateDenoUrls.Contains($"{DenoEndpoint}/api/game-engine"))
     {
         candidateDenoUrls.Add($"{DenoEndpoint}/api/game-engine");
