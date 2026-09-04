@@ -2201,7 +2201,12 @@ func _update_matchmaking_slots_visual(room: Dictionary, my_user_id: String, slot
 			var is_empty = bool(s.get("isEmpty", false)) or s.get("userId", "") == "" or s.get("userId", "") == "empty"
 			var is_drag = bool(s.get("isDragon", (i == 0 or i == 2)))
 			var is_ai = bool(s.get("isAI", false))
-			var is_me = (s.get("userId", "") == my_user_id)
+			var my_user_name = AuthManager.current_user_name if AuthManager else ""
+			var is_me = false
+			if AppwriteMatchmaking:
+				is_me = AppwriteMatchmaking.is_same_user(s.get("userId", ""), s.get("userName", ""), my_user_id, my_user_name)
+			else:
+				is_me = (s.get("userId", "") == my_user_id)
 
 			if is_empty:
 				name_l.text = "Ghế %d: Đang tìm tướng lĩnh..." % (i + 1)
@@ -2242,7 +2247,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	if is_instance_valid(status_lbl):
 		status_lbl.text = "🔍 Đang quét tìm phòng thi đấu trên máy chủ Singapore..."
 
-	var found_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points)
+	var found_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, 500, my_user_name)
 	if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
 		return
 
@@ -2379,8 +2384,10 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		for i in range(slots.size()):
 			var s = slots[i]
 			if s.get("isEmpty", false):
+				var bot_name = AppwriteMatchmaking.get_realistic_gamer_name(bot_seed_base + i * 17, used_names)
+				used_names.append(bot_name)
 				s["userId"] = "bot_" + str(randi()).md5_text().substr(0, 6)
-				s["userName"] = AppwriteMatchmaking.get_realistic_gamer_name(bot_seed_base + i * 17, used_names)
+				s["userName"] = bot_name
 				s["rankPoints"] = maxi(20, my_rank_points + randi_range(-15, 15))
 				s["isAI"] = true
 				s["isEmpty"] = false
@@ -2505,7 +2512,13 @@ func _run_automated_screenshot_matchmaking() -> void:
 func _run_automated_screenshot_matchmaking_filled() -> void:
 	print("[Home] Kích hoạt kiểm thử Modal Tìm Trận 2v2 (Đầy 4 ghế)...")
 	_start_2v2_matchmaking()
-	await get_tree().create_timer(2.4).timeout
+	var wait_limit = 10.0
+	while wait_limit > 0.0:
+		await get_tree().create_timer(0.5).timeout
+		wait_limit -= 0.5
+		if mm_current_room.get("status") == "STARTED":
+			break
+	await get_tree().create_timer(0.5).timeout
 	var img = get_viewport().get_texture().get_image()
 	var path = "res://home_matchmaking_filled_screenshot.png"
 	var err = img.save_png(path)

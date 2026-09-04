@@ -65,21 +65,61 @@ func _setup_draft_slots() -> void:
 	var current_room = AppwriteMatchmaking.current_room if AppwriteMatchmaking else {}
 	var slots = current_room.get("slots", [])
 
-	var my_name = AuthManager.current_user_name if AuthManager else "Trần Hưng Đạo"
-	var my_uid = AuthManager.current_user_id if AuthManager else "me"
+	var my_name = AuthManager.current_user_name if AuthManager and AuthManager.current_user_name != "" else "Đại Tướng Quân"
+	var my_uid = AuthManager.current_user_id if AuthManager and AuthManager.current_user_id != "" else ""
+
+	# Xác định chính xác vị trí ghế thực tế của người chơi
+	var my_seat_idx = -1
+	if slots.size() == 4:
+		# 1. So khớp người chơi qua is_same_user (khớp userId nguyên bản/24 ký tự hoặc userName)
+		for i in range(4):
+			var s = slots[i]
+			if not bool(s.get("isEmpty", false)):
+				if AppwriteMatchmaking and AppwriteMatchmaking.is_same_user(s.get("userId", ""), s.get("userName", ""), my_uid, my_name):
+					my_seat_idx = i
+					break
+				elif s.get("userId", "") == my_uid or (my_name != "" and s.get("userName", "").to_lower() == my_name.to_lower()):
+					my_seat_idx = i
+					break
+		# 2. Nếu vẫn không thấy slot nào khớp, tìm ghế đầu tiên không phải AI
+		if my_seat_idx == -1:
+			for i in range(4):
+				var s = slots[i]
+				if not bool(s.get("isAI", false)) and not bool(s.get("isEmpty", false)):
+					my_seat_idx = i
+					break
+		# 3. Fallback mặc định là ghế 0 (ghế 1)
+		if my_seat_idx == -1:
+			my_seat_idx = 0
+
+	var my_seat_num = my_seat_idx + 1
+	var my_is_dragon = (my_seat_num == 1 or my_seat_num == 3)
+
+	var used_names: Array = []
 
 	if slots.size() == 4:
 		for i in range(4):
 			var s = slots[i]
 			var s_num = int(s.get("seatNumber", i + 1))
-			var is_me = (s.get("userId", "") == my_uid or s_num == 1)
-			var uname = s.get("userName", "Chiến Tướng %d" % s_num)
-			if is_me and my_name != "":
+			var is_me = (i == my_seat_idx)
+
+			var uname = ""
+			if is_me:
 				uname = my_name
+			else:
+				uname = s.get("userName", "").strip_edges()
+				if uname.is_empty() or uname in used_names:
+					if AppwriteMatchmaking:
+						uname = AppwriteMatchmaking.get_realistic_gamer_name(s_num * 101 + 42, used_names)
+					else:
+						uname = "Chiến Tướng %d" % s_num
+
+			used_names.append(uname)
 
 			var is_drag = (s_num == 1 or s_num == 3)
-			var role_tag = "(BẠN)" if is_me else ("(ĐỒNG MINH)" if is_drag else "(ĐỐI THỦ)")
-			var is_ai = bool(s.get("isAI", not is_me))
+			var is_ally = (is_drag == my_is_dragon)
+			var role_tag = "(BẠN)" if is_me else ("(ĐỒNG MINH)" if is_ally else "(ĐỐI THỦ)")
+			var is_ai = false if is_me else bool(s.get("isAI", true))
 
 			draft_slots.append({
 				"seatNumber": s_num,
@@ -92,12 +132,19 @@ func _setup_draft_slots() -> void:
 				"isLocked": false
 			})
 	else:
-		# Mặc định 4 ghế chuẩn 2v2
+		# Mặc định 4 ghế chuẩn 2v2 với 3 tên AI ngẫu nhiên không trùng lặp
+		used_names.append(my_name)
+		var b1 = AppwriteMatchmaking.get_realistic_gamer_name(101, used_names) if AppwriteMatchmaking else "Chiến Tướng 2"
+		used_names.append(b1)
+		var b2 = AppwriteMatchmaking.get_realistic_gamer_name(202, used_names) if AppwriteMatchmaking else "Chiến Tướng 3"
+		used_names.append(b2)
+		var b3 = AppwriteMatchmaking.get_realistic_gamer_name(303, used_names) if AppwriteMatchmaking else "Chiến Tướng 4"
+
 		draft_slots = [
 			{"seatNumber": 1, "userName": my_name, "roleTag": "(BẠN)", "isPlayer": true, "isDragon": true, "isAI": false, "chosenHero": null, "isLocked": false},
-			{"seatNumber": 2, "userName": "Ô Mã Nhi", "roleTag": "(ĐỐI THỦ)", "isPlayer": false, "isDragon": false, "isAI": true, "chosenHero": null, "isLocked": false},
-			{"seatNumber": 3, "userName": "Trần Khánh Dư", "roleTag": "(ĐỒNG MINH)", "isPlayer": false, "isDragon": true, "isAI": true, "chosenHero": null, "isLocked": false},
-			{"seatNumber": 4, "userName": "Phàn Tiếp", "roleTag": "(ĐỐI THỦ)", "isPlayer": false, "isDragon": false, "isAI": true, "chosenHero": null, "isLocked": false}
+			{"seatNumber": 2, "userName": b1, "roleTag": "(ĐỐI THỦ)", "isPlayer": false, "isDragon": false, "isAI": true, "chosenHero": null, "isLocked": false},
+			{"seatNumber": 3, "userName": b2, "roleTag": "(ĐỒNG MINH)", "isPlayer": false, "isDragon": true, "isAI": true, "chosenHero": null, "isLocked": false},
+			{"seatNumber": 4, "userName": b3, "roleTag": "(ĐỐI THỦ)", "isPlayer": false, "isDragon": false, "isAI": true, "chosenHero": null, "isLocked": false}
 		]
 
 func _build_ui() -> void:
@@ -651,13 +698,18 @@ func _inspect_hero(hero: Dictionary) -> void:
 
 	_update_lock_in_button_state()
 
+func _is_my_turn() -> bool:
+	if current_picker_index >= 0 and current_picker_index < draft_slots.size():
+		return draft_slots[current_picker_index].get("isPlayer", false)
+	return false
+
 func _update_lock_in_button_state() -> void:
 	if not is_draft_active:
 		lock_in_btn.disabled = true
 		lock_in_btn_lbl.text = "⚔️ TRẬN ĐẤU SẴN SÀNG"
 		return
 
-	if current_picker_index == 0:
+	if _is_my_turn():
 		if is_player_locked:
 			lock_in_btn.disabled = true
 			lock_in_btn_lbl.text = "✅ BẠN ĐÃ KHÓA TƯỚNG"
@@ -671,7 +723,10 @@ func _update_lock_in_button_state() -> void:
 				lock_in_btn_lbl.text = "👑 XÁC NHẬN CHỌN TƯỚNG"
 	else:
 		lock_in_btn.disabled = true
-		lock_in_btn_lbl.text = "⏳ ĐANG CHỜ GHẾ #%d CHỌN..." % (current_picker_index + 1)
+		if is_player_locked:
+			lock_in_btn_lbl.text = "⏳ ĐANG CHỜ CÁC TƯỚNG KHÁC..."
+		else:
+			lock_in_btn_lbl.text = "⏳ ĐANG CHỜ GHẾ #%d CHỌN..." % (current_picker_index + 1)
 
 # --- Luồng Chọn Tướng Theo Lượt (Turn-based Draft Sequence) ---
 func _start_draft_sequence() -> void:
@@ -689,10 +744,11 @@ func _run_draft_loop() -> void:
 		_update_lock_in_button_state()
 
 		turn_timer = 15.0
-		var is_bot = slot["isAI"]
+		var is_bot = bool(slot.get("isAI", false))
+		var is_player = bool(slot.get("isPlayer", false))
 
-		if not is_bot:
-			# Lượt của Người Chơi (Ghế 1)
+		if is_player:
+			# Lượt của Người Chơi
 			draft_status_lbl.text = "👑 ĐẾN LƯỢT BẠN CHỌN TƯỚNG (#%d)!" % slot["seatNumber"]
 			draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 
@@ -709,10 +765,10 @@ func _run_draft_loop() -> void:
 					candidate = _get_first_available_candidate()
 				_lock_hero_for_slot(slot, candidate)
 		else:
-			# Lượt của AI Bot
+			# Lượt của AI Bot hoặc đối thủ
 			var seat_num = slot["seatNumber"]
-			var role_name = "Đồng đội" if slot["isDragon"] else "Đối thủ"
-			draft_status_lbl.text = "⏳ Ghế #%d (%s: %s) đang suy nghĩ..." % [seat_num, role_name, slot["userName"]]
+			var role_name = slot.get("roleTag", "")
+			draft_status_lbl.text = "⏳ Ghế #%d %s: %s đang chọn tướng..." % [seat_num, role_name, slot["userName"]]
 			draft_status_lbl.add_theme_color_override("font_color", COLOR_DRAGON_CYAN if slot["isDragon"] else COLOR_PHOENIX_RED)
 
 			var think_time = randf_range(1.2, 2.2)
@@ -812,8 +868,8 @@ func _get_first_available_candidate() -> Dictionary:
 	return HeroDatabase.get_hero(47) if HeroDatabase else {}
 
 func _on_confirm_pick_pressed() -> void:
-	if current_picker_index == 0 and not is_player_locked:
-		var slot = draft_slots[0]
+	if _is_my_turn() and not is_player_locked:
+		var slot = draft_slots[current_picker_index]
 		_lock_hero_for_slot(slot, inspecting_hero)
 
 func _on_draft_completed() -> void:

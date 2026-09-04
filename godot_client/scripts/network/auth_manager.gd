@@ -536,3 +536,10 @@ func load_saved_session() -> void:
 					tutorial_reward_claimed = bool(data.get("tutorialRewardClaimed", false))
 					if session_secret != "":
 						is_logged_in = true
+
+	if current_user_id == "":
+		current_user_id = "u_" + str(Time.get_unix_time_from_system()).replace(".", "") + "_" + str(randi() % 10000)
+		save_session()
+	if current_user_name == "":
+		current_user_name = "Đại Tướng Quân"
+		save_session()

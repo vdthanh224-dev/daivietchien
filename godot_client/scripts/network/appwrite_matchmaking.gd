@@ -71,6 +71,21 @@ func get_realistic_gamer_name(seed_val: int, exclude_names: Array = []) -> Strin
 			return n
 	return "Chiến Tướng %d" % rng.randi_range(100, 999)
 
+func is_same_user(uid1: String, name1: String, uid2: String, name2: String) -> bool:
+	if uid1.is_empty() and uid2.is_empty() and name1.is_empty() and name2.is_empty():
+		return false
+	if uid1 != "" and uid2 != "" and uid1 == uid2:
+		return true
+	if uid1 != "" and uid2 != "":
+		# So khớp tiền tố nếu 1 bên bị cắt ngắn xuống 24 ký tự theo chuẩn ROOM4
+		if uid1.length() >= 20 and uid2.begins_with(uid1):
+			return true
+		if uid2.length() >= 20 and uid1.begins_with(uid2):
+			return true
+	if name1 != "" and name2 != "" and name1.strip_edges().to_lower() == name2.strip_edges().to_lower():
+		return true
+	return false
+
 # --- Encoding & Decoding Room State ---
 func encode_room_string(room: Dictionary) -> String:
 	var r_id = sanitize(room.get("roomId", ""), 18)
@@ -189,7 +204,7 @@ func _send_http_request(url: String, method: int, body_json: String = "") -> Dic
 	}
 
 # --- 1. Find Best Waiting Room ---
-func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_diff: int = 500) -> Dictionary:
+func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_diff: int = 500, my_user_name: String = "") -> Dictionary:
 	var q_equal = "{\"method\":\"equal\",\"attribute\":\"userId\",\"values\":[\"ROOM_WAITING\"]}".uri_encode()
 	var q_order = "{\"method\":\"orderDesc\",\"attribute\":\"$createdAt\"}".uri_encode()
 	var q_limit = "{\"method\":\"limit\",\"values\":[100]}".uri_encode()
@@ -220,8 +235,8 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 				_delete_document_async(doc_id)
 			continue
 
-		# Only consider active rooms waiting within 45s
-		if age > 45000:
+		# Only consider active rooms waiting within 25s
+		if age > 25000:
 			continue
 
 		var r = decode_room_string(user_name_val, doc_time, int(doc.get("rankPoints", 0)))
@@ -229,7 +244,17 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 			continue
 
 		# Host cannot be self
-		if r.get("hostUserId") == my_user_id:
+		if is_same_user(r.get("hostUserId", ""), "", my_user_id, my_user_name):
+			continue
+
+		# Self cannot already occupy any slot in this room
+		var already_present = false
+		for s in r.get("slots", []):
+			if not s.get("isEmpty", false):
+				if is_same_user(s.get("userId", ""), s.get("userName", ""), my_user_id, my_user_name):
+					already_present = true
+					break
+		if already_present:
 			continue
 
 		# Must have empty slot
@@ -294,6 +319,13 @@ func join_room_slot(room: Dictionary, my_user_id: String, my_user_name: String, 
 		return {}
 
 	var slots = latest_room.get("slots", [])
+	# Prevent duplicate self joining
+	for s in slots:
+		if not s.get("isEmpty", false):
+			if is_same_user(s.get("userId", ""), s.get("userName", ""), my_user_id, my_user_name):
+				print("[AppwriteMatchmaking] Self already in room, aborting duplicate join")
+				return {}
+
 	var target_slot: Dictionary = {}
 	for s in slots:
 		if s.get("isEmpty", false):
