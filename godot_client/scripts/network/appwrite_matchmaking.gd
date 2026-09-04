@@ -11,6 +11,8 @@ const COLLECTION_ID = "matchmaking_queue"
 
 const PUBLIC_DOC_PERMISSIONS = ["read(\"any\")", "update(\"any\")", "delete(\"any\")"]
 
+var current_room: Dictionary = {}
+
 const REALISTIC_GAMER_NAMES = [
 	"Bá_Đạo_Tổng_Tài", "Lữ_Bố_Tái_Thế", "Thần_Kiếm_888", "Bảo_Bối_Cute",
 	"Phong_Thần_2004", "Trọng_Nghĩa_SG", "Hải_Quay_Xe", "Cửu_Vĩ_Hồ",
@@ -171,6 +173,8 @@ func _send_http_request(url: String, method: int, body_json: String = "") -> Dic
 	var response_code = resp[1]
 	var resp_body_bytes: PackedByteArray = resp[3]
 	var raw_text = resp_body_bytes.get_string_from_utf8()
+
+	print("[AppwriteMatchmaking] HTTP %d -> Code: %d (%s)" % [method, response_code, url.substr(0, 80)])
 
 	var data = null
 	if raw_text.length() > 0:

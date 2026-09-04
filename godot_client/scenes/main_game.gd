@@ -42,11 +42,28 @@ func _setup_seats() -> void:
 	seats_map[1] = player_seat_ui
 	player_seat_ui.is_player = true
 	player_seat_ui.seat_number = 1
-	player_seat_ui.update_seat_display(1, "Trần Hưng Đạo", 4, 4, 4)
-	player_seat_ui.seat_selected.connect(_on_seat_clicked)
+	var my_name = "Trần Hưng Đạo"
+	if AuthManager and AuthManager.current_user_name != "":
+		my_name = AuthManager.current_user_name
 
 	# Ghế 2, 3, 4: Opponents & Teammate
 	var seat_names = { 2: "Đào Hãn (Đối thủ)", 3: "Trần Khánh Dư (Đồng đội)", 4: "Ô Mã Nhi (Đối thủ)" }
+	if AppwriteMatchmaking and not AppwriteMatchmaking.current_room.is_empty():
+		var slots = AppwriteMatchmaking.current_room.get("slots", [])
+		for s in slots:
+			var s_num = int(s.get("seatNumber", 1))
+			if s_num == 1:
+				my_name = s.get("userName", my_name)
+			elif s_num in [2, 3, 4]:
+				var uname = s.get("userName", "Chiến Tướng")
+				var is_ai = bool(s.get("isAI", false))
+				var role = " (Đồng đội)" if s_num == 3 else " (Đối thủ)"
+				var suffix = " (AI)" if is_ai else ""
+				seat_names[s_num] = uname + role + suffix
+
+	player_seat_ui.update_seat_display(1, my_name, 4, 4, 4)
+	player_seat_ui.seat_selected.connect(_on_seat_clicked)
+
 	for s in [2, 3, 4]:
 		var seat_ui = GeneralSeatUIScene.instantiate()
 		seat_ui.seat_number = s

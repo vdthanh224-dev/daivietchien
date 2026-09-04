@@ -881,7 +881,7 @@ func _cancel_matchmaking_internal() -> void:
 		AppwriteMatchmaking.leave_room_slot(mm_active_room_id, my_uid)
 
 func _show_modal(title_text: String, content_node: Node) -> void:
-	if is_matchmaking_active:
+	if is_matchmaking_active and title_text != "⚔️ TÌM TRẬN 2v2 HOÀNG TRIỀU":
 		_cancel_matchmaking_internal()
 
 	AudioManager.play_card_draw()
@@ -1931,11 +1931,7 @@ func _build_2v2_content() -> Control:
 
 # --- 2v2 Real-Player Matchmaking System (Appwrite Singapore) ---
 func _start_2v2_matchmaking() -> void:
-	is_matchmaking_active = true
-	mm_is_cancelled = false
-	mm_active_room_id = ""
-	mm_is_host = false
-	mm_current_room = {}
+	_cancel_matchmaking_internal()
 
 	var container = VBoxContainer.new()
 	container.add_theme_constant_override("separation", 10)
@@ -2140,6 +2136,13 @@ func _start_2v2_matchmaking() -> void:
 	btn_hbox.add_child(cancel_btn)
 
 	_show_modal("⚔️ TÌM TRẬN 2v2 HOÀNG TRIỀU", container)
+
+	is_matchmaking_active = true
+	mm_is_cancelled = false
+	mm_active_room_id = ""
+	mm_is_host = false
+	mm_current_room = {}
+
 	_run_2v2_matchmaking_loop(status_lbl, timer_lbl, slot_nodes)
 
 func _style_cancel_red_button(btn: Button) -> void:
@@ -2232,6 +2235,8 @@ func _update_matchmaking_slots_visual(room: Dictionary, my_user_id: String, slot
 func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: Array) -> void:
 	var my_user_id = AuthManager.current_user_id if AuthManager and AuthManager.current_user_id != "" else ("user_" + str(randi()).md5_text().substr(0, 8))
 	var my_user_name = AuthManager.current_user_name if AuthManager and AuthManager.current_user_name != "" else "Đại Tướng Quân"
+	if (my_user_name == "" or my_user_name == "Đại Tướng Quân") and AuthManager and AuthManager.current_user_email != "":
+		my_user_name = AuthManager.current_user_email.split("@")[0].to_upper()
 	var my_rank_points = AuthManager.current_2v2_points if AuthManager else 1200
 
 	if is_instance_valid(status_lbl):
@@ -2274,10 +2279,12 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		var created = await AppwriteMatchmaking.create_waiting_room(new_room)
 		if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
 			return
-		if created:
-			mm_current_room = new_room
-			mm_active_room_id = new_room_id
-			mm_is_host = true
+
+		mm_current_room = new_room
+		mm_active_room_id = new_room_id
+		mm_is_host = true
+		if not created:
+			print("[Matchmaking] Appwrite notice: Đang ở chế độ dự phòng ghép bot...")
 
 	if mm_is_cancelled or mm_current_room.is_empty() or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
 		return
@@ -2286,23 +2293,24 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 
 	var elapsed_timer: float = 0.0
 	var is_fast_test = "--screenshot-matchmaking-filled" in OS.get_cmdline_user_args() or "--screenshot-matchmaking-filled" in OS.get_cmdline_args()
-	var host_hidden_timer: float = 1.0 if is_fast_test else 15.0
+	var countdown_max: float = 1.0 if is_fast_test else 15.0
+	var time_left: float = countdown_max
 	var heartbeat_timer: float = 0.0
 	var last_real_player_count: int = 1
 	var guest_wait_timer: float = 0.0
 
-	while not mm_is_cancelled:
+	while not mm_is_cancelled and time_left > 0.0:
 		if not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
 			return
 
+		time_left -= 0.5
 		elapsed_timer += 0.5
-		host_hidden_timer -= 0.5
 		heartbeat_timer -= 0.5
 		guest_wait_timer += 0.5
 
-		var sec = int(elapsed_timer)
+		var sec = maxi(0, int(ceilf(time_left)))
 		if is_instance_valid(timer_lbl):
-			timer_lbl.text = "⏳ %02d:%02d" % [sec / 60, sec % 60]
+			timer_lbl.text = "⏳ %ds" % sec
 
 		if mm_is_host:
 			if heartbeat_timer <= 0.0:
@@ -2321,61 +2329,13 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 					current_real_count += 1
 
 			if current_real_count > last_real_player_count:
-				host_hidden_timer = 15.0
 				last_real_player_count = current_real_count
 				if is_instance_valid(status_lbl):
 					status_lbl.text = "⚔️ Có thêm người chơi thực tham gia! Đang đợi tiếp..."
 
 			_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
 
-			if current_real_count >= 4 or host_hidden_timer <= 0.0:
-				var fresh = await AppwriteMatchmaking.poll_room_state(mm_active_room_id)
-				if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
-					return
-				if not fresh.is_empty():
-					mm_current_room = fresh
-
-				var used_names: Array = [my_user_name]
-				for s in mm_current_room.get("slots", []):
-					if not s.get("isEmpty", false) and s.get("userName", "") != "":
-						used_names.append(s.get("userName"))
-
-				var bot_seed_base = AppwriteMatchmaking.get_deterministic_hash_code(mm_active_room_id)
-				var slots = mm_current_room.get("slots", [])
-				for i in range(slots.size()):
-					var s = slots[i]
-					if s.get("isEmpty", false):
-						s["userId"] = "bot_" + str(randi()).md5_text().substr(0, 6)
-						s["userName"] = AppwriteMatchmaking.get_realistic_gamer_name(bot_seed_base + i * 17, used_names)
-						s["rankPoints"] = maxi(20, my_rank_points + randi_range(-15, 15))
-						s["isAI"] = true
-						s["isEmpty"] = false
-
-				# Deterministic shuffle
-				var rng = RandomNumberGenerator.new()
-				rng.seed = bot_seed_base
-				for i in range(slots.size() - 1, 0, -1):
-					var k = rng.randi_range(0, i)
-					var tmp = slots[i]
-					slots[i] = slots[k]
-					slots[k] = tmp
-
-				for i in range(slots.size()):
-					slots[i]["seatNumber"] = i + 1
-
-				mm_current_room["status"] = "STARTED"
-				await AppwriteMatchmaking.update_room_state(mm_current_room)
-				if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
-					return
-
-				if is_instance_valid(status_lbl):
-					status_lbl.text = "⚔️ ĐÃ KẾT NỐI ĐỦ 4 CHIẾN TƯỚNG! Bắt đầu vào trận..."
-					status_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
-				if is_instance_valid(timer_lbl):
-					timer_lbl.text = "⚔️ SẴN SÀNG!"
-					timer_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
-				AudioManager.play_victory()
-				_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
+			if current_real_count >= 4:
 				break
 		else:
 			var polled = await AppwriteMatchmaking.poll_room_state(mm_active_room_id)
@@ -2388,13 +2348,6 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 				_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
 
 				if mm_current_room.get("status") == "STARTED":
-					if is_instance_valid(status_lbl):
-						status_lbl.text = "⚔️ PHÒNG ĐÃ BẮT ĐẦU! Đang vào màn thi đấu..."
-						status_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
-					if is_instance_valid(timer_lbl):
-						timer_lbl.text = "⚔️ SẴN SÀNG!"
-						timer_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
-					AudioManager.play_victory()
 					break
 
 			if guest_wait_timer > 35.0:
@@ -2407,14 +2360,53 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 
 		await get_tree().create_timer(0.5).timeout
 
-	if mm_is_cancelled:
+	if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
 		return
+
+	if mm_is_host:
+		var fresh = await AppwriteMatchmaking.poll_room_state(mm_active_room_id)
+		if not fresh.is_empty():
+			mm_current_room = fresh
+
+		var used_names: Array = [my_user_name]
+		for s in mm_current_room.get("slots", []):
+			if not s.get("isEmpty", false) and s.get("userName", "") != "":
+				used_names.append(s.get("userName"))
+
+		var bot_seed_base = AppwriteMatchmaking.get_deterministic_hash_code(mm_active_room_id)
+		var slots = mm_current_room.get("slots", [])
+		for i in range(slots.size()):
+			var s = slots[i]
+			if s.get("isEmpty", false):
+				s["userId"] = "bot_" + str(randi()).md5_text().substr(0, 6)
+				s["userName"] = AppwriteMatchmaking.get_realistic_gamer_name(bot_seed_base + i * 17, used_names)
+				s["rankPoints"] = maxi(20, my_rank_points + randi_range(-15, 15))
+				s["isAI"] = true
+				s["isEmpty"] = false
+
+		mm_current_room["status"] = "STARTED"
+		await AppwriteMatchmaking.update_room_state(mm_current_room)
+
+	if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
+		return
+
+	if is_instance_valid(status_lbl):
+		status_lbl.text = "⚔️ ĐÃ KẾT NỐI ĐỦ 4 CHIẾN TƯỚNG! Bắt đầu vào trận..."
+		status_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
+	if is_instance_valid(timer_lbl):
+		timer_lbl.text = "⚔️ SẴN SÀNG!"
+		timer_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
+	AudioManager.play_victory()
+	_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
+
+	# Lưu phòng vào AppwriteMatchmaking để main_game.tscn có thể hiển thị chính xác tên 4 người
+	AppwriteMatchmaking.current_room = mm_current_room
 
 	await get_tree().create_timer(1.2).timeout
 	if mm_is_cancelled:
 		return
-	_hide_modal()
 	is_matchmaking_active = false
+	_hide_modal()
 	get_tree().change_scene_to_file("res://scenes/main_game.tscn")
 
 func _build_national_war_content() -> Control:
