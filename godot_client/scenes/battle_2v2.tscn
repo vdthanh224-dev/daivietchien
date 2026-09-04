@@ -781,3 +781,194 @@ size_flags_horizontal = 4
 focus_mode = 0
 theme_override_font_sizes/font_size = 13
 text = "🏠 VỀ SẢNH CHÍNH"
+
+[node name="IronChainModal" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="DarkMask" type="ColorRect" parent="IronChainModal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_bottom = -225.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.02, 0.03, 0.06, 0.75)
+
+[node name="Dim" type="CenterContainer" parent="IronChainModal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_bottom = -225.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Box" type="PanelContainer" parent="IronChainModal/Dim"]
+custom_minimum_size = Vector2(680, 270)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
+
+[node name="Margin" type="MarginContainer" parent="IronChainModal/Dim/Box"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 12
+
+[node name="VBox" type="VBoxContainer" parent="IronChainModal/Dim/Box/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="IronChainModal/Dim/Box/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_font_sizes/font_size = 14
+text = "⛓️ XÍCH TÂM TỎA: CHỌN TỐI ĐA 2 TƯỚNG"
+horizontal_alignment = 1
+
+[node name="Desc" type="Label" parent="IronChainModal/Dim/Box/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.93, 0.98, 1)
+theme_override_font_sizes/font_size = 11
+text = "Chọn 1 hoặc 2 tướng để trói vào Xích Liên Hoàn (hoặc gỡ xích). Được chọn cả Đồng minh và Đối thủ!"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="GeneralsGrid" type="HBoxContainer" parent="IronChainModal/Dim/Box/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="StatusLbl" type="Label" parent="IronChainModal/Dim/Box/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.45, 1)
+theme_override_font_sizes/font_size = 11
+text = "👉 Đã chọn: 0/2 tướng"
+horizontal_alignment = 1
+
+[node name="HBox" type="HBoxContainer" parent="IronChainModal/Dim/Box/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="ConfirmBtn" type="Button" parent="IronChainModal/Dim/Box/Margin/VBox/HBox"]
+custom_minimum_size = Vector2(210, 36)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 12
+text = "⛓️ XÁC NHẬN XÍCH"
+
+[node name="CancelBtn" type="Button" parent="IronChainModal/Dim/Box/Margin/VBox/HBox"]
+custom_minimum_size = Vector2(150, 36)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 12
+text = "✕ HỦY BỎ"
+
+[node name="CardPickModal" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="DarkMask" type="ColorRect" parent="CardPickModal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_bottom = -225.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.02, 0.03, 0.06, 0.75)
+
+[node name="Dim" type="CenterContainer" parent="CardPickModal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_bottom = -225.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Box" type="PanelContainer" parent="CardPickModal/Dim"]
+custom_minimum_size = Vector2(680, 270)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
+
+[node name="Margin" type="MarginContainer" parent="CardPickModal/Dim/Box"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 12
+
+[node name="VBox" type="VBoxContainer" parent="CardPickModal/Dim/Box/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="CardPickModal/Dim/Box/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_font_sizes/font_size = 14
+text = "🗡️ CƯỚP / PHÁ HỦY BÀI MỤC TIÊU"
+horizontal_alignment = 1
+
+[node name="Desc" type="Label" parent="CardPickModal/Dim/Box/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.93, 0.98, 1)
+theme_override_font_sizes/font_size = 11
+text = "💡 Hãy chạm chọn 1 lá bài úp trên tay hoặc 1 trang bị đang mặc của mục tiêu:"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Scroll" type="ScrollContainer" parent="CardPickModal/Dim/Box/Margin/VBox"]
+custom_minimum_size = Vector2(0, 115)
+layout_mode = 2
+horizontal_scroll_mode = 1
+vertical_scroll_mode = 0
+
+[node name="OptionsHBox" type="HBoxContainer" parent="CardPickModal/Dim/Box/Margin/VBox/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="SelectedStatusLbl" type="Label" parent="CardPickModal/Dim/Box/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.45, 1)
+theme_override_font_sizes/font_size = 11
+text = "👉 Đang chọn: Chưa chọn lá nào"
+horizontal_alignment = 1
+
+[node name="HBox" type="HBoxContainer" parent="CardPickModal/Dim/Box/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="ConfirmBtn" type="Button" parent="CardPickModal/Dim/Box/Margin/VBox/HBox"]
+custom_minimum_size = Vector2(210, 36)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 12
+text = "🗡️ XÁC NHẬN CƯỚP"
+
+[node name="CancelBtn" type="Button" parent="CardPickModal/Dim/Box/Margin/VBox/HBox"]
+custom_minimum_size = Vector2(150, 36)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 12
+text = "✕ HỦY BỎ"

@@ -47,6 +47,8 @@ var turn_dots: Array = []
 var turn_dots_container: Control = null
 var turn_timer_badge: PanelContainer = null
 var turn_timer_label: Label = null
+var is_chained: bool = false
+var chain_badge: PanelContainer = null
 
 func _ready() -> void:
 	if click_btn:
@@ -187,6 +189,44 @@ func update_turn_timer(seconds_left: int) -> void:
 			turn_timer_label.add_theme_color_override("font_color", Color(1.0, 0.35, 0.35, 1.0))
 		else:
 			turn_timer_label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.4, 1.0))
+
+func set_chained(chained: bool) -> void:
+	is_chained = chained
+	if chained:
+		if not chain_badge:
+			chain_badge = PanelContainer.new()
+			chain_badge.custom_minimum_size = Vector2(104, 22)
+			chain_badge.mouse_filter = MOUSE_FILTER_IGNORE
+			chain_badge.z_index = 20
+			var style = StyleBoxFlat.new()
+			style.bg_color = Color(0.25, 0.08, 0.06, 0.95)
+			style.border_width_left = 1
+			style.border_width_top = 1
+			style.border_width_right = 1
+			style.border_width_bottom = 1
+			style.border_color = Color(1.0, 0.45, 0.35, 1.0)
+			style.corner_radius_top_left = 6
+			style.corner_radius_top_right = 6
+			style.corner_radius_bottom_right = 6
+			style.corner_radius_bottom_left = 6
+			style.shadow_color = Color(0.8, 0.2, 0.1, 0.6)
+			style.shadow_size = 5
+			chain_badge.add_theme_stylebox_override("panel", style)
+
+			var lbl = Label.new()
+			lbl.text = "⛓️ XÍCH LIÊN HOÀN"
+			lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			lbl.add_theme_font_size_override("font_size", 9)
+			lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.8, 1.0))
+			chain_badge.add_child(lbl)
+			add_child(chain_badge)
+
+		chain_badge.position = Vector2((size.x - 104) * 0.5, size.y * 0.42)
+		chain_badge.visible = true
+	else:
+		if chain_badge:
+			chain_badge.visible = false
 
 func _init_equipment_slots() -> void:
 	if is_instance_valid(weapon_slot):
