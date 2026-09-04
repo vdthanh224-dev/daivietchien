@@ -12,6 +12,7 @@ const COLLECTION_ID = "matchmaking_queue"
 const PUBLIC_DOC_PERMISSIONS = ["read(\"any\")", "update(\"any\")", "delete(\"any\")"]
 
 var current_room: Dictionary = {}
+var draft_slots: Array = []
 
 const REALISTIC_GAMER_NAMES = [
 	"Bá_Đạo_Tổng_Tài", "Lữ_Bố_Tái_Thế", "Thần_Kiếm_888", "Bảo_Bối_Cute",

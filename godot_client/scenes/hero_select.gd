@@ -1022,28 +1022,52 @@ func _on_draft_completed() -> void:
 	turn_timer_lbl.text = "⚔️ SẴN SÀNG!"
 	AudioManager.play_victory()
 
+	# Lưu danh sách 4 tướng đã chọn vào AppwriteMatchmaking để battle_2v2.tscn sử dụng
+	if AppwriteMatchmaking:
+		if AppwriteMatchmaking.current_room is Dictionary:
+			AppwriteMatchmaking.current_room["draft_slots"] = draft_slots
+		AppwriteMatchmaking.draft_slots = draft_slots
+
+	# Đếm ngược 5 giây cùng nhau vào Đấu Trường 2v2
+	for count in [5, 4, 3, 2, 1]:
+		draft_status_lbl.text = "⚔️ ĐÃ KHÓA ĐỦ 4 CHIẾN TƯỚNG! TẤT CẢ VÀO 2v2 TRONG %d..." % count
+		draft_status_lbl.add_theme_color_override("font_color", Color(0.35, 0.95, 0.5, 1.0))
+		turn_timer_lbl.text = "⚔️ %ds" % count
+
+		if is_host and not current_room_id.is_empty() and AppwriteMatchmaking:
+			AppwriteMatchmaking.send_draft_host_state({
+				"roomId": current_room_id,
+				"phase": "COUNTDOWN",
+				"currentPickerIndex": 3,
+				"currentSeatNumber": 4,
+				"timerLeft": 0.0,
+				"countdownSec": count,
+				"heroId1": _get_locked_hero_id(0),
+				"heroId2": _get_locked_hero_id(1),
+				"heroId3": _get_locked_hero_id(2),
+				"heroId4": _get_locked_hero_id(3)
+			})
+
+		await get_tree().create_timer(1.0).timeout
+
+	draft_status_lbl.text = "⚔️ TẤT CẢ XUẤT TRẬN 2v2!"
+
 	if is_host and not current_room_id.is_empty() and AppwriteMatchmaking:
 		AppwriteMatchmaking.send_draft_host_state({
 			"roomId": current_room_id,
-			"phase": "COUNTDOWN",
+			"phase": "START_BATTLE",
 			"currentPickerIndex": 3,
 			"currentSeatNumber": 4,
 			"timerLeft": 0.0,
-			"countdownSec": 3,
+			"countdownSec": 0,
 			"heroId1": _get_locked_hero_id(0),
 			"heroId2": _get_locked_hero_id(1),
 			"heroId3": _get_locked_hero_id(2),
 			"heroId4": _get_locked_hero_id(3)
 		})
 
-	# Đếm ngược 3 giây vào trận
-	for count in [3, 2, 1]:
-		draft_status_lbl.text = "⚔️ ĐÃ KHÓA ĐỦ 4 CHIẾN TƯỚNG! VÀO TRẬN TRONG %d..." % count
-		draft_status_lbl.add_theme_color_override("font_color", Color(0.35, 0.95, 0.5, 1.0))
-		await get_tree().create_timer(1.0).timeout
-
-	draft_status_lbl.text = "⚔️ XUẤT TRẬN ĐẠI VIỆT!"
-	_show_battle_launch_dialog()
+	await get_tree().create_timer(0.4).timeout
+	get_tree().change_scene_to_file("res://scenes/battle_2v2.tscn")
 
 func _show_battle_launch_dialog() -> void:
 	var overlay = ColorRect.new()
