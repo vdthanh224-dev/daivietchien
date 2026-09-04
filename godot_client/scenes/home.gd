@@ -804,28 +804,28 @@ func _load_user_data() -> void:
 				name_str = AuthManager.current_user_email.split("@")[0].to_upper()
 			else:
 				name_str = "LÝ THƯỜNG KIỆT"
-		if player_name_label:
+		if is_instance_valid(player_name_label):
 			player_name_label.text = name_str
 
-		if level_badge_label:
+		if is_instance_valid(level_badge_label):
 			level_badge_label.text = " CẤP %d " % AuthManager.current_level
 
 		var mil_info = AuthManager.get_military_rank_info()
-		if rank_label:
+		if is_instance_valid(rank_label):
 			rank_label.text = "%s (%d/%dđ)" % [mil_info["full_name"], mil_info["points"], mil_info["next_min"]]
 
 		var next_exp = AuthManager.get_exp_to_next_level()
-		if exp_bar:
+		if is_instance_valid(exp_bar):
 			exp_bar.max_value = next_exp
 			exp_bar.value = AuthManager.current_exp
-		if exp_text_label:
+		if is_instance_valid(exp_text_label):
 			exp_text_label.text = "%d/%d EXP" % [AuthManager.current_exp, next_exp]
 
 		current_silver = AuthManager.current_silver
 		current_gold = AuthManager.current_gold
-		if silver_label:
+		if is_instance_valid(silver_label):
 			silver_label.text = _format_number(current_silver)
-		if gold_label:
+		if is_instance_valid(gold_label):
 			gold_label.text = _format_number(current_gold)
 
 # --- Ambient Particle Embers ---
@@ -871,31 +871,55 @@ func _on_profile_clicked() -> void:
 	_show_modal("HỒ SƠ TƯỚNG QUÂN", _build_profile_content())
 
 # --- Modal System ---
+func _cancel_matchmaking_internal() -> void:
+	mm_is_cancelled = true
+	is_matchmaking_active = false
+	var my_uid = AuthManager.current_user_id if AuthManager else ""
+	if mm_is_host and mm_active_room_id != "":
+		AppwriteMatchmaking.delete_room(mm_active_room_id)
+	elif mm_active_room_id != "" and my_uid != "":
+		AppwriteMatchmaking.leave_room_slot(mm_active_room_id, my_uid)
+
 func _show_modal(title_text: String, content_node: Node) -> void:
+	if is_matchmaking_active:
+		_cancel_matchmaking_internal()
+
 	AudioManager.play_card_draw()
-	modal_title_label.text = title_text
+	if is_instance_valid(modal_title_label):
+		modal_title_label.text = title_text
 
 	# Clear previous content
-	for child in modal_content_container.get_children():
-		child.queue_free()
+	if is_instance_valid(modal_content_container):
+		for child in modal_content_container.get_children():
+			child.queue_free()
 
-	if content_node:
-		modal_content_container.add_child(content_node)
+		if content_node:
+			modal_content_container.add_child(content_node)
 
-	modal_overlay.visible = true
-	modal_panel.scale = Vector2(0.9, 0.9)
-	modal_panel.modulate.a = 0.0
-	var tw = create_tween().set_parallel(true)
-	tw.tween_property(modal_panel, "scale", Vector2(1.0, 1.0), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(modal_panel, "modulate:a", 1.0, 0.15)
+	if is_instance_valid(modal_overlay):
+		modal_overlay.visible = true
+	if is_instance_valid(modal_panel):
+		modal_panel.scale = Vector2(0.9, 0.9)
+		modal_panel.modulate.a = 0.0
+		var tw = create_tween().set_parallel(true)
+		tw.tween_property(modal_panel, "scale", Vector2(1.0, 1.0), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(modal_panel, "modulate:a", 1.0, 0.15)
 
 func _hide_modal() -> void:
+	if is_matchmaking_active:
+		_cancel_matchmaking_internal()
+
 	AudioManager.play_card_select()
-	var tw = create_tween().set_parallel(true)
-	tw.tween_property(modal_panel, "scale", Vector2(0.9, 0.9), 0.15)
-	tw.tween_property(modal_panel, "modulate:a", 0.0, 0.15)
-	await tw.finished
-	modal_overlay.visible = false
+	if is_instance_valid(modal_panel):
+		var tw = create_tween().set_parallel(true)
+		tw.tween_property(modal_panel, "scale", Vector2(0.9, 0.9), 0.15)
+		tw.tween_property(modal_panel, "modulate:a", 0.0, 0.15)
+		await tw.finished
+	if is_instance_valid(modal_overlay):
+		modal_overlay.visible = false
+	if is_instance_valid(modal_content_container):
+		for child in modal_content_container.get_children():
+			child.queue_free()
 
 # --- EXP Animation & Level Up System ---
 func _check_pending_exp_gain() -> void:
@@ -916,12 +940,12 @@ func gain_exp_animated(amount: int, on_finished: Callable = Callable()) -> void:
 
 func _run_exp_animation_loop(lvl: int, cur_exp: int, remaining: int, on_finished: Callable = Callable()) -> void:
 	var req = AuthManager.get_exp_required_for_level(lvl + 1)
-	if exp_bar:
+	if is_instance_valid(exp_bar):
 		exp_bar.max_value = req
 		exp_bar.value = cur_exp
-	if exp_text_label:
+	if is_instance_valid(exp_text_label):
 		exp_text_label.text = "%d/%d EXP" % [cur_exp, req]
-	if level_badge_label:
+	if is_instance_valid(level_badge_label):
 		level_badge_label.text = " CẤP %d " % lvl
 
 	var target_exp = cur_exp + remaining
@@ -930,9 +954,9 @@ func _run_exp_animation_loop(lvl: int, cur_exp: int, remaining: int, on_finished
 		var tw = create_tween()
 		var fill_dur = clampf(float(remaining) * 0.05, 0.4, 1.2)
 		tw.tween_method(func(val: float):
-			if exp_bar: exp_bar.value = val
+			if is_instance_valid(exp_bar): exp_bar.value = val
 			var int_v = int(val)
-			if exp_text_label: exp_text_label.text = "%d/%d EXP" % [int_v, req]
+			if is_instance_valid(exp_text_label): exp_text_label.text = "%d/%d EXP" % [int_v, req]
 			if int_v > last_tick:
 				last_tick = int_v
 				var progress = float(int_v) / float(req)
@@ -953,9 +977,9 @@ func _run_exp_animation_loop(lvl: int, cur_exp: int, remaining: int, on_finished
 		var to_full = req - cur_exp
 		var fill_dur = clampf(float(to_full) * 0.045, 0.4, 1.0)
 		tw.tween_method(func(val: float):
-			if exp_bar: exp_bar.value = val
+			if is_instance_valid(exp_bar): exp_bar.value = val
 			var int_v = int(val)
-			if exp_text_label: exp_text_label.text = "%d/%d EXP" % [int_v, req]
+			if is_instance_valid(exp_text_label): exp_text_label.text = "%d/%d EXP" % [int_v, req]
 			if int_v > last_tick:
 				last_tick = int_v
 				var progress = float(int_v) / float(req)
@@ -963,7 +987,7 @@ func _run_exp_animation_loop(lvl: int, cur_exp: int, remaining: int, on_finished
 		, float(cur_exp), float(req), fill_dur).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 		tw.tween_callback(func():
-			if exp_bar:
+			if is_instance_valid(exp_bar):
 				var flash_tw = create_tween()
 				flash_tw.tween_property(exp_bar, "modulate", Color(1.8, 1.6, 0.8, 1.0), 0.15)
 				flash_tw.tween_property(exp_bar, "modulate", Color.WHITE, 0.15)
@@ -978,7 +1002,7 @@ func _run_exp_animation_loop(lvl: int, cur_exp: int, remaining: int, on_finished
 				AuthManager.save_session()
 				AuthManager.save_profile_to_appwrite()
 
-				if level_badge_label:
+				if is_instance_valid(level_badge_label):
 					level_badge_label.text = " CẤP %d " % next_lvl
 					var bounce_tw = create_tween()
 					bounce_tw.tween_property(level_badge_label, "scale", Vector2(1.35, 1.35), 0.15)
@@ -988,10 +1012,10 @@ func _run_exp_animation_loop(lvl: int, cur_exp: int, remaining: int, on_finished
 					_run_exp_animation_loop(next_lvl, 0, leftover, on_finished)
 				else:
 					var next_req = AuthManager.get_exp_required_for_level(next_lvl + 1)
-					if exp_bar:
+					if is_instance_valid(exp_bar):
 						exp_bar.max_value = next_req
 						exp_bar.value = 0
-					if exp_text_label:
+					if is_instance_valid(exp_text_label):
 						exp_text_label.text = "0/%d EXP" % next_req
 					_load_user_data()
 					if on_finished.is_valid(): on_finished.call()
@@ -1028,7 +1052,7 @@ func _show_level_up_modal(old_lvl: int, new_lvl: int, on_close: Callable = Calla
 		ray.default_color = Color(1.0, 0.85, 0.35, 0.07 if i % 2 == 0 else 0.03)
 		rays_center.add_child(ray)
 
-	var rays_tw = create_tween().set_loops()
+	var rays_tw = rays_center.create_tween().set_loops()
 	rays_tw.tween_property(rays_center, "rotation", TAU, 24.0).as_relative()
 
 	# 3. Floating Golden Sparkle Particles
@@ -1040,7 +1064,7 @@ func _show_level_up_modal(old_lvl: int, new_lvl: int, on_close: Callable = Calla
 		sp.position = Vector2(randf_range(300, 980), randf_range(150, 600))
 		levelup_overlay.add_child(sp)
 
-		var float_tw = create_tween().set_loops()
+		var float_tw = sp.create_tween().set_loops()
 		var dur = randf_range(2.0, 4.0)
 		float_tw.tween_property(sp, "position:y", sp.position.y - randf_range(60, 120), dur)
 		float_tw.parallel().tween_property(sp, "modulate:a", 0.1, dur)
@@ -2149,13 +2173,7 @@ func _style_cancel_red_button(btn: Button) -> void:
 	btn.add_theme_font_size_override("font_size", 14)
 
 func _cancel_2v2_matchmaking() -> void:
-	mm_is_cancelled = true
-	var my_uid = AuthManager.current_user_id if AuthManager else ""
-	if mm_is_host and mm_active_room_id != "":
-		AppwriteMatchmaking.delete_room(mm_active_room_id)
-	elif mm_active_room_id != "" and my_uid != "":
-		AppwriteMatchmaking.leave_room_slot(mm_active_room_id, my_uid)
-	is_matchmaking_active = false
+	_cancel_matchmaking_internal()
 	_hide_modal()
 
 func _update_matchmaking_slots_visual(room: Dictionary, my_user_id: String, slot_nodes: Array) -> void:
@@ -2166,11 +2184,14 @@ func _update_matchmaking_slots_visual(room: Dictionary, my_user_id: String, slot
 		if i >= slot_nodes.size():
 			break
 		var node_dict = slot_nodes[i]
-		var sp_style: StyleBoxFlat = node_dict["style"]
-		var name_l: Label = node_dict["name_lbl"]
-		var status_l: Label = node_dict["status_lbl"]
-		var rank_l: Label = node_dict["rank_lbl"]
-		var t_badge: Label = node_dict["team_badge"]
+		var sp_style: StyleBoxFlat = node_dict.get("style", null)
+		var name_l: Label = node_dict.get("name_lbl", null)
+		var status_l: Label = node_dict.get("status_lbl", null)
+		var rank_l: Label = node_dict.get("rank_lbl", null)
+		var t_badge: Label = node_dict.get("team_badge", null)
+
+		if not is_instance_valid(name_l) or not is_instance_valid(status_l) or not is_instance_valid(rank_l) or not is_instance_valid(sp_style):
+			continue
 
 		if i < slots.size():
 			var s = slots[i]
@@ -2213,15 +2234,19 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	var my_user_name = AuthManager.current_user_name if AuthManager and AuthManager.current_user_name != "" else "Đại Tướng Quân"
 	var my_rank_points = AuthManager.current_2v2_points if AuthManager else 1200
 
-	status_lbl.text = "🔍 Đang quét tìm phòng thi đấu trên máy chủ Singapore..."
+	if is_instance_valid(status_lbl):
+		status_lbl.text = "🔍 Đang quét tìm phòng thi đấu trên máy chủ Singapore..."
 
 	var found_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points)
-	if mm_is_cancelled:
+	if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
 		return
 
 	if not found_room.is_empty():
-		status_lbl.text = "🌐 Đã tìm thấy phòng [%s]. Đang tham gia..." % found_room.get("roomId", "")
+		if is_instance_valid(status_lbl):
+			status_lbl.text = "🌐 Đã tìm thấy phòng [%s]. Đang tham gia..." % found_room.get("roomId", "")
 		var joined = await AppwriteMatchmaking.join_room_slot(found_room, my_user_id, my_user_name, my_rank_points)
+		if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
+			return
 		if not joined.is_empty():
 			mm_current_room = joined
 			mm_active_room_id = joined.get("roomId", "")
@@ -2230,7 +2255,8 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 			found_room = {}
 
 	if found_room.is_empty() and not mm_is_cancelled:
-		status_lbl.text = "👑 Đang tạo phòng thi đấu mới trên máy chủ..."
+		if is_instance_valid(status_lbl):
+			status_lbl.text = "👑 Đang tạo phòng thi đấu mới trên máy chủ..."
 		var new_room_id = "room_" + str(randi()).md5_text().substr(0, 8)
 		var new_room = {
 			"roomId": new_room_id,
@@ -2246,12 +2272,14 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 			]
 		}
 		var created = await AppwriteMatchmaking.create_waiting_room(new_room)
+		if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
+			return
 		if created:
 			mm_current_room = new_room
 			mm_active_room_id = new_room_id
 			mm_is_host = true
 
-	if mm_is_cancelled or mm_current_room.is_empty():
+	if mm_is_cancelled or mm_current_room.is_empty() or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
 		return
 
 	_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
@@ -2264,13 +2292,17 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	var guest_wait_timer: float = 0.0
 
 	while not mm_is_cancelled:
+		if not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
+			return
+
 		elapsed_timer += 0.5
 		host_hidden_timer -= 0.5
 		heartbeat_timer -= 0.5
 		guest_wait_timer += 0.5
 
 		var sec = int(elapsed_timer)
-		timer_lbl.text = "⏳ %02d:%02d" % [sec / 60, sec % 60]
+		if is_instance_valid(timer_lbl):
+			timer_lbl.text = "⏳ %02d:%02d" % [sec / 60, sec % 60]
 
 		if mm_is_host:
 			if heartbeat_timer <= 0.0:
@@ -2278,11 +2310,10 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 				AppwriteMatchmaking.send_host_heartbeat(mm_active_room_id)
 
 			var polled = await AppwriteMatchmaking.poll_room_state(mm_active_room_id)
+			if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
+				return
 			if not polled.is_empty():
 				mm_current_room = polled
-
-			if mm_is_cancelled:
-				return
 
 			var current_real_count = 0
 			for s in mm_current_room.get("slots", []):
@@ -2292,12 +2323,15 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 			if current_real_count > last_real_player_count:
 				host_hidden_timer = 15.0
 				last_real_player_count = current_real_count
-				status_lbl.text = "⚔️ Có thêm người chơi thực tham gia! Đang đợi tiếp..."
+				if is_instance_valid(status_lbl):
+					status_lbl.text = "⚔️ Có thêm người chơi thực tham gia! Đang đợi tiếp..."
 
 			_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
 
 			if current_real_count >= 4 or host_hidden_timer <= 0.0:
 				var fresh = await AppwriteMatchmaking.poll_room_state(mm_active_room_id)
+				if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
+					return
 				if not fresh.is_empty():
 					mm_current_room = fresh
 
@@ -2331,36 +2365,42 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 
 				mm_current_room["status"] = "STARTED"
 				await AppwriteMatchmaking.update_room_state(mm_current_room)
+				if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
+					return
 
-				status_lbl.text = "⚔️ ĐÃ KẾT NỐI ĐỦ 4 CHIẾN TƯỚNG! Bắt đầu vào trận..."
-				status_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
-				timer_lbl.text = "⚔️ SẴN SÀNG!"
-				timer_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
+				if is_instance_valid(status_lbl):
+					status_lbl.text = "⚔️ ĐÃ KẾT NỐI ĐỦ 4 CHIẾN TƯỚNG! Bắt đầu vào trận..."
+					status_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
+				if is_instance_valid(timer_lbl):
+					timer_lbl.text = "⚔️ SẴN SÀNG!"
+					timer_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
 				AudioManager.play_victory()
 				_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
 				break
 		else:
 			var polled = await AppwriteMatchmaking.poll_room_state(mm_active_room_id)
+			if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
+				return
 			if not polled.is_empty():
 				mm_current_room = polled
-
-			if mm_is_cancelled:
-				return
 
 			if not mm_current_room.is_empty():
 				_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
 
 				if mm_current_room.get("status") == "STARTED":
-					status_lbl.text = "⚔️ PHÒNG ĐÃ BẮT ĐẦU! Đang vào màn thi đấu..."
-					status_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
-					timer_lbl.text = "⚔️ SẴN SÀNG!"
-					timer_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
+					if is_instance_valid(status_lbl):
+						status_lbl.text = "⚔️ PHÒNG ĐÃ BẮT ĐẦU! Đang vào màn thi đấu..."
+						status_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
+					if is_instance_valid(timer_lbl):
+						timer_lbl.text = "⚔️ SẴN SÀNG!"
+						timer_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
 					AudioManager.play_victory()
 					break
 
 			if guest_wait_timer > 35.0:
-				status_lbl.text = "❌ Mất kết nối với chủ phòng!"
-				status_lbl.add_theme_color_override("font_color", Color(1.0, 0.35, 0.35, 1.0))
+				if is_instance_valid(status_lbl):
+					status_lbl.text = "❌ Mất kết nối với chủ phòng!"
+					status_lbl.add_theme_color_override("font_color", Color(1.0, 0.35, 0.35, 1.0))
 				await get_tree().create_timer(2.0).timeout
 				_hide_modal()
 				return
@@ -2371,6 +2411,8 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		return
 
 	await get_tree().create_timer(1.2).timeout
+	if mm_is_cancelled:
+		return
 	_hide_modal()
 	is_matchmaking_active = false
 	get_tree().change_scene_to_file("res://scenes/main_game.tscn")

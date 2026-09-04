@@ -1391,6 +1391,7 @@ func _show_reward_modal() -> void:
 				var last_tick = 0
 				var fill_tw = create_tween()
 				fill_tw.tween_method(func(val: float):
+					if not is_instance_valid(exp_bar) or not is_instance_valid(exp_status_lbl): return
 					exp_bar.value = val
 					var int_v = int(val)
 					exp_status_lbl.text = "%d/20 EXP (CẤP 1)" % int_v
@@ -1401,6 +1402,7 @@ func _show_reward_modal() -> void:
 				, 0.0, 20.0, 1.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 				fill_tw.tween_callback(func():
+					if not is_instance_valid(r_card) or not is_instance_valid(r_val) or not is_instance_valid(exp_status_lbl) or not is_instance_valid(r_desc) or not is_instance_valid(rc_style): return
 					# Nhấp nháy hào quang hoàng kim & phát âm thanh Thăng Cấp hào hùng
 					var flash_tw = create_tween()
 					flash_tw.tween_property(r_card, "modulate", Color(1.5, 1.4, 0.8, 1.0), 0.15)

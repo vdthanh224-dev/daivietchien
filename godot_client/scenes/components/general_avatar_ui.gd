@@ -58,40 +58,45 @@ func _ready() -> void:
 	_init_equipment_slots()
 
 func _init_equipment_slots() -> void:
-	if weapon_slot:
+	if is_instance_valid(weapon_slot):
 		weapon_slot.visible = true
-		weapon_label.text = "🗡️ (Trống)"
-		weapon_label.modulate.a = 0.45
-	if armor_slot:
+		if is_instance_valid(weapon_label):
+			weapon_label.text = "🗡️ (Trống)"
+			weapon_label.modulate.a = 0.45
+	if is_instance_valid(armor_slot):
 		armor_slot.visible = true
-		armor_label.text = "🛡️ (Trống)"
-		armor_label.modulate.a = 0.45
-	if defensive_mount_slot:
+		if is_instance_valid(armor_label):
+			armor_label.text = "🛡️ (Trống)"
+			armor_label.modulate.a = 0.45
+	if is_instance_valid(defensive_mount_slot):
 		defensive_mount_slot.visible = true
-		defensive_mount_label.text = "🐘 (+1) Trống"
-		defensive_mount_label.modulate.a = 0.45
-	if offensive_mount_slot:
+		if is_instance_valid(defensive_mount_label):
+			defensive_mount_label.text = "🐘 (+1) Trống"
+			defensive_mount_label.modulate.a = 0.45
+	if is_instance_valid(offensive_mount_slot):
 		offensive_mount_slot.visible = true
-		offensive_mount_label.text = "🐎 (-1) Trống"
-		offensive_mount_label.modulate.a = 0.45
-	if treasure_slot:
+		if is_instance_valid(offensive_mount_label):
+			offensive_mount_label.text = "🐎 (-1) Trống"
+			offensive_mount_label.modulate.a = 0.45
+	if is_instance_valid(treasure_slot):
 		treasure_slot.visible = true
-		treasure_label.text = "👑 (Trống)"
-		treasure_label.modulate.a = 0.45
+		if is_instance_valid(treasure_label):
+			treasure_label.text = "👑 (Trống)"
+			treasure_label.modulate.a = 0.45
 
 func _on_avatar_clicked() -> void:
 	clicked.emit()
 
 func set_skill(skill_title: String) -> void:
-	if skill_btn:
+	if is_instance_valid(skill_btn):
 		skill_btn.text = skill_title
 		skill_btn.visible = (skill_title != "")
 
 func set_target_highlight(active: bool) -> void:
-	if target_border:
+	if is_instance_valid(target_border):
 		target_border.visible = active
 		if active:
-			var tw = create_tween().set_loops(4)
+			var tw = target_border.create_tween().set_loops(4)
 			tw.tween_property(target_border, "border_color", Color(1, 1, 0.5, 1), 0.2)
 			tw.tween_property(target_border, "border_color", Color(1, 0.7, 0.1, 1), 0.2)
 
@@ -108,54 +113,59 @@ func set_equipment(slot_type: String, item_name: String, suit_rank: String = "")
 	match slot_type.to_lower():
 		"weapon", "vu_khi":
 			key = "weapon"
-			if weapon_slot:
+			if is_instance_valid(weapon_slot):
 				weapon_slot.visible = true
-				if item_name != "":
-					weapon_label.text = _format_equip_str("🗡️", suit_rank, item_name)
-					weapon_label.modulate.a = 1.0
-				else:
-					weapon_label.text = "🗡️ (Trống)"
-					weapon_label.modulate.a = 0.45
+				if is_instance_valid(weapon_label):
+					if item_name != "":
+						weapon_label.text = _format_equip_str("🗡️", suit_rank, item_name)
+						weapon_label.modulate.a = 1.0
+					else:
+						weapon_label.text = "🗡️ (Trống)"
+						weapon_label.modulate.a = 0.45
 		"armor", "giap":
 			key = "armor"
-			if armor_slot:
+			if is_instance_valid(armor_slot):
 				armor_slot.visible = true
-				if item_name != "":
-					armor_label.text = _format_equip_str("🛡️", suit_rank, item_name)
-					armor_label.modulate.a = 1.0
-				else:
-					armor_label.text = "🛡️ (Trống)"
-					armor_label.modulate.a = 0.45
+				if is_instance_valid(armor_label):
+					if item_name != "":
+						armor_label.text = _format_equip_str("🛡️", suit_rank, item_name)
+						armor_label.modulate.a = 1.0
+					else:
+						armor_label.text = "🛡️ (Trống)"
+						armor_label.modulate.a = 0.45
 		"defensive_mount", "mount_defense", "ngua_thu", "mount":
 			key = "defensive_mount"
-			if defensive_mount_slot:
+			if is_instance_valid(defensive_mount_slot):
 				defensive_mount_slot.visible = true
-				if item_name != "":
-					defensive_mount_label.text = _format_equip_str("🐘 (+1)", suit_rank, item_name)
-					defensive_mount_label.modulate.a = 1.0
-				else:
-					defensive_mount_label.text = "🐘 (+1) Trống"
-					defensive_mount_label.modulate.a = 0.45
+				if is_instance_valid(defensive_mount_label):
+					if item_name != "":
+						defensive_mount_label.text = _format_equip_str("🐘 (+1)", suit_rank, item_name)
+						defensive_mount_label.modulate.a = 1.0
+					else:
+						defensive_mount_label.text = "🐘 (+1) Trống"
+						defensive_mount_label.modulate.a = 0.45
 		"offensive_mount", "mount_offense", "ngua_cong":
 			key = "offensive_mount"
-			if offensive_mount_slot:
+			if is_instance_valid(offensive_mount_slot):
 				offensive_mount_slot.visible = true
-				if item_name != "":
-					offensive_mount_label.text = _format_equip_str("🐎 (-1)", suit_rank, item_name)
-					offensive_mount_label.modulate.a = 1.0
-				else:
-					offensive_mount_label.text = "🐎 (-1) Trống"
-					offensive_mount_label.modulate.a = 0.45
+				if is_instance_valid(offensive_mount_label):
+					if item_name != "":
+						offensive_mount_label.text = _format_equip_str("🐎 (-1)", suit_rank, item_name)
+						offensive_mount_label.modulate.a = 1.0
+					else:
+						offensive_mount_label.text = "🐎 (-1) Trống"
+						offensive_mount_label.modulate.a = 0.45
 		"treasure", "bao_vat":
 			key = "treasure"
-			if treasure_slot:
+			if is_instance_valid(treasure_slot):
 				treasure_slot.visible = true
-				if item_name != "":
-					treasure_label.text = _format_equip_str("👑", suit_rank, item_name)
-					treasure_label.modulate.a = 1.0
-				else:
-					treasure_label.text = "👑 (Trống)"
-					treasure_label.modulate.a = 0.45
+				if is_instance_valid(treasure_label):
+					if item_name != "":
+						treasure_label.text = _format_equip_str("👑", suit_rank, item_name)
+						treasure_label.modulate.a = 1.0
+					else:
+						treasure_label.text = "👑 (Trống)"
+						treasure_label.modulate.a = 0.45
 
 	if key != "":
 		if item_name != "":
@@ -205,24 +215,27 @@ func set_faction_color(color: Color) -> void:
 
 func setup_general(p_id: String, p_name: String, p_faction: String = "Trần", p_hp: int = 4, p_max_hp: int = 4, p_role: String = "") -> void:
 	general_id = p_id
-	name_label.text = p_name
-	faction_badge.text = " %s " % p_faction
+	if is_instance_valid(name_label):
+		name_label.text = p_name
+	if is_instance_valid(faction_badge):
+		faction_badge.text = " %s " % p_faction
 	current_hp = p_hp
 	max_hp = p_max_hp
 
-	if p_role != "":
-		role_badge.visible = true
-		role_badge.text = " %s " % p_role
-		if p_role == "BẠN":
-			role_badge.add_theme_color_override("font_color", Color(0.4, 0.95, 0.5, 1.0))
+	if is_instance_valid(role_badge):
+		if p_role != "":
+			role_badge.visible = true
+			role_badge.text = " %s " % p_role
+			if p_role == "BẠN":
+				role_badge.add_theme_color_override("font_color", Color(0.4, 0.95, 0.5, 1.0))
+			else:
+				role_badge.add_theme_color_override("font_color", Color(1.0, 0.45, 0.45, 1.0))
 		else:
-			role_badge.add_theme_color_override("font_color", Color(1.0, 0.45, 0.45, 1.0))
-	else:
-		role_badge.visible = false
+			role_badge.visible = false
 
 	# Tải ảnh chân dung tướng nếu có
 	var tex_path = "res://assets/ui/" + p_id + ".png"
-	if ResourceLoader.exists(tex_path):
+	if ResourceLoader.exists(tex_path) and is_instance_valid(portrait_rect):
 		portrait_rect.texture = load(tex_path)
 
 	update_hp(current_hp, max_hp)
@@ -236,7 +249,7 @@ func update_hp(p_hp: int, p_max_hp: int) -> void:
 	current_hp = clamp(p_hp, 0, p_max_hp)
 	max_hp = p_max_hp
 
-	if lotus_container:
+	if is_instance_valid(lotus_container):
 		while lotus_container.get_child_count() < max_hp:
 			var tr = TextureRect.new()
 			tr.custom_minimum_size = Vector2(18, 18)
@@ -251,29 +264,31 @@ func update_hp(p_hp: int, p_max_hp: int) -> void:
 			c.queue_free()
 
 		for i in range(max_hp):
-			var tr: TextureRect = lotus_container.get_child(i)
-			if i < current_hp:
-				tr.texture = LOTUS_FULL_TEX
-				tr.modulate = Color(1, 1, 1, 1)
-			else:
-				tr.texture = LOTUS_EMPTY_TEX
-				tr.modulate = Color(1, 1, 1, 0.75)
+			var tr = lotus_container.get_child(i)
+			if is_instance_valid(tr):
+				if i < current_hp:
+					tr.texture = LOTUS_FULL_TEX
+					tr.modulate = Color(1, 1, 1, 1)
+				else:
+					tr.texture = LOTUS_EMPTY_TEX
+					tr.modulate = Color(1, 1, 1, 0.75)
 
 		# If HP changed, animate the affected lotus unit
 		if old_hp != current_hp and current_hp < max_hp and current_hp >= 0:
 			var anim_idx = clamp(current_hp if current_hp < old_hp else current_hp - 1, 0, max_hp - 1)
 			if anim_idx < lotus_container.get_child_count():
-				var anim_tr: TextureRect = lotus_container.get_child(anim_idx)
-				var tw = create_tween()
-				tw.tween_property(anim_tr, "scale", Vector2(1.35, 1.35), 0.1).set_trans(Tween.TRANS_BACK)
-				tw.tween_property(anim_tr, "scale", Vector2(1.0, 1.0), 0.15)
+				var anim_tr = lotus_container.get_child(anim_idx)
+				if is_instance_valid(anim_tr):
+					var tw = create_tween()
+					tw.tween_property(anim_tr, "scale", Vector2(1.35, 1.35), 0.1).set_trans(Tween.TRANS_BACK)
+					tw.tween_property(anim_tr, "scale", Vector2(1.0, 1.0), 0.15)
 
-	if hp_text_label:
+	if is_instance_valid(hp_text_label):
 		hp_text_label.text = "(%d/%d)" % [current_hp, max_hp]
 
 func update_hand_count(count: int) -> void:
 	hand_count = count
-	if hand_count_label:
+	if is_instance_valid(hand_count_label):
 		hand_count_label.text = "🎴 %d" % hand_count
 
 func _on_mouse_entered() -> void:
