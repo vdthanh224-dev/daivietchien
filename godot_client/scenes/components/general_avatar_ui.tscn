@@ -76,17 +76,17 @@ corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_skill_btn"]
-bg_color = Color(0.1, 0.14, 0.22, 0.96)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(1, 0.85, 0.35, 1)
+bg_color = Color(0.97, 0.96, 0.92, 1)
+border_width_left = 1.5
+border_width_top = 1.5
+border_width_right = 1.5
+border_width_bottom = 1.5
+border_color = Color(0.85, 0.7, 0.25, 1)
 corner_radius_top_left = 6
 corner_radius_top_right = 6
 corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
-shadow_color = Color(0, 0, 0, 0.4)
+shadow_color = Color(0, 0, 0, 0.35)
 shadow_size = 4
 shadow_offset = Vector2(0, 2)
 
@@ -370,12 +370,12 @@ mouse_filter = 2
 theme_override_constants/separation = 2
 
 [node name="WeaponSlot" type="PanelContainer" parent="Frame/EquipContainer"]
-visible = false
 layout_mode = 2
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_equip_slot")
 
 [node name="Label" type="Label" parent="Frame/EquipContainer/WeaponSlot"]
+modulate = Color(1, 1, 1, 0.45)
 layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 0.88, 0.45, 1)
@@ -383,15 +383,15 @@ theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.95)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
 theme_override_font_sizes/font_size = 11
-text = "🗡️ Kiếm Thuận Thiên"
+text = "🗡️ (Trống)"
 
 [node name="ArmorSlot" type="PanelContainer" parent="Frame/EquipContainer"]
-visible = false
 layout_mode = 2
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_equip_slot")
 
 [node name="Label" type="Label" parent="Frame/EquipContainer/ArmorSlot"]
+modulate = Color(1, 1, 1, 0.45)
 layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.65, 0.88, 1, 1)
@@ -399,15 +399,15 @@ theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.95)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
 theme_override_font_sizes/font_size = 11
-text = "🛡️ Khiên Mây Bện ♦K"
+text = "🛡️ (Trống)"
 
 [node name="DefensiveMountSlot" type="PanelContainer" parent="Frame/EquipContainer"]
-visible = false
 layout_mode = 2
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_equip_slot")
 
 [node name="Label" type="Label" parent="Frame/EquipContainer/DefensiveMountSlot"]
+modulate = Color(1, 1, 1, 0.45)
 layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.65, 0.95, 0.75, 1)
@@ -415,15 +415,15 @@ theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.95)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
 theme_override_font_sizes/font_size = 11
-text = "🐘🛡️ Voi Chiến (+1)"
+text = "🐘 (+1) Trống"
 
 [node name="OffensiveMountSlot" type="PanelContainer" parent="Frame/EquipContainer"]
-visible = false
 layout_mode = 2
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_equip_slot")
 
 [node name="Label" type="Label" parent="Frame/EquipContainer/OffensiveMountSlot"]
+modulate = Color(1, 1, 1, 0.45)
 layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 0.65, 0.55, 1)
@@ -431,15 +431,15 @@ theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.95)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
 theme_override_font_sizes/font_size = 11
-text = "🐎⚔️ Ngựa Trắng (-1)"
+text = "🐎 (-1) Trống"
 
 [node name="TreasureSlot" type="PanelContainer" parent="Frame/EquipContainer"]
-visible = false
 layout_mode = 2
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_equip_slot")
 
 [node name="Label" type="Label" parent="Frame/EquipContainer/TreasureSlot"]
+modulate = Color(1, 1, 1, 0.45)
 layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.9, 0.75, 1, 1)
@@ -447,7 +447,7 @@ theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.95)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
 theme_override_font_sizes/font_size = 11
-text = "👑 Bảo Vật"
+text = "👑 (Trống)"
 
 [node name="TargetBorder" type="ReferenceRect" parent="."]
 visible = false
@@ -481,10 +481,15 @@ theme_override_font_sizes/font_size = 10
 theme_override_styles/normal = SubResource("StyleBoxFlat_skill_btn")
 theme_override_styles/hover = SubResource("StyleBoxFlat_skill_btn")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_skill_btn")
-theme_override_colors/font_color = Color(1, 0.9, 0.55, 1)
-theme_override_colors/font_hover_color = Color(1, 1, 0.8, 1)
-theme_override_colors/font_pressed_color = Color(1, 0.85, 0.35, 1)
-theme_override_colors/font_focus_color = Color(1, 0.9, 0.55, 1)
+theme_override_styles/focus = SubResource("StyleBoxFlat_skill_btn")
+theme_override_colors/font_color = Color(0.08, 0.08, 0.08, 1)
+theme_override_colors/font_hover_color = Color(0, 0, 0, 1)
+theme_override_colors/font_pressed_color = Color(0.2, 0.2, 0.2, 1)
+theme_override_colors/font_focus_color = Color(0.08, 0.08, 0.08, 1)
+theme_override_colors/font_shadow_color = Color(1, 0.82, 0.2, 1)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_constants/shadow_outline_size = 1
 text = "⚡ TIẾN THOÁI"
 
 [node name="ClickBtn" type="Button" parent="."]

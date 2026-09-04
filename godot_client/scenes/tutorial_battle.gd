@@ -60,6 +60,7 @@ var is_free_battle: bool = false
 var slashes_used_this_turn: int = 0
 var is_player_turn: bool = true
 var is_waiting_dodge_reaction: bool = false
+var is_in_free_discard_phase: bool = false
 
 func _ready() -> void:
 	# Bắt đầu phát nhạc nền chiến trận hào hùng
@@ -222,6 +223,27 @@ func _ready() -> void:
 		img.save_png("res://tutorial_info_btn_clicked_screenshot.png")
 		print("[Screenshot] Đã lưu tutorial_info_btn_clicked_screenshot.png! Modal visible: ", general_info_modal.visible)
 		get_tree().quit()
+	elif "--screenshot-discard" in OS.get_cmdline_user_args():
+		_on_close_health_spotlight()
+		_start_step_4_8_discard_lesson()
+		await get_tree().process_frame
+		if hand_container.get_child_count() > 0:
+			hand_container.get_child(0).set_selected(true)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var img = get_viewport().get_texture().get_image()
+		img.save_png("res://tutorial_discard_screenshot.png")
+		print("[Screenshot] Đã lưu tutorial_discard_screenshot.png!")
+		get_tree().quit()
+	elif "--screenshot-avatar-slots" in OS.get_cmdline_user_args():
+		_on_close_health_spotlight()
+		player_avatar.set_equipment("weapon", "Kiếm Thuận Thiên", "♦A")
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var img = get_viewport().get_texture().get_image()
+		img.save_png("res://tutorial_avatar_slots_screenshot.png")
+		print("[Screenshot] Đã lưu tutorial_avatar_slots_screenshot.png!")
+		get_tree().quit()
 
 func _process(delta: float) -> void:
 	if arrow_node and arrow_node.visible:
@@ -294,6 +316,14 @@ func _on_card_selected_state_changed(card_ui: Control, is_sel: bool) -> void:
 			selected_card_ui = null
 			if is_waiting_dodge_reaction:
 				_update_dodge_reaction_ui()
+			elif is_in_free_discard_phase:
+				_update_free_discard_ui()
+			elif current_step == 42:
+				action_btn.disabled = true
+				action_btn.text = "🗑️ HÃY CHỌN LÁ ĐỂ BỎ (1 LÁ THỪA)"
+				desc_text.text = "🗑️ Hãy chọn 1 lá bài thừa trên tay để bỏ..."
+				if hand_container.get_child_count() > 0:
+					_show_arrow(hand_container.get_child(0).global_position + Vector2(-15, 80), "CHỌN LÁ ĐỂ BỎ")
 			else:
 				desc_text.text = "💡 Chạm chọn một lá bài trên tay để xem mô tả & sử dụng..."
 				card_play_btn.visible = false
@@ -310,6 +340,13 @@ func _handle_card_selected(c_ui: Control) -> void:
 			card_play_btn.disabled = true
 			card_play_btn.text = "🛡️ CẦN LÁ ĐỠ"
 			desc_text.text = "⚠️ Bạn đang bị Sơn Tặc tấn công! Hãy chọn lá [ĐỠ] hoặc bấm [💔 CHỊU ĐÒN (-1)]."
+		return
+
+	if current_step == 42:
+		action_btn.disabled = false
+		action_btn.text = "🗑️ BỎ LÁ [%s] (1 LÁ THỪA)" % c_ui.card_name.to_upper()
+		desc_text.text = "🗑️ Đã chọn lá [%s]. Nhấn nút [BỎ BÀI] ở góc trên để loại bỏ lá bài thừa!" % c_ui.card_name
+		_show_arrow(action_btn.global_position + Vector2(-15, 21), "XÁC NHẬN BỎ")
 		return
 
 	if is_free_battle:
@@ -351,6 +388,18 @@ func _handle_free_battle_card_selected(c_ui: Control) -> void:
 			card_play_btn.disabled = true
 			card_play_btn.text = "🛡️ CẦN LÁ ĐỠ"
 			desc_text.text = "⚠️ Bạn đang bị Sơn Tặc tấn công! Hãy chọn lá [ĐỠ] hoặc bấm [💔 CHỊU ĐÒN (-1)]."
+		return
+
+	if is_in_free_discard_phase:
+		var excess = hand_container.get_child_count() - player_hp
+		if excess > 0:
+			card_play_btn.visible = true
+			card_play_btn.disabled = false
+			card_play_btn.text = "🗑️ BỎ LÁ [%s]" % c_ui.card_name.to_upper()
+			desc_text.text = "🗑️ Đã chọn [%s]. Nhấn [BỎ BÀI] để loại bỏ (Cần bỏ %d lá thừa)." % [c_ui.card_name, excess]
+		else:
+			is_in_free_discard_phase = false
+			card_play_btn.visible = false
 		return
 
 	if not is_player_turn:
@@ -410,6 +459,10 @@ func _on_card_play_btn_clicked() -> void:
 		_execute_free_play_dodge()
 		return
 
+	if is_in_free_discard_phase:
+		_execute_free_play_discard()
+		return
+
 	if is_free_battle:
 		_execute_free_card_play()
 		return
@@ -429,7 +482,9 @@ func _on_action_btn_clicked() -> void:
 		4:
 			_start_step_4_5_skill()
 		41:
-			_start_step_5_boss_turn()
+			_start_step_4_8_discard_lesson()
+		42:
+			_execute_tutorial_discard()
 		6: # Bấm nút "BẮT ĐẦU THỰC CHIẾN ⚔️"
 			_start_free_battle_mode()
 
@@ -520,6 +575,54 @@ func _on_player_skill_clicked() -> void:
 		action_btn.disabled = false
 		action_btn.text = "KẾT THÚC LƯỢT ➜"
 
+func _start_step_4_8_discard_lesson() -> void:
+	current_step = 42
+
+	# Đảm bảo bài trên tay nhiều hơn số máu để minh họa bài học Bỏ Bài Thừa
+	var hand_count = hand_container.get_child_count()
+	if hand_count <= player_hp:
+		# Rút thêm 1 lá để thừa bài (5 lá trên tay > 4 Máu)
+		_create_card_in_hand("Trảm Thường", "7", "Club", 0, "Tấn công gây 1 sát thương.")
+		deck_count -= 1
+		deck_label.text = "🎴 %d" % deck_count
+		AudioManager.play_card_draw()
+		hand_count = hand_container.get_child_count()
+
+	var excess = hand_count - player_hp
+	banner.visible = true
+	banner_title.text = "🗑️ GIAI ĐOẠN 3: BỎ BÀI CUỐI LƯỢT (DISCARD PHASE)"
+	banner_desc.text = "• QUY TẮC: Khi kết thúc lượt, số bài trên tay tối đa chỉ được BẰNG SỐ MÁU (%d Máu)!\n• Hiện tại bạn có %d lá bài (vượt quá %d lá bài thừa).\nHãy chạm chọn đúng %d lá bài thừa rồi nhấn [BỎ BÀI]!" % [player_hp, hand_count, excess, excess]
+	_add_log("🗑️ Giai đoạn Bỏ Bài: Số bài trên tay (%d) > Số máu (%d). Cần bỏ %d lá bài thừa." % [hand_count, player_hp, excess])
+
+	action_btn.visible = true
+	action_btn.disabled = true
+	action_btn.text = "🗑️ HÃY CHỌN LÁ ĐỂ BỎ (%d LÁ THỪA)" % excess
+	card_play_btn.visible = false
+
+	if hand_container.get_child_count() > 0:
+		var first_card = hand_container.get_child(0)
+		_show_arrow(first_card.global_position + Vector2(-15, 80), "CHỌN LÁ ĐỂ BỎ")
+
+func _execute_tutorial_discard() -> void:
+	if not selected_card_ui:
+		return
+
+	var c_name = selected_card_ui.card_name
+	_animate_card_play_to_center(selected_card_ui)
+	selected_card_ui = null
+	AudioManager.play_card_select()
+
+	var remaining = hand_container.get_child_count()
+	arrow_node.visible = false
+	action_btn.visible = false
+
+	_add_log("🗑️ Đã bỏ lá [%s]. Số bài trên tay (%d/%d) đã cân bằng với số máu!" % [c_name, remaining, player_hp])
+	banner_title.text = "✅ HOÀN TẤT BỎ BÀI!"
+	banner_desc.text = "Số bài trên tay (%d/%d) đã cân bằng với số máu!\nĐang chuyển lượt sang Thủ Lĩnh Sơn Tặc..." % [remaining, player_hp]
+
+	await get_tree().create_timer(1.6).timeout
+	_start_step_5_boss_turn()
+
 func _start_step_5_boss_turn() -> void:
 	current_step = 5
 	action_btn.visible = false
@@ -585,9 +688,11 @@ func _start_free_battle_mode() -> void:
 
 func _player_turn_start_free_play() -> void:
 	is_player_turn = true
+	is_in_free_discard_phase = false
 	slashes_used_this_turn = 0
 	card_play_btn.visible = false
 	end_turn_btn.disabled = false
+	end_turn_btn.text = "KẾT THÚC LƯỢT ➜"
 	desc_text.text = "💡 Lượt của bạn! Chọn lá bài trên tay để sử dụng hoặc nhấn Kết thúc lượt."
 	_add_log("=== LƯỢT MỚI CỦA BẠN ===")
 
@@ -702,6 +807,44 @@ func _execute_free_card_play() -> void:
 
 	desc_text.text = "💡 Chọn lá bài khác trên tay hoặc nhấn Kết thúc lượt."
 
+func _update_free_discard_ui() -> void:
+	var excess = hand_container.get_child_count() - player_hp
+	if excess <= 0:
+		is_in_free_discard_phase = false
+		card_play_btn.visible = false
+		desc_text.text = "✅ Số bài trên tay đã cân bằng với số máu! Nhấn [KẾT THÚC LƯỢT] để kết thúc lượt."
+		return
+
+	card_play_btn.visible = true
+	if selected_card_ui:
+		card_play_btn.disabled = false
+		card_play_btn.text = "🗑️ BỎ LÁ [%s]" % selected_card_ui.card_name.to_upper()
+		desc_text.text = "🗑️ Đã chọn [%s]. Nhấn [BỎ BÀI] để loại bỏ (Cần bỏ %d lá thừa)." % [selected_card_ui.card_name, excess]
+	else:
+		card_play_btn.disabled = true
+		card_play_btn.text = "🗑️ CHỌN LÁ ĐỂ BỎ (%d THỪA)" % excess
+		desc_text.text = "⚠️ Hãy chọn lá bài thừa trên tay để bỏ (Còn %d lá thừa)..." % excess
+
+func _execute_free_play_discard() -> void:
+	if not selected_card_ui:
+		return
+
+	var c_name = selected_card_ui.card_name
+	_animate_card_play_to_center(selected_card_ui)
+	selected_card_ui = null
+	AudioManager.play_card_select()
+
+	var remaining = hand_container.get_child_count()
+	var excess = remaining - player_hp
+	if excess > 0:
+		_add_log("🗑️ Đã bỏ lá [%s]. Vẫn còn thừa %d lá bài (%d/%d)." % [c_name, excess, remaining, player_hp])
+		_update_free_discard_ui()
+	else:
+		is_in_free_discard_phase = false
+		card_play_btn.visible = false
+		_add_log("✅ Đã bỏ xong bài thừa (%d/%d). Bạn có thể bấm [KẾT THÚC LƯỢT]!" % [remaining, player_hp])
+		desc_text.text = "✅ Số bài trên tay đã cân bằng với số máu! Nhấn [KẾT THÚC LƯỢT] để kết thúc lượt."
+
 func _on_end_turn_btn_clicked() -> void:
 	end_turn_btn.release_focus()
 	if is_waiting_dodge_reaction:
@@ -714,6 +857,16 @@ func _on_end_turn_btn_clicked() -> void:
 	if not is_player_turn:
 		return
 
+	# Kiểm tra quy tắc Bỏ Bài Cuối Lượt: Số bài trên tay tối đa bằng số máu hiện tại
+	var current_cards = hand_container.get_child_count()
+	if current_cards > player_hp:
+		var excess = current_cards - player_hp
+		is_in_free_discard_phase = true
+		_add_log("⚠️ GIAI ĐOẠN BỎ BÀI: Số bài trên tay (%d) > Số máu (%d). Cần bỏ %d lá bài thừa!" % [current_cards, player_hp, excess])
+		_update_free_discard_ui()
+		return
+
+	is_in_free_discard_phase = false
 	is_player_turn = false
 	end_turn_btn.disabled = true
 	card_play_btn.visible = false

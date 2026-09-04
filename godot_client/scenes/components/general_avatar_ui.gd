@@ -52,6 +52,30 @@ func _ready() -> void:
 			info_clicked.emit()
 		)
 
+	_init_equipment_slots()
+
+func _init_equipment_slots() -> void:
+	if weapon_slot:
+		weapon_slot.visible = true
+		weapon_label.text = "🗡️ (Trống)"
+		weapon_label.modulate.a = 0.45
+	if armor_slot:
+		armor_slot.visible = true
+		armor_label.text = "🛡️ (Trống)"
+		armor_label.modulate.a = 0.45
+	if defensive_mount_slot:
+		defensive_mount_slot.visible = true
+		defensive_mount_label.text = "🐘 (+1) Trống"
+		defensive_mount_label.modulate.a = 0.45
+	if offensive_mount_slot:
+		offensive_mount_slot.visible = true
+		offensive_mount_label.text = "🐎 (-1) Trống"
+		offensive_mount_label.modulate.a = 0.45
+	if treasure_slot:
+		treasure_slot.visible = true
+		treasure_label.text = "👑 (Trống)"
+		treasure_label.modulate.a = 0.45
+
 func _on_avatar_clicked() -> void:
 	clicked.emit()
 
@@ -82,28 +106,53 @@ func set_equipment(slot_type: String, item_name: String, suit_rank: String = "")
 		"weapon", "vu_khi":
 			key = "weapon"
 			if weapon_slot:
-				weapon_slot.visible = (item_name != "")
-				weapon_label.text = _format_equip_str("🗡️", suit_rank, item_name)
+				weapon_slot.visible = true
+				if item_name != "":
+					weapon_label.text = _format_equip_str("🗡️", suit_rank, item_name)
+					weapon_label.modulate.a = 1.0
+				else:
+					weapon_label.text = "🗡️ (Trống)"
+					weapon_label.modulate.a = 0.45
 		"armor", "giap":
 			key = "armor"
 			if armor_slot:
-				armor_slot.visible = (item_name != "")
-				armor_label.text = _format_equip_str("🛡️", suit_rank, item_name)
+				armor_slot.visible = true
+				if item_name != "":
+					armor_label.text = _format_equip_str("🛡️", suit_rank, item_name)
+					armor_label.modulate.a = 1.0
+				else:
+					armor_label.text = "🛡️ (Trống)"
+					armor_label.modulate.a = 0.45
 		"defensive_mount", "mount_defense", "ngua_thu", "mount":
 			key = "defensive_mount"
 			if defensive_mount_slot:
-				defensive_mount_slot.visible = (item_name != "")
-				defensive_mount_label.text = _format_equip_str("🐘 (+1)", suit_rank, item_name)
+				defensive_mount_slot.visible = true
+				if item_name != "":
+					defensive_mount_label.text = _format_equip_str("🐘 (+1)", suit_rank, item_name)
+					defensive_mount_label.modulate.a = 1.0
+				else:
+					defensive_mount_label.text = "🐘 (+1) Trống"
+					defensive_mount_label.modulate.a = 0.45
 		"offensive_mount", "mount_offense", "ngua_cong":
 			key = "offensive_mount"
 			if offensive_mount_slot:
-				offensive_mount_slot.visible = (item_name != "")
-				offensive_mount_label.text = _format_equip_str("🐎 (-1)", suit_rank, item_name)
+				offensive_mount_slot.visible = true
+				if item_name != "":
+					offensive_mount_label.text = _format_equip_str("🐎 (-1)", suit_rank, item_name)
+					offensive_mount_label.modulate.a = 1.0
+				else:
+					offensive_mount_label.text = "🐎 (-1) Trống"
+					offensive_mount_label.modulate.a = 0.45
 		"treasure", "bao_vat":
 			key = "treasure"
 			if treasure_slot:
-				treasure_slot.visible = (item_name != "")
-				treasure_label.text = _format_equip_str("👑", suit_rank, item_name)
+				treasure_slot.visible = true
+				if item_name != "":
+					treasure_label.text = _format_equip_str("👑", suit_rank, item_name)
+					treasure_label.modulate.a = 1.0
+				else:
+					treasure_label.text = "👑 (Trống)"
+					treasure_label.modulate.a = 0.45
 
 	if key != "":
 		if item_name != "":
@@ -117,10 +166,10 @@ func set_equipment(slot_type: String, item_name: String, suit_rank: String = "")
 			equipped_items[key] = ""
 
 func has_armor() -> bool:
-	return armor_slot != null and armor_slot.visible
+	return equipped_items.get("armor", "") != ""
 
 func get_armor_name() -> String:
-	return armor_label.text if has_armor() else ""
+	return equipped_items.get("armor", "")
 
 func play_damage_effect() -> void:
 	var orig_pos = position
