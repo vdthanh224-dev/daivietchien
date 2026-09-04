@@ -19,8 +19,8 @@ var is_deleting_session: bool = false
 # Player Profile & Progression (Synced with Appwrite /account/prefs)
 var current_level: int = 1
 var current_exp: int = 0
-var current_silver: int = 25000
-var current_gold: int = 1200
+var current_silver: int = 5000
+var current_gold: int = 0
 var current_generals: Array = ["ly_thuong_kiet"]
 var current_2v2_points: int = 1200
 var tutorial_reward_claimed: bool = false
@@ -137,7 +137,7 @@ func get_military_rank_info() -> Dictionary:
 
 # --- Tutorial Reward ---
 # Lần đầu chơi tân thủ cho được 20Exp cho vừa tròn lên cấp 2. Tướng Lý Thường Kiệt +50 Exp quân hàm.
-func claim_tutorial_reward(exp_amt: int = 20, silver_amt: int = 2000, gold_amt: int = 200) -> Dictionary:
+func claim_tutorial_reward(exp_amt: int = 20, silver_amt: int = 5000, gold_amt: int = 0) -> Dictionary:
 	var old_lvl = current_level
 	var old_exp_val = current_exp
 	tutorial_reward_claimed = true
@@ -527,8 +527,8 @@ func load_saved_session() -> void:
 					session_cookie = data.get("cookie", "")
 					current_level = int(data.get("level", 1))
 					current_exp = int(data.get("exp", 0))
-					current_silver = int(data.get("silver", 25000))
-					current_gold = int(data.get("gold", 1200))
+					current_silver = int(data.get("silver", 5000))
+					current_gold = int(data.get("gold", 0))
 					current_generals = data.get("generals", ["ly_thuong_kiet"])
 					if current_generals.is_empty():
 						current_generals = ["ly_thuong_kiet"]

@@ -37,8 +37,8 @@ var modal_title_label: Label
 var modal_content_container: VBoxContainer
 
 # Player State
-var current_silver: int = 25000
-var current_gold: int = 1200
+var current_silver: int = 5000
+var current_gold: int = 0
 var current_rp: int = 1200
 var current_military_points: int = 350
 
@@ -304,9 +304,12 @@ func _build_top_header() -> void:
 	s_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	s_hbox.add_theme_constant_override("separation", 6)
 
-	var s_icon = Label.new()
-	s_icon.text = "🪙"
-	s_icon.add_theme_font_size_override("font_size", 16)
+	var s_icon = TextureRect.new()
+	s_icon.custom_minimum_size = Vector2(22, 22)
+	s_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	s_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var s_tex = load("res://assets/ui/icon_silver.png")
+	if s_tex: s_icon.texture = s_tex
 	s_hbox.add_child(s_icon)
 
 	silver_label = Label.new()
@@ -337,9 +340,12 @@ func _build_top_header() -> void:
 	g_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	g_hbox.add_theme_constant_override("separation", 6)
 
-	var g_icon = Label.new()
-	g_icon.text = "💎"
-	g_icon.add_theme_font_size_override("font_size", 16)
+	var g_icon = TextureRect.new()
+	g_icon.custom_minimum_size = Vector2(22, 22)
+	g_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	g_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var g_tex = load("res://assets/ui/icon_gold.png")
+	if g_tex: g_icon.texture = g_tex
 	g_hbox.add_child(g_icon)
 
 	gold_label = Label.new()
@@ -1203,16 +1209,15 @@ func _show_level_up_modal(old_lvl: int, new_lvl: int, on_close: Callable = Calla
 	speech_panel.add_child(speech_hbox)
 	vbox.add_child(speech_panel)
 
-	# 4 Reward & Perk Cards
+	# 3 Reward & Perk Cards (Đã xóa Khí Lực và không tặng Vàng free)
 	var perk_hbox = HBoxContainer.new()
-	perk_hbox.add_theme_constant_override("separation", 8)
+	perk_hbox.add_theme_constant_override("separation", 10)
 	perk_hbox.custom_minimum_size = Vector2(0, 95)
 
 	var perks = [
-		{"icon": "⚡", "title": "KHÍ LỰC", "desc": "Hồi 100% Thể Lực\nTăng giới hạn", "c": Color(0.20, 0.55, 0.85, 1.0)},
-		{"icon": "🔓", "title": "MỞ KHÓA", "desc": "Đấu Trường 2v2\nVương Triều", "c": Color(0.75, 0.35, 0.15, 1.0)},
-		{"icon": "🪙", "title": "BỔNG LỘC", "desc": "+500 BẠC\nQuân lương triều đình", "c": Color(0.20, 0.50, 0.25, 1.0)},
-		{"icon": "💎", "title": "QUÂN LỆNH", "desc": "+50 VÀNG\nBảo vật hoàng gia", "c": Color(0.65, 0.25, 0.85, 1.0)}
+		{"icon": "🔓", "title": "MỞ KHÓA TÍNH NĂNG", "desc": "Đấu Trường 2v2 Hoàng Triều\nVương Triều Tranh Bá", "c": Color(0.75, 0.35, 0.15, 1.0)},
+		{"icon": "🥈", "title": "BỔNG LỘC TRIỀU ĐÌNH", "desc": "+1,000 BẠC\nQuân lương triều đình phong thưởng", "c": Color(0.25, 0.45, 0.70, 1.0)},
+		{"icon": "🎖️", "title": "QUÂN CÔNG THĂNG TRẬT", "desc": "Uy Danh Vang Dội Tứ Hải\nTriều Đình Đặc Cách Gia Phong", "c": Color(0.20, 0.55, 0.25, 1.0)}
 	]
 
 	for p in perks:
@@ -1274,8 +1279,7 @@ func _show_level_up_modal(old_lvl: int, new_lvl: int, on_close: Callable = Calla
 		AudioManager.play_card_select()
 
 		if AuthManager:
-			AuthManager.current_silver += 500
-			AuthManager.current_gold += 50
+			AuthManager.current_silver += 1000
 			AuthManager.save_session()
 			AuthManager.save_profile_to_appwrite()
 			_load_user_data()
@@ -1516,10 +1520,10 @@ func _build_quests_content() -> Control:
 	container.add_theme_constant_override("separation", 10)
 
 	var quests = [
-		{"name": "Đánh thắng 1 trận Luyện Tập", "prog": "1/1", "done": true, "reward": "🪙 500 Bạc"},
-		{"name": "Dùng thành công 3 lá Trảm", "prog": "2/3", "done": false, "reward": "🪙 300 Bạc"},
-		{"name": "Phán xét Khiên Mây Bện thành công", "prog": "1/1", "done": true, "reward": "💎 50 Vàng"},
-		{"name": "Tham gia 1 trận Đấu Trường 2v2", "prog": "0/1", "done": false, "reward": "💎 100 Vàng"},
+		{"name": "Đánh thắng 1 trận Luyện Tập", "prog": "1/1", "done": true, "reward": "🥈 500 Bạc"},
+		{"name": "Dùng thành công 3 lá Trảm", "prog": "2/3", "done": false, "reward": "🥈 300 Bạc"},
+		{"name": "Phán xét Khiên Mây Bện thành công", "prog": "1/1", "done": true, "reward": "🥈 600 Bạc"},
+		{"name": "Tham gia 1 trận Đấu Trường 2v2", "prog": "0/1", "done": false, "reward": "🥈 1,000 Bạc"},
 	]
 
 	for q in quests:
@@ -1657,8 +1661,8 @@ func _build_mail_content() -> Control:
 	container.add_theme_constant_override("separation", 8)
 
 	var letters = [
-		{"from": "Triều Đình Đại Việt", "sub": "Chiếu chỉ ban tặng bổng lộc tân chiến tướng", "gift": "🪙 5,000 Bạc"},
-		{"from": "Hệ Thống 2v2", "sub": "Thưởng mùa giải Hoàng Triều Khởi Đấu", "gift": "💎 200 Vàng"},
+		{"from": "Triều Đình Đại Việt", "sub": "Chiếu chỉ ban tặng bổng lộc tân chiến tướng", "gift": "🥈 5,000 Bạc"},
+		{"from": "Hệ Thống 2v2", "sub": "Thưởng mùa giải Hoàng Triều Khởi Đấu", "gift": "🥈 2,000 Bạc"},
 	]
 
 	for l in letters:

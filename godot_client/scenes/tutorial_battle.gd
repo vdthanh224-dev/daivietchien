@@ -1240,16 +1240,10 @@ func _show_reward_modal() -> void:
 			"tag_color": Color(0.85, 0.45, 0.05, 1.0)
 		},
 		{
-			"tag": "🪙 QUÂN LƯƠNG",
-			"val": "+2,000 BẠC",
+			"tag": "🥈 QUÂN LƯƠNG",
+			"val": "+5,000 BẠC",
 			"desc": "Ngân lượng khởi đầu\nChiêu mộ tướng soái\nRèn đúc binh khí",
-			"tag_color": Color(0.20, 0.45, 0.75, 1.0)
-		},
-		{
-			"tag": "💎 QUÂN LỆNH",
-			"val": "+200 VÀNG",
-			"desc": "Bảo vật hoàng gia\nMua sắm Trân Bảo Các\nBổng lộc triều đình",
-			"tag_color": Color(0.65, 0.35, 0.85, 1.0)
+			"tag_color": Color(0.25, 0.45, 0.70, 1.0)
 		}
 	]
 
@@ -1411,8 +1405,8 @@ func _show_reward_modal() -> void:
 		claim_btn.release_focus()
 		claim_btn.disabled = true
 		AudioManager.play_victory()
-		AuthManager.claim_tutorial_reward(20, 2000, 200)
-		_add_log("🎁 ĐÃ NHẬN THƯỞNG: Tướng Lý Thường Kiệt, +20 EXP (Thăng Cấp 2), +2,000 Bạc, +200 Vàng!")
+		AuthManager.claim_tutorial_reward(20, 5000, 0)
+		_add_log("🎁 ĐÃ NHẬN THƯỞNG: Tướng Lý Thường Kiệt, +20 EXP (Thăng Cấp 2), +5,000 Bạc!")
 		await get_tree().create_timer(0.6).timeout
 		get_tree().change_scene_to_file("res://scenes/home.tscn")
 	)
