@@ -42,6 +42,13 @@ var current_gold: int = 0
 var current_rp: int = 1200
 var current_military_points: int = 350
 
+# Matchmaking 2v2 State
+var is_matchmaking_active: bool = false
+var mm_is_cancelled: bool = false
+var mm_active_room_id: String = ""
+var mm_is_host: bool = false
+var mm_current_room: Dictionary = {}
+
 # Embers particle pool
 var ember_particles: Array = []
 var levelup_overlay: Control = null
@@ -67,6 +74,10 @@ func _ready() -> void:
 		_run_automated_screenshot_levelup()
 	elif "--screenshot-exp" in args:
 		_run_automated_screenshot_exp()
+	elif "--screenshot-matchmaking" in args:
+		_run_automated_screenshot_matchmaking()
+	elif "--screenshot-matchmaking-filled" in args:
+		_run_automated_screenshot_matchmaking_filled()
 	else:
 		_check_pending_exp_gain()
 
@@ -616,6 +627,8 @@ func _build_modal_layer() -> void:
 	# Click outside to close
 	modal_overlay.gui_input.connect(func(event: InputEvent):
 		if event is InputEventMouseButton and event.pressed:
+			if is_matchmaking_active:
+				return
 			_hide_modal()
 	)
 
@@ -848,7 +861,7 @@ func _start_mode_dynasty() -> void:
 	get_tree().change_scene_to_file("res://scenes/main_game.tscn")
 
 func _start_mode_2v2() -> void:
-	_show_modal("ĐẤU TRƯỜNG 2v2", _build_2v2_content())
+	_start_2v2_matchmaking()
 
 func _start_mode_national_war() -> void:
 	_show_modal("QUỐC CHIẾN BỐN CÕI", _build_national_war_content())
@@ -1886,12 +1899,481 @@ func _build_2v2_content() -> Control:
 	play_btn.text = "⚔️ TÌM TRẬN ĐẤU 2v2 NGAY"
 	_style_white_gold_action_button(play_btn)
 	play_btn.pressed.connect(func():
-		_hide_modal()
-		get_tree().change_scene_to_file("res://scenes/main_game.tscn")
+		_start_2v2_matchmaking()
 	)
 	container.add_child(play_btn)
 
 	return container
+
+# --- 2v2 Real-Player Matchmaking System (Appwrite Singapore) ---
+func _start_2v2_matchmaking() -> void:
+	is_matchmaking_active = true
+	mm_is_cancelled = false
+	mm_active_room_id = ""
+	mm_is_host = false
+	mm_current_room = {}
+
+	var container = VBoxContainer.new()
+	container.add_theme_constant_override("separation", 10)
+
+	# 1. Subtitle & Server Status Bar
+	var status_bar = PanelContainer.new()
+	status_bar.custom_minimum_size = Vector2(0, 44)
+	var sb_style = StyleBoxFlat.new()
+	sb_style.bg_color = Color(0.08, 0.12, 0.18, 0.95)
+	sb_style.border_width_left = 1
+	sb_style.border_width_top = 1
+	sb_style.border_width_right = 1
+	sb_style.border_width_bottom = 1
+	sb_style.border_color = COLOR_GOLD_PRIMARY
+	sb_style.corner_radius_top_left = 6
+	sb_style.corner_radius_top_right = 6
+	sb_style.corner_radius_bottom_right = 6
+	sb_style.corner_radius_bottom_left = 6
+	status_bar.add_theme_stylebox_override("panel", sb_style)
+
+	var sb_margin = MarginContainer.new()
+	sb_margin.add_theme_constant_override("margin_left", 12)
+	sb_margin.add_theme_constant_override("margin_right", 12)
+	status_bar.add_child(sb_margin)
+
+	var sb_hbox = HBoxContainer.new()
+	sb_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	sb_margin.add_child(sb_hbox)
+
+	var status_lbl = Label.new()
+	status_lbl.size_flags_horizontal = SIZE_EXPAND_FILL
+	status_lbl.text = "👑 Đang kết nối máy chủ Singapore..."
+	status_lbl.add_theme_font_size_override("font_size", 13)
+	status_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.65, 1.0))
+	sb_hbox.add_child(status_lbl)
+
+	var timer_badge = PanelContainer.new()
+	var tb_style = StyleBoxFlat.new()
+	tb_style.bg_color = Color(0.05, 0.08, 0.14, 0.9)
+	tb_style.border_width_left = 1
+	tb_style.border_width_top = 1
+	tb_style.border_width_right = 1
+	tb_style.border_width_bottom = 1
+	tb_style.border_color = Color(0.35, 0.75, 0.95, 0.8)
+	tb_style.corner_radius_top_left = 4
+	tb_style.corner_radius_top_right = 4
+	tb_style.corner_radius_bottom_right = 4
+	tb_style.corner_radius_bottom_left = 4
+	timer_badge.add_theme_stylebox_override("panel", tb_style)
+
+	var tb_margin = MarginContainer.new()
+	tb_margin.add_theme_constant_override("margin_left", 8)
+	tb_margin.add_theme_constant_override("margin_right", 8)
+	tb_margin.add_theme_constant_override("margin_top", 2)
+	tb_margin.add_theme_constant_override("margin_bottom", 2)
+	timer_badge.add_child(tb_margin)
+
+	var timer_lbl = Label.new()
+	timer_lbl.text = "⏳ 00:00"
+	timer_lbl.add_theme_font_size_override("font_size", 13)
+	timer_lbl.add_theme_color_override("font_color", Color(0.4, 0.85, 1.0, 1.0))
+	tb_margin.add_child(timer_lbl)
+	sb_hbox.add_child(timer_badge)
+
+	container.add_child(status_bar)
+
+	# 2. 4 Seat Slots Container
+	var slots_vbox = VBoxContainer.new()
+	slots_vbox.add_theme_constant_override("separation", 8)
+	container.add_child(slots_vbox)
+
+	var slot_nodes: Array = []
+	var my_name = AuthManager.current_user_name if AuthManager else "Đại Tướng Quân"
+	var my_rp = AuthManager.current_2v2_points if AuthManager else 1200
+
+	for i in range(4):
+		var s_panel = PanelContainer.new()
+		s_panel.custom_minimum_size = Vector2(0, 52)
+		var sp_style = StyleBoxFlat.new()
+		sp_style.bg_color = Color(0.06, 0.09, 0.15, 0.95)
+		sp_style.border_width_left = 1.5
+		sp_style.border_width_top = 1.5
+		sp_style.border_width_right = 1.5
+		sp_style.border_width_bottom = 1.5
+		sp_style.border_color = Color(0.2, 0.28, 0.4, 0.7)
+		sp_style.corner_radius_top_left = 8
+		sp_style.corner_radius_top_right = 8
+		sp_style.corner_radius_bottom_right = 8
+		sp_style.corner_radius_bottom_left = 8
+		s_panel.add_theme_stylebox_override("panel", sp_style)
+
+		var s_margin = MarginContainer.new()
+		s_margin.add_theme_constant_override("margin_left", 12)
+		s_margin.add_theme_constant_override("margin_right", 12)
+		s_margin.add_theme_constant_override("margin_top", 6)
+		s_margin.add_theme_constant_override("margin_bottom", 6)
+		s_panel.add_child(s_margin)
+
+		var s_hbox = HBoxContainer.new()
+		s_hbox.add_theme_constant_override("separation", 12)
+		s_margin.add_child(s_hbox)
+
+		# Team Badge
+		var t_badge = Label.new()
+		t_badge.custom_minimum_size = Vector2(76, 26)
+		t_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		t_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		t_badge.add_theme_font_size_override("font_size", 11)
+		var is_drag = (i == 0 or i == 2)
+		var tb_s = StyleBoxFlat.new()
+		tb_s.corner_radius_top_left = 4
+		tb_s.corner_radius_top_right = 4
+		tb_s.corner_radius_bottom_right = 4
+		tb_s.corner_radius_bottom_left = 4
+		if is_drag:
+			tb_s.bg_color = Color(0.08, 0.42, 0.72, 0.95)
+			t_badge.text = "[RỒNG]"
+			t_badge.add_theme_color_override("font_color", Color(0.7, 0.9, 1.0, 1.0))
+		else:
+			tb_s.bg_color = Color(0.72, 0.18, 0.25, 0.95)
+			t_badge.text = "[PHƯỢNG]"
+			t_badge.add_theme_color_override("font_color", Color(1.0, 0.8, 0.85, 1.0))
+		t_badge.add_theme_stylebox_override("normal", tb_s)
+		s_hbox.add_child(t_badge)
+
+		# Avatar Texture
+		var av_rect = TextureRect.new()
+		av_rect.custom_minimum_size = Vector2(36, 36)
+		av_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		av_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		var av_tex = load("res://assets/ui/game_avatar.png")
+		if av_tex: av_rect.texture = av_tex
+		s_hbox.add_child(av_rect)
+
+		# Info VBox (Name + Status)
+		var info_v = VBoxContainer.new()
+		info_v.size_flags_horizontal = SIZE_EXPAND_FILL
+		info_v.add_theme_constant_override("separation", 2)
+		s_hbox.add_child(info_v)
+
+		var name_l = Label.new()
+		name_l.add_theme_font_size_override("font_size", 13)
+		info_v.add_child(name_l)
+
+		var status_l = Label.new()
+		status_l.add_theme_font_size_override("font_size", 11)
+		info_v.add_child(status_l)
+
+		var rank_l = Label.new()
+		rank_l.add_theme_font_size_override("font_size", 12)
+		rank_l.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+		s_hbox.add_child(rank_l)
+
+		var seat_l = Label.new()
+		seat_l.text = "GHẾ %d" % (i + 1)
+		seat_l.add_theme_font_size_override("font_size", 11)
+		seat_l.add_theme_color_override("font_color", Color(0.6, 0.65, 0.75, 1.0))
+		s_hbox.add_child(seat_l)
+
+		slots_vbox.add_child(s_panel)
+
+		# Initial slot visual
+		if i == 0:
+			name_l.text = "%s (BẠN)" % my_name
+			name_l.add_theme_color_override("font_color", Color.WHITE)
+			status_l.text = "✅ ĐÃ SẴN SÀNG"
+			status_l.add_theme_color_override("font_color", Color(0.35, 0.95, 0.5, 1.0))
+			rank_l.text = "• %d RP" % my_rp
+			sp_style.border_color = COLOR_GOLD_PRIMARY
+			sp_style.bg_color = Color(0.1, 0.18, 0.32, 0.95)
+		else:
+			name_l.text = "Ghế %d: Đang tìm tướng lĩnh..." % (i + 1)
+			name_l.add_theme_color_override("font_color", Color(0.55, 0.62, 0.75, 1.0))
+			status_l.text = "⏳ Đang tìm kiếm trên máy chủ..."
+			status_l.add_theme_color_override("font_color", Color(0.45, 0.52, 0.65, 1.0))
+			rank_l.text = ""
+
+		slot_nodes.append({
+			"panel": s_panel,
+			"style": sp_style,
+			"team_badge": t_badge,
+			"avatar_rect": av_rect,
+			"name_lbl": name_l,
+			"status_lbl": status_l,
+			"rank_lbl": rank_l,
+			"seat_lbl": seat_l
+		})
+
+	# 3. Cancel Button
+	var btn_hbox = HBoxContainer.new()
+	btn_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	container.add_child(btn_hbox)
+
+	var cancel_btn = Button.new()
+	cancel_btn.custom_minimum_size = Vector2(280, 44)
+	cancel_btn.text = "✕ HỦY TÌM TRẬN"
+	_style_cancel_red_button(cancel_btn)
+	cancel_btn.pressed.connect(func():
+		AudioManager.play_card_select()
+		_cancel_2v2_matchmaking()
+	)
+	btn_hbox.add_child(cancel_btn)
+
+	_show_modal("⚔️ TÌM TRẬN 2v2 HOÀNG TRIỀU", container)
+	_run_2v2_matchmaking_loop(status_lbl, timer_lbl, slot_nodes)
+
+func _style_cancel_red_button(btn: Button) -> void:
+	var norm = StyleBoxFlat.new()
+	norm.bg_color = Color(0.80, 0.20, 0.22, 1.0)
+	norm.border_width_left = 2
+	norm.border_width_top = 2
+	norm.border_width_right = 2
+	norm.border_width_bottom = 2
+	norm.border_color = Color(1.0, 0.85, 0.35, 0.9)
+	norm.corner_radius_top_left = 8
+	norm.corner_radius_top_right = 8
+	norm.corner_radius_bottom_right = 8
+	norm.corner_radius_bottom_left = 8
+	norm.shadow_color = Color(0, 0, 0, 0.4)
+	norm.shadow_size = 5
+	norm.shadow_offset = Vector2(0, 3)
+
+	var hov = norm.duplicate()
+	hov.bg_color = Color(0.92, 0.26, 0.28, 1.0)
+	hov.border_color = Color(1.0, 0.95, 0.6, 1.0)
+
+	var press = norm.duplicate()
+	press.bg_color = Color(0.68, 0.15, 0.18, 1.0)
+
+	btn.add_theme_stylebox_override("normal", norm)
+	btn.add_theme_stylebox_override("hover", hov)
+	btn.add_theme_stylebox_override("pressed", press)
+	btn.add_theme_color_override("font_color", Color.WHITE)
+	btn.add_theme_color_override("font_hover_color", Color.WHITE)
+	btn.add_theme_font_size_override("font_size", 14)
+
+func _cancel_2v2_matchmaking() -> void:
+	mm_is_cancelled = true
+	var my_uid = AuthManager.current_user_id if AuthManager else ""
+	if mm_is_host and mm_active_room_id != "":
+		AppwriteMatchmaking.delete_room(mm_active_room_id)
+	elif mm_active_room_id != "" and my_uid != "":
+		AppwriteMatchmaking.leave_room_slot(mm_active_room_id, my_uid)
+	is_matchmaking_active = false
+	_hide_modal()
+
+func _update_matchmaking_slots_visual(room: Dictionary, my_user_id: String, slot_nodes: Array) -> void:
+	if room.is_empty():
+		return
+	var slots = room.get("slots", [])
+	for i in range(4):
+		if i >= slot_nodes.size():
+			break
+		var node_dict = slot_nodes[i]
+		var sp_style: StyleBoxFlat = node_dict["style"]
+		var name_l: Label = node_dict["name_lbl"]
+		var status_l: Label = node_dict["status_lbl"]
+		var rank_l: Label = node_dict["rank_lbl"]
+		var t_badge: Label = node_dict["team_badge"]
+
+		if i < slots.size():
+			var s = slots[i]
+			var is_empty = bool(s.get("isEmpty", false)) or s.get("userId", "") == "" or s.get("userId", "") == "empty"
+			var is_drag = bool(s.get("isDragon", (i == 0 or i == 2)))
+			var is_ai = bool(s.get("isAI", false))
+			var is_me = (s.get("userId", "") == my_user_id)
+
+			if is_empty:
+				name_l.text = "Ghế %d: Đang tìm tướng lĩnh..." % (i + 1)
+				name_l.add_theme_color_override("font_color", Color(0.55, 0.62, 0.75, 1.0))
+				status_l.text = "⏳ Đang tìm kiếm trên máy chủ..."
+				status_l.add_theme_color_override("font_color", Color(0.45, 0.52, 0.65, 1.0))
+				rank_l.text = ""
+				sp_style.bg_color = Color(0.06, 0.09, 0.15, 0.95)
+				sp_style.border_color = Color(0.2, 0.28, 0.4, 0.7)
+			else:
+				var uname = s.get("userName", "Chiến Tướng")
+				var role_str = " (BẠN)" if is_me else (" (AI)" if is_ai else " (NGƯỜI THẬT)")
+				name_l.text = "%s%s" % [uname, role_str]
+				if is_me:
+					name_l.add_theme_color_override("font_color", Color(1.0, 0.92, 0.55, 1.0))
+					sp_style.bg_color = Color(0.1, 0.22, 0.38, 0.95)
+					sp_style.border_color = COLOR_GOLD_PRIMARY
+				elif is_drag:
+					name_l.add_theme_color_override("font_color", Color(0.65, 0.9, 1.0, 1.0))
+					sp_style.bg_color = Color(0.07, 0.16, 0.26, 0.95)
+					sp_style.border_color = Color(0.25, 0.65, 0.95, 0.8)
+				else:
+					name_l.add_theme_color_override("font_color", Color(1.0, 0.75, 0.8, 1.0))
+					sp_style.bg_color = Color(0.22, 0.08, 0.12, 0.95)
+					sp_style.border_color = Color(0.9, 0.35, 0.45, 0.8)
+
+				status_l.text = "✅ ĐÃ SẴN SÀNG"
+				status_l.add_theme_color_override("font_color", Color(0.35, 0.95, 0.5, 1.0))
+				rank_l.text = "• %d RP" % int(s.get("rankPoints", 0))
+
+func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: Array) -> void:
+	var my_user_id = AuthManager.current_user_id if AuthManager and AuthManager.current_user_id != "" else ("user_" + str(randi()).md5_text().substr(0, 8))
+	var my_user_name = AuthManager.current_user_name if AuthManager and AuthManager.current_user_name != "" else "Đại Tướng Quân"
+	var my_rank_points = AuthManager.current_2v2_points if AuthManager else 1200
+
+	status_lbl.text = "🔍 Đang quét tìm phòng thi đấu trên máy chủ Singapore..."
+
+	var found_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points)
+	if mm_is_cancelled:
+		return
+
+	if not found_room.is_empty():
+		status_lbl.text = "🌐 Đã tìm thấy phòng [%s]. Đang tham gia..." % found_room.get("roomId", "")
+		var joined = await AppwriteMatchmaking.join_room_slot(found_room, my_user_id, my_user_name, my_rank_points)
+		if not joined.is_empty():
+			mm_current_room = joined
+			mm_active_room_id = joined.get("roomId", "")
+			mm_is_host = false
+		else:
+			found_room = {}
+
+	if found_room.is_empty() and not mm_is_cancelled:
+		status_lbl.text = "👑 Đang tạo phòng thi đấu mới trên máy chủ..."
+		var new_room_id = "room_" + str(randi()).md5_text().substr(0, 8)
+		var new_room = {
+			"roomId": new_room_id,
+			"hostUserId": my_user_id,
+			"status": "WAITING",
+			"version": 1,
+			"hostRankPoints": my_rank_points,
+			"slots": [
+				{ "seatNumber": 1, "isDragon": true, "isAI": false, "userId": my_user_id, "userName": my_user_name, "rankPoints": my_rank_points, "isEmpty": false },
+				{ "seatNumber": 2, "isDragon": false, "isAI": false, "userId": "", "userName": "", "rankPoints": 0, "isEmpty": true },
+				{ "seatNumber": 3, "isDragon": true, "isAI": false, "userId": "", "userName": "", "rankPoints": 0, "isEmpty": true },
+				{ "seatNumber": 4, "isDragon": false, "isAI": false, "userId": "", "userName": "", "rankPoints": 0, "isEmpty": true }
+			]
+		}
+		var created = await AppwriteMatchmaking.create_waiting_room(new_room)
+		if created:
+			mm_current_room = new_room
+			mm_active_room_id = new_room_id
+			mm_is_host = true
+
+	if mm_is_cancelled or mm_current_room.is_empty():
+		return
+
+	_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
+
+	var elapsed_timer: float = 0.0
+	var is_fast_test = "--screenshot-matchmaking-filled" in OS.get_cmdline_user_args() or "--screenshot-matchmaking-filled" in OS.get_cmdline_args()
+	var host_hidden_timer: float = 1.0 if is_fast_test else 15.0
+	var heartbeat_timer: float = 0.0
+	var last_real_player_count: int = 1
+	var guest_wait_timer: float = 0.0
+
+	while not mm_is_cancelled:
+		elapsed_timer += 0.5
+		host_hidden_timer -= 0.5
+		heartbeat_timer -= 0.5
+		guest_wait_timer += 0.5
+
+		var sec = int(elapsed_timer)
+		timer_lbl.text = "⏳ %02d:%02d" % [sec / 60, sec % 60]
+
+		if mm_is_host:
+			if heartbeat_timer <= 0.0:
+				heartbeat_timer = 2.0
+				AppwriteMatchmaking.send_host_heartbeat(mm_active_room_id)
+
+			var polled = await AppwriteMatchmaking.poll_room_state(mm_active_room_id)
+			if not polled.is_empty():
+				mm_current_room = polled
+
+			if mm_is_cancelled:
+				return
+
+			var current_real_count = 0
+			for s in mm_current_room.get("slots", []):
+				if not s.get("isEmpty", false) and not s.get("isAI", false) and s.get("userId", "") != "":
+					current_real_count += 1
+
+			if current_real_count > last_real_player_count:
+				host_hidden_timer = 15.0
+				last_real_player_count = current_real_count
+				status_lbl.text = "⚔️ Có thêm người chơi thực tham gia! Đang đợi tiếp..."
+
+			_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
+
+			if current_real_count >= 4 or host_hidden_timer <= 0.0:
+				var fresh = await AppwriteMatchmaking.poll_room_state(mm_active_room_id)
+				if not fresh.is_empty():
+					mm_current_room = fresh
+
+				var used_names: Array = [my_user_name]
+				for s in mm_current_room.get("slots", []):
+					if not s.get("isEmpty", false) and s.get("userName", "") != "":
+						used_names.append(s.get("userName"))
+
+				var bot_seed_base = AppwriteMatchmaking.get_deterministic_hash_code(mm_active_room_id)
+				var slots = mm_current_room.get("slots", [])
+				for i in range(slots.size()):
+					var s = slots[i]
+					if s.get("isEmpty", false):
+						s["userId"] = "bot_" + str(randi()).md5_text().substr(0, 6)
+						s["userName"] = AppwriteMatchmaking.get_realistic_gamer_name(bot_seed_base + i * 17, used_names)
+						s["rankPoints"] = maxi(20, my_rank_points + randi_range(-15, 15))
+						s["isAI"] = true
+						s["isEmpty"] = false
+
+				# Deterministic shuffle
+				var rng = RandomNumberGenerator.new()
+				rng.seed = bot_seed_base
+				for i in range(slots.size() - 1, 0, -1):
+					var k = rng.randi_range(0, i)
+					var tmp = slots[i]
+					slots[i] = slots[k]
+					slots[k] = tmp
+
+				for i in range(slots.size()):
+					slots[i]["seatNumber"] = i + 1
+
+				mm_current_room["status"] = "STARTED"
+				await AppwriteMatchmaking.update_room_state(mm_current_room)
+
+				status_lbl.text = "⚔️ ĐÃ KẾT NỐI ĐỦ 4 CHIẾN TƯỚNG! Bắt đầu vào trận..."
+				status_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
+				timer_lbl.text = "⚔️ SẴN SÀNG!"
+				timer_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
+				AudioManager.play_victory()
+				_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
+				break
+		else:
+			var polled = await AppwriteMatchmaking.poll_room_state(mm_active_room_id)
+			if not polled.is_empty():
+				mm_current_room = polled
+
+			if mm_is_cancelled:
+				return
+
+			if not mm_current_room.is_empty():
+				_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
+
+				if mm_current_room.get("status") == "STARTED":
+					status_lbl.text = "⚔️ PHÒNG ĐÃ BẮT ĐẦU! Đang vào màn thi đấu..."
+					status_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
+					timer_lbl.text = "⚔️ SẴN SÀNG!"
+					timer_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
+					AudioManager.play_victory()
+					break
+
+			if guest_wait_timer > 35.0:
+				status_lbl.text = "❌ Mất kết nối với chủ phòng!"
+				status_lbl.add_theme_color_override("font_color", Color(1.0, 0.35, 0.35, 1.0))
+				await get_tree().create_timer(2.0).timeout
+				_hide_modal()
+				return
+
+		await get_tree().create_timer(0.5).timeout
+
+	if mm_is_cancelled:
+		return
+
+	await get_tree().create_timer(1.2).timeout
+	_hide_modal()
+	is_matchmaking_active = false
+	get_tree().change_scene_to_file("res://scenes/main_game.tscn")
 
 func _build_national_war_content() -> Control:
 	var container = VBoxContainer.new()
@@ -1968,4 +2450,34 @@ func _run_automated_screenshot_exp() -> void:
 	else:
 		print("[Home] Lỗi lưu ảnh chụp: ", err)
 	await get_tree().create_timer(0.2).timeout
+	get_tree().quit()
+
+func _run_automated_screenshot_matchmaking() -> void:
+	print("[Home] Kích hoạt kiểm thử Modal Tìm Trận 2v2...")
+	_start_2v2_matchmaking()
+	await get_tree().create_timer(1.2).timeout
+	var img = get_viewport().get_texture().get_image()
+	var path = "res://home_matchmaking_screenshot.png"
+	var err = img.save_png(path)
+	if err == OK:
+		print("[Home] Đã lưu ảnh chụp Tìm Trận 2v2 tại: ", path)
+	else:
+		print("[Home] Lỗi lưu ảnh chụp: ", err)
+	_cancel_2v2_matchmaking()
+	await get_tree().create_timer(0.3).timeout
+	get_tree().quit()
+
+func _run_automated_screenshot_matchmaking_filled() -> void:
+	print("[Home] Kích hoạt kiểm thử Modal Tìm Trận 2v2 (Đầy 4 ghế)...")
+	_start_2v2_matchmaking()
+	await get_tree().create_timer(2.4).timeout
+	var img = get_viewport().get_texture().get_image()
+	var path = "res://home_matchmaking_filled_screenshot.png"
+	var err = img.save_png(path)
+	if err == OK:
+		print("[Home] Đã lưu ảnh chụp 4 ghế Tìm Trận 2v2 tại: ", path)
+	else:
+		print("[Home] Lỗi lưu ảnh chụp: ", err)
+	_cancel_2v2_matchmaking()
+	await get_tree().create_timer(0.3).timeout
 	get_tree().quit()

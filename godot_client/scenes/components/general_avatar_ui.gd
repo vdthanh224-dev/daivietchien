@@ -8,7 +8,10 @@ signal info_clicked()
 @onready var name_label: Label = $Frame/TopBanner/Margin/HBox/NameLabel
 @onready var role_badge: Label = $Frame/TopBanner/Margin/HBox/RoleBadge
 @onready var faction_badge: Label = $Frame/BottomBanner/Margin/HBox/FactionBadge
-@onready var hp_label: Label = $Frame/BottomBanner/Margin/HBox/HpLabel
+@onready var hp_box: HBoxContainer = $Frame/BottomBanner/Margin/HBox/HpBox
+@onready var lotus_container: HBoxContainer = $Frame/BottomBanner/Margin/HBox/HpBox/LotusContainer
+@onready var hp_text_label: Label = $Frame/BottomBanner/Margin/HBox/HpBox/HpTextLabel
+@onready var hp_label: Label = $Frame/BottomBanner/Margin/HBox/HpBox/HpTextLabel
 @onready var hand_count_label: Label = $Frame/HandBadge/HandLabel
 @onready var target_border: ReferenceRect = $TargetBorder
 @onready var skill_btn: Button = $SkillBtn
@@ -225,17 +228,48 @@ func setup_general(p_id: String, p_name: String, p_faction: String = "Trần", p
 	update_hp(current_hp, max_hp)
 	update_hand_count(hand_count)
 
+const LOTUS_FULL_TEX = preload("res://assets/ui/lotus_full.png")
+const LOTUS_EMPTY_TEX = preload("res://assets/ui/lotus_empty.png")
+
 func update_hp(p_hp: int, p_max_hp: int) -> void:
+	var old_hp = current_hp
 	current_hp = clamp(p_hp, 0, p_max_hp)
 	max_hp = p_max_hp
 
-	var lotus = ""
-	for i in range(max_hp):
-		if i < current_hp:
-			lotus += "🌸 "
-		else:
-			lotus += "⚪ "
-	hp_label.text = "%s(%d/%d)" % [lotus, current_hp, max_hp]
+	if lotus_container:
+		while lotus_container.get_child_count() < max_hp:
+			var tr = TextureRect.new()
+			tr.custom_minimum_size = Vector2(18, 18)
+			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			lotus_container.add_child(tr)
+
+		while lotus_container.get_child_count() > max_hp:
+			var c = lotus_container.get_child(lotus_container.get_child_count() - 1)
+			lotus_container.remove_child(c)
+			c.queue_free()
+
+		for i in range(max_hp):
+			var tr: TextureRect = lotus_container.get_child(i)
+			if i < current_hp:
+				tr.texture = LOTUS_FULL_TEX
+				tr.modulate = Color(1, 1, 1, 1)
+			else:
+				tr.texture = LOTUS_EMPTY_TEX
+				tr.modulate = Color(1, 1, 1, 0.75)
+
+		# If HP changed, animate the affected lotus unit
+		if old_hp != current_hp and current_hp < max_hp and current_hp >= 0:
+			var anim_idx = clamp(current_hp if current_hp < old_hp else current_hp - 1, 0, max_hp - 1)
+			if anim_idx < lotus_container.get_child_count():
+				var anim_tr: TextureRect = lotus_container.get_child(anim_idx)
+				var tw = create_tween()
+				tw.tween_property(anim_tr, "scale", Vector2(1.35, 1.35), 0.1).set_trans(Tween.TRANS_BACK)
+				tw.tween_property(anim_tr, "scale", Vector2(1.0, 1.0), 0.15)
+
+	if hp_text_label:
+		hp_text_label.text = "(%d/%d)" % [current_hp, max_hp]
 
 func update_hand_count(count: int) -> void:
 	hand_count = count

@@ -87,6 +87,7 @@ func _ready() -> void:
 	info_close_btn.pressed.connect(_hide_general_info_modal)
 
 	# 4. Hiển thị Bước 1: Máu hoa sen
+	_setup_spotlight_lotus_icons()
 	spotlight_overlay.visible = true
 	reward_modal.visible = false
 	general_info_modal.visible = false
@@ -138,6 +139,16 @@ func _ready() -> void:
 		var img = get_viewport().get_texture().get_image()
 		img.save_png("res://tutorial_target_screenshot.png")
 		print("[Screenshot] Đã lưu tutorial_target_screenshot.png!")
+		get_tree().quit()
+	elif "--screenshot-lotus-hp" in OS.get_cmdline_user_args():
+		_on_close_health_spotlight()
+		boss_avatar.update_hp(2, 3)
+		player_avatar.update_hp(3, 4)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var img = get_viewport().get_texture().get_image()
+		img.save_png("res://tutorial_lotus_hp_screenshot.png")
+		print("[Screenshot] Đã lưu tutorial_lotus_hp_screenshot.png!")
 		get_tree().quit()
 	elif "--screenshot-showcase" in OS.get_cmdline_user_args():
 		_on_close_health_spotlight()
@@ -288,6 +299,55 @@ func _process(delta: float) -> void:
 
 func _add_log(msg: String) -> void:
 	log_text.text += "\n" + msg
+
+func _setup_spotlight_lotus_icons() -> void:
+	var lotus_full_tex = preload("res://assets/ui/lotus_full.png")
+	var boss_vbox = get_node_or_null("HealthSpotlightOverlay/BossSpotlightLotus/VBox")
+	var player_vbox = get_node_or_null("HealthSpotlightOverlay/PlayerSpotlightLotus/VBox")
+
+	if boss_vbox and boss_vbox.has_node("Lotus"):
+		var old_lbl = boss_vbox.get_node("Lotus")
+		old_lbl.visible = false
+		if not boss_vbox.has_node("LotusRow"):
+			var row = HBoxContainer.new()
+			row.name = "LotusRow"
+			row.alignment = BoxContainer.ALIGNMENT_CENTER
+			row.add_theme_constant_override("separation", 4)
+			for i in range(3):
+				var tr = TextureRect.new()
+				tr.custom_minimum_size = Vector2(22, 22)
+				tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				tr.texture = lotus_full_tex
+				row.add_child(tr)
+			var txt = Label.new()
+			txt.text = " (3/3)"
+			txt.add_theme_color_override("font_color", Color(1, 0.85, 0.5, 1))
+			txt.add_theme_font_size_override("font_size", 12)
+			row.add_child(txt)
+			boss_vbox.add_child(row)
+
+	if player_vbox and player_vbox.has_node("Lotus"):
+		var old_lbl = player_vbox.get_node("Lotus")
+		old_lbl.visible = false
+		if not player_vbox.has_node("LotusRow"):
+			var row = HBoxContainer.new()
+			row.name = "LotusRow"
+			row.alignment = BoxContainer.ALIGNMENT_CENTER
+			row.add_theme_constant_override("separation", 4)
+			for i in range(4):
+				var tr = TextureRect.new()
+				tr.custom_minimum_size = Vector2(22, 22)
+				tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				tr.texture = lotus_full_tex
+				row.add_child(tr)
+			var txt = Label.new()
+			txt.text = " (4/4)"
+			txt.add_theme_color_override("font_color", Color(1, 0.85, 0.5, 1))
+			txt.add_theme_font_size_override("font_size", 12)
+			row.add_child(txt)
+			player_vbox.add_child(row)
 
 func _on_close_health_spotlight() -> void:
 	spotlight_overlay.visible = false

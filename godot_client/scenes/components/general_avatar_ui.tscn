@@ -323,14 +323,25 @@ theme_override_styles/normal = SubResource("StyleBoxFlat_badge")
 text = " Khác "
 vertical_alignment = 1
 
-[node name="HpLabel" type="Label" parent="Frame/BottomBanner/Margin/HBox"]
+[node name="HpBox" type="HBoxContainer" parent="Frame/BottomBanner/Margin/HBox"]
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
-theme_override_colors/font_color = Color(1, 0.65, 0.8, 1)
+theme_override_constants/separation = 4
+alignment = 1
+
+[node name="LotusContainer" type="HBoxContainer" parent="Frame/BottomBanner/Margin/HBox/HpBox"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 2
+alignment = 1
+
+[node name="HpTextLabel" type="Label" parent="Frame/BottomBanner/Margin/HBox/HpBox"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.88, 0.6, 1)
 theme_override_font_sizes/font_size = 11
-text = "🌸 🌸 🌸 🌸 (4/4)"
-horizontal_alignment = 1
+text = "(4/4)"
 vertical_alignment = 1
 
 [node name="HandBadge" type="PanelContainer" parent="Frame"]
