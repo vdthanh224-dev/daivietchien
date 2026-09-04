@@ -49,4 +49,5 @@ Thumbs.db
 .godot/
 godot_client/.godot/
 *_screenshot.png
+*_screenshot.png.import
 

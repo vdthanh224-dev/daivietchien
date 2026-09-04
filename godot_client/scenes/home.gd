@@ -23,8 +23,10 @@ var embers_layer: Control
 
 # Header Controls
 var player_name_label: Label
+var level_badge_label: Label
 var rank_label: Label
 var exp_bar: ProgressBar
+var exp_text_label: Label
 var silver_label: Label
 var gold_label: Label
 
@@ -48,6 +50,8 @@ func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
 	_build_ui()
 	_load_user_data()
+	if AuthManager:
+		AuthManager.profile_updated.connect(_load_user_data)
 	_start_ambient_effects()
 
 	# Check for automated screenshot argument
@@ -169,23 +173,50 @@ func _build_top_header() -> void:
 	p_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	p_vbox.add_theme_constant_override("separation", 2)
 
+	var name_hbox = HBoxContainer.new()
+	name_hbox.add_theme_constant_override("separation", 6)
+
 	player_name_label = Label.new()
 	player_name_label.text = "LÝ THƯỜNG KIỆT"
-	player_name_label.add_theme_font_size_override("font_size", 14)
+	player_name_label.add_theme_font_size_override("font_size", 13)
 	player_name_label.add_theme_color_override("font_color", COLOR_TEXT_DARK)
-	p_vbox.add_child(player_name_label)
+	name_hbox.add_child(player_name_label)
+
+	var level_badge = PanelContainer.new()
+	var lb_style = StyleBoxFlat.new()
+	lb_style.bg_color = Color(0.96, 0.80, 0.28, 1.0)
+	lb_style.border_width_left = 1
+	lb_style.border_width_top = 1
+	lb_style.border_width_right = 1
+	lb_style.border_width_bottom = 1
+	lb_style.border_color = Color(0.72, 0.54, 0.12, 1.0)
+	lb_style.corner_radius_top_left = 4
+	lb_style.corner_radius_top_right = 4
+	lb_style.corner_radius_bottom_right = 4
+	lb_style.corner_radius_bottom_left = 4
+	level_badge.add_theme_stylebox_override("panel", lb_style)
+
+	level_badge_label = Label.new()
+	level_badge_label.text = " CẤP 1 "
+	level_badge_label.add_theme_font_size_override("font_size", 10)
+	level_badge_label.add_theme_color_override("font_color", Color(0.12, 0.08, 0.02, 1.0))
+	level_badge.add_child(level_badge_label)
+	name_hbox.add_child(level_badge)
+	p_vbox.add_child(name_hbox)
 
 	var rank_hbox = HBoxContainer.new()
+	rank_hbox.add_theme_constant_override("separation", 6)
+
 	rank_label = Label.new()
-	rank_label.text = "⭐ Chánh Tướng"
+	rank_label.text = "🔰 Tân Binh (50/100đ)"
 	rank_label.add_theme_font_size_override("font_size", 11)
 	rank_label.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
 	rank_hbox.add_child(rank_label)
 
 	exp_bar = ProgressBar.new()
-	exp_bar.custom_minimum_size = Vector2(80, 8)
+	exp_bar.custom_minimum_size = Vector2(65, 8)
 	exp_bar.size_flags_vertical = SIZE_SHRINK_CENTER
-	exp_bar.value = 65
+	exp_bar.value = 0
 	exp_bar.show_percentage = false
 	var exp_bg = StyleBoxFlat.new()
 	exp_bg.bg_color = Color(0.85, 0.83, 0.77, 1.0)
@@ -202,6 +233,12 @@ func _build_top_header() -> void:
 	exp_bar.add_theme_stylebox_override("background", exp_bg)
 	exp_bar.add_theme_stylebox_override("fill", exp_fill)
 	rank_hbox.add_child(exp_bar)
+
+	exp_text_label = Label.new()
+	exp_text_label.text = "0/20 EXP"
+	exp_text_label.add_theme_font_size_override("font_size", 10)
+	exp_text_label.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+	rank_hbox.add_child(exp_text_label)
 
 	p_vbox.add_child(rank_hbox)
 	p_hbox.add_child(p_vbox)
@@ -741,12 +778,29 @@ func _load_user_data() -> void:
 				name_str = AuthManager.current_user_email.split("@")[0].to_upper()
 			else:
 				name_str = "LÝ THƯỜNG KIỆT"
-		player_name_label.text = name_str
+		if player_name_label:
+			player_name_label.text = name_str
 
-	rank_label.text = "⭐ Chánh Tướng"
-	exp_bar.value = 65
-	silver_label.text = _format_number(current_silver)
-	gold_label.text = _format_number(current_gold)
+		if level_badge_label:
+			level_badge_label.text = " CẤP %d " % AuthManager.current_level
+
+		var mil_info = AuthManager.get_military_rank_info()
+		if rank_label:
+			rank_label.text = "%s (%d/%dđ)" % [mil_info["full_name"], mil_info["points"], mil_info["next_min"]]
+
+		var next_exp = AuthManager.get_exp_to_next_level()
+		if exp_bar:
+			exp_bar.max_value = next_exp
+			exp_bar.value = AuthManager.current_exp
+		if exp_text_label:
+			exp_text_label.text = "%d/%d EXP" % [AuthManager.current_exp, next_exp]
+
+		current_silver = AuthManager.current_silver
+		current_gold = AuthManager.current_gold
+		if silver_label:
+			silver_label.text = _format_number(current_silver)
+		if gold_label:
+			gold_label.text = _format_number(current_gold)
 
 # --- Ambient Particle Embers ---
 func _start_ambient_effects() -> void:
@@ -1327,11 +1381,23 @@ func _build_profile_content() -> Control:
 	n.add_theme_color_override("font_color", COLOR_TEXT_DARK)
 	v.add_child(n)
 
+	var mil_info = AuthManager.get_military_rank_info() if AuthManager else {"full_name": "🔰 Tân Binh", "tier": 1, "points": 50, "next_min": 100}
+	var lvl = AuthManager.current_level if AuthManager else 1
+	var exp_c = AuthManager.current_exp if AuthManager else 0
+	var exp_req = AuthManager.get_exp_to_next_level() if AuthManager else 20
+	var num_generals = AuthManager.current_generals.size() if AuthManager else 1
+
 	var r = Label.new()
-	r.text = "Quân hàm: ⭐ Chánh Tướng (Bậc 8/12)"
+	r.text = "Cấp độ: Cấp %d (%d/%d EXP) | Quân hàm: %s (Bậc %d/12)" % [lvl, exp_c, exp_req, mil_info["full_name"], mil_info["tier"]]
 	r.add_theme_font_size_override("font_size", 13)
 	r.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
 	v.add_child(r)
+
+	var gen_lbl = Label.new()
+	gen_lbl.text = "Danh tướng sở hữu: %d tướng (Cứ 1 tướng sở hữu +50 Exp Quân hàm = %dđ)" % [num_generals, mil_info["points"]]
+	gen_lbl.add_theme_font_size_override("font_size", 12)
+	gen_lbl.add_theme_color_override("font_color", Color(0.18, 0.50, 0.20, 1.0))
+	v.add_child(gen_lbl)
 
 	var win = Label.new()
 	win.text = "Thành tích: 48 Thắng / 12 Bại (Tỉ lệ: 80.0%)"
@@ -1340,7 +1406,11 @@ func _build_profile_content() -> Control:
 	v.add_child(win)
 
 	var rp = Label.new()
-	rp.text = "Điểm 2v2 RP: 1,200 | Quân công: 350đ"
+	rp.text = "Điểm 2v2 RP: %d | Bạc: %s | Vàng: %s" % [
+		AuthManager.current_2v2_points if AuthManager else 1200,
+		_format_number(current_silver),
+		_format_number(current_gold)
+	]
 	rp.add_theme_font_size_override("font_size", 13)
 	rp.add_theme_color_override("font_color", Color(0.70, 0.48, 0.05, 1.0))
 	v.add_child(rp)

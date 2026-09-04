@@ -97,6 +97,19 @@ func _ready() -> void:
 
 	_add_log("• Trận chiến huấn luyện khởi động.")
 
+	var cmd_args = OS.get_cmdline_user_args()
+	if cmd_args.is_empty():
+		cmd_args = OS.get_cmdline_args()
+	if "--screenshot-reward" in cmd_args:
+		spotlight_overlay.visible = false
+		_show_reward_modal()
+		await get_tree().create_timer(0.6).timeout
+		var img = get_viewport().get_texture().get_image()
+		img.save_png("res://tutorial_reward_screenshot.png")
+		print("[Screenshot] Đã lưu tutorial_reward_screenshot.png!")
+		get_tree().quit()
+		return
+
 	if "--screenshot" in OS.get_cmdline_user_args():
 		await get_tree().process_frame
 		await get_tree().process_frame
@@ -1052,9 +1065,303 @@ func _on_boss_defeated() -> void:
 func _show_reward_modal() -> void:
 	reward_modal.visible = true
 	banner.visible = false
-	var box = reward_modal.get_node("Dim/Box")
-	var tw = create_tween()
-	tw.tween_property(box, "scale", Vector2(1.0, 1.0), 0.25).from(Vector2(0.7, 0.7)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var box = reward_modal.get_node("Dim/Box") as PanelContainer
+
+	# Style Box: Imperial White/Cream with Gold Border & Deep Shadows
+	var box_style = StyleBoxFlat.new()
+	box_style.bg_color = Color(0.98, 0.97, 0.94, 0.98)
+	box_style.border_width_left = 3
+	box_style.border_width_top = 3
+	box_style.border_width_right = 3
+	box_style.border_width_bottom = 3
+	box_style.border_color = Color(0.85, 0.70, 0.22, 1.0)
+	box_style.corner_radius_top_left = 14
+	box_style.corner_radius_top_right = 14
+	box_style.corner_radius_bottom_right = 14
+	box_style.corner_radius_bottom_left = 14
+	box_style.shadow_color = Color(0.0, 0.0, 0.0, 0.65)
+	box_style.shadow_size = 22
+	box_style.shadow_offset = Vector2(0, 8)
+	box.add_theme_stylebox_override("panel", box_style)
+
+	box.custom_minimum_size = Vector2(860, 530)
+
+	# Xóa các con cũ để dựng bố cục chuẩn đẹp mới
+	for c in box.get_children():
+		c.queue_free()
+
+	var margin = MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 22)
+	margin.add_theme_constant_override("margin_right", 22)
+	margin.add_theme_constant_override("margin_top", 18)
+	margin.add_theme_constant_override("margin_bottom", 18)
+	box.add_child(margin)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	margin.add_child(vbox)
+
+	# 1. Header Tiêu Đề
+	var title = Label.new()
+	title.text = "👑 KHAI MÔN ĐẮC THẮNG - BAN THƯỞNG TÂN THỦ 👑"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 21)
+	title.add_theme_color_override("font_color", Color(0.68, 0.48, 0.05, 1.0))
+	title.add_theme_color_override("font_shadow_color", Color(1.0, 0.88, 0.40, 0.85))
+	title.add_theme_constant_override("shadow_offset_x", 1)
+	title.add_theme_constant_override("shadow_offset_y", 1)
+	vbox.add_child(title)
+
+	var sub = Label.new()
+	sub.text = "Chiến công đầu dẹp tan sào huyệt Sơn Tặc. Triều đình đặc cách ban phong tướng lĩnh & bổng lộc khởi nghiệp!"
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub.add_theme_font_size_override("font_size", 12)
+	sub.add_theme_color_override("font_color", Color(0.45, 0.40, 0.30, 1.0))
+	vbox.add_child(sub)
+
+	var div = ColorRect.new()
+	div.custom_minimum_size = Vector2(0, 2)
+	div.color = Color(0.85, 0.70, 0.22, 0.8)
+	vbox.add_child(div)
+
+	# 2. Khối Chân Dung Danh Tướng & Chiếu Chỉ
+	var hero_hbox = HBoxContainer.new()
+	hero_hbox.add_theme_constant_override("separation", 16)
+	hero_hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+	# Khung chân dung Tướng Lý Thường Kiệt
+	var portrait_box = PanelContainer.new()
+	portrait_box.custom_minimum_size = Vector2(140, 175)
+	var pb_style = StyleBoxFlat.new()
+	pb_style.bg_color = Color(0.12, 0.16, 0.24, 1.0)
+	pb_style.border_width_left = 2
+	pb_style.border_width_top = 2
+	pb_style.border_width_right = 2
+	pb_style.border_width_bottom = 2
+	pb_style.border_color = Color(0.85, 0.70, 0.22, 1.0)
+	pb_style.corner_radius_top_left = 10
+	pb_style.corner_radius_top_right = 10
+	pb_style.corner_radius_bottom_right = 10
+	pb_style.corner_radius_bottom_left = 10
+	pb_style.shadow_color = Color(0, 0, 0, 0.35)
+	pb_style.shadow_size = 6
+	pb_style.shadow_offset = Vector2(0, 3)
+	portrait_box.add_theme_stylebox_override("panel", pb_style)
+
+	var pv = VBoxContainer.new()
+	pv.add_theme_constant_override("separation", 4)
+	portrait_box.add_child(pv)
+
+	var hero_tex = TextureRect.new()
+	hero_tex.custom_minimum_size = Vector2(136, 140)
+	hero_tex.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	hero_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	hero_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	var h_img = load("res://assets/ui/ly_thuong_kiet.png")
+	if h_img: hero_tex.texture = h_img
+	pv.add_child(hero_tex)
+
+	var name_badge = Label.new()
+	name_badge.text = "LÝ THƯỜNG KIỆT"
+	name_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_badge.add_theme_font_size_override("font_size", 11)
+	name_badge.add_theme_color_override("font_color", Color(1.0, 0.85, 0.35, 1.0))
+	pv.add_child(name_badge)
+
+	hero_hbox.add_child(portrait_box)
+
+	# Khung Chiếu chỉ triều đình
+	var dialogue_panel = PanelContainer.new()
+	dialogue_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dialogue_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var dp_style = StyleBoxFlat.new()
+	dp_style.bg_color = Color(0.95, 0.94, 0.89, 1.0)
+	dp_style.border_width_left = 2
+	dp_style.border_width_top = 1
+	dp_style.border_width_right = 1
+	dp_style.border_width_bottom = 1
+	dp_style.border_color = Color(0.85, 0.70, 0.22, 0.8)
+	dp_style.corner_radius_top_left = 8
+	dp_style.corner_radius_top_right = 8
+	dp_style.corner_radius_bottom_right = 8
+	dp_style.corner_radius_bottom_left = 8
+	dp_style.shadow_color = Color(0, 0, 0, 0.20)
+	dp_style.shadow_size = 4
+	dp_style.shadow_offset = Vector2(0, 2)
+	dialogue_panel.add_theme_stylebox_override("panel", dp_style)
+
+	var dv = VBoxContainer.new()
+	dv.offset_left = 14
+	dv.offset_right = -14
+	dv.offset_top = 10
+	dv.offset_bottom = -10
+	dv.add_theme_constant_override("separation", 8)
+	dialogue_panel.add_child(dv)
+
+	var d_title = Label.new()
+	d_title.text = "📜 HUẤN TỪ CHÚC MỪNG CHIẾN THẮNG:"
+	d_title.add_theme_font_size_override("font_size", 13)
+	d_title.add_theme_color_override("font_color", Color(0.72, 0.52, 0.08, 1.0))
+	dv.add_child(d_title)
+
+	var d_speech = Label.new()
+	d_speech.text = "“Chúc mừng Tướng Quân đã dẹp yên sào huyệt Sơn Tặc, bảo toàn biên cương! Bản soái xin đích thân đồng hành cùng Tướng Quân trên con đường chinh phục và bảo vệ giang sơn xã tắc Đại Việt!”"
+	d_speech.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	d_speech.add_theme_font_size_override("font_size", 12)
+	d_speech.add_theme_color_override("font_color", Color(0.15, 0.12, 0.06, 1.0))
+	dv.add_child(d_speech)
+
+	var d_mil = Label.new()
+	d_mil.text = "🎖️ Exp Quân Hàm: Cứ 1 tướng sở hữu +50đ ➜ Tướng Lý Thường Kiệt: +50 Exp Quân Hàm (🔰 Tân Binh 50/100đ)!"
+	d_mil.add_theme_font_size_override("font_size", 12)
+	d_mil.add_theme_color_override("font_color", Color(0.18, 0.50, 0.20, 1.0))
+	dv.add_child(d_mil)
+
+	hero_hbox.add_child(dialogue_panel)
+	vbox.add_child(hero_hbox)
+
+	# 3. 4 Thẻ Phần Thưởng
+	var cards_hbox = HBoxContainer.new()
+	cards_hbox.add_theme_constant_override("separation", 10)
+	cards_hbox.custom_minimum_size = Vector2(0, 110)
+
+	var rewards_data = [
+		{
+			"tag": "🎖️ THẦN TƯỚNG",
+			"val": "LÝ THƯỜNG KIỆT",
+			"desc": "Tướng 4 Khí Huyết\nTuyệt kỹ: Tiến Thoái\n+50 Exp Quân Hàm",
+			"tag_color": Color(0.72, 0.52, 0.08, 1.0)
+		},
+		{
+			"tag": "⭐ KINH NGHIỆM",
+			"val": "+20 EXP",
+			"desc": "VỪA TRÒN LÊN CẤP 2!\n(Cần 20 Exp lên Cấp 2)\nTiếp theo: 0/30 Exp",
+			"tag_color": Color(0.85, 0.45, 0.05, 1.0)
+		},
+		{
+			"tag": "🪙 QUÂN LƯƠNG",
+			"val": "+2,000 BẠC",
+			"desc": "Ngân lượng khởi đầu\nChiêu mộ tướng soái\nRèn đúc binh khí",
+			"tag_color": Color(0.20, 0.45, 0.75, 1.0)
+		},
+		{
+			"tag": "💎 QUÂN LỆNH",
+			"val": "+200 VÀNG",
+			"desc": "Bảo vật hoàng gia\nMua sắm Trân Bảo Các\nBổng lộc triều đình",
+			"tag_color": Color(0.65, 0.35, 0.85, 1.0)
+		}
+	]
+
+	for r in rewards_data:
+		var r_card = PanelContainer.new()
+		r_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var rc_style = StyleBoxFlat.new()
+		rc_style.bg_color = Color(0.96, 0.95, 0.91, 1.0)
+		rc_style.border_width_left = 1
+		rc_style.border_width_top = 1
+		rc_style.border_width_right = 1
+		rc_style.border_width_bottom = 1
+		rc_style.border_color = Color(0.85, 0.70, 0.22, 0.8)
+		rc_style.corner_radius_top_left = 8
+		rc_style.corner_radius_top_right = 8
+		rc_style.corner_radius_bottom_right = 8
+		rc_style.corner_radius_bottom_left = 8
+		rc_style.shadow_color = Color(0, 0, 0, 0.25)
+		rc_style.shadow_size = 5
+		rc_style.shadow_offset = Vector2(0, 3)
+		r_card.add_theme_stylebox_override("panel", rc_style)
+
+		var rv = VBoxContainer.new()
+		rv.offset_left = 8
+		rv.offset_right = -8
+		rv.offset_top = 8
+		rv.offset_bottom = -8
+		rv.add_theme_constant_override("separation", 2)
+		rv.alignment = BoxContainer.ALIGNMENT_CENTER
+
+		var r_tag = Label.new()
+		r_tag.text = r["tag"]
+		r_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		r_tag.add_theme_font_size_override("font_size", 10)
+		r_tag.add_theme_color_override("font_color", r["tag_color"])
+		rv.add_child(r_tag)
+
+		var r_val = Label.new()
+		r_val.text = r["val"]
+		r_val.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		r_val.add_theme_font_size_override("font_size", 14)
+		r_val.add_theme_color_override("font_color", Color(0.12, 0.10, 0.05, 1.0))
+		rv.add_child(r_val)
+
+		var r_desc = Label.new()
+		r_desc.text = r["desc"]
+		r_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		r_desc.add_theme_font_size_override("font_size", 10)
+		r_desc.add_theme_color_override("font_color", Color(0.40, 0.38, 0.32, 1.0))
+		rv.add_child(r_desc)
+
+		r_card.add_child(rv)
+		cards_hbox.add_child(r_card)
+
+	vbox.add_child(cards_hbox)
+
+	# 4. Nút Nhận Thưởng Có Bóng Đổ Nổi Bật
+	var claim_btn = Button.new()
+	claim_btn.custom_minimum_size = Vector2(360, 46)
+	claim_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	claim_btn.text = "NHẬN THƯỞNG & VỀ SẢNH CHÍNH ➜"
+
+	var btn_normal = StyleBoxFlat.new()
+	btn_normal.bg_color = Color(0.96, 0.80, 0.28, 1.0)
+	btn_normal.border_width_left = 2
+	btn_normal.border_width_top = 2
+	btn_normal.border_width_right = 2
+	btn_normal.border_width_bottom = 2
+	btn_normal.border_color = Color(0.72, 0.54, 0.12, 1.0)
+	btn_normal.corner_radius_top_left = 8
+	btn_normal.corner_radius_top_right = 8
+	btn_normal.corner_radius_bottom_right = 8
+	btn_normal.corner_radius_bottom_left = 8
+	btn_normal.shadow_color = Color(0, 0, 0, 0.45)
+	btn_normal.shadow_size = 6
+	btn_normal.shadow_offset = Vector2(0, 4)
+
+	var btn_hover = btn_normal.duplicate() as StyleBoxFlat
+	btn_hover.bg_color = Color(1.0, 0.88, 0.38, 1.0)
+	btn_hover.shadow_size = 8
+	btn_hover.shadow_offset = Vector2(0, 5)
+
+	var btn_pressed = btn_normal.duplicate() as StyleBoxFlat
+	btn_pressed.bg_color = Color(0.88, 0.72, 0.22, 1.0)
+	btn_pressed.shadow_size = 2
+	btn_pressed.shadow_offset = Vector2(0, 1)
+
+	claim_btn.add_theme_stylebox_override("normal", btn_normal)
+	claim_btn.add_theme_stylebox_override("hover", btn_hover)
+	claim_btn.add_theme_stylebox_override("pressed", btn_pressed)
+	claim_btn.add_theme_stylebox_override("focus", btn_hover)
+	claim_btn.add_theme_color_override("font_color", Color(0.12, 0.08, 0.02, 1.0))
+	claim_btn.add_theme_font_size_override("font_size", 14)
+
+	claim_btn.pressed.connect(func():
+		claim_btn.release_focus()
+		claim_btn.disabled = true
+		AudioManager.play_victory()
+		AuthManager.claim_tutorial_reward(20, 2000, 200)
+		_add_log("🎁 ĐÃ NHẬN THƯỞNG: Tướng Lý Thường Kiệt, +20 EXP (Thăng Cấp 2), +2,000 Bạc, +200 Vàng!")
+		await get_tree().create_timer(0.6).timeout
+		get_tree().change_scene_to_file("res://scenes/home.tscn")
+	)
+
+	vbox.add_child(claim_btn)
+
+	# Hiệu ứng Pop-in
+	box.scale = Vector2(0.75, 0.75)
+	box.modulate.a = 0.0
+	var tw = create_tween().set_parallel(true)
+	tw.tween_property(box, "scale", Vector2(1.0, 1.0), 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(box, "modulate:a", 1.0, 0.2)
 
 func _get_equipment_description(item_name: String) -> String:
 	var name_lower = item_name.to_lower()
