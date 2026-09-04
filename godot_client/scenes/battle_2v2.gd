@@ -29,6 +29,8 @@ const CardUIScene = preload("res://scenes/components/card_ui.tscn")
 @onready var dodge_timer_lbl: Label = $DodgeModal/Dim/Box/Margin/VBox/TimerLbl
 @onready var dodge_confirm_btn: Button = $DodgeModal/Dim/Box/Margin/VBox/HBox/DodgeBtn
 @onready var dodge_pass_btn: Button = $DodgeModal/Dim/Box/Margin/VBox/HBox/PassBtn
+@onready var dodge_card_selector_hbox: HBoxContainer = $DodgeModal/Dim/Box/Margin/VBox/CardSelectorScroll/CardSelectorHBox
+@onready var dodge_selected_lbl: Label = $DodgeModal/Dim/Box/Margin/VBox/SelectedCardStatus
 
 @onready var rescue_modal: Control = $RescueModal
 @onready var rescue_desc_lbl: Label = $RescueModal/Dim/Box/Margin/VBox/Desc
@@ -74,6 +76,7 @@ var dodge_attacker_seat: int = -1
 var dodge_time_left: float = 15.0
 var incoming_slash_damage: int = 1
 var incoming_slash_element: String = "NORMAL"
+var selected_dodge_card_ui: Control = null
 
 # Waiting for Rescue (Bánh Chưng / Hủ Rượu)
 var is_waiting_rescue: bool = false
@@ -137,6 +140,25 @@ func _ready() -> void:
 		var img = get_viewport().get_texture().get_image()
 		img.save_png("res://battle_2v2_screenshot.png")
 		print("[Screenshot] Đã lưu battle_2v2_screenshot.png!")
+		get_tree().quit()
+
+	if "--screenshot-dodge-modal" in cmd_args:
+		# Add 2 Dodge cards with different suits/ranks to test selection
+		_add_card_to_player_hand({"id": "D80_DO_D2", "name": "Đỡ", "rank": 2, "suit": "Diamond", "cat": 0, "desc": "Hóa giải hoàn toàn 1 đòn Trảm"})
+		_add_card_to_player_hand({"id": "D80_DO_H7", "name": "Đỡ", "rank": 7, "suit": "Heart", "cat": 0, "desc": "Hóa giải hoàn toàn 1 đòn Trảm"})
+		await get_tree().create_timer(0.5).timeout
+		_prompt_dodge_reaction(2, 1, "NORMAL")
+		await get_tree().create_timer(0.4).timeout
+
+		# Test switching to the second valid card (♦ 2 Đỡ) to prove manual selection works
+		var valid_cards = _get_valid_dodge_cards(2)
+		if valid_cards.size() >= 2:
+			_select_dodge_card(valid_cards[1])
+
+		await get_tree().create_timer(0.6).timeout
+		var img = get_viewport().get_texture().get_image()
+		img.save_png("res://battle_2v2_dodge_screenshot.png")
+		print("[Screenshot] Đã lưu battle_2v2_dodge_screenshot.png!")
 		get_tree().quit()
 
 func _process(delta: float) -> void:
@@ -382,7 +404,13 @@ func _add_card_to_player_hand(c_info: Dictionary) -> void:
 	AudioManager.play_card_draw()
 
 func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> void:
-	if not is_player_turn or is_waiting_dodge or is_waiting_rescue:
+	if is_waiting_dodge:
+		_handle_dodge_hand_card_selection(card_node, c_info)
+		return
+	if is_waiting_rescue:
+		_handle_rescue_hand_card_selection(card_node, c_info)
+		return
+	if not is_player_turn:
 		return
 
 	if selected_card_ui == card_node:
@@ -416,6 +444,49 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 
 	_update_action_btn()
 
+func _handle_dodge_hand_card_selection(card_node: Control, _c_info: Dictionary) -> void:
+	if not is_waiting_dodge:
+		return
+	var is_valid = _is_card_valid_for_dodge(card_node, dodge_attacker_seat)
+	if is_valid:
+		_select_dodge_card(card_node)
+	else:
+		if card_node.has_method("set_selected"):
+			card_node.set_selected(false)
+		var info = _get_card_info_from_ui(card_node)
+		var c_name = info.get("name", "Lá bài")
+		desc_text.text = "❌ Lá [%s] không thể dùng để Đỡ đòn Trảm này! Hãy chọn lá [Đỡ] hợp lệ." % c_name
+		AudioManager.play_skill()
+
+func _handle_rescue_hand_card_selection(card_node: Control, _c_info: Dictionary) -> void:
+	if not is_waiting_rescue:
+		return
+	var info = _get_card_info_from_ui(card_node)
+	var c_name = info.get("name", "")
+	var is_valid = false
+	if c_name == "Bánh Chưng":
+		is_valid = true
+	elif c_name == "Hủ Rượu" and rescue_victim_seat == my_seat:
+		is_valid = true
+
+	if is_valid:
+		if rescue_card_to_use and is_instance_valid(rescue_card_to_use) and rescue_card_to_use != card_node:
+			if rescue_card_to_use.has_method("set_selected"):
+				rescue_card_to_use.set_selected(false)
+		rescue_card_to_use = card_node
+		if card_node.has_method("set_selected"):
+			card_node.set_selected(true)
+		AudioManager.play_card_select()
+		var suit_sym = _get_suit_icon(info.get("suit", ""))
+		var rank_str = _format_rank(info.get("rank", 1))
+		rescue_confirm_btn.text = "🍲 DÙNG [%s %s %s]" % [suit_sym, rank_str, c_name.to_upper()]
+		desc_text.text = "🍲 Đã chọn lá [%s %s %s] để cứu viện. Bấm nút để xác nhận." % [suit_sym, rank_str, c_name]
+	else:
+		if card_node.has_method("set_selected"):
+			card_node.set_selected(false)
+		desc_text.text = "❌ Lá [%s] không thể dùng để cứu viện cận tử!" % c_name
+		AudioManager.play_skill()
+
 func _on_general_avatar_clicked(seat_num: int) -> void:
 	if is_game_over:
 		return
@@ -442,11 +513,26 @@ func _get_card_info_from_ui(ui_node: Control) -> Dictionary:
 	if not ui_node or not is_instance_valid(ui_node):
 		return {}
 	var c_name = ui_node.get("card_name")
-	if c_name == null or c_name == "":
-		if ui_node.card_data:
+	var suit = ""
+	var rank = 1
+	var desc = ""
+	var cat = 0
+	var id = ""
+	if ui_node.get("card_data") and ui_node.card_data != null:
+		if c_name == null or c_name == "":
 			c_name = ui_node.card_data.card_name
+		suit = ui_node.card_data.suit
+		rank = ui_node.card_data.rank
+		desc = ui_node.card_data.description
+		cat = ui_node.card_data.category
+		id = ui_node.card_data.id
 	return {
-		"name": c_name,
+		"id": id,
+		"name": c_name if c_name != null else "",
+		"suit": suit,
+		"rank": rank,
+		"desc": desc,
+		"cat": cat,
 		"card_node": ui_node
 	}
 
@@ -570,7 +656,8 @@ func _on_card_play_btn_clicked() -> void:
 		_animate_showcase_card(c_name, "Bạn dùng [%s] tấn công %s!" % [c_name, tgt["name"]])
 		_add_log("⚔️ Bạn dùng [%s]%s lên %s (Ghế %d)." % [c_name, " (kèm Hủ Rượu: +1 Sát Thương)" if is_wine else "", tgt["name"], tgt["seat"]])
 
-		_handle_slash_attack(my_seat, tgt["seat"], slash_dmg, elem)
+		var slash_suit = c_info.get("suit", "")
+		_handle_slash_attack(my_seat, tgt["seat"], slash_dmg, elem, slash_suit)
 
 	elif c_name == "Bánh Chưng":
 		var p_gen = generals_data[my_seat]
@@ -744,9 +831,10 @@ func _discard_player_card(card_node: Control) -> void:
 	g["hand_count"] = max(0, g["hand_count"] - 1)
 	g["avatar_node"].update_hand_count(g["hand_count"])
 
-func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: int = 1, damage_element: String = "NORMAL") -> void:
+func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: int = 1, damage_element: String = "NORMAL", slash_card_suit: String = "") -> void:
 	var tgt = generals_data[target_seat]
 	var atk = generals_data.get(attacker_seat, {})
+	atk["last_slash_suit"] = slash_card_suit
 	var has_thuan_thien = (atk.get("equipped_weapon", "") == "Kiếm Thuận Thiên")
 
 	# 1. Kiểm tra Giáp Đồng Sơn Vi (chỉ chặn Trảm Thường, bị Kiếm Thuận Thiên xuyên qua)
@@ -765,6 +853,17 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 			return
 		else:
 			_add_log("🛡️ [Khiên Mây Bện] của %s lật %s %d (ĐEN) -> Phán xét thất bại!" % [tgt["name"], judge_card.get("suit", ""), judge_card.get("rank", 1)])
+
+	# 3. Kỹ năng Bùi Bị (Hero 98 - Dũng Hãn): Nếu Máu mục tiêu > Máu người Trảm thì không thể Đỡ
+	var cannot_be_dodged = false
+	if atk.get("hero_id", -1) == 98 and tgt.get("hp", 0) > atk.get("hp", 0):
+		cannot_be_dodged = true
+		_add_log("⚔️ Kỹ năng [Dũng Hãn] của %s: Đòn Trảm không thể bị Đỡ!" % atk["name"])
+
+	if cannot_be_dodged:
+		_animate_showcase_card("Không Thể Đỡ", "Đòn Trảm không thể bị hóa giải!")
+		_apply_damage_to_general(target_seat, damage_amount, attacker_seat, damage_element)
+		return
 
 	if tgt["isPlayer"]:
 		_prompt_dodge_reaction(attacker_seat, damage_amount, damage_element)
@@ -796,49 +895,231 @@ func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_e
 	incoming_slash_element = damage_element
 	dodge_time_left = 15.0
 	is_waiting_dodge = true
+	selected_dodge_card_ui = null
 
-	dodge_desc_lbl.text = "%s (Ghế %d) đang dùng [Trảm] tấn công bạn! Bạn có muốn dùng lá [ĐỠ] trên tay không?" % [atk["name"], attacker_seat]
+	# Hủy chọn bài đang chọn ở lượt trước nếu có
+	if selected_card_ui and is_instance_valid(selected_card_ui):
+		if selected_card_ui.has_method("set_selected"):
+			selected_card_ui.set_selected(false)
+		selected_card_ui = null
+
+	dodge_desc_lbl.text = "%s (Ghế %d) đang dùng [Trảm] tấn công bạn!\nHãy CHỌN một lá bài trên tay để Đỡ:" % [atk["name"], attacker_seat]
 	dodge_timer_lbl.text = "⏳ Còn lại: 15s"
-	
-	var has_dodge = _find_card_in_hand("Đỡ") != null
-	dodge_confirm_btn.disabled = not has_dodge
-	if has_dodge:
-		dodge_confirm_btn.text = "🛡️ DÙNG [ĐỠ]"
+
+	var valid_cards = _get_valid_dodge_cards(attacker_seat)
+	_build_dodge_card_selector_buttons(valid_cards)
+
+	if valid_cards.size() > 0:
+		_select_dodge_card(valid_cards[0])
+		desc_text.text = "🛡️ Bị Trảm! Nhấp lá bài trên tay hoặc các nút ở trên để đổi lá Đỡ bạn muốn dùng."
 	else:
-		dodge_confirm_btn.text = "❌ KHÔNG CÓ [ĐỠ]"
+		_select_dodge_card(null)
 
 	dodge_modal.visible = true
 
-func _find_card_in_hand(c_name: String) -> Control:
-	for c in hand_container.get_children():
-		var info = _get_card_info_from_ui(c)
-		if info.get("name", "") == c_name:
-			return c
-	return null
+func _is_card_valid_for_dodge(card_ui: Control, attacker_seat: int) -> bool:
+	if not card_ui or not is_instance_valid(card_ui):
+		return false
+	var info = _get_card_info_from_ui(card_ui)
+	var c_name = info.get("name", "")
+	var suit = info.get("suit", "")
+	var rank = int(info.get("rank", 1))
+
+	var my_gen = generals_data.get(my_seat, {})
+	var atk_gen = generals_data.get(attacker_seat, {})
+
+	# 1. Súng Thần Công Hồ Triều: Mục tiêu không được dùng Đỡ cùng chất với Trảm
+	if atk_gen.get("equipped_weapon", "") == "Súng Thần Công Hồ Triều":
+		var slash_suit = atk_gen.get("last_slash_suit", "")
+		if slash_suit != "" and suit == slash_suit:
+			return false
+
+	# 2. Hero 72: Trần Duệ Tông ("Trực Chiến"): Đỡ phải >= 7
+	if atk_gen.get("hero_id", -1) == 72:
+		if rank < 7:
+			return false
+
+	# 3. Hero 44: Tông Đản ("Thổ Binh"): Cự ly <= 2 không được dùng Đỡ từ 2..5
+	if atk_gen.get("hero_id", -1) == 44:
+		var dist = _calculate_distance(attacker_seat, my_seat)
+		if dist <= 2 and rank >= 2 and rank <= 5:
+			return false
+
+	# Cơ bản: Lá bài "Đỡ"
+	if "đỡ" in c_name.to_lower():
+		return true
+
+	# Hero 47: Lý Thường Kiệt ("Tiến Thoái"): Dùng Trảm như Đỡ
+	if my_gen.get("hero_id", -1) == 47 and "trảm" in c_name.to_lower():
+		return true
+
+	# Hero 83: Nguyễn Cảnh Chân ("Thủy Binh"): Dùng bài chất Chuồn (♣) như Đỡ
+	if my_gen.get("hero_id", -1) == 83 and suit == "Club":
+		return true
+
+	return false
+
+func _get_valid_dodge_cards(attacker_seat: int) -> Array:
+	var valid_list: Array = []
+	for card_ui in hand_container.get_children():
+		if _is_card_valid_for_dodge(card_ui, attacker_seat):
+			valid_list.append(card_ui)
+	return valid_list
+
+func _build_dodge_card_selector_buttons(valid_cards: Array) -> void:
+	if not dodge_card_selector_hbox:
+		return
+	for ch in dodge_card_selector_hbox.get_children():
+		ch.queue_free()
+
+	if valid_cards.is_empty():
+		var empty_lbl = Label.new()
+		empty_lbl.text = "❌ Không có lá Đỡ phù hợp trên tay"
+		empty_lbl.add_theme_color_override("font_color", Color(0.9, 0.45, 0.45, 1.0))
+		empty_lbl.add_theme_font_size_override("font_size", 11)
+		dodge_card_selector_hbox.add_child(empty_lbl)
+		return
+
+	for card_ui in valid_cards:
+		var info = _get_card_info_from_ui(card_ui)
+		var suit = info.get("suit", "")
+		var suit_sym = _get_suit_icon(suit)
+		var rank_str = _format_rank(info.get("rank", 1))
+		var c_name = info.get("name", "Đỡ")
+
+		var btn = Button.new()
+		btn.custom_minimum_size = Vector2(105, 34)
+		btn.text = "%s %s %s" % [suit_sym, rank_str, c_name]
+		btn.focus_mode = Control.FOCUS_NONE
+		btn.add_theme_font_size_override("font_size", 11)
+		if suit in ["Heart", "Diamond"]:
+			btn.add_theme_color_override("font_color", Color(1.0, 0.45, 0.45, 1.0))
+		else:
+			btn.add_theme_color_override("font_color", Color(0.85, 0.92, 1.0, 1.0))
+
+		var captured_card = card_ui
+		btn.pressed.connect(func(): _select_dodge_card(captured_card))
+		btn.set_meta("card_ui", card_ui)
+		dodge_card_selector_hbox.add_child(btn)
+
+func _update_dodge_card_selector_buttons() -> void:
+	if not dodge_card_selector_hbox:
+		return
+	for ch in dodge_card_selector_hbox.get_children():
+		if ch is Button and ch.has_meta("card_ui"):
+			var card_ref = ch.get_meta("card_ui")
+			if card_ref == selected_dodge_card_ui:
+				ch.modulate = Color(1.4, 1.4, 1.0, 1.0)
+				if not ch.text.begins_with("👉 "):
+					ch.text = "👉 " + ch.text
+			else:
+				ch.modulate = Color(0.85, 0.85, 0.85, 0.85)
+				ch.text = ch.text.trim_prefix("👉 ")
+
+func _select_dodge_card(card_ui: Control) -> void:
+	if card_ui == null:
+		selected_dodge_card_ui = null
+		dodge_confirm_btn.disabled = true
+		dodge_confirm_btn.text = "❌ KHÔNG CÓ [ĐỠ]"
+		if dodge_selected_lbl:
+			dodge_selected_lbl.text = "❌ Bạn không có lá bài nào có thể dùng để Đỡ!"
+		desc_text.text = "💥 Bạn không có lá Đỡ nào trên tay! Bấm [CHỊU ĐÒN] hoặc đợi hết giờ."
+		_update_dodge_card_selector_buttons()
+		return
+
+	if selected_dodge_card_ui and is_instance_valid(selected_dodge_card_ui) and selected_dodge_card_ui != card_ui:
+		if selected_dodge_card_ui.has_method("set_selected"):
+			selected_dodge_card_ui.set_selected(false)
+
+	selected_dodge_card_ui = card_ui
+	if selected_dodge_card_ui and is_instance_valid(selected_dodge_card_ui):
+		if selected_dodge_card_ui.has_method("set_selected"):
+			selected_dodge_card_ui.set_selected(true)
+
+	AudioManager.play_card_select()
+
+	var info = _get_card_info_from_ui(card_ui)
+	var suit_sym = _get_suit_icon(info.get("suit", ""))
+	var rank_str = _format_rank(info.get("rank", 1))
+	var c_name = info.get("name", "Đỡ")
+
+	dodge_confirm_btn.disabled = false
+	dodge_confirm_btn.text = "🛡️ DÙNG [%s %s %s]" % [suit_sym, rank_str, c_name]
+	if dodge_selected_lbl:
+		dodge_selected_lbl.text = "👉 Đang chọn: %s %s [%s]" % [suit_sym, rank_str, c_name]
+	desc_text.text = "🛡️ Đã chọn lá [%s %s %s] để Đỡ đòn Trảm! Bấm nút để xác nhận hoặc nhấp lá khác trên tay." % [suit_sym, rank_str, c_name]
+
+	_update_dodge_card_selector_buttons()
 
 func _on_dodge_confirmed() -> void:
 	if not is_waiting_dodge:
 		return
-	var dodge_card = _find_card_in_hand("Đỡ")
-	if dodge_card:
-		_discard_player_card(dodge_card)
-		dodge_modal.visible = false
-		is_waiting_dodge = false
-		_broadcast_player_battle_action("DODGE_RESPONSE", "do", dodge_attacker_seat)
-		_animate_showcase_card("Đỡ", "Bạn dùng [Đỡ] hóa giải đòn tấn công!")
-		_add_log("🛡️ Bạn đã dùng [Đỡ] hóa giải đòn Trảm thành công!")
-		AudioManager.play_voice("Đỡ")
-		AudioManager.play_parry()
-	else:
+	if not selected_dodge_card_ui or not is_instance_valid(selected_dodge_card_ui):
 		_on_dodge_passed()
+		return
+
+	var chosen_card = selected_dodge_card_ui
+	var card_info = _get_card_info_from_ui(chosen_card)
+	var c_name = card_info.get("name", "Đỡ")
+	var suit_sym = _get_suit_icon(card_info.get("suit", ""))
+	var rank_str = _format_rank(card_info.get("rank", 1))
+
+	if chosen_card.has_method("set_selected"):
+		chosen_card.set_selected(false)
+	_discard_player_card(chosen_card)
+	selected_dodge_card_ui = null
+
+	dodge_modal.visible = false
+	is_waiting_dodge = false
+
+	var card_id = card_info.get("id", "do")
+	_broadcast_player_battle_action("DODGE_RESPONSE", card_id, dodge_attacker_seat)
+	_animate_showcase_card(c_name, "Bạn dùng [%s %s %s] hóa giải đòn Trảm!" % [suit_sym, rank_str, c_name])
+	_add_log("🛡️ Bạn đã tự chọn dùng lá [%s %s %s] hóa giải đòn Trảm thành công!" % [suit_sym, rank_str, c_name])
+	AudioManager.play_voice("Đỡ")
+	AudioManager.play_parry()
+
+	# Kiểm tra Song Cung Mường Nhạ của người tấn công
+	var atk = generals_data.get(dodge_attacker_seat, {})
+	if atk.get("equipped_weapon", "") == "Song Cung Mường Nhạ" and dodge_attacker_seat != my_seat and atk.get("hand_count", 0) >= 2:
+		atk["hand_count"] = max(0, atk["hand_count"] - 2)
+		atk["avatar_node"].update_hand_count(atk["hand_count"])
+		_add_log("🏹 [Song Cung Mường Nhạ] của %s ép bạn chịu 1 sát thương!" % atk["name"])
+		AudioManager.play_skill()
+		_apply_damage_to_general(my_seat, 1, dodge_attacker_seat, "NORMAL")
 
 func _on_dodge_passed() -> void:
 	if not is_waiting_dodge:
 		return
+	if selected_dodge_card_ui and is_instance_valid(selected_dodge_card_ui):
+		if selected_dodge_card_ui.has_method("set_selected"):
+			selected_dodge_card_ui.set_selected(false)
+	selected_dodge_card_ui = null
 	dodge_modal.visible = false
 	is_waiting_dodge = false
 	_broadcast_player_battle_action("DODGE_RESPONSE", "pass", dodge_attacker_seat)
 	_apply_damage_to_general(my_seat, incoming_slash_damage, dodge_attacker_seat, incoming_slash_element)
+
+func _calculate_distance(seat_a: int, seat_b: int) -> int:
+	var diff = abs(seat_a - seat_b)
+	return min(diff, 4 - diff)
+
+func _get_suit_icon(suit: String) -> String:
+	match suit:
+		"Heart": return "♥"
+		"Diamond": return "♦"
+		"Club": return "♣"
+		"Spade": return "♠"
+		_: return ""
+
+func _format_rank(r: Variant) -> String:
+	var val = int(r)
+	match val:
+		1: return "A"
+		11: return "J"
+		12: return "Q"
+		13: return "K"
+		_: return str(val)
 
 func _apply_damage_to_general(target_seat: int, amount: int, attacker_seat: int = -1, damage_element: String = "NORMAL") -> void:
 	if not generals_data.has(target_seat):
@@ -1190,7 +1471,8 @@ func _execute_ai_turn(ai_seat: int) -> void:
 		_animate_showcase_card("Trảm", "%s dùng [Trảm] tấn công %s!" % [ai_gen["name"], tgt_gen["name"]])
 		_add_log("⚔️ %s (Ghế %d) dùng [Trảm] lên %s (Ghế %d)." % [ai_gen["name"], ai_seat, tgt_gen["name"], chosen_tgt_seat])
 
-		_handle_slash_attack(ai_seat, chosen_tgt_seat)
+		var ai_slash_suit = ["Spade", "Heart", "Club", "Diamond"].pick_random()
+		_handle_slash_attack(ai_seat, chosen_tgt_seat, 1, "NORMAL", ai_slash_suit)
 
 		if chosen_tgt_seat == my_seat:
 			while is_waiting_dodge and not is_game_over:

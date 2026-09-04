@@ -424,8 +424,10 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_bottom = -225.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 color = Color(0.02, 0.03, 0.06, 0.7)
 
 [node name="Dim" type="CenterContainer" parent="DodgeModal"]
@@ -433,24 +435,26 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_bottom = -225.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 
 [node name="Box" type="PanelContainer" parent="DodgeModal/Dim"]
-custom_minimum_size = Vector2(440, 220)
+custom_minimum_size = Vector2(500, 240)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
 
 [node name="Margin" type="MarginContainer" parent="DodgeModal/Dim/Box"]
 layout_mode = 2
 theme_override_constants/margin_left = 20
-theme_override_constants/margin_top = 16
+theme_override_constants/margin_top = 14
 theme_override_constants/margin_right = 20
-theme_override_constants/margin_bottom = 16
+theme_override_constants/margin_bottom = 14
 
 [node name="VBox" type="VBoxContainer" parent="DodgeModal/Dim/Box/Margin"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 8
 
 [node name="Title" type="Label" parent="DodgeModal/Dim/Box/Margin/VBox"]
 layout_mode = 2
@@ -461,11 +465,30 @@ horizontal_alignment = 1
 
 [node name="Desc" type="Label" parent="DodgeModal/Dim/Box/Margin/VBox"]
 layout_mode = 2
-size_flags_vertical = 3
 theme_override_colors/font_color = Color(0.9, 0.93, 0.98, 1)
-theme_override_font_sizes/font_size = 12
-text = "Đối phương đang Trảm bạn! Dùng lá [ĐỠ] trên tay để hóa giải đòn đánh?"
+theme_override_font_sizes/font_size = 11
+text = "Đối phương đang Trảm bạn! Hãy chọn lá [Đỡ] để hóa giải:"
+horizontal_alignment = 1
 autowrap_mode = 2
+
+[node name="CardSelectorScroll" type="ScrollContainer" parent="DodgeModal/Dim/Box/Margin/VBox"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+horizontal_scroll_mode = 1
+vertical_scroll_mode = 0
+
+[node name="CardSelectorHBox" type="HBoxContainer" parent="DodgeModal/Dim/Box/Margin/VBox/CardSelectorScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="SelectedCardStatus" type="Label" parent="DodgeModal/Dim/Box/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.45, 1)
+theme_override_font_sizes/font_size = 11
+text = "👉 Đang chọn: ..."
+horizontal_alignment = 1
 
 [node name="TimerLbl" type="Label" parent="DodgeModal/Dim/Box/Margin/VBox"]
 layout_mode = 2
@@ -480,14 +503,14 @@ theme_override_constants/separation = 16
 alignment = 1
 
 [node name="DodgeBtn" type="Button" parent="DodgeModal/Dim/Box/Margin/VBox/HBox"]
-custom_minimum_size = Vector2(170, 40)
+custom_minimum_size = Vector2(210, 38)
 layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 12
 text = "🛡️ DÙNG [ĐỠ]"
 
 [node name="PassBtn" type="Button" parent="DodgeModal/Dim/Box/Margin/VBox/HBox"]
-custom_minimum_size = Vector2(170, 40)
+custom_minimum_size = Vector2(160, 38)
 layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 12
@@ -507,8 +530,10 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_bottom = -225.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 color = Color(0.02, 0.03, 0.06, 0.75)
 
 [node name="Dim" type="CenterContainer" parent="RescueModal"]
@@ -516,8 +541,10 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_bottom = -225.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 
 [node name="Box" type="PanelContainer" parent="RescueModal/Dim"]
 custom_minimum_size = Vector2(460, 220)
