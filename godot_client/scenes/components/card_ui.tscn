@@ -83,6 +83,8 @@ theme_override_font_sizes/font_size = 13
 text = "Trảm Thường"
 horizontal_alignment = 1
 vertical_alignment = 1
+clip_text = true
+text_overrun_behavior = 3
 
 [node name="SubHeader" type="HBoxContainer" parent="Panel/Margin/VBox"]
 custom_minimum_size = Vector2(0, 18)

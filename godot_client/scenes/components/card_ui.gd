@@ -63,6 +63,12 @@ func update_card(data: Resource) -> void:
 
 	cat_lbl.text = data.get_category_name()
 	name_lbl.text = data.card_name
+	if data.card_name.length() >= 14:
+		name_lbl.add_theme_font_size_override("font_size", 9)
+	elif data.card_name.length() >= 10:
+		name_lbl.add_theme_font_size_override("font_size", 11)
+	else:
+		name_lbl.add_theme_font_size_override("font_size", 13)
 
 	# Tải hình minh họa lá bài (Artwork)
 	if artwork_rect:
