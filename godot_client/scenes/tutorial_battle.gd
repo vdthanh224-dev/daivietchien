@@ -155,6 +155,8 @@ func _ready() -> void:
 		player_avatar.set_equipment("weapon", "Kiếm Thuận Thiên", "♦A")
 		player_avatar.set_equipment("armor", "Khiên Mây Bện", "♦K")
 		player_avatar.set_equipment("defensive_mount", "Voi Chiến", "♥K")
+		player_avatar.set_equipment("offensive_mount", "Ngựa Trắng", "♠5")
+		player_avatar.set_equipment("treasure", "Bảo Vật Quốc Gia", "♥Q")
 		_show_general_info_modal("player")
 		await get_tree().create_timer(0.3).timeout
 		await get_tree().process_frame
@@ -842,6 +844,59 @@ func _show_reward_modal() -> void:
 	var tw = create_tween()
 	tw.tween_property(box, "scale", Vector2(1.0, 1.0), 0.25).from(Vector2(0.7, 0.7)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
+func _get_equipment_description(item_name: String) -> String:
+	var name_lower = item_name.to_lower()
+	if "thuận thiên" in name_lower or "thuan thien" in name_lower:
+		return "Tầm 2. Thanh bảo kiếm hộ quốc của Bình Định Vương, công thủ toàn diện."
+	elif "song cung" in name_lower or "mường nhạ" in name_lower:
+		return "Tầm 2. Khi Trảm bị Đỡ, có thể bỏ 2 bài trên tay ép mục tiêu chịu 1 sát thương."
+	elif "nỏ thần" in name_lower or "kim quy" in name_lower:
+		return "Tầm 3. Không giới hạn số lá Trảm được đánh ra trong cùng một lượt."
+	elif "trường đao" in name_lower or "nam sơn" in name_lower:
+		return "Tầm 3. Khi Trảm bị Đỡ, có thể bỏ thêm 1 lá Trảm ép đối phương Đỡ lần nữa."
+	elif "đại đao" in name_lower:
+		return "Tầm 2. Vũ khí hung hãn của thảo khấu sơn lâm, tăng sát thương công phá."
+	elif "giáp đồng" in name_lower or "sơn vi" in name_lower:
+		return "Vô hiệu hóa toàn bộ mọi đòn Trảm Thường không có thuộc tính."
+	elif "khiên mây" in name_lower:
+		return "Khi cần Đỡ, lật phán xét chất Đỏ (Cơ/Rô) tự động tính là Đỡ thành công."
+	elif "áo bào" in name_lower:
+		return "Tất cả sát thương nhận vào giảm 1 (tối đa 3 lần)."
+	elif "voi chiến" in name_lower:
+		return "Tăng +1 khoảng cách phòng thủ từ tất cả người khác nhắm tới bạn."
+	elif "ngựa trắng" in name_lower or "thuần nông" in name_lower:
+		return "Giảm -1 khoảng cách tấn công từ bạn tới tất cả người khác."
+	elif "bảo vật" in name_lower or "quốc gia" in name_lower or "hoàng gia" in name_lower:
+		return "Bảo vật gia truyền ban phúc lành hộ mệnh, gia tăng phòng hộ và sĩ khí."
+	elif item_name.strip_edges() == "":
+		return "Chưa trang bị"
+	else:
+		return "Trang bị đặc biệt kích hoạt hiệu ứng bảo hộ trong trận đấu."
+
+func _format_equipment_info(slot_icon: String, slot_name: String, equip_str: String, default_color: String) -> String:
+	var clean_str = equip_str.strip_edges()
+	if clean_str == "" or clean_str == "(Chưa trang bị)":
+		return "[b][color=#7A8B9E]• %s %s:[/color][/b] [color=#607185](Chưa trang bị)[/color]" % [slot_icon, slot_name]
+
+	var parts = clean_str.split(" ", false, 1)
+	var suit_rank_part = ""
+	var item_name_part = clean_str
+
+	if parts.size() >= 2 and (parts[0].begins_with("♠") or parts[0].begins_with("♥") or parts[0].begins_with("♦") or parts[0].begins_with("♣")):
+		suit_rank_part = parts[0]
+		item_name_part = parts[1]
+
+	var name_formatted = ""
+	if suit_rank_part != "":
+		var is_red = ("♥" in suit_rank_part or "♦" in suit_rank_part)
+		var color_hex = "#FF4D4D" if is_red else "#E2E8F0"
+		name_formatted = "[color=%s][b]%s[/b][/color] [color=%s][b]%s[/b][/color]" % [color_hex, suit_rank_part, default_color, item_name_part]
+	else:
+		name_formatted = "[color=%s][b]%s[/b][/color]" % [default_color, item_name_part]
+
+	var desc = _get_equipment_description(item_name_part)
+	return "[b][color=%s]• %s %s:[/color][/b] %s\n  [color=#8EB6DB]↳ %s[/color]" % [default_color, slot_icon, slot_name, name_formatted, desc]
+
 func _show_general_info_modal(target: String) -> void:
 	if target == "player":
 		info_modal_title.text = "🎖️ THÔNG TIN TƯỚNG: LÝ THƯỜNG KIỆT"
@@ -853,15 +908,15 @@ func _show_general_info_modal(target: String) -> void:
 
 		var w = player_avatar.equipped_items.get("weapon", "")
 		var a = player_avatar.equipped_items.get("armor", "")
-		var om = player_avatar.equipped_items.get("offensive_mount", "")
 		var dm = player_avatar.equipped_items.get("defensive_mount", "")
+		var om = player_avatar.equipped_items.get("offensive_mount", "")
 		var tr = player_avatar.equipped_items.get("treasure", "")
 
-		info_eq_weapon.text = "• 🗡️ Vũ Khí: " + (w if w != "" else "(Chưa trang bị)")
-		info_eq_armor.text = "• 🛡️ Giáp Phòng Thủ: " + (a if a != "" else "(Chưa trang bị)")
-		info_eq_def_mount.text = "• 🐘 Ngựa Thủ (+1): " + (dm if dm != "" else "(Chưa trang bị)")
-		info_eq_off_mount.text = "• 🐎 Ngựa Công (-1): " + (om if om != "" else "(Chưa trang bị)")
-		info_eq_treasure.text = "• 👑 Bảo Vật: " + (tr if tr != "" else "(Chưa trang bị)")
+		info_eq_weapon.text = _format_equipment_info("🗡️", "Vũ Khí", w, "#FFD700")
+		info_eq_armor.text = _format_equipment_info("🛡️", "Giáp Phòng Thủ", a, "#65D8FF")
+		info_eq_def_mount.text = _format_equipment_info("🐘", "Ngựa Thủ (+1)", dm, "#65F5AF")
+		info_eq_off_mount.text = _format_equipment_info("🐎", "Ngựa Công (-1)", om, "#FFA585")
+		info_eq_treasure.text = _format_equipment_info("👑", "Bảo Vật", tr, "#E0B5FF")
 
 	else:
 		info_modal_title.text = "👺 THÔNG TIN ĐỐI THỦ: THỦ LĨNH SƠN TẶC"
@@ -871,11 +926,17 @@ func _show_general_info_modal(target: String) -> void:
 		info_skill_title.text = "🗡️ TUYỆT KỸ: [CƯỚP BÓC] (Bị Động)"
 		info_skill_desc.text = "Đầu mỗi lượt, thủ lĩnh sơn tặc tự động rút thêm 2 lá bài từ kho bài và vung đại đao tung chiêu Trảm hung bạo nhắm vào đối thủ."
 
-		info_eq_weapon.text = "• 🗡️ Vũ Khí: ♦8 Đại Đao Sơn Tặc"
-		info_eq_armor.text = "• 🛡️ Giáp Phòng Thủ: (Chưa trang bị)"
-		info_eq_def_mount.text = "• 🐘 Ngựa Thủ (+1): (Chưa trang bị)"
-		info_eq_off_mount.text = "• 🐎 Ngựa Công (-1): (Chưa trang bị)"
-		info_eq_treasure.text = "• 👑 Bảo Vật: (Chưa trang bị)"
+		var w = boss_avatar.equipped_items.get("weapon", "♦8 Đại Đao Sơn Tặc")
+		var a = boss_avatar.equipped_items.get("armor", "")
+		var dm = boss_avatar.equipped_items.get("defensive_mount", "")
+		var om = boss_avatar.equipped_items.get("offensive_mount", "")
+		var tr = boss_avatar.equipped_items.get("treasure", "")
+
+		info_eq_weapon.text = _format_equipment_info("🗡️", "Vũ Khí", w, "#FFD700")
+		info_eq_armor.text = _format_equipment_info("🛡️", "Giáp Phòng Thủ", a, "#65D8FF")
+		info_eq_def_mount.text = _format_equipment_info("🐘", "Ngựa Thủ (+1)", dm, "#65F5AF")
+		info_eq_off_mount.text = _format_equipment_info("🐎", "Ngựa Công (-1)", om, "#FFA585")
+		info_eq_treasure.text = _format_equipment_info("👑", "Bảo Vật", tr, "#E0B5FF")
 
 	general_info_modal.visible = true
 	var box = general_info_modal.get_node("Dim/Box")

@@ -871,17 +871,17 @@ grow_vertical = 2
 color = Color(0, 0, 0, 0.75)
 
 [node name="Box" type="PanelContainer" parent="GeneralInfoModal/Dim"]
-custom_minimum_size = Vector2(680, 420)
+custom_minimum_size = Vector2(740, 520)
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -340.0
-offset_top = -210.0
-offset_right = 340.0
-offset_bottom = 210.0
+offset_left = -370.0
+offset_top = -260.0
+offset_right = 370.0
+offset_bottom = 260.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
@@ -993,36 +993,56 @@ text = "🛡️ TRANG BỊ ĐANG MANG (5 VỊ TRÍ):"
 
 [node name="EqList" type="VBoxContainer" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol"]
 layout_mode = 2
-theme_override_constants/separation = 4
+theme_override_constants/separation = 6
 
-[node name="EqWeapon" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList"]
+[node name="EqWeapon" type="RichTextLabel" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.88, 0.45, 1)
-theme_override_font_sizes/font_size = 11
+mouse_filter = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+theme_override_font_sizes/normal_font_size = 11
+theme_override_font_sizes/bold_font_size = 11
 text = "• 🗡️ Vũ Khí: (Chưa trang bị)"
 
-[node name="EqArmor" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList"]
+[node name="EqArmor" type="RichTextLabel" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.65, 0.88, 1, 1)
-theme_override_font_sizes/font_size = 11
+mouse_filter = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+theme_override_font_sizes/normal_font_size = 11
+theme_override_font_sizes/bold_font_size = 11
 text = "• 🛡️ Giáp Phòng Thủ: (Chưa trang bị)"
 
-[node name="EqDefMount" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList"]
+[node name="EqDefMount" type="RichTextLabel" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.65, 0.95, 0.75, 1)
-theme_override_font_sizes/font_size = 11
+mouse_filter = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+theme_override_font_sizes/normal_font_size = 11
+theme_override_font_sizes/bold_font_size = 11
 text = "• 🐘 Ngựa Thủ (+1): (Chưa trang bị)"
 
-[node name="EqOffMount" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList"]
+[node name="EqOffMount" type="RichTextLabel" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.65, 0.55, 1)
-theme_override_font_sizes/font_size = 11
+mouse_filter = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+theme_override_font_sizes/normal_font_size = 11
+theme_override_font_sizes/bold_font_size = 11
 text = "• 🐎 Ngựa Công (-1): (Chưa trang bị)"
 
-[node name="EqTreasure" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList"]
+[node name="EqTreasure" type="RichTextLabel" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/EqList"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.9, 0.75, 1, 1)
-theme_override_font_sizes/font_size = 11
+mouse_filter = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+theme_override_font_sizes/normal_font_size = 11
+theme_override_font_sizes/bold_font_size = 11
 text = "• 👑 Bảo Vật: (Chưa trang bị)"
 
 [node name="CloseModalBtn" type="Button" parent="GeneralInfoModal/Dim/Box/Margin/VBox"]
