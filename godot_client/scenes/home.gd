@@ -857,8 +857,8 @@ func _start_mode_practice() -> void:
 	get_tree().change_scene_to_file("res://scenes/tutorial_battle.tscn")
 
 func _start_mode_dynasty() -> void:
-	print("[Home] Chuyển cảnh vào Vương Triều (Main Game)...")
-	get_tree().change_scene_to_file("res://scenes/main_game.tscn")
+	print("[Home] Chuyển cảnh vào Vương Triều (Chọn Tướng)...")
+	get_tree().change_scene_to_file("res://scenes/hero_select.tscn")
 
 func _start_mode_2v2() -> void:
 	_start_2v2_matchmaking()
@@ -2293,24 +2293,24 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 
 	var elapsed_timer: float = 0.0
 	var is_fast_test = "--screenshot-matchmaking-filled" in OS.get_cmdline_user_args() or "--screenshot-matchmaking-filled" in OS.get_cmdline_args()
-	var countdown_max: float = 1.0 if is_fast_test else 15.0
-	var time_left: float = countdown_max
+	var bot_fill_timeout: float = 1.0 if is_fast_test else 15.0
+	var bot_fill_timer: float = 0.0
 	var heartbeat_timer: float = 0.0
 	var last_real_player_count: int = 1
 	var guest_wait_timer: float = 0.0
 
-	while not mm_is_cancelled and time_left > 0.0:
+	while not mm_is_cancelled:
 		if not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
 			return
 
-		time_left -= 0.5
 		elapsed_timer += 0.5
+		bot_fill_timer += 0.5
 		heartbeat_timer -= 0.5
 		guest_wait_timer += 0.5
 
-		var sec = maxi(0, int(ceilf(time_left)))
+		var sec = int(elapsed_timer)
 		if is_instance_valid(timer_lbl):
-			timer_lbl.text = "⏳ %ds" % sec
+			timer_lbl.text = "⏳ %02d:%02d" % [sec / 60, sec % 60]
 
 		if mm_is_host:
 			if heartbeat_timer <= 0.0:
@@ -2329,13 +2329,14 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 					current_real_count += 1
 
 			if current_real_count > last_real_player_count:
+				bot_fill_timer = 0.0 # reset ngầm cho thêm thời gian khi có người thật
 				last_real_player_count = current_real_count
 				if is_instance_valid(status_lbl):
 					status_lbl.text = "⚔️ Có thêm người chơi thực tham gia! Đang đợi tiếp..."
 
 			_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
 
-			if current_real_count >= 4:
+			if current_real_count >= 4 or bot_fill_timer >= bot_fill_timeout:
 				break
 		else:
 			var polled = await AppwriteMatchmaking.poll_room_state(mm_active_room_id)
@@ -2399,7 +2400,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	AudioManager.play_victory()
 	_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
 
-	# Lưu phòng vào AppwriteMatchmaking để main_game.tscn có thể hiển thị chính xác tên 4 người
+	# Lưu phòng vào AppwriteMatchmaking để hero_select.tscn có thể hiển thị chính xác tên 4 người
 	AppwriteMatchmaking.current_room = mm_current_room
 
 	await get_tree().create_timer(1.2).timeout
@@ -2407,7 +2408,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		return
 	is_matchmaking_active = false
 	_hide_modal()
-	get_tree().change_scene_to_file("res://scenes/main_game.tscn")
+	get_tree().change_scene_to_file("res://scenes/hero_select.tscn")
 
 func _build_national_war_content() -> Control:
 	var container = VBoxContainer.new()
@@ -2432,7 +2433,7 @@ func _build_national_war_content() -> Control:
 	_style_white_gold_action_button(war_btn)
 	war_btn.pressed.connect(func():
 		_hide_modal()
-		get_tree().change_scene_to_file("res://scenes/main_game.tscn")
+		get_tree().change_scene_to_file("res://scenes/hero_select.tscn")
 	)
 	container.add_child(war_btn)
 

@@ -22,6 +22,7 @@ NetworkClient="*res://scripts/network/network_client.gd"
 AuthManager="*res://scripts/network/auth_manager.gd"
 AudioManager="*res://scripts/audio_manager.gd"
 AppwriteMatchmaking="*res://scripts/network/appwrite_matchmaking.gd"
+HeroDatabase="*res://scripts/hero_database.gd"
 
 [display]
 
