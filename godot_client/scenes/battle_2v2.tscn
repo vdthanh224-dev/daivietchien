@@ -2,7 +2,7 @@
 
 [ext_resource type="Theme" uid="uid://d4af37royalgold" path="res://resources/themes/royal_gold_theme.tres" id="1_theme"]
 [ext_resource type="Script" path="res://scenes/battle_2v2.gd" id="2_script"]
-[ext_resource type="Texture2D" uid="uid://7cvwr40xn6ig" path="res://assets/ui/login_background.png" id="3_bg"]
+[ext_resource type="Texture2D" uid="uid://de3p08snhv5qn" path="res://assets/ui/home_background.png" id="3_bg"]
 [ext_resource type="PackedScene" uid="uid://cgeneralavatar123" path="res://scenes/components/general_avatar_ui.tscn" id="4_avatar"]
 [ext_resource type="Texture2D" uid="uid://b3cx3q63bytrs" path="res://assets/ui/card_back_bg.png" id="5_deck_card"]
 
@@ -83,11 +83,15 @@ theme = ExtResource("1_theme")
 script = ExtResource("2_script")
 
 [node name="Background" type="TextureRect" parent="."]
-modulate = Color(0.38, 0.4, 0.46, 1)
+modulate = Color(0.9, 0.9, 0.95, 1)
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = -40.0
+offset_top = -25.0
+offset_right = 40.0
+offset_bottom = 25.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -103,7 +107,16 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.02, 0.04, 0.08, 0.65)
+color = Color(0.02, 0.04, 0.08, 0.45)
+
+[node name="EmbersLayer" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [node name="TableTop" type="Control" parent="."]
 layout_mode = 1
@@ -479,6 +492,89 @@ layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 12
 text = "💥 CHỊU ĐÒN"
+
+[node name="RescueModal" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="DarkMask" type="ColorRect" parent="RescueModal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.02, 0.03, 0.06, 0.75)
+
+[node name="Dim" type="CenterContainer" parent="RescueModal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Box" type="PanelContainer" parent="RescueModal/Dim"]
+custom_minimum_size = Vector2(460, 220)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
+
+[node name="Margin" type="MarginContainer" parent="RescueModal/Dim/Box"]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 16
+
+[node name="VBox" type="VBoxContainer" parent="RescueModal/Dim/Box/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="RescueModal/Dim/Box/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.35, 0.35, 1)
+theme_override_font_sizes/font_size = 14
+text = "🚨 CẬN TỬ! CẦN CỨU VIỆN"
+horizontal_alignment = 1
+
+[node name="Desc" type="Label" parent="RescueModal/Dim/Box/Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.9, 0.93, 0.98, 1)
+theme_override_font_sizes/font_size = 12
+text = "Tướng đang hấp hối (0 Máu)! Dùng [Bánh Chưng] (hoặc Hủ Rượu) để cứu?"
+autowrap_mode = 2
+
+[node name="TimerLbl" type="Label" parent="RescueModal/Dim/Box/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_font_sizes/font_size = 11
+text = "⏳ Còn lại: 10s"
+horizontal_alignment = 1
+
+[node name="HBox" type="HBoxContainer" parent="RescueModal/Dim/Box/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="RescueBtn" type="Button" parent="RescueModal/Dim/Box/Margin/VBox/HBox"]
+custom_minimum_size = Vector2(170, 40)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 12
+text = "🍲 DÙNG BÁNH CHƯNG"
+
+[node name="PassBtn" type="Button" parent="RescueModal/Dim/Box/Margin/VBox/HBox"]
+custom_minimum_size = Vector2(170, 40)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 12
+text = "❌ BỎ QUA"
 
 [node name="GeneralInfoModal" type="Control" parent="."]
 visible = false

@@ -690,7 +690,8 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
     discardCard(state, card);
     state.slashesUsedThisTurn++;
     const isWine = !!(caster.isWineBuffActive || state.isWineBuffActive);
-    const damage = isWine ? 2 : 1;
+    let damage = 1;
+    if (isWine) damage += 1;
     caster.isWineBuffActive = false;
     state.isWineBuffActive = false;
 
@@ -738,7 +739,7 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
         cardName: card.name,
         damage,
         isWineBuff: isWine,
-        description: `🗡️ <b>${caster.generalName}</b> tung chiêu ${formatCardText(card)}${isWine ? ' <color=#FFD700><b>(kèm hiệu ứng Hủ Rượu: +1 Sát thương -> 2 Tổng!)</b></color>' : ''} nhắm vào <b>${target ? target.generalName : 'đối thủ'}</b>! (Mục tiêu có 40s để Đỡ${requiredDodgeText})`
+        description: `🗡️ <b>${caster.generalName}</b> tung chiêu ${formatCardText(card)}${isWine ? ' <color=#FFD700><b>(kèm hiệu ứng Hủ Rượu: +1 Sát thương)</b></color>' : ''} nhắm vào <b>${target ? target.generalName : 'đối thủ'}</b>! (Mục tiêu có 40s để Đỡ${requiredDodgeText})`
       });
     return { success: true, state };
   }
@@ -774,7 +775,7 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
       casterSeat,
       cardId: card.id,
       cardName: card.name,
-      description: `🍶 <b>${caster.generalName}</b> uống ${formatCardText(card)}: Đòn Trảm kế tiếp gây +1 sát thương (+2 tổng)!`
+      description: `🍶 <b>${caster.generalName}</b> uống ${formatCardText(card)}: Đòn Trảm kế tiếp được +1 sát thương!`
     });
     refreshLastDelta(state);
     return { success: true, state };

@@ -21,11 +21,20 @@ const CardUIScene = preload("res://scenes/components/card_ui.tscn")
 @onready var showcase_card_slot: Control = $CenterArea/CardShowcase/CardSlot
 @onready var showcase_label: Label = $CenterArea/CardShowcase/ActionBanner/ShowcaseName
 
+@onready var bg_rect: TextureRect = $Background
+@onready var embers_layer: Control = $EmbersLayer
+
 @onready var dodge_modal: Control = $DodgeModal
 @onready var dodge_desc_lbl: Label = $DodgeModal/Dim/Box/Margin/VBox/Desc
 @onready var dodge_timer_lbl: Label = $DodgeModal/Dim/Box/Margin/VBox/TimerLbl
 @onready var dodge_confirm_btn: Button = $DodgeModal/Dim/Box/Margin/VBox/HBox/DodgeBtn
 @onready var dodge_pass_btn: Button = $DodgeModal/Dim/Box/Margin/VBox/HBox/PassBtn
+
+@onready var rescue_modal: Control = $RescueModal
+@onready var rescue_desc_lbl: Label = $RescueModal/Dim/Box/Margin/VBox/Desc
+@onready var rescue_timer_lbl: Label = $RescueModal/Dim/Box/Margin/VBox/TimerLbl
+@onready var rescue_confirm_btn: Button = $RescueModal/Dim/Box/Margin/VBox/HBox/RescueBtn
+@onready var rescue_pass_btn: Button = $RescueModal/Dim/Box/Margin/VBox/HBox/PassBtn
 
 @onready var general_info_modal: Control = $GeneralInfoModal
 @onready var info_title: Label = $GeneralInfoModal/Dim/Box/Margin/VBox/HeaderHBox/ModalTitle
@@ -66,6 +75,16 @@ var dodge_time_left: float = 15.0
 var incoming_slash_damage: int = 1
 var incoming_slash_element: String = "NORMAL"
 
+# Waiting for Rescue (Bánh Chưng / Hủ Rượu)
+var is_waiting_rescue: bool = false
+var rescue_victim_seat: int = -1
+var rescue_time_left: float = 10.0
+var rescue_card_to_use: Control = null
+
+# Dynamic Background & Embers
+var ember_particles: Array = []
+var bg_anim_timer: float = 0.0
+
 # General Info Table (Key: seatNumber 1..4)
 var generals_data: Dictionary = {}
 
@@ -80,17 +99,21 @@ func _ready() -> void:
 	end_turn_btn.pressed.connect(_on_end_turn_btn_clicked)
 	dodge_confirm_btn.pressed.connect(_on_dodge_confirmed)
 	dodge_pass_btn.pressed.connect(_on_dodge_passed)
+	rescue_confirm_btn.pressed.connect(_on_rescue_confirmed)
+	rescue_pass_btn.pressed.connect(_on_rescue_passed)
 	info_close_x_btn.pressed.connect(_hide_general_info_modal)
 	info_close_btn.pressed.connect(_hide_general_info_modal)
 	victory_return_btn.pressed.connect(_on_return_home_clicked)
 
 	dodge_modal.visible = false
+	rescue_modal.visible = false
 	general_info_modal.visible = false
 	victory_defeat_modal.visible = false
 	center_showcase.visible = false
 	card_play_btn.visible = false
 	end_turn_btn.visible = false
 
+	_start_ambient_effects()
 	_init_deck()
 	_init_generals_from_draft()
 	_deal_initial_hands()
@@ -113,6 +136,24 @@ func _ready() -> void:
 		get_tree().quit()
 
 func _process(delta: float) -> void:
+	# Subtle background breathing animation
+	bg_anim_timer += delta * 0.35
+	if bg_rect and is_instance_valid(bg_rect):
+		var scale_v = 1.02 + sin(bg_anim_timer) * 0.02
+		bg_rect.scale = Vector2(scale_v, scale_v)
+		bg_rect.position = Vector2(cos(bg_anim_timer * 0.6) * 8.0 - 40.0, sin(bg_anim_timer * 0.4) * 6.0 - 25.0)
+
+	# Floating Golden Embers
+	for p in ember_particles:
+		if is_instance_valid(p):
+			var pos = p.position
+			pos.y -= p.get_meta("speed_y") * delta
+			pos.x += p.get_meta("drift_x") * delta * sin(Time.get_ticks_msec() * 0.002)
+			if pos.y < -10:
+				pos.y = 730
+				pos.x = randf_range(0, 1280)
+			p.position = pos
+
 	if is_game_over:
 		return
 
@@ -131,6 +172,28 @@ func _process(delta: float) -> void:
 		dodge_timer_lbl.text = "⏳ Còn lại: %ds" % sec
 		if dodge_time_left <= 0:
 			_on_dodge_passed()
+
+	# Handle Rescue Reaction Timer (Bánh Chưng / Hủ Rượu Cận Tử)
+	if is_waiting_rescue:
+		rescue_time_left -= delta
+		var sec = max(0, int(ceil(rescue_time_left)))
+		rescue_timer_lbl.text = "⏳ Còn lại: %ds" % sec
+		if rescue_time_left <= 0:
+			_on_rescue_passed()
+
+func _start_ambient_effects() -> void:
+	if not is_instance_valid(embers_layer):
+		return
+	for i in range(22):
+		var ember = ColorRect.new()
+		var s = randf_range(3.0, 7.0)
+		ember.custom_minimum_size = Vector2(s, s)
+		ember.color = Color(1.0, randf_range(0.75, 0.95), randf_range(0.25, 0.45), randf_range(0.35, 0.75))
+		ember.position = Vector2(randf_range(0, 1280), randf_range(0, 720))
+		ember.set_meta("speed_y", randf_range(25.0, 60.0))
+		ember.set_meta("drift_x", randf_range(-18.0, 18.0))
+		embers_layer.add_child(ember)
+		ember_particles.append(ember)
 
 func _init_deck() -> void:
 	card_deck_pile.clear()
@@ -305,9 +368,10 @@ func _add_card_to_player_hand(c_info: Dictionary) -> void:
 	hand_container.add_child(card_ui)
 	card_ui.setup_card_data(c_info["id"], c_info["name"], c_info["rank"], c_info["suit"], c_info["cat"], c_info["desc"])
 	card_ui.card_clicked.connect(func(_c): _on_player_hand_card_clicked(card_ui, c_info))
+	AudioManager.play_card_draw()
 
 func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> void:
-	if not is_player_turn or is_waiting_dodge:
+	if not is_player_turn or is_waiting_dodge or is_waiting_rescue:
 		return
 
 	if selected_card_ui == card_node:
@@ -323,6 +387,7 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 
 	selected_card_ui = card_node
 	selected_card_ui.set_selected(true)
+	AudioManager.play_card_select()
 
 	var c_name = c_info.get("name", "")
 	var c_desc = c_info.get("desc", "")
@@ -445,7 +510,8 @@ func _on_card_play_btn_clicked() -> void:
 			return
 
 		var is_wine = is_wine_buff_active
-		var slash_dmg = 2 if is_wine else 1
+		var base_slash_dmg = 1
+		var slash_dmg = base_slash_dmg + (1 if is_wine else 0)
 		is_wine_buff_active = false
 
 		var elem = "NORMAL"
@@ -457,9 +523,11 @@ func _on_card_play_btn_clicked() -> void:
 		selected_card_ui = null
 		card_play_btn.visible = false
 
+		AudioManager.play_voice(c_name)
+		AudioManager.play_slash()
 		_broadcast_player_battle_action("PLAY_CARD", c_name, tgt["seat"])
 		_animate_showcase_card(c_name, "Bạn dùng [%s] tấn công %s!" % [c_name, tgt["name"]])
-		_add_log("⚔️ Bạn dùng [%s]%s lên %s (Ghế %d)." % [c_name, " (kèm Hủ Rượu: 2 ST)" if is_wine else "", tgt["name"], tgt["seat"]])
+		_add_log("⚔️ Bạn dùng [%s]%s lên %s (Ghế %d)." % [c_name, " (kèm Hủ Rượu: +1 Sát Thương)" if is_wine else "", tgt["name"], tgt["seat"]])
 
 		_handle_slash_attack(my_seat, tgt["seat"], slash_dmg, elem)
 
@@ -473,6 +541,8 @@ func _on_card_play_btn_clicked() -> void:
 		card_play_btn.visible = false
 		p_gen["hp"] = min(p_gen["max_hp"], p_gen["hp"] + 1)
 		p_gen["avatar_node"].update_hp(p_gen["hp"], p_gen["max_hp"])
+		AudioManager.play_voice(c_name)
+		AudioManager.play_skill()
 		_broadcast_player_battle_action("PLAY_CARD", "banh_chung", my_seat)
 		_animate_showcase_card(c_name, "Bạn ăn Bánh Chưng hồi 1 Máu!")
 		_add_log("🍲 Bạn hồi phục 1 Máu bằng [Bánh Chưng] (%d/%d)." % [p_gen["hp"], p_gen["max_hp"]])
@@ -482,9 +552,11 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		AudioManager.play_voice(c_name)
+		AudioManager.play_skill()
 		_broadcast_player_battle_action("PLAY_CARD", "ruou", my_seat)
 		_animate_showcase_card(c_name, "Bạn uống Hủ Rượu (+1 Sát Thương)!")
-		_add_log("🍶 Bạn đã uống [Hủ Rượu], đòn Trảm kế tiếp được +1 Sát Thương (Tổng 2 ST)!")
+		_add_log("🍶 Bạn đã uống [Hủ Rượu], đòn Trảm kế tiếp được +1 Sát Thương!")
 
 	elif c_name == "Xích Tâm Tỏa":
 		_discard_player_card(selected_card_ui)
@@ -494,6 +566,8 @@ func _on_card_play_btn_clicked() -> void:
 		var tgt = generals_data[tgt_seat]
 		tgt["is_chained"] = !tgt["is_chained"]
 		var chain_desc = "⛓️ Trói Xích Liên Hoàn" if tgt["is_chained"] else "🔓 Gỡ Xích Liên Hoàn"
+		AudioManager.play_voice(c_name)
+		AudioManager.play_skill()
 		_broadcast_player_battle_action("PLAY_CARD", "xichtam", tgt_seat)
 		_animate_showcase_card(c_name, "%s lên %s!" % [chain_desc, tgt["name"]])
 		_add_log("⛓️ Bạn dùng [Xích Tâm Tỏa] %s đối với %s (Ghế %d)!" % [chain_desc, tgt["name"], tgt_seat])
@@ -502,6 +576,8 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		AudioManager.play_voice(c_name)
+		AudioManager.play_skill()
 		for k in range(2):
 			var c_draw = _draw_card_from_pile()
 			_add_card_to_player_hand(c_draw)
@@ -521,6 +597,8 @@ func _on_card_play_btn_clicked() -> void:
 		tgt["avatar_node"].update_hand_count(tgt["hand_count"])
 		var stolen = _draw_card_from_pile()
 		_add_card_to_player_hand(stolen)
+		AudioManager.play_voice(c_name)
+		AudioManager.play_skill()
 		_broadcast_player_battle_action("PLAY_CARD", "dotkich", tgt["seat"])
 		_animate_showcase_card(c_name, "Cướp 1 lá bài từ %s!" % tgt["name"])
 		_add_log("🗡️ Bạn dùng [Đột Kích Trộm Lương] cướp 1 lá bài từ %s!" % tgt["name"])
@@ -533,6 +611,8 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		AudioManager.play_voice(c_name)
+		AudioManager.play_skill()
 		if tgt["equipped_weapon"] != "":
 			var old_w = tgt["equipped_weapon"]
 			tgt["equipped_weapon"] = ""
@@ -557,6 +637,8 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		AudioManager.play_voice(c_name)
+		AudioManager.play_skill()
 		_broadcast_player_battle_action("PLAY_CARD", c_name, my_seat)
 		_animate_showcase_card(c_name, "Bạn trang bị [%s]!" % c_name)
 		_add_log("🗡️ Bạn đã trang bị Vũ Khí: [%s]!" % c_name)
@@ -570,6 +652,8 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		AudioManager.play_voice(c_name)
+		AudioManager.play_skill()
 		_broadcast_player_battle_action("PLAY_CARD", c_name, my_seat)
 		_animate_showcase_card(c_name, "Bạn trang bị [%s]!" % c_name)
 		_add_log("🛡️ Bạn đã trang bị Áo Giáp: [%s]!" % c_name)
@@ -581,6 +665,8 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		AudioManager.play_voice(c_name)
+		AudioManager.play_skill()
 		_broadcast_player_battle_action("PLAY_CARD", c_name, my_seat)
 		_animate_showcase_card(c_name, "Bạn cưỡi [%s]!" % c_name)
 		_add_log("🐎 Bạn đã trang bị Chiến Mã: [%s]!" % c_name)
@@ -589,6 +675,8 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		AudioManager.play_voice(c_name)
+		AudioManager.play_skill()
 		_broadcast_player_battle_action("PLAY_CARD", c_name, 0)
 		_animate_showcase_card(c_name, "Bạn đã dùng [%s]!" % c_name)
 		_add_log("🎴 Bạn đã dùng [%s]." % c_name)
@@ -649,10 +737,13 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 		tgt["avatar_node"].update_hand_count(tgt["hand_count"])
 		_animate_showcase_card("Đỡ", "%s dùng [Đỡ] hóa giải đòn tấn công!" % tgt["name"])
 		_add_log("🛡️ %s đã dùng [Đỡ] hóa giải đòn Trảm thành công!" % tgt["name"])
+		AudioManager.play_voice("Đỡ")
+		AudioManager.play_parry()
 
 		# Kiểm tra Song Cung Mường Nhạ của người tấn công
 		if atk.get("equipped_weapon", "") == "Song Cung Mường Nhạ" and attacker_seat == my_seat and hand_container.get_child_count() >= 2:
 			_add_log("🏹 [Song Cung Mường Nhạ] của bạn ép %s chịu 1 sát thương!" % tgt["name"])
+			AudioManager.play_skill()
 			_apply_damage_to_general(target_seat, 1, attacker_seat, "NORMAL")
 	else:
 		_apply_damage_to_general(target_seat, damage_amount, attacker_seat, damage_element)
@@ -695,6 +786,8 @@ func _on_dodge_confirmed() -> void:
 		_broadcast_player_battle_action("DODGE_RESPONSE", "do", dodge_attacker_seat)
 		_animate_showcase_card("Đỡ", "Bạn dùng [Đỡ] hóa giải đòn tấn công!")
 		_add_log("🛡️ Bạn đã dùng [Đỡ] hóa giải đòn Trảm thành công!")
+		AudioManager.play_voice("Đỡ")
+		AudioManager.play_parry()
 	else:
 		_on_dodge_passed()
 
@@ -735,6 +828,7 @@ func _apply_damage_to_general(target_seat: int, amount: int, attacker_seat: int 
 	tgt["avatar_node"].update_hp(tgt["hp"], tgt["max_hp"])
 	tgt["avatar_node"].play_damage_effect()
 	tgt["avatar_node"].spawn_damage_number(amount)
+	AudioManager.play_damage()
 
 	_add_log("💥 %s nhận %d sát thương! Còn (%d/%d) Máu." % [tgt["name"], amount, tgt["hp"], tgt["max_hp"]])
 
@@ -751,8 +845,102 @@ func _apply_damage_to_general(target_seat: int, amount: int, attacker_seat: int 
 					_apply_damage_to_general(other_seat, amount, -1, "NORMAL")
 
 	if tgt["hp"] <= 0:
-		_handle_general_death(target_seat)
+		_prompt_near_death_check(target_seat)
+	else:
+		_check_victory_condition()
 
+func _prompt_near_death_check(victim_seat: int) -> void:
+	if not generals_data.has(victim_seat):
+		return
+	var victim = generals_data[victim_seat]
+	if not victim["is_alive"]:
+		return
+
+	# Kiểm tra người chơi có thể cứu không
+	var is_victim_ally = (victim["isDragon"] == my_team_is_dragon)
+	var player_can_rescue = false
+	var found_rescue_card_node: Control = null
+	var found_rescue_card_name: String = ""
+
+	if is_victim_ally:
+		for c_node in hand_container.get_children():
+			var info = _get_card_info_from_ui(c_node)
+			var n = info.get("name", "")
+			if n == "Bánh Chưng":
+				player_can_rescue = true
+				found_rescue_card_node = c_node
+				found_rescue_card_name = "Bánh Chưng"
+				break
+			elif n == "Hủ Rượu" and victim_seat == my_seat:
+				player_can_rescue = true
+				found_rescue_card_node = c_node
+				found_rescue_card_name = "Hủ Rượu"
+				break
+
+	if player_can_rescue:
+		is_waiting_rescue = true
+		rescue_victim_seat = victim_seat
+		rescue_card_to_use = found_rescue_card_node
+		rescue_time_left = 10.0
+
+		var who_text = "BẠN ĐANG HẤP HỐI" if victim_seat == my_seat else ("ĐỒNG ĐỘI " + victim["name"])
+		rescue_desc_lbl.text = "%s (Ghế %d) đang cận tử (%d/%d Máu)!\nBạn có muốn dùng [%s] trên tay để cứu viện không?" % [who_text, victim_seat, victim["hp"], victim["max_hp"], found_rescue_card_name]
+		rescue_timer_lbl.text = "⏳ Còn lại: 10s"
+		rescue_confirm_btn.text = "🍲 DÙNG [%s]" % found_rescue_card_name.to_upper()
+		rescue_modal.visible = true
+		_add_log("🚨 CẬN TỬ: %s đang cận tử (%d Máu)! Đang chờ cứu viện..." % [victim["name"], victim["hp"]])
+		return
+
+	# Nếu người chơi không thể cứu hoặc nạn nhân là phe địch:
+	# Kiểm tra nếu nạn nhân là AI (hoặc đồng đội AI) có tự cứu không
+	if victim["isAI"] and victim["hand_count"] > 0 and randf() < 0.65:
+		victim["hand_count"] = max(0, victim["hand_count"] - 1)
+		victim["avatar_node"].update_hand_count(victim["hand_count"])
+		victim["hp"] = 1
+		victim["avatar_node"].update_hp(victim["hp"], victim["max_hp"])
+		_animate_showcase_card("Bánh Chưng", "%s dùng [Bánh Chưng] thoát chết!" % victim["name"])
+		_add_log("💮 %s đã dùng [Bánh Chưng] thoát khỏi trạng thái Cận Tử (1/%d Máu)!" % [victim["name"], victim["max_hp"]])
+		AudioManager.play_voice("Bánh Chưng")
+		AudioManager.play_skill()
+		_check_victory_condition()
+		return
+
+	# Không có ai cứu -> Tử trận
+	_handle_general_death(victim_seat)
+	_check_victory_condition()
+
+func _on_rescue_confirmed() -> void:
+	if not is_waiting_rescue or not generals_data.has(rescue_victim_seat):
+		return
+	rescue_modal.visible = false
+	is_waiting_rescue = false
+
+	var victim = generals_data[rescue_victim_seat]
+	if rescue_card_to_use and is_instance_valid(rescue_card_to_use):
+		var info = _get_card_info_from_ui(rescue_card_to_use)
+		var c_name = info.get("name", "Bánh Chưng")
+		_discard_player_card(rescue_card_to_use)
+		rescue_card_to_use = null
+		victim["hp"] = min(victim["max_hp"], victim["hp"] + 1)
+		victim["avatar_node"].update_hp(victim["hp"], victim["max_hp"])
+		_broadcast_player_battle_action("RESCUE_RESPONSE", c_name, rescue_victim_seat)
+		_animate_showcase_card(c_name, "Bạn cứu sống %s (+1 Máu)!" % victim["name"])
+		_add_log("💮 Bạn dùng [%s] cứu sống %s (%d/%d Máu)!" % [c_name, victim["name"], victim["hp"], victim["max_hp"]])
+		AudioManager.play_voice(c_name)
+		AudioManager.play_skill()
+
+	if victim["hp"] <= 0:
+		_prompt_near_death_check(rescue_victim_seat)
+	else:
+		_check_victory_condition()
+
+func _on_rescue_passed() -> void:
+	if not is_waiting_rescue:
+		return
+	rescue_modal.visible = false
+	is_waiting_rescue = false
+	_broadcast_player_battle_action("RESCUE_RESPONSE", "pass", rescue_victim_seat)
+	_handle_general_death(rescue_victim_seat)
 	_check_victory_condition()
 
 func _handle_general_death(seat_num: int) -> void:
@@ -780,6 +968,7 @@ func _check_victory_condition() -> void:
 
 func _show_victory_defeat_modal(is_win: bool) -> void:
 	victory_defeat_modal.visible = true
+	AudioManager.play_victory()
 	if is_win:
 		victory_title.text = "🎉 CHIẾN THẮNG HUY HOÀNG!"
 		victory_title.add_theme_color_override("font_color", Color(1, 0.85, 0.25, 1))
@@ -894,10 +1083,14 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 	if card_name == "Bánh Chưng":
 		caster["hp"] = min(caster["max_hp"], caster["hp"] + 1)
 		caster["avatar_node"].update_hp(caster["hp"], caster["max_hp"])
+		AudioManager.play_voice(card_name)
+		AudioManager.play_skill()
 		_animate_showcase_card(card_name, "%s dùng [Bánh Chưng] hồi 1 Máu!" % caster["name"])
 		_add_log("🍲 %s dùng [Bánh Chưng] hồi 1 Máu." % caster["name"])
 	elif target_seat > 0 and generals_data.has(target_seat):
 		var tgt = generals_data[target_seat]
+		AudioManager.play_voice(card_name)
+		AudioManager.play_slash()
 		_animate_showcase_card(card_name, "%s dùng [%s] tấn công %s!" % [caster["name"], card_name, tgt["name"]])
 		_add_log("⚔️ %s dùng [%s] lên %s (Ghế %d)." % [caster["name"], card_name, tgt["name"], target_seat])
 		_handle_slash_attack(caster_seat, target_seat)
@@ -918,6 +1111,8 @@ func _execute_ai_turn(ai_seat: int) -> void:
 		ai_gen["avatar_node"].update_hand_count(ai_gen["hand_count"])
 		ai_gen["hp"] = min(ai_gen["max_hp"], ai_gen["hp"] + 1)
 		ai_gen["avatar_node"].update_hp(ai_gen["hp"], ai_gen["max_hp"])
+		AudioManager.play_voice("Bánh Chưng")
+		AudioManager.play_skill()
 		_animate_showcase_card("Bánh Chưng", "%s dùng [Bánh Chưng] hồi 1 Máu!" % ai_gen["name"])
 		_add_log("🍲 %s dùng [Bánh Chưng] hồi 1 Máu (%d/%d)." % [ai_gen["name"], ai_gen["hp"], ai_gen["max_hp"]])
 		await get_tree().create_timer(1.0).timeout
@@ -940,6 +1135,8 @@ func _execute_ai_turn(ai_seat: int) -> void:
 		ai_gen["hand_count"] = max(0, ai_gen["hand_count"] - 1)
 		ai_gen["avatar_node"].update_hand_count(ai_gen["hand_count"])
 
+		AudioManager.play_voice("Trảm")
+		AudioManager.play_slash()
 		_animate_showcase_card("Trảm", "%s dùng [Trảm] tấn công %s!" % [ai_gen["name"], tgt_gen["name"]])
 		_add_log("⚔️ %s (Ghế %d) dùng [Trảm] lên %s (Ghế %d)." % [ai_gen["name"], ai_seat, tgt_gen["name"], chosen_tgt_seat])
 

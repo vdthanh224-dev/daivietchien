@@ -26,6 +26,7 @@ func _ready() -> void:
 	add_child(voice_player)
 
 	_preload_audio()
+	call_deferred("play_bgm", "bgm_battle")
 
 func _preload_audio() -> void:
 	var list = [
@@ -106,7 +107,9 @@ func play_voice(card_or_skill_name: String) -> void:
 		return
 
 	if not voice_cache.has(key):
-		var path = "res://assets/audio/voice/%s.wav" % key
+		var path = "res://assets/audio/Voice/%s.wav" % key
+		if not ResourceLoader.exists(path):
+			path = "res://assets/audio/voice/%s.wav" % key
 		if ResourceLoader.exists(path):
 			voice_cache[key] = load(path)
 
@@ -127,23 +130,27 @@ func _normalize_voice_key(raw_name: String) -> String:
 	elif "bánh chưng" in n or "banh chung" in n: return "banh_chung"
 	elif "rượu" in n or "ruou" in n: return "hu_ruou"
 	elif "tiến thoái" in n or "tien thoai" in n: return "tien_thoai"
+	elif "giáp đồng" in n or "giap dong" in n: return "giap_dong_son_vi"
 	elif "khiên mây" in n or "khien may" in n: return "khien_may_ben"
-	elif "áo bào" in n: return "ao_bao_hoang_toc"
-	elif "nỏ thần" in n: return "no_than_kim_quy"
-	elif "song cung" in n: return "song_cung_muong_nha"
-	elif "thuận thiên" in n: return "kiem_thuan_thien"
-	elif "trường đao" in n: return "truong_dao_nam_son"
-	elif "voi chiến" in n: return "voi_chien_dai_viet"
-	elif "ngựa trắng" in n: return "ngua_trang_thuan_nong"
-	elif "diệu kế" in n: return "dieu_ke_pha_muu"
-	elif "vô trung" in n or "dụng binh" in n: return "dung_binh_nhu_than"
-	elif "vườn không" in n or "rút ván" in n: return "vuon_khong_nha_trong"
-	elif "đột kích" in n or "dắt dê" in n: return "dot_kich_trom_luong"
-	elif "quyết đấu" in n or "thách đấu" in n: return "thach_dau"
-	elif "mưa tên" in n or "vạn tiễn" in n: return "mua_ten_lien_chau"
-	elif "cọc ngầm" in n or "bãi cọc" in n: return "bai_coc_ngam"
-	elif "mở kho" in n: return "mo_kho_cuu_te"
-	elif "trầm ảo" in n: return "tram_ao_sa_bay"
-	elif "cắt lương" in n: return "cat_duong_luong"
-	elif "thần sấm" in n: return "than_sam_bao_ung"
+	elif "áo bào" in n or "ao bao" in n: return "ao_bao_hoang_toc"
+	elif "nỏ thần" in n or "no than" in n: return "no_than_kim_quy"
+	elif "song cung" in n or "muong nha" in n: return "song_cung_muong_nha"
+	elif "thuận thiên" in n or "thuan thien" in n: return "kiem_thuan_thien"
+	elif "trường đao" in n or "truong dao" in n: return "truong_dao_nam_son"
+	elif "thương ngâu" in n or "thuong ngau" in n or "lãng bạc" in n or "lang bac" in n: return "thuong_ngau_lang_bac"
+	elif "súng thần công" in n or "sung than cong" in n or "hồ triều" in n or "ho trieu" in n: return "sung_than_cong_ho_trieu"
+	elif "voi chiến" in n or "voi chien" in n: return "voi_chien_dai_viet"
+	elif "ngựa trắng" in n or "ngua trang" in n: return "ngua_trang_thuan_nong"
+	elif "diệu kế" in n or "dieu ke" in n: return "dieu_ke_pha_muu"
+	elif "vô trung" in n or "dụng binh" in n or "dung binh" in n: return "dung_binh_nhu_than"
+	elif "vườn không" in n or "vuon khong" in n or "rút ván" in n: return "vuon_khong_nha_trong"
+	elif "đột kích" in n or "dot kich" in n or "trộm lương" in n or "dắt dê" in n: return "dot_kich_trom_luong"
+	elif "xích tâm" in n or "xich tam" in n or "xích" in n or "xich" in n: return "xich_tho"
+	elif "quyết đấu" in n or "thách đấu" in n or "thach dau" in n: return "thach_dau"
+	elif "mưa tên" in n or "vạn tiễn" in n or "mua ten" in n: return "mua_ten_lien_chau"
+	elif "cọc ngầm" in n or "bãi cọc" in n or "bai coc" in n: return "bai_coc_ngam"
+	elif "mở kho" in n or "mo kho" in n: return "mo_kho_cuu_te"
+	elif "trầm ảo" in n or "tram ao" in n or "sa bẫy" in n or "sa bay" in n: return "tram_ao_sa_bay"
+	elif "cắt lương" in n or "cat luong" in n or "cắt đường" in n or "cat duong" in n: return "cat_duong_luong"
+	elif "thần sấm" in n or "than sam" in n: return "than_sam_bao_ung"
 	return ""
