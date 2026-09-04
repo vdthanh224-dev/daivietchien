@@ -44,3 +44,9 @@ scratch_*.ps1
 # OS generated
 .DS_Store
 Thumbs.db
+
+# Godot generated & test artifacts
+.godot/
+godot_client/.godot/
+*_screenshot.png
+

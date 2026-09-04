@@ -139,9 +139,9 @@ func _on_login_succeeded(user_data: Dictionary) -> void:
 		_set_status("Chào mừng tân chiến tướng!", Color("#10B981"))
 		_show_onboarding_modal()
 	else:
-		_set_status("🎉 Đăng nhập thành công! Đang vào chiến trường...", Color("#10B981"))
+		_set_status("🎉 Đăng nhập thành công! Đang vào sảnh chính...", Color("#10B981"))
 		await get_tree().create_timer(0.5).timeout
-		get_tree().change_scene_to_file("res://scenes/main_game.tscn")
+		get_tree().change_scene_to_file("res://scenes/home.tscn")
 
 func _show_onboarding_modal() -> void:
 	var modal = OnboardingModalScene.instantiate()
@@ -152,7 +152,7 @@ func _show_onboarding_modal() -> void:
 	)
 	modal.veteran_chosen.connect(func():
 		AuthManager.set_onboarding_done()
-		get_tree().change_scene_to_file("res://scenes/main_game.tscn")
+		get_tree().change_scene_to_file("res://scenes/home.tscn")
 	)
 
 func _on_login_failed(err_msg: String) -> void:
