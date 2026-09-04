@@ -462,3 +462,178 @@ func delete_room(room_id: String) -> void:
 func _delete_document_async(doc_id: String) -> void:
 	var delete_url = "%s/databases/%s/collections/%s/documents/%s" % [ENDPOINT, DATABASE_ID, COLLECTION_ID, doc_id]
 	_send_http_request(delete_url, HTTPClient.METHOD_DELETE)
+
+# --- 9. Draft State Protocol (Sync 40s Draft between Host and Guests) ---
+func send_draft_host_state(state: Dictionary) -> bool:
+	var room_id = state.get("roomId", "")
+	if room_id.is_empty():
+		return false
+	var now = get_now_ms()
+	var doc_id = get_deterministic_doc_id("ds_", room_id)
+	var docs_url = "%s/databases/%s/collections/%s/documents" % [ENDPOINT, DATABASE_ID, COLLECTION_ID]
+
+	var timer_str = "%.1f" % float(state.get("timerLeft", 40.0))
+	var h1 = int(state.get("heroId1", 0))
+	var h2 = int(state.get("heroId2", 0))
+	var h3 = int(state.get("heroId3", 0))
+	var h4 = int(state.get("heroId4", 0))
+	var heroes_str = "%d,%d,%d,%d" % [h1, h2, h3, h4]
+
+	var compact_state = "DSTATE:%s:%d:%s:%d:%d:%s:%d:%s" % [
+		sanitize(room_id, 18),
+		int(state.get("seq", 0)),
+		sanitize(state.get("phase", "PICKING"), 14),
+		int(state.get("currentPickerIndex", 0)),
+		int(state.get("currentSeatNumber", 1)),
+		timer_str,
+		int(state.get("countdownSec", 0)),
+		heroes_str
+	]
+
+	var payload = {
+		"documentId": doc_id,
+		"data": {
+			"userId": "DRAFT_STATE",
+			"userName": compact_state,
+			"rankPoints": int(state.get("currentPickerIndex", 0)),
+			"timestamp": now
+		},
+		"permissions": PUBLIC_DOC_PERMISSIONS
+	}
+
+	var patch_url = "%s/%s" % [docs_url, doc_id]
+	var patch_payload = {
+		"data": payload["data"],
+		"permissions": PUBLIC_DOC_PERMISSIONS
+	}
+	var p_res = await _send_http_request(patch_url, HTTPClient.METHOD_PATCH, JSON.stringify(patch_payload))
+	if p_res["code"] == 200:
+		return true
+
+	var res = await _send_http_request(docs_url, HTTPClient.METHOD_POST, JSON.stringify(payload))
+	return (res["code"] == 201 or res["code"] == 200)
+
+func poll_draft_host_state(room_id: String) -> Dictionary:
+	if room_id.is_empty():
+		return {}
+	var doc_id = get_deterministic_doc_id("ds_", room_id)
+	var get_url = "%s/databases/%s/collections/%s/documents/%s" % [ENDPOINT, DATABASE_ID, COLLECTION_ID, doc_id]
+	var res = await _send_http_request(get_url, HTTPClient.METHOD_GET)
+	if res["code"] == 200 and res["data"] != null:
+		var doc = res["data"]
+		var uname = doc.get("userName", "")
+		if uname.begins_with("DSTATE:"):
+			var parts = uname.split(":")
+			if parts.size() >= 8:
+				var r_id = parts[1]
+				if r_id == room_id:
+					var p_seq = 0
+					var ph = ""
+					var p_idx = 0
+					var s_num = 1
+					var t_left = 40.0
+					var c_sec = 0
+					var h_str = ""
+
+					if parts.size() >= 9 and parts[2].is_valid_int():
+						p_seq = int(parts[2])
+						ph = parts[3]
+						p_idx = int(parts[4]) if parts[4].is_valid_int() else 0
+						s_num = int(parts[5]) if parts[5].is_valid_int() else 1
+						t_left = float(parts[6]) if parts[6].is_valid_float() else 40.0
+						c_sec = int(parts[7]) if parts[7].is_valid_int() else 0
+						h_str = parts[8]
+					else:
+						ph = parts[2]
+						p_idx = int(parts[3]) if parts[3].is_valid_int() else 0
+						s_num = int(parts[4]) if parts[4].is_valid_int() else 1
+						t_left = float(parts[5]) if parts[5].is_valid_float() else 40.0
+						c_sec = int(parts[6]) if parts[6].is_valid_int() else 0
+						h_str = parts[7]
+
+					var h_ids = h_str.split(",")
+					var hero_ids = [0, 0, 0, 0]
+					for k in range(mini(4, h_ids.size())):
+						if h_ids[k].is_valid_int():
+							hero_ids[k] = int(h_ids[k])
+
+					return {
+						"roomId": r_id,
+						"seq": p_seq,
+						"phase": ph,
+						"currentPickerIndex": p_idx,
+						"currentSeatNumber": s_num,
+						"timerLeft": t_left,
+						"countdownSec": c_sec,
+						"heroIds": hero_ids,
+						"timestamp": int(doc.get("timestamp", 0))
+					}
+	return {}
+
+func send_draft_player_action(act: Dictionary) -> bool:
+	var room_id = act.get("roomId", "")
+	var seat_num = int(act.get("seatNumber", 1))
+	if room_id.is_empty():
+		return false
+	var now = get_now_ms()
+	var doc_id = get_deterministic_doc_id("da_", "%s_%d" % [room_id, seat_num])
+	var docs_url = "%s/databases/%s/collections/%s/documents" % [ENDPOINT, DATABASE_ID, COLLECTION_ID]
+
+	var compact_act = "DACT:%s:%d:%s:%d:%d" % [
+		sanitize(room_id, 18),
+		int(act.get("seq", 0)),
+		sanitize(act.get("senderUserId", ""), 24),
+		seat_num,
+		int(act.get("requestedHeroId", 0))
+	]
+
+	var payload = {
+		"documentId": doc_id,
+		"data": {
+			"userId": "DRAFT_ACT",
+			"userName": compact_act,
+			"rankPoints": int(act.get("requestedHeroId", 0)),
+			"timestamp": now
+		},
+		"permissions": PUBLIC_DOC_PERMISSIONS
+	}
+
+	var patch_url = "%s/%s" % [docs_url, doc_id]
+	var patch_payload = {
+		"data": payload["data"],
+		"permissions": PUBLIC_DOC_PERMISSIONS
+	}
+	var p_res = await _send_http_request(patch_url, HTTPClient.METHOD_PATCH, JSON.stringify(patch_payload))
+	if p_res["code"] == 200:
+		return true
+
+	var res = await _send_http_request(docs_url, HTTPClient.METHOD_POST, JSON.stringify(payload))
+	return (res["code"] == 201 or res["code"] == 200)
+
+func poll_draft_player_action_for_seat(room_id: String, seat: int) -> Dictionary:
+	if room_id.is_empty():
+		return {}
+	var doc_id = get_deterministic_doc_id("da_", "%s_%d" % [room_id, seat])
+	var get_url = "%s/databases/%s/collections/%s/documents/%s" % [ENDPOINT, DATABASE_ID, COLLECTION_ID, doc_id]
+	var res = await _send_http_request(get_url, HTTPClient.METHOD_GET)
+	if res["code"] == 200 and res["data"] != null:
+		var doc = res["data"]
+		var uname = doc.get("userName", "")
+		if uname.begins_with("DACT:"):
+			var parts = uname.split(":")
+			if parts.size() >= 5:
+				var r_id = parts[1]
+				if r_id == room_id:
+					var p_seq = int(parts[2]) if parts.size() >= 6 and parts[2].is_valid_int() else 0
+					var s_uid = parts[3] if parts.size() >= 6 else parts[2]
+					var s_num = int(parts[4]) if parts.size() >= 6 and parts[4].is_valid_int() else (int(parts[3]) if parts[3].is_valid_int() else seat)
+					var h_id = int(parts[5]) if parts.size() >= 6 and parts[5].is_valid_int() else (int(parts[4]) if parts[4].is_valid_int() else 0)
+					return {
+						"roomId": r_id,
+						"seq": p_seq,
+						"senderUserId": s_uid,
+						"seatNumber": s_num,
+						"requestedHeroId": h_id,
+						"timestamp": int(doc.get("timestamp", 0))
+					}
+	return {}

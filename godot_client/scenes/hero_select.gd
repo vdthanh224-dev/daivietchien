@@ -21,9 +21,11 @@ var available_heroes: Array[Dictionary] = []
 var selected_hero_ids: Array[int] = []
 var inspecting_hero: Dictionary = {}
 var current_picker_index: int = 0
-var turn_timer: float = 15.0
+var turn_timer: float = 40.0
 var is_draft_active: bool = true
 var is_player_locked: bool = false
+var current_room_id: String = ""
+var is_host: bool = false
 
 # UI References
 var draft_status_lbl: Label
@@ -41,6 +43,15 @@ var lock_in_btn: Button
 var lock_in_btn_lbl: Label
 
 func _ready() -> void:
+	var current_room = AppwriteMatchmaking.current_room if AppwriteMatchmaking else {}
+	current_room_id = current_room.get("roomId", "")
+	var my_uid = AuthManager.current_user_id if AuthManager else ""
+	var my_name = AuthManager.current_user_name if AuthManager else ""
+	if AppwriteMatchmaking:
+		is_host = AppwriteMatchmaking.is_same_user(current_room.get("hostUserId", ""), "", my_uid, my_name)
+	else:
+		is_host = (current_room.get("hostUserId", "") == my_uid)
+
 	# Khởi tạo dữ liệu tướng khả dụng từ HeroDatabase
 	if HeroDatabase:
 		available_heroes = HeroDatabase.get_available_pick_heroes()
@@ -249,7 +260,7 @@ func _build_header() -> void:
 	timer_box.add_child(tb_hbox)
 
 	turn_timer_lbl = Label.new()
-	turn_timer_lbl.text = "⏳ 15s"
+	turn_timer_lbl.text = "⏳ 40s"
 	turn_timer_lbl.add_theme_font_size_override("font_size", 14)
 	turn_timer_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 	tb_hbox.add_child(turn_timer_lbl)
@@ -743,44 +754,147 @@ func _run_draft_loop() -> void:
 		_highlight_active_picker(slot_idx)
 		_update_lock_in_button_state()
 
-		turn_timer = 15.0
 		var is_bot = bool(slot.get("isAI", false))
 		var is_player = bool(slot.get("isPlayer", false))
 
 		if is_player:
-			# Lượt của Người Chơi
-			draft_status_lbl.text = "👑 ĐẾN LƯỢT BẠN CHỌN TƯỚNG (#%d)!" % slot["seatNumber"]
+			# ══════════════════════════════════════════════════════════════
+			# 1. LƯỢT CỦA BẠN (NGƯỜI THẬT TRÊN MÁY NÀY): ĐỂ ĐỦ 40 GIÂY!
+			# Tuyệt đối không tự chọn thay bạn khi đồng hồ còn đang chạy!
+			# ══════════════════════════════════════════════════════════════
+			turn_timer = 40.0
+			turn_timer_lbl.text = "⏳ 40s"
+			draft_status_lbl.text = "👑 ĐẾN LƯỢT BẠN CHỌN TƯỚNG (#%d)! (Bạn có 40 giây)" % slot["seatNumber"]
 			draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 
+			if is_host and not current_room_id.is_empty() and AppwriteMatchmaking:
+				AppwriteMatchmaking.send_draft_host_state({
+					"roomId": current_room_id,
+					"phase": "PICKING",
+					"currentPickerIndex": slot_idx,
+					"currentSeatNumber": slot["seatNumber"],
+					"timerLeft": turn_timer,
+					"heroId1": _get_locked_hero_id(0),
+					"heroId2": _get_locked_hero_id(1),
+					"heroId3": _get_locked_hero_id(2),
+					"heroId4": _get_locked_hero_id(3)
+				})
+
+			var host_sync_timer = 0.0
 			while turn_timer > 0.0 and not slot["isLocked"] and is_draft_active:
 				turn_timer -= 0.5
+				host_sync_timer += 0.5
 				turn_timer_lbl.text = "⏳ %ds" % maxi(0, int(ceilf(turn_timer)))
+
+				# Host đồng bộ thời gian còn lại sang máy khách mỗi 1 giây
+				if is_host and host_sync_timer >= 1.0 and not current_room_id.is_empty() and AppwriteMatchmaking:
+					host_sync_timer = 0.0
+					AppwriteMatchmaking.send_draft_host_state({
+						"roomId": current_room_id,
+						"phase": "PICKING",
+						"currentPickerIndex": slot_idx,
+						"currentSeatNumber": slot["seatNumber"],
+						"timerLeft": turn_timer,
+						"heroId1": _get_locked_hero_id(0),
+						"heroId2": _get_locked_hero_id(1),
+						"heroId3": _get_locked_hero_id(2),
+						"heroId4": _get_locked_hero_id(3)
+					})
+
 				await get_tree().create_timer(0.5).timeout
 
-			# Tự động khóa nếu hết 15s mà người chơi chưa chọn
+			# CHỈ KHI HẾT SẠCH 40s mà người chơi vẫn chưa bấm "XÁC NHẬN CHỌN TƯỚNG",
+			# mới tự động khóa tướng đang soi (hoặc tướng đầu tiên khả dụng) làm dự phòng timeout
 			if not slot["isLocked"] and is_draft_active:
 				var candidate = inspecting_hero
 				var cid = int(candidate.get("id", 0))
 				if cid == 0 or cid in selected_hero_ids:
 					candidate = _get_first_available_candidate()
 				_lock_hero_for_slot(slot, candidate)
-		else:
-			# Lượt của AI Bot hoặc đối thủ
+				_send_pick_action_if_needed(slot["seatNumber"], int(candidate.get("id", 0)))
+
+		elif not is_bot:
+			# ══════════════════════════════════════════════════════════════
+			# 2. LƯỢT CỦA NGƯỜI THẬT KHÁC (ĐỒNG ĐỘI / ĐỐI THỦ LÀ NGƯỜI CHƠI KHÁCH):
+			# Để đủ 40 giây cho người thật đó tự suy nghĩ và chọn tướng!
+			# Tuyệt đối KHÔNG tự chọn cho họ sau 1-2s!
+			# ══════════════════════════════════════════════════════════════
+			turn_timer = 40.0
+			turn_timer_lbl.text = "⏳ 40s"
 			var seat_num = slot["seatNumber"]
 			var role_name = slot.get("roleTag", "")
-			draft_status_lbl.text = "⏳ Ghế #%d %s: %s đang chọn tướng..." % [seat_num, role_name, slot["userName"]]
+			draft_status_lbl.text = "⏳ Ghế #%d %s: %s (Người thật) đang suy nghĩ và chọn tướng (40s)..." % [seat_num, role_name, slot["userName"]]
 			draft_status_lbl.add_theme_color_override("font_color", COLOR_DRAGON_CYAN if slot["isDragon"] else COLOR_PHOENIX_RED)
 
-			var think_time = randf_range(1.2, 2.2)
+			var poll_timer = 0.0
+			while turn_timer > 0.0 and not slot["isLocked"] and is_draft_active:
+				turn_timer -= 0.5
+				poll_timer += 0.5
+				turn_timer_lbl.text = "⏳ %ds" % maxi(0, int(ceilf(turn_timer)))
+
+				# Lắng nghe xem người thật đó đã chọn tướng qua mạng chưa
+				if poll_timer >= 0.8 and not current_room_id.is_empty() and AppwriteMatchmaking:
+					poll_timer = 0.0
+					if is_host:
+						# Host kiểm tra xem Guest có gửi DACT chọn tướng lên không
+						var act = await AppwriteMatchmaking.poll_draft_player_action_for_seat(current_room_id, seat_num)
+						var req_id = int(act.get("requestedHeroId", 0))
+						if req_id > 0 and not req_id in selected_hero_ids:
+							var h = HeroDatabase.get_hero(req_id) if HeroDatabase else {}
+							if not h.is_empty():
+								_lock_hero_for_slot(slot, h)
+								break
+					else:
+						# Guest kiểm tra xem Host đã đồng bộ heroId cho slot này chưa
+						var h_state = await AppwriteMatchmaking.poll_draft_host_state(current_room_id)
+						var h_ids = h_state.get("heroIds", [0, 0, 0, 0])
+						if slot_idx < h_ids.size() and h_ids[slot_idx] > 0 and not h_ids[slot_idx] in selected_hero_ids:
+							var h = HeroDatabase.get_hero(h_ids[slot_idx]) if HeroDatabase else {}
+							if not h.is_empty():
+								_lock_hero_for_slot(slot, h)
+								break
+
+				await get_tree().create_timer(0.5).timeout
+
+			# Nếu hết sạch 40s mà người thật kia vẫn chưa khóa (hoặc rớt mạng), tự động chọn tướng dự phòng
+			if not slot["isLocked"] and is_draft_active:
+				var candidate = _get_first_available_candidate()
+				_lock_hero_for_slot(slot, candidate)
+
+		else:
+			# ══════════════════════════════════════════════════════════════
+			# 3. LƯỢT CỦA AI BOT: Suy nghĩ 2.0 - 3.5s rồi tự động chọn
+			# ══════════════════════════════════════════════════════════════
+			turn_timer = 15.0
+			var seat_num = slot["seatNumber"]
+			var role_name = slot.get("roleTag", "")
+			draft_status_lbl.text = "⏳ Ghế #%d (AI: %s) đang suy nghĩ..." % [seat_num, slot["userName"]]
+			draft_status_lbl.add_theme_color_override("font_color", COLOR_DRAGON_CYAN if slot["isDragon"] else COLOR_PHOENIX_RED)
+
+			var think_time = randf_range(2.0, 3.5)
 			while think_time > 0.0 and is_draft_active:
 				think_time -= 0.5
 				turn_timer -= 0.5
 				turn_timer_lbl.text = "⏳ %ds" % maxi(0, int(ceilf(turn_timer)))
 				await get_tree().create_timer(0.5).timeout
 
-			if is_draft_active:
+			if is_draft_active and not slot["isLocked"]:
 				var bot_pick = _choose_bot_hero()
 				_lock_hero_for_slot(slot, bot_pick)
+
+		# Cập nhật phát sóng trạng thái sau mỗi lượt
+		if is_host and not current_room_id.is_empty() and AppwriteMatchmaking:
+			AppwriteMatchmaking.send_draft_host_state({
+				"roomId": current_room_id,
+				"phase": "PICKING",
+				"currentPickerIndex": slot_idx,
+				"currentSeatNumber": slot["seatNumber"],
+				"timerLeft": 0.0,
+				"heroId1": _get_locked_hero_id(0),
+				"heroId2": _get_locked_hero_id(1),
+				"heroId3": _get_locked_hero_id(2),
+				"heroId4": _get_locked_hero_id(3)
+			})
 
 		await get_tree().create_timer(0.4).timeout
 
@@ -867,15 +981,60 @@ func _get_first_available_candidate() -> Dictionary:
 				return h
 	return HeroDatabase.get_hero(47) if HeroDatabase else {}
 
+func _get_locked_hero_id(idx: int) -> int:
+	if idx >= 0 and idx < draft_slots.size():
+		var h = draft_slots[idx].get("chosenHero", null)
+		if h is Dictionary and not h.is_empty():
+			return int(h.get("id", 0))
+	return 0
+
+func _send_pick_action_if_needed(seat_num: int, hero_id: int) -> void:
+	if not current_room_id.is_empty() and AppwriteMatchmaking:
+		if not is_host:
+			AppwriteMatchmaking.send_draft_player_action({
+				"roomId": current_room_id,
+				"seatNumber": seat_num,
+				"senderUserId": AuthManager.current_user_id if AuthManager else "",
+				"requestedHeroId": hero_id,
+				"seq": 1
+			})
+		else:
+			AppwriteMatchmaking.send_draft_host_state({
+				"roomId": current_room_id,
+				"phase": "PICKING",
+				"currentPickerIndex": current_picker_index,
+				"currentSeatNumber": seat_num,
+				"timerLeft": turn_timer,
+				"heroId1": _get_locked_hero_id(0),
+				"heroId2": _get_locked_hero_id(1),
+				"heroId3": _get_locked_hero_id(2),
+				"heroId4": _get_locked_hero_id(3)
+			})
+
 func _on_confirm_pick_pressed() -> void:
 	if _is_my_turn() and not is_player_locked:
 		var slot = draft_slots[current_picker_index]
 		_lock_hero_for_slot(slot, inspecting_hero)
+		_send_pick_action_if_needed(slot["seatNumber"], int(inspecting_hero.get("id", 0)))
 
 func _on_draft_completed() -> void:
 	is_draft_active = false
 	turn_timer_lbl.text = "⚔️ SẴN SÀNG!"
 	AudioManager.play_victory()
+
+	if is_host and not current_room_id.is_empty() and AppwriteMatchmaking:
+		AppwriteMatchmaking.send_draft_host_state({
+			"roomId": current_room_id,
+			"phase": "COUNTDOWN",
+			"currentPickerIndex": 3,
+			"currentSeatNumber": 4,
+			"timerLeft": 0.0,
+			"countdownSec": 3,
+			"heroId1": _get_locked_hero_id(0),
+			"heroId2": _get_locked_hero_id(1),
+			"heroId3": _get_locked_hero_id(2),
+			"heroId4": _get_locked_hero_id(3)
+		})
 
 	# Đếm ngược 3 giây vào trận
 	for count in [3, 2, 1]:
