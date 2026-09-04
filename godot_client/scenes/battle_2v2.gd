@@ -48,7 +48,7 @@ var current_turn_seat: int = 1
 var current_turn_timer: float = 40.0
 var is_player_turn: bool = false
 var slashes_used_this_turn: int = 0
-var deck_count: int = 52
+var deck_count: int = 80
 var selected_card_ui: Control = null
 var selected_target_seat: int = -1
 var is_game_over: bool = false
@@ -131,48 +131,7 @@ func _process(delta: float) -> void:
 
 func _init_deck() -> void:
 	card_deck_pile.clear()
-	var suits = ["Spade", "Heart", "Club", "Diamond"]
-	
-	# Trảm x18
-	for i in range(18):
-		var suit = suits[i % 4]
-		var rank = (i % 10) + 2
-		card_deck_pile.append({"id": "tram_%d" % i, "name": "Trảm", "suit": suit, "rank": rank, "cat": 0, "desc": "Tấn công 1 tướng địch gây 1 sát thương."})
-
-	# Đỡ x12
-	for i in range(12):
-		var suit = suits[i % 4]
-		var rank = (i % 9) + 2
-		card_deck_pile.append({"id": "do_%d" % i, "name": "Đỡ", "suit": suit, "rank": rank, "cat": 0, "desc": "Hóa giải 1 đòn Trảm nhắm vào bản thân."})
-
-	# Bánh Chưng x8
-	for i in range(8):
-		var suit = ["Heart", "Diamond"][i % 2]
-		var rank = (i % 8) + 3
-		card_deck_pile.append({"id": "banh_%d" % i, "name": "Bánh Chưng", "suit": suit, "rank": rank, "cat": 0, "desc": "Hồi phục 1 Máu (tối đa bằng Máu gốc)."})
-
-	# Hủ Rượu x4
-	for i in range(4):
-		var suit = ["Diamond", "Club"][i % 2]
-		var rank = (i % 5) + 3
-		card_deck_pile.append({"id": "ruou_%d" % i, "name": "Hủ Rượu", "suit": suit, "rank": rank, "cat": 0, "desc": "Uống rượu: đòn Trảm kế tiếp gây thêm +1 sát thương."})
-
-	# Nỏ Thần Kim Quy x2 (Vũ Khí)
-	for i in range(2):
-		card_deck_pile.append({"id": "nothan_%d" % i, "name": "Nỏ Thần Kim Quy", "suit": "Club", "rank": 1, "cat": 1, "desc": "Trang bị Vũ Khí: Tầm đánh 3, không giới hạn số lần Trảm trong 1 lượt."})
-
-	# Khiên Mây Bện x2 (Áo Giáp)
-	for i in range(2):
-		card_deck_pile.append({"id": "khienmay_%d" % i, "name": "Khiên Mây Bện", "suit": "Spade", "rank": 2, "cat": 1, "desc": "Trang bị Giáp: Có cơ hội tự động đỡ đòn tấn công khi cần phòng thủ."})
-
-	# Diệu Kế Phá Mưu x4 (Cẩm Nang)
-	for i in range(4):
-		card_deck_pile.append({"id": "dieuke_%d" % i, "name": "Diệu Kế Phá Mưu", "suit": suits[i % 4], "rank": 11, "cat": 2, "desc": "Cẩm Nang: Vô hiệu hóa hiệu ứng của một lá Cẩm Nang khác."})
-
-	# Xích Tâm Tỏa x2 (Cẩm Nang)
-	for i in range(2):
-		card_deck_pile.append({"id": "xichtam_%d" % i, "name": "Xích Tâm Tỏa", "suit": "Club", "rank": 12, "cat": 2, "desc": "Cẩm Nang: Khóa xích đối phương để nhận chung sát thương thuộc tính."})
-
+	card_deck_pile = CardDatabase.create_deck_80()
 	card_deck_pile.shuffle()
 	deck_count = card_deck_pile.size()
 	_update_deck_hud()
@@ -379,7 +338,7 @@ func _on_general_avatar_clicked(seat_num: int) -> void:
 	# Don't target self for attack
 	if seat_num == my_seat and selected_card_ui:
 		var c_info = _get_card_info_from_ui(selected_card_ui)
-		if c_info.get("name", "") == "Trảm":
+		if "Trảm" in c_info.get("name", ""):
 			return
 
 	# Clear previous target border
@@ -410,11 +369,11 @@ func _update_action_btn() -> void:
 	var c_info = _get_card_info_from_ui(selected_card_ui)
 	var c_name = c_info.get("name", "")
 
-	if c_name == "Trảm":
+	if "Trảm" in c_name:
 		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 			var tgt = generals_data[selected_target_seat]
 			if tgt["isDragon"] != my_team_is_dragon and tgt["is_alive"]:
-				card_play_btn.text = "⚔️ TRẢM ➜ %s" % tgt["name"]
+				card_play_btn.text = "⚔️ %s ➜ %s" % [c_name.to_upper(), tgt["name"]]
 				card_play_btn.visible = true
 				return
 		card_play_btn.text = "⚔️ CHỌN MỤC TIÊU ĐỊCH..."
@@ -430,11 +389,29 @@ func _update_action_btn() -> void:
 	elif c_name == "Hủ Rượu":
 		card_play_btn.text = "🍶 UỐNG RƯỢU (+1 SÁT THƯƠNG)"
 		card_play_btn.visible = true
-	elif c_name in ["Nỏ Thần Kim Quy", "Khiên Mây Bện"]:
-		card_play_btn.text = "🛡️ TRANG BỊ [%s]" % c_name
+	elif c_name in ["Kiếm Thuận Thiên", "Song Cung Mường Nhạ", "Nỏ Thần Kim Quy", "Trường Đao Nam Sơn", "Thương Ngâu Lãng Bạc", "Súng Thần Công Hồ Triều"]:
+		card_play_btn.text = "🗡️ TRANG BỊ VŨ KHÍ [%s]" % c_name
+		card_play_btn.visible = true
+	elif c_name in ["Giáp Đồng Sơn Vi", "Khiên Mây Bện", "Áo Bào Hoàng Tộc"]:
+		card_play_btn.text = "🛡️ TRANG BỊ ÁO GIÁP [%s]" % c_name
+		card_play_btn.visible = true
+	elif c_name == "Voi Chiến Đại Việt":
+		card_play_btn.text = "🐘 TRANG BỊ NGỰA THỦ (+1 K/CÁCH)"
+		card_play_btn.visible = true
+	elif c_name == "Ngựa Trắng Thuần Nông":
+		card_play_btn.text = "🐎 TRANG BỊ NGỰA CÔNG (-1 K/CÁCH)"
+		card_play_btn.visible = true
+	elif c_name == "Xích Tâm Tỏa":
+		card_play_btn.text = "⛓️ DÙNG XÍCH TÂM TỎA"
 		card_play_btn.visible = true
 	elif c_name == "Diệu Kế Phá Mưu":
 		card_play_btn.text = "📜 DÙNG DIỆU KẾ PHÁ MƯU"
+		card_play_btn.visible = true
+	elif c_name == "Vườn Không Nhà Trống":
+		card_play_btn.text = "🌾 DÙNG VƯỜN KHÔNG NHÀ TRỐNG"
+		card_play_btn.visible = true
+	elif c_name == "Đột Kích Trộm Lương":
+		card_play_btn.text = "🗡️ DÙNG ĐỘT KÍCH TRỘM LƯƠNG"
 		card_play_btn.visible = true
 	else:
 		card_play_btn.text = "DÙNG [%s]" % c_name
@@ -447,7 +424,7 @@ func _on_card_play_btn_clicked() -> void:
 	var c_info = _get_card_info_from_ui(selected_card_ui)
 	var c_name = c_info.get("name", "")
 
-	if c_name == "Trảm":
+	if "Trảm" in c_name:
 		if selected_target_seat <= 0 or not generals_data.has(selected_target_seat):
 			desc_text.text = "⚠️ Vui lòng nhấp chọn 1 Tướng đối thủ trên bàn để Trảm!"
 			return
@@ -467,9 +444,9 @@ func _on_card_play_btn_clicked() -> void:
 		selected_card_ui = null
 		card_play_btn.visible = false
 
-		_broadcast_player_battle_action("PLAY_CARD", "tram", tgt["seat"])
-		_animate_showcase_card(c_name, "Bạn dùng [Trảm] tấn công %s!" % tgt["name"])
-		_add_log("⚔️ Bạn dùng [Trảm] lên %s (Ghế %d)." % [tgt["name"], tgt["seat"]])
+		_broadcast_player_battle_action("PLAY_CARD", c_name, tgt["seat"])
+		_animate_showcase_card(c_name, "Bạn dùng [%s] tấn công %s!" % [c_name, tgt["name"]])
+		_add_log("⚔️ Bạn dùng [%s] lên %s (Ghế %d)." % [c_name, tgt["name"], tgt["seat"]])
 
 		_handle_slash_attack(my_seat, tgt["seat"])
 
@@ -487,27 +464,46 @@ func _on_card_play_btn_clicked() -> void:
 		_animate_showcase_card(c_name, "Bạn ăn Bánh Chưng hồi 1 Máu!")
 		_add_log("🍲 Bạn hồi phục 1 Máu bằng [Bánh Chưng] (%d/%d)." % [p_gen["hp"], p_gen["max_hp"]])
 
-	elif c_name == "Nỏ Thần Kim Quy":
+	elif c_name == "Hủ Rượu":
+		_discard_player_card(selected_card_ui)
+		selected_card_ui = null
+		card_play_btn.visible = false
+		_broadcast_player_battle_action("PLAY_CARD", "ruou", my_seat)
+		_animate_showcase_card(c_name, "Bạn uống Hủ Rượu (+1 Sát Thương)!")
+		_add_log("🍶 Bạn đã uống [Hủ Rượu], đòn Trảm kế tiếp được +1 Sát Thương!")
+
+	elif c_name in ["Kiếm Thuận Thiên", "Song Cung Mường Nhạ", "Nỏ Thần Kim Quy", "Trường Đao Nam Sơn", "Thương Ngâu Lãng Bạc", "Súng Thần Công Hồ Triều"]:
 		var p_gen = generals_data[my_seat]
 		p_gen["equipped_weapon"] = c_name
-		p_gen["avatar_node"].set_equipment("weapon", c_name, "♣ A")
+		p_gen["avatar_node"].set_equipment("weapon", c_name, "")
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
-		_broadcast_player_battle_action("PLAY_CARD", "nothan", my_seat)
-		_animate_showcase_card(c_name, "Bạn trang bị [Nỏ Thần Kim Quy]!")
-		_add_log("🗡️ Bạn đã trang bị Vũ Khí: [Nỏ Thần Kim Quy] (Không giới hạn Trảm)!")
+		_broadcast_player_battle_action("PLAY_CARD", c_name, my_seat)
+		_animate_showcase_card(c_name, "Bạn trang bị [%s]!" % c_name)
+		_add_log("🗡️ Bạn đã trang bị Vũ Khí: [%s]!" % c_name)
 
-	elif c_name == "Khiên Mây Bện":
+	elif c_name in ["Giáp Đồng Sơn Vi", "Khiên Mây Bện", "Áo Bào Hoàng Tộc"]:
 		var p_gen = generals_data[my_seat]
 		p_gen["equipped_armor"] = c_name
-		p_gen["avatar_node"].set_equipment("armor", c_name, "♠ 2")
+		p_gen["avatar_node"].set_equipment("armor", c_name, "")
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
-		_broadcast_player_battle_action("PLAY_CARD", "khienmay", my_seat)
-		_animate_showcase_card(c_name, "Bạn trang bị [Khiên Mây Bện]!")
-		_add_log("🛡️ Bạn đã trang bị Áo Giáp: [Khiên Mây Bện]!")
+		_broadcast_player_battle_action("PLAY_CARD", c_name, my_seat)
+		_animate_showcase_card(c_name, "Bạn trang bị [%s]!" % c_name)
+		_add_log("🛡️ Bạn đã trang bị Áo Giáp: [%s]!" % c_name)
+
+	elif c_name in ["Voi Chiến Đại Việt", "Ngựa Trắng Thuần Nông"]:
+		var p_gen = generals_data[my_seat]
+		var slot_type = "def_horse" if c_name == "Voi Chiến Đại Việt" else "off_horse"
+		p_gen["avatar_node"].set_equipment(slot_type, c_name, "")
+		_discard_player_card(selected_card_ui)
+		selected_card_ui = null
+		card_play_btn.visible = false
+		_broadcast_player_battle_action("PLAY_CARD", c_name, my_seat)
+		_animate_showcase_card(c_name, "Bạn cưỡi [%s]!" % c_name)
+		_add_log("🐎 Bạn đã trang bị Chiến Mã: [%s]!" % c_name)
 
 	else:
 		_discard_player_card(selected_card_ui)

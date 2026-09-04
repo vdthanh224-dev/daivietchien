@@ -694,7 +694,8 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
     caster.isWineBuffActive = false;
     state.isWineBuffActive = false;
 
-    if (card.subType === CARD_SUBTYPES.ATTACK_NORMAL
+    const hasThuanThien = getEquippedWeapon(caster, "Thuận Thiên");
+    if (!hasThuanThien && card.subType === CARD_SUBTYPES.ATTACK_NORMAL
         && target?.equipments?.some((equipment) =>
           equipment.subType === CARD_SUBTYPES.ARMOR && equipment.name?.includes("Giáp Đồng"))) {
       recordAction(state, {
@@ -1815,6 +1816,11 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
   if (state.phase === "AWAIT_SLASH_DEFENSE") {
     if (accepted && cardId) {
       if (cardId === "KHIEN_MAY" || cardId === "KHIEN_MAY_BEN") {
+        const caster = state.players.find(x => x.seat === (state.activeCard ? state.activeCard.casterSeat : 0));
+        const hasThuanThien = getEquippedWeapon(caster, "Thuận Thiên");
+        if (hasThuanThien) {
+          return { error: "Đối phương trang bị Kiếm Thuận Thiên, đòn Trảm bỏ qua Trang bị Giáp!" };
+        }
         const armor = getEquippedKhienMay(respondent);
         if (!armor) return { error: "Không có Khiên Mây Bện để phán xét" };
         const judgeCard = drawJudgementCard(state);
