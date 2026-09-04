@@ -41,6 +41,13 @@ var equipped_items: Dictionary = {
 	"treasure": ""
 }
 
+var is_turn_active: bool = false
+var turn_border_timer: float = 0.0
+var turn_dots: Array = []
+var turn_dots_container: Control = null
+var turn_timer_badge: PanelContainer = null
+var turn_timer_label: Label = null
+
 func _ready() -> void:
 	if click_btn:
 		click_btn.pressed.connect(_on_avatar_clicked)
@@ -56,6 +63,130 @@ func _ready() -> void:
 		)
 
 	_init_equipment_slots()
+	_build_turn_indicators()
+
+func _build_turn_indicators() -> void:
+	# 1. Container cho 3 dấu chấm chạy quanh border
+	turn_dots_container = Control.new()
+	turn_dots_container.set_anchors_preset(PRESET_FULL_RECT)
+	turn_dots_container.mouse_filter = MOUSE_FILTER_IGNORE
+	turn_dots_container.z_index = 25
+	turn_dots_container.visible = false
+	add_child(turn_dots_container)
+
+	# 3 dấu chấm vàng hoàng gia rực rỡ (glowing royal gold dots)
+	for i in range(3):
+		var dot = Panel.new()
+		var d_size = 11.0
+		dot.custom_minimum_size = Vector2(d_size, d_size)
+		dot.size = Vector2(d_size, d_size)
+		dot.mouse_filter = MOUSE_FILTER_IGNORE
+
+		var dot_style = StyleBoxFlat.new()
+		dot_style.bg_color = Color(1.0, 0.96, 0.45, 1.0)
+		dot_style.border_width_left = 1
+		dot_style.border_width_top = 1
+		dot_style.border_width_right = 1
+		dot_style.border_width_bottom = 1
+		dot_style.border_color = Color(1.0, 1.0, 0.85, 1.0)
+		dot_style.corner_radius_top_left = 6
+		dot_style.corner_radius_top_right = 6
+		dot_style.corner_radius_bottom_right = 6
+		dot_style.corner_radius_bottom_left = 6
+		dot_style.shadow_color = Color(1.0, 0.85, 0.25, 0.95)
+		dot_style.shadow_size = 7
+		dot.add_theme_stylebox_override("panel", dot_style)
+
+		turn_dots_container.add_child(dot)
+		turn_dots.append(dot)
+
+	# 2. Đồng hồ đếm ngược đặt ngay trên đầu avatar
+	turn_timer_badge = PanelContainer.new()
+	turn_timer_badge.custom_minimum_size = Vector2(76, 24)
+	turn_timer_badge.mouse_filter = MOUSE_FILTER_IGNORE
+	turn_timer_badge.z_index = 30
+	turn_timer_badge.visible = false
+
+	var badge_style = StyleBoxFlat.new()
+	badge_style.bg_color = Color(0.08, 0.11, 0.18, 0.95)
+	badge_style.border_width_left = 1
+	badge_style.border_width_top = 1
+	badge_style.border_width_right = 1
+	badge_style.border_width_bottom = 1
+	badge_style.border_color = Color(1.0, 0.85, 0.3, 1.0)
+	badge_style.corner_radius_top_left = 12
+	badge_style.corner_radius_top_right = 12
+	badge_style.corner_radius_bottom_right = 12
+	badge_style.corner_radius_bottom_left = 12
+	badge_style.shadow_color = Color(0.0, 0.0, 0.0, 0.6)
+	badge_style.shadow_size = 5
+	badge_style.shadow_offset = Vector2(0, 2)
+	turn_timer_badge.add_theme_stylebox_override("panel", badge_style)
+
+	turn_timer_label = Label.new()
+	turn_timer_label.text = "⏳ 40s"
+	turn_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	turn_timer_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	turn_timer_label.add_theme_font_size_override("font_size", 11)
+	turn_timer_label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.4, 1.0))
+	turn_timer_badge.add_child(turn_timer_label)
+
+	turn_timer_badge.position = Vector2((size.x - 76) * 0.5, -28)
+	add_child(turn_timer_badge)
+
+func _process(delta: float) -> void:
+	if not is_turn_active:
+		return
+
+	if turn_timer_badge:
+		turn_timer_badge.position = Vector2((size.x - 76) * 0.5, -28)
+
+	turn_border_timer += delta * 0.75
+	var w = size.x
+	var h = size.y
+	var perimeter = 2.0 * (w + h)
+	var d_size = 11.0
+
+	for i in range(turn_dots.size()):
+		var dot = turn_dots[i]
+		var t = fposmod(turn_border_timer + float(i) / float(turn_dots.size()), 1.0)
+		var dist = t * perimeter
+		var px = 0.0
+		var py = 0.0
+
+		if dist < w:
+			# Cạnh trên: trái -> phải
+			px = dist
+			py = 0.0
+		elif dist < w + h:
+			# Cạnh phải: trên -> dưới
+			px = w
+			py = dist - w
+		elif dist < 2.0 * w + h:
+			# Cạnh dưới: phải -> trái
+			px = w - (dist - (w + h))
+			py = h
+		else:
+			# Cạnh trái: dưới -> trên
+			px = 0.0
+			py = h - (dist - (2.0 * w + h))
+
+		dot.position = Vector2(px - d_size * 0.5, py - d_size * 0.5)
+
+func set_turn_active(active: bool) -> void:
+	is_turn_active = active
+	if turn_dots_container:
+		turn_dots_container.visible = active
+	if turn_timer_badge:
+		turn_timer_badge.visible = active
+
+func update_turn_timer(seconds_left: int) -> void:
+	if turn_timer_label:
+		turn_timer_label.text = "⏳ %ds" % max(0, seconds_left)
+		if seconds_left <= 5:
+			turn_timer_label.add_theme_color_override("font_color", Color(1.0, 0.35, 0.35, 1.0))
+		else:
+			turn_timer_label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.4, 1.0))
 
 func _init_equipment_slots() -> void:
 	if is_instance_valid(weapon_slot):

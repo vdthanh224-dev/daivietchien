@@ -81,6 +81,10 @@ var rescue_victim_seat: int = -1
 var rescue_time_left: float = 10.0
 var rescue_card_to_use: Control = null
 
+# Discard Phase State (Bỏ bài thừa)
+var is_discard_phase: bool = false
+var cards_to_discard_count: int = 0
+
 # Dynamic Background & Embers
 var ember_particles: Array = []
 var bg_anim_timer: float = 0.0
@@ -162,8 +166,15 @@ func _process(delta: float) -> void:
 		current_turn_timer -= delta
 		var sec = max(0, int(ceil(current_turn_timer)))
 		turn_indicator.text = "⏳ LƯỢT CỦA BẠN (%ds)" % sec
+		if generals_data.has(my_seat) and generals_data[my_seat].has("avatar_node"):
+			generals_data[my_seat]["avatar_node"].update_turn_timer(sec)
 		if current_turn_timer <= 0:
-			_on_end_turn_btn_clicked()
+			_on_player_turn_timeout()
+
+	# Handle Remote / AI Turn Timer
+	if not is_player_turn and current_turn_seat > 0 and generals_data.has(current_turn_seat):
+		var sec_remote = max(0, int(ceil(remote_turn_timer)))
+		generals_data[current_turn_seat]["avatar_node"].update_turn_timer(sec_remote)
 
 	# Handle Dodge Reaction Timer
 	if is_waiting_dodge:
@@ -393,6 +404,14 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 	var c_desc = c_info.get("desc", "")
 	var suit = c_info.get("suit", "")
 	var rank = c_info.get("rank", 1)
+
+	if is_discard_phase:
+		card_play_btn.visible = true
+		card_play_btn.disabled = false
+		card_play_btn.text = "🗑️ BỎ [%s] (CÒN %d LÁ)" % [c_name.to_upper(), cards_to_discard_count]
+		desc_text.text = "🗑️ Nhấp nút để bỏ lá [%s]. Cần bỏ thêm %d lá bài thừa để kết thúc lượt." % [c_name, cards_to_discard_count]
+		return
+
 	desc_text.text = "🎴 [%s %s] %s: %s" % [suit, rank, c_name, c_desc]
 
 	_update_action_btn()
@@ -489,6 +508,28 @@ func _update_action_btn() -> void:
 
 func _on_card_play_btn_clicked() -> void:
 	if not is_player_turn or selected_card_ui == null:
+		return
+
+	if is_discard_phase:
+		var info_d = _get_card_info_from_ui(selected_card_ui)
+		var c_name_d = info_d.get("name", "Bài")
+		_discard_player_card(selected_card_ui)
+		selected_card_ui = null
+		cards_to_discard_count -= 1
+		_add_log("🗑️ Bạn đã bỏ lá bài thừa [%s] (Còn cần bỏ %d lá)." % [c_name_d, cards_to_discard_count])
+		_animate_showcase_card(c_name_d, "Bỏ bài thừa: %s" % c_name_d)
+		AudioManager.play_card_draw()
+
+		if cards_to_discard_count > 0:
+			card_play_btn.text = "🗑️ BỎ %d LÁ THỪA (CHỌN BÀI)" % cards_to_discard_count
+			card_play_btn.disabled = true
+			desc_text.text = "⚠️ Hãy chọn tiếp lá bài thừa để bỏ (Còn %d lá)." % cards_to_discard_count
+		else:
+			is_discard_phase = false
+			card_play_btn.visible = false
+			card_play_btn.disabled = false
+			_add_log("✅ Bạn đã hoàn thành việc bỏ bài thừa.")
+			_finish_player_end_turn()
 		return
 
 	var c_info = _get_card_info_from_ui(selected_card_ui)
@@ -993,7 +1034,16 @@ func _start_turn(seat_num: int) -> void:
 
 	current_turn_seat = seat_num
 	slashes_used_this_turn = 0
+	is_discard_phase = false
+	cards_to_discard_count = 0
 	_add_log("📜 [LƯỢT %d] Tướng %s (%s) bước vào lượt chiến đấu." % [seat_num, g["name"], "Phe Rồng" if g["isDragon"] else "Phe Phượng"])
+
+	# Kích hoạt 3 dấu chấm viền chạy quanh và đồng hồ đếm ngược trên đầu avatar tướng
+	for s in [1, 2, 3, 4]:
+		if generals_data.has(s) and generals_data[s].has("avatar_node"):
+			var is_active = (s == seat_num and generals_data[s]["is_alive"])
+			generals_data[s]["avatar_node"].set_turn_active(is_active)
+			generals_data[s]["avatar_node"].update_turn_timer(40)
 
 	# Draw 2 cards phase
 	for k in range(2):
@@ -1148,14 +1198,57 @@ func _execute_ai_turn(ai_seat: int) -> void:
 		else:
 			await get_tree().create_timer(1.2).timeout
 
+	# 3. AI Discard Phase (Bỏ bài thừa)
+	var ai_hp = ai_gen["hp"]
+	var ai_excess = ai_gen["hand_count"] - ai_hp
+	if ai_excess > 0:
+		ai_gen["hand_count"] = ai_hp
+		ai_gen["avatar_node"].update_hand_count(ai_gen["hand_count"])
+		_animate_showcase_card("Bỏ bài thừa", "%s bỏ %d lá bài thừa!" % [ai_gen["name"], ai_excess])
+		_add_log("🗑️ %s đã bỏ %d lá bài thừa (Còn %d lá = %d Máu)." % [ai_gen["name"], ai_excess, ai_hp, ai_hp])
+		AudioManager.play_card_draw()
+		await get_tree().create_timer(0.8).timeout
+
 	# End AI turn
-	await get_tree().create_timer(1.0).timeout
+	await get_tree().create_timer(0.8).timeout
 	_next_turn()
 
 func _on_end_turn_btn_clicked() -> void:
 	if not is_player_turn:
 		return
+
+	var p_gen = generals_data[my_seat]
+	var current_cards = hand_container.get_child_count()
+	var hp = p_gen["hp"]
+	var excess = current_cards - hp
+
+	if excess > 0:
+		is_discard_phase = true
+		cards_to_discard_count = excess
+		end_turn_btn.visible = false
+		card_play_btn.visible = true
+		card_play_btn.disabled = true
+		card_play_btn.text = "🗑️ BỎ %d LÁ THỪA (CHỌN BÀI)" % cards_to_discard_count
+		desc_text.text = "⚠️ Giai đoạn bỏ bài: Bạn có %d lá bài nhưng chỉ còn %d Máu! Vui lòng chọn và bỏ %d lá bài thừa để kết thúc lượt." % [current_cards, hp, excess]
+		_add_log("⚠️ [BỎ BÀI]: Bạn có %d lá bài nhưng chỉ còn %d Máu. Phải bỏ %d lá bài thừa để kết thúc lượt!" % [current_cards, hp, excess])
+		return
+
+	_finish_player_end_turn()
+
+func _on_player_turn_timeout() -> void:
+	var p_gen = generals_data[my_seat]
+	var hp = p_gen["hp"]
+	while hand_container.get_child_count() > hp and hand_container.get_child_count() > 0:
+		var c_last = hand_container.get_child(hand_container.get_child_count() - 1)
+		var info = _get_card_info_from_ui(c_last)
+		_discard_player_card(c_last)
+		_add_log("⏰ Hết giờ: Tự động bỏ lá bài thừa [%s]." % info.get("name", "Bài"))
+	is_discard_phase = false
+	_finish_player_end_turn()
+
+func _finish_player_end_turn() -> void:
 	is_player_turn = false
+	is_discard_phase = false
 	end_turn_btn.visible = false
 	card_play_btn.visible = false
 	if selected_card_ui and is_instance_valid(selected_card_ui):
