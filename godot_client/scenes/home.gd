@@ -44,6 +44,7 @@ var current_military_points: int = 350
 
 # Embers particle pool
 var ember_particles: Array = []
+var levelup_overlay: Control = null
 
 func _ready() -> void:
 	anchors_preset = PRESET_FULL_RECT
@@ -62,6 +63,12 @@ func _ready() -> void:
 		_run_automated_screenshot(false)
 	elif "--screenshot-modal" in args:
 		_run_automated_screenshot(true)
+	elif "--screenshot-levelup" in args:
+		_run_automated_screenshot_levelup()
+	elif "--screenshot-exp" in args:
+		_run_automated_screenshot_exp()
+	else:
+		_check_pending_exp_gain()
 
 func _build_ui() -> void:
 	# 1. Background
@@ -871,6 +878,427 @@ func _hide_modal() -> void:
 	await tw.finished
 	modal_overlay.visible = false
 
+# --- EXP Animation & Level Up System ---
+func _check_pending_exp_gain() -> void:
+	if AuthManager and not AuthManager.pending_exp_gain.is_empty():
+		var p_gain = AuthManager.pending_exp_gain.duplicate()
+		AuthManager.pending_exp_gain.clear()
+		await get_tree().create_timer(0.4).timeout
+		if p_gain.get("show_modal", false):
+			_show_level_up_modal(p_gain.get("old_level", 1), p_gain.get("new_level", 2))
+
+func gain_exp_animated(amount: int, on_finished: Callable = Callable()) -> void:
+	if not AuthManager:
+		if on_finished.is_valid(): on_finished.call()
+		return
+	var start_lvl = AuthManager.current_level
+	var start_exp = AuthManager.current_exp
+	_run_exp_animation_loop(start_lvl, start_exp, amount, on_finished)
+
+func _run_exp_animation_loop(lvl: int, cur_exp: int, remaining: int, on_finished: Callable = Callable()) -> void:
+	var req = AuthManager.get_exp_required_for_level(lvl + 1)
+	if exp_bar:
+		exp_bar.max_value = req
+		exp_bar.value = cur_exp
+	if exp_text_label:
+		exp_text_label.text = "%d/%d EXP" % [cur_exp, req]
+	if level_badge_label:
+		level_badge_label.text = " CẤP %d " % lvl
+
+	var target_exp = cur_exp + remaining
+	if target_exp < req:
+		var last_tick = cur_exp
+		var tw = create_tween()
+		var fill_dur = clampf(float(remaining) * 0.05, 0.4, 1.2)
+		tw.tween_method(func(val: float):
+			if exp_bar: exp_bar.value = val
+			var int_v = int(val)
+			if exp_text_label: exp_text_label.text = "%d/%d EXP" % [int_v, req]
+			if int_v > last_tick:
+				last_tick = int_v
+				var progress = float(int_v) / float(req)
+				AudioManager.play_exp_tick(lerpf(1.0, 1.45, progress), -2.0)
+		, float(cur_exp), float(target_exp), fill_dur).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+		tw.tween_callback(func():
+			AuthManager.current_level = lvl
+			AuthManager.current_exp = target_exp
+			AuthManager.save_session()
+			AuthManager.save_profile_to_appwrite()
+			_load_user_data()
+			if on_finished.is_valid(): on_finished.call()
+		)
+	else:
+		var last_tick = cur_exp
+		var tw = create_tween()
+		var to_full = req - cur_exp
+		var fill_dur = clampf(float(to_full) * 0.045, 0.4, 1.0)
+		tw.tween_method(func(val: float):
+			if exp_bar: exp_bar.value = val
+			var int_v = int(val)
+			if exp_text_label: exp_text_label.text = "%d/%d EXP" % [int_v, req]
+			if int_v > last_tick:
+				last_tick = int_v
+				var progress = float(int_v) / float(req)
+				AudioManager.play_exp_tick(lerpf(1.0, 1.5, progress), -2.0)
+		, float(cur_exp), float(req), fill_dur).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+		tw.tween_callback(func():
+			if exp_bar:
+				var flash_tw = create_tween()
+				flash_tw.tween_property(exp_bar, "modulate", Color(1.8, 1.6, 0.8, 1.0), 0.15)
+				flash_tw.tween_property(exp_bar, "modulate", Color.WHITE, 0.15)
+
+			AudioManager.play_levelup()
+
+			_show_level_up_modal(lvl, lvl + 1, func():
+				var leftover = remaining - to_full
+				var next_lvl = lvl + 1
+				AuthManager.current_level = next_lvl
+				AuthManager.current_exp = 0
+				AuthManager.save_session()
+				AuthManager.save_profile_to_appwrite()
+
+				if level_badge_label:
+					level_badge_label.text = " CẤP %d " % next_lvl
+					var bounce_tw = create_tween()
+					bounce_tw.tween_property(level_badge_label, "scale", Vector2(1.35, 1.35), 0.15)
+					bounce_tw.tween_property(level_badge_label, "scale", Vector2(1.0, 1.0), 0.15)
+
+				if leftover > 0:
+					_run_exp_animation_loop(next_lvl, 0, leftover, on_finished)
+				else:
+					var next_req = AuthManager.get_exp_required_for_level(next_lvl + 1)
+					if exp_bar:
+						exp_bar.max_value = next_req
+						exp_bar.value = 0
+					if exp_text_label:
+						exp_text_label.text = "0/%d EXP" % next_req
+					_load_user_data()
+					if on_finished.is_valid(): on_finished.call()
+			)
+		)
+
+func _show_level_up_modal(old_lvl: int, new_lvl: int, on_close: Callable = Callable()) -> void:
+	if levelup_overlay != null and is_instance_valid(levelup_overlay):
+		levelup_overlay.queue_free()
+
+	levelup_overlay = Control.new()
+	levelup_overlay.set_anchors_preset(PRESET_FULL_RECT)
+	levelup_overlay.z_index = 120
+	add_child(levelup_overlay)
+
+	# 1. Dark Vignette Background
+	var bg_dim = ColorRect.new()
+	bg_dim.set_anchors_preset(PRESET_FULL_RECT)
+	bg_dim.color = Color(0.01, 0.02, 0.04, 0.82)
+	levelup_overlay.add_child(bg_dim)
+
+	# 2. Rotating Imperial Sunburst Rays behind modal
+	var rays_center = Control.new()
+	rays_center.position = Vector2(640, 360)
+	levelup_overlay.add_child(rays_center)
+
+	var num_rays = 16
+	for i in range(num_rays):
+		var ray = Line2D.new()
+		var angle = (float(i) / float(num_rays)) * TAU
+		var dir = Vector2(cos(angle), sin(angle))
+		ray.points = PackedVector2Array([Vector2.ZERO, dir * 550])
+		ray.width = 48.0
+		ray.default_color = Color(1.0, 0.85, 0.35, 0.07 if i % 2 == 0 else 0.03)
+		rays_center.add_child(ray)
+
+	var rays_tw = create_tween().set_loops()
+	rays_tw.tween_property(rays_center, "rotation", TAU, 24.0).as_relative()
+
+	# 3. Floating Golden Sparkle Particles
+	for i in range(20):
+		var sp = Label.new()
+		sp.text = "✦" if i % 3 == 0 else ("✨" if i % 3 == 1 else "★")
+		sp.add_theme_font_size_override("font_size", randi_range(12, 20))
+		sp.add_theme_color_override("font_color", Color(1.0, randf_range(0.8, 0.95), randf_range(0.3, 0.6), randf_range(0.5, 0.9)))
+		sp.position = Vector2(randf_range(300, 980), randf_range(150, 600))
+		levelup_overlay.add_child(sp)
+
+		var float_tw = create_tween().set_loops()
+		var dur = randf_range(2.0, 4.0)
+		float_tw.tween_property(sp, "position:y", sp.position.y - randf_range(60, 120), dur)
+		float_tw.parallel().tween_property(sp, "modulate:a", 0.1, dur)
+		float_tw.tween_property(sp, "position:y", sp.position.y, 0.01)
+		float_tw.tween_property(sp, "modulate:a", 1.0, 0.01)
+
+	# 4. Main Imperial Celebration Box
+	var box = PanelContainer.new()
+	box.custom_minimum_size = Vector2(620, 470)
+	box.set_anchors_preset(PRESET_CENTER)
+	box.grow_horizontal = GROW_DIRECTION_BOTH
+	box.grow_vertical = GROW_DIRECTION_BOTH
+
+	var box_style = StyleBoxFlat.new()
+	box_style.bg_color = Color(0.98, 0.97, 0.93, 0.98)
+	box_style.border_width_left = 3
+	box_style.border_width_top = 3
+	box_style.border_width_right = 3
+	box_style.border_width_bottom = 3
+	box_style.border_color = Color(0.88, 0.72, 0.22, 1.0)
+	box_style.corner_radius_top_left = 14
+	box_style.corner_radius_top_right = 14
+	box_style.corner_radius_bottom_right = 14
+	box_style.corner_radius_bottom_left = 14
+	box_style.shadow_color = Color(0, 0, 0, 0.65)
+	box_style.shadow_size = 28
+	box_style.shadow_offset = Vector2(0, 10)
+	box.add_theme_stylebox_override("panel", box_style)
+	levelup_overlay.add_child(box)
+
+	var vbox = VBoxContainer.new()
+	vbox.set_anchors_preset(PRESET_FULL_RECT)
+	vbox.offset_left = 22
+	vbox.offset_right = -22
+	vbox.offset_top = 18
+	vbox.offset_bottom = -18
+	vbox.add_theme_constant_override("separation", 10)
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_child(vbox)
+
+	# Header Crown & Title
+	var crown_lbl = Label.new()
+	crown_lbl.text = "👑  TRIỀU ĐÌNH ĐẠI VIỆT SẮC PHONG  👑"
+	crown_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	crown_lbl.add_theme_font_size_override("font_size", 12)
+	crown_lbl.add_theme_color_override("font_color", Color(0.72, 0.52, 0.10, 1.0))
+	vbox.add_child(crown_lbl)
+
+	var title_lbl = Label.new()
+	title_lbl.text = "🎉  THĂNG CẤP HOÀNG TRIỀU  🎉"
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.add_theme_font_size_override("font_size", 22)
+	title_lbl.add_theme_color_override("font_color", Color(0.68, 0.44, 0.04, 1.0))
+	title_lbl.add_theme_color_override("font_shadow_color", Color(1.0, 0.88, 0.45, 0.7))
+	title_lbl.add_theme_constant_override("shadow_offset_x", 1)
+	title_lbl.add_theme_constant_override("shadow_offset_y", 2)
+	vbox.add_child(title_lbl)
+
+	var div = ColorRect.new()
+	div.custom_minimum_size = Vector2(0, 2)
+	div.color = Color(0.88, 0.72, 0.22, 0.8)
+	vbox.add_child(div)
+
+	# Centerpiece: Level Upgrade Transition (CẤP X ➔➔➔ CẤP Y)
+	var trans_hbox = HBoxContainer.new()
+	trans_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	trans_hbox.add_theme_constant_override("separation", 18)
+
+	# Old Level Badge
+	var old_badge = PanelContainer.new()
+	old_badge.custom_minimum_size = Vector2(100, 48)
+	var ob_style = StyleBoxFlat.new()
+	ob_style.bg_color = Color(0.90, 0.89, 0.85, 1.0)
+	ob_style.border_width_left = 1
+	ob_style.border_width_top = 1
+	ob_style.border_width_right = 1
+	ob_style.border_width_bottom = 1
+	ob_style.border_color = Color(0.70, 0.68, 0.62, 1.0)
+	ob_style.corner_radius_top_left = 8
+	ob_style.corner_radius_top_right = 8
+	ob_style.corner_radius_bottom_right = 8
+	ob_style.corner_radius_bottom_left = 8
+	old_badge.add_theme_stylebox_override("panel", ob_style)
+
+	var old_lbl = Label.new()
+	old_lbl.text = "CẤP %d" % old_lvl
+	old_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	old_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	old_lbl.add_theme_font_size_override("font_size", 16)
+	old_lbl.add_theme_color_override("font_color", Color(0.45, 0.42, 0.38, 1.0))
+	old_badge.add_child(old_lbl)
+	trans_hbox.add_child(old_badge)
+
+	# Glowing Golden Arrow
+	var arrow_lbl = Label.new()
+	arrow_lbl.text = "➔➔➔"
+	arrow_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	arrow_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	arrow_lbl.add_theme_font_size_override("font_size", 22)
+	arrow_lbl.add_theme_color_override("font_color", Color(0.96, 0.65, 0.05, 1.0))
+	trans_hbox.add_child(arrow_lbl)
+
+	# New Level Radiant Golden Medal
+	var new_badge = PanelContainer.new()
+	new_badge.custom_minimum_size = Vector2(130, 56)
+	var nb_style = StyleBoxFlat.new()
+	nb_style.bg_color = Color(0.98, 0.85, 0.30, 1.0)
+	nb_style.border_width_left = 2
+	nb_style.border_width_top = 2
+	nb_style.border_width_right = 2
+	nb_style.border_width_bottom = 2
+	nb_style.border_color = Color(0.72, 0.52, 0.08, 1.0)
+	nb_style.corner_radius_top_left = 10
+	nb_style.corner_radius_top_right = 10
+	nb_style.corner_radius_bottom_right = 10
+	nb_style.corner_radius_bottom_left = 10
+	nb_style.shadow_color = Color(0, 0, 0, 0.35)
+	nb_style.shadow_size = 8
+	nb_style.shadow_offset = Vector2(0, 3)
+	new_badge.add_theme_stylebox_override("panel", nb_style)
+
+	var nb_vbox = VBoxContainer.new()
+	nb_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	nb_vbox.add_theme_constant_override("separation", 0)
+
+	var nb_sub = Label.new()
+	nb_sub.text = "⭐ TIẾN CẤP ⭐"
+	nb_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	nb_sub.add_theme_font_size_override("font_size", 9)
+	nb_sub.add_theme_color_override("font_color", Color(0.45, 0.30, 0.02, 1.0))
+	nb_vbox.add_child(nb_sub)
+
+	var new_lbl = Label.new()
+	new_lbl.text = "CẤP %d" % new_lvl
+	new_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	new_lbl.add_theme_font_size_override("font_size", 22)
+	new_lbl.add_theme_color_override("font_color", Color(0.12, 0.08, 0.02, 1.0))
+	nb_vbox.add_child(new_lbl)
+
+	new_badge.add_child(nb_vbox)
+	trans_hbox.add_child(new_badge)
+	vbox.add_child(trans_hbox)
+
+	# Congratulatory Speech Plaque
+	var speech_panel = PanelContainer.new()
+	var sp_style = StyleBoxFlat.new()
+	sp_style.bg_color = Color(0.95, 0.94, 0.89, 1.0)
+	sp_style.border_width_left = 2
+	sp_style.border_color = Color(0.85, 0.70, 0.22, 0.9)
+	sp_style.corner_radius_top_left = 6
+	sp_style.corner_radius_top_right = 6
+	sp_style.corner_radius_bottom_right = 6
+	sp_style.corner_radius_bottom_left = 6
+	speech_panel.add_theme_stylebox_override("panel", sp_style)
+
+	var speech_hbox = HBoxContainer.new()
+	speech_hbox.offset_left = 10
+	speech_hbox.offset_right = -10
+	speech_hbox.offset_top = 8
+	speech_hbox.offset_bottom = -8
+	speech_hbox.add_theme_constant_override("separation", 10)
+
+	var hero_av = TextureRect.new()
+	hero_av.custom_minimum_size = Vector2(40, 40)
+	hero_av.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	hero_av.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	var h_tex = load("res://assets/ui/ly_thuong_kiet.png")
+	if h_tex: hero_av.texture = h_tex
+	speech_hbox.add_child(hero_av)
+
+	var s_lbl = Label.new()
+	s_lbl.text = "“Trảm tướng đoạt kỳ, uy danh vang dội non sông! Triều đình đặc cách phong tước và ban phát bổng lộc hoàng triều cho Tướng Quân!”"
+	s_lbl.size_flags_horizontal = SIZE_EXPAND_FILL
+	s_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	s_lbl.add_theme_font_size_override("font_size", 11)
+	s_lbl.add_theme_color_override("font_color", Color(0.20, 0.16, 0.08, 1.0))
+	speech_hbox.add_child(s_lbl)
+
+	speech_panel.add_child(speech_hbox)
+	vbox.add_child(speech_panel)
+
+	# 4 Reward & Perk Cards
+	var perk_hbox = HBoxContainer.new()
+	perk_hbox.add_theme_constant_override("separation", 8)
+	perk_hbox.custom_minimum_size = Vector2(0, 95)
+
+	var perks = [
+		{"icon": "⚡", "title": "KHÍ LỰC", "desc": "Hồi 100% Thể Lực\nTăng giới hạn", "c": Color(0.20, 0.55, 0.85, 1.0)},
+		{"icon": "🔓", "title": "MỞ KHÓA", "desc": "Đấu Trường 2v2\nVương Triều", "c": Color(0.75, 0.35, 0.15, 1.0)},
+		{"icon": "🪙", "title": "BỔNG LỘC", "desc": "+500 BẠC\nQuân lương triều đình", "c": Color(0.20, 0.50, 0.25, 1.0)},
+		{"icon": "💎", "title": "QUÂN LỆNH", "desc": "+50 VÀNG\nBảo vật hoàng gia", "c": Color(0.65, 0.25, 0.85, 1.0)}
+	]
+
+	for p in perks:
+		var p_card = PanelContainer.new()
+		p_card.size_flags_horizontal = SIZE_EXPAND_FILL
+		var pc_style = StyleBoxFlat.new()
+		pc_style.bg_color = Color(0.96, 0.95, 0.91, 1.0)
+		pc_style.border_width_left = 1
+		pc_style.border_width_top = 1
+		pc_style.border_width_right = 1
+		pc_style.border_width_bottom = 1
+		pc_style.border_color = Color(0.85, 0.70, 0.22, 0.7)
+		pc_style.corner_radius_top_left = 6
+		pc_style.corner_radius_top_right = 6
+		pc_style.corner_radius_bottom_right = 6
+		pc_style.corner_radius_bottom_left = 6
+		pc_style.shadow_color = Color(0, 0, 0, 0.20)
+		pc_style.shadow_size = 4
+		pc_style.shadow_offset = Vector2(0, 2)
+		p_card.add_theme_stylebox_override("panel", pc_style)
+
+		var pv = VBoxContainer.new()
+		pv.offset_left = 6
+		pv.offset_right = -6
+		pv.offset_top = 6
+		pv.offset_bottom = -6
+		pv.alignment = BoxContainer.ALIGNMENT_CENTER
+		pv.add_theme_constant_override("separation", 2)
+
+		var p_icon = Label.new()
+		p_icon.text = "%s %s" % [p["icon"], p["title"]]
+		p_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		p_icon.add_theme_font_size_override("font_size", 10)
+		p_icon.add_theme_color_override("font_color", p["c"])
+		pv.add_child(p_icon)
+
+		var p_desc = Label.new()
+		p_desc.text = p["desc"]
+		p_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		p_desc.add_theme_font_size_override("font_size", 10)
+		p_desc.add_theme_color_override("font_color", Color(0.18, 0.15, 0.10, 1.0))
+		pv.add_child(p_desc)
+
+		p_card.add_child(pv)
+		perk_hbox.add_child(p_card)
+
+	vbox.add_child(perk_hbox)
+
+	# Action Button
+	var confirm_btn = Button.new()
+	confirm_btn.custom_minimum_size = Vector2(340, 44)
+	confirm_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	confirm_btn.text = "TIẾP NHẬN BỔNG LỘC & TIẾP TỤC ➜"
+	_style_white_gold_action_button(confirm_btn)
+
+	confirm_btn.pressed.connect(func():
+		confirm_btn.release_focus()
+		confirm_btn.disabled = true
+		AudioManager.play_card_select()
+
+		if AuthManager:
+			AuthManager.current_silver += 500
+			AuthManager.current_gold += 50
+			AuthManager.save_session()
+			AuthManager.save_profile_to_appwrite()
+			_load_user_data()
+
+		var close_tw = create_tween().set_parallel(true)
+		close_tw.tween_property(box, "scale", Vector2(0.8, 0.8), 0.2)
+		close_tw.tween_property(levelup_overlay, "modulate:a", 0.0, 0.2)
+		await close_tw.finished
+		levelup_overlay.queue_free()
+		levelup_overlay = null
+
+		if on_close.is_valid():
+			on_close.call()
+	)
+	vbox.add_child(confirm_btn)
+
+	# Pop-in Animation
+	box.scale = Vector2(0.65, 0.65)
+	box.modulate.a = 0.0
+	var pop_tw = create_tween().set_parallel(true)
+	pop_tw.tween_property(box, "scale", Vector2(1.0, 1.0), 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	pop_tw.tween_property(box, "modulate:a", 1.0, 0.25)
+
 # --- Modal Content Builders ---
 func _build_heroes_content() -> Control:
 	var container = VBoxContainer.new()
@@ -1415,6 +1843,17 @@ func _build_profile_content() -> Control:
 	rp.add_theme_color_override("font_color", Color(0.70, 0.48, 0.05, 1.0))
 	v.add_child(rp)
 
+	var test_btn = Button.new()
+	test_btn.custom_minimum_size = Vector2(0, 36)
+	test_btn.text = "⭐ NHẬN +20 EXP & LÊN CẤP (HIỆU ỨNG & ÂM THANH)"
+	_style_white_gold_action_button(test_btn)
+	test_btn.pressed.connect(func():
+		_hide_modal()
+		await get_tree().create_timer(0.25).timeout
+		gain_exp_animated(20)
+	)
+	v.add_child(test_btn)
+
 	hbox.add_child(v)
 	p_panel.add_child(hbox)
 	container.add_child(p_panel)
@@ -1496,5 +1935,33 @@ func _run_automated_screenshot(show_modal_test: bool) -> void:
 	else:
 		print("[Home] Lỗi lưu ảnh chụp: ", err)
 
+	await get_tree().create_timer(0.2).timeout
+	get_tree().quit()
+
+func _run_automated_screenshot_levelup() -> void:
+	print("[Home] Kích hoạt kiểm thử Modal Thăng Cấp...")
+	_show_level_up_modal(1, 2)
+	await get_tree().create_timer(0.6).timeout
+	var img = get_viewport().get_texture().get_image()
+	var path = "res://home_levelup_screenshot.png"
+	var err = img.save_png(path)
+	if err == OK:
+		print("[Home] Đã lưu ảnh chụp Thăng Cấp tại: ", path)
+	else:
+		print("[Home] Lỗi lưu ảnh chụp Thăng Cấp: ", err)
+	await get_tree().create_timer(0.2).timeout
+	get_tree().quit()
+
+func _run_automated_screenshot_exp() -> void:
+	print("[Home] Kích hoạt kiểm thử chạy thanh Kinh Nghiệm...")
+	gain_exp_animated(20)
+	await get_tree().create_timer(0.5).timeout
+	var img = get_viewport().get_texture().get_image()
+	var path = "res://home_exp_fill_screenshot.png"
+	var err = img.save_png(path)
+	if err == OK:
+		print("[Home] Đã lưu ảnh chụp Thanh Kinh Nghiệm tại: ", path)
+	else:
+		print("[Home] Lỗi lưu ảnh chụp: ", err)
 	await get_tree().create_timer(0.2).timeout
 	get_tree().quit()

@@ -103,7 +103,7 @@ func _ready() -> void:
 	if "--screenshot-reward" in cmd_args:
 		spotlight_overlay.visible = false
 		_show_reward_modal()
-		await get_tree().create_timer(0.6).timeout
+		await get_tree().create_timer(1.8).timeout
 		var img = get_viewport().get_texture().get_image()
 		img.save_png("res://tutorial_reward_screenshot.png")
 		print("[Screenshot] Đã lưu tutorial_reward_screenshot.png!")
@@ -1299,7 +1299,70 @@ func _show_reward_modal() -> void:
 		r_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		r_desc.add_theme_font_size_override("font_size", 10)
 		r_desc.add_theme_color_override("font_color", Color(0.40, 0.38, 0.32, 1.0))
-		rv.add_child(r_desc)
+
+		if r["tag"] == "⭐ KINH NGHIỆM":
+			var exp_bar = ProgressBar.new()
+			exp_bar.custom_minimum_size = Vector2(0, 8)
+			exp_bar.max_value = 20
+			exp_bar.value = 0
+			exp_bar.show_percentage = false
+			var bar_bg = StyleBoxFlat.new()
+			bar_bg.bg_color = Color(0.85, 0.83, 0.78, 1.0)
+			bar_bg.corner_radius_top_left = 4
+			bar_bg.corner_radius_top_right = 4
+			bar_bg.corner_radius_bottom_right = 4
+			bar_bg.corner_radius_bottom_left = 4
+			var bar_fill = StyleBoxFlat.new()
+			bar_fill.bg_color = Color(0.96, 0.75, 0.18, 1.0)
+			bar_fill.corner_radius_top_left = 4
+			bar_fill.corner_radius_top_right = 4
+			bar_fill.corner_radius_bottom_right = 4
+			bar_fill.corner_radius_bottom_left = 4
+			exp_bar.add_theme_stylebox_override("background", bar_bg)
+			exp_bar.add_theme_stylebox_override("fill", bar_fill)
+			rv.add_child(exp_bar)
+
+			var exp_status_lbl = Label.new()
+			exp_status_lbl.text = "0/20 EXP (CẤP 1)"
+			exp_status_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			exp_status_lbl.add_theme_font_size_override("font_size", 9)
+			exp_status_lbl.add_theme_color_override("font_color", Color(0.40, 0.38, 0.32, 1.0))
+			rv.add_child(exp_status_lbl)
+			rv.add_child(r_desc)
+
+			# Chạy tăng dần thanh kinh nghiệm và phát âm thanh bắt tai
+			var delay_tw = create_tween()
+			delay_tw.tween_interval(0.45)
+			delay_tw.tween_callback(func():
+				var last_tick = 0
+				var fill_tw = create_tween()
+				fill_tw.tween_method(func(val: float):
+					exp_bar.value = val
+					var int_v = int(val)
+					exp_status_lbl.text = "%d/20 EXP (CẤP 1)" % int_v
+					if int_v > last_tick:
+						last_tick = int_v
+						var pitch = lerpf(1.0, 1.5, float(int_v) / 20.0)
+						AudioManager.play_exp_tick(pitch, -2.0)
+				, 0.0, 20.0, 1.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+				fill_tw.tween_callback(func():
+					# Nhấp nháy hào quang hoàng kim & phát âm thanh Thăng Cấp hào hùng
+					var flash_tw = create_tween()
+					flash_tw.tween_property(r_card, "modulate", Color(1.5, 1.4, 0.8, 1.0), 0.15)
+					flash_tw.tween_property(r_card, "modulate", Color.WHITE, 0.15)
+					rc_style.bg_color = Color(1.0, 0.96, 0.85, 1.0)
+					rc_style.border_color = Color(0.96, 0.72, 0.12, 1.0)
+					AudioManager.play_levelup()
+					r_val.text = "🎉 CẤP 2!"
+					r_val.add_theme_color_override("font_color", Color(0.72, 0.45, 0.02, 1.0))
+					exp_status_lbl.text = "THĂNG CẤP 2! (0/30 EXP)"
+					exp_status_lbl.add_theme_color_override("font_color", Color(0.72, 0.45, 0.02, 1.0))
+					r_desc.text = "⭐ VỪA TRÒN LÊN CẤP 2 ⭐\nTriều đình phong thưởng!"
+				)
+			)
+		else:
+			rv.add_child(r_desc)
 
 		r_card.add_child(rv)
 		cards_hbox.add_child(r_card)

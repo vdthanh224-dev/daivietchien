@@ -24,6 +24,7 @@ var current_gold: int = 1200
 var current_generals: Array = ["ly_thuong_kiet"]
 var current_2v2_points: int = 1200
 var tutorial_reward_claimed: bool = false
+var pending_exp_gain: Dictionary = {}
 
 # 12 Tiers of Military Ranks
 const MILITARY_TIERS = [
@@ -137,6 +138,8 @@ func get_military_rank_info() -> Dictionary:
 # --- Tutorial Reward ---
 # Lần đầu chơi tân thủ cho được 20Exp cho vừa tròn lên cấp 2. Tướng Lý Thường Kiệt +50 Exp quân hàm.
 func claim_tutorial_reward(exp_amt: int = 20, silver_amt: int = 2000, gold_amt: int = 200) -> Dictionary:
+	var old_lvl = current_level
+	var old_exp_val = current_exp
 	tutorial_reward_claimed = true
 	add_general("ly_thuong_kiet")
 	current_silver += silver_amt
@@ -145,6 +148,16 @@ func claim_tutorial_reward(exp_amt: int = 20, silver_amt: int = 2000, gold_amt: 
 	set_onboarding_done()
 	save_session()
 	save_profile_to_appwrite()
+
+	pending_exp_gain = {
+		"old_level": old_lvl,
+		"old_exp": old_exp_val,
+		"new_level": current_level,
+		"new_exp": current_exp,
+		"exp_added": exp_amt,
+		"show_modal": true
+	}
+
 	profile_updated.emit()
 
 	return {

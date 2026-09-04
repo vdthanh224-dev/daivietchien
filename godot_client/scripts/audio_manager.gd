@@ -30,7 +30,8 @@ func _ready() -> void:
 func _preload_audio() -> void:
 	var list = [
 		"sfx_slash", "sfx_damage", "sfx_parry", "sfx_skill",
-		"sfx_card_draw", "sfx_card_select", "sfx_victory", "bgm_battle"
+		"sfx_card_draw", "sfx_card_select", "sfx_victory", "bgm_battle",
+		"sfx_exp_tick", "sfx_exp_fill", "sfx_levelup"
 	]
 	for name in list:
 		var path = "res://assets/audio/%s.wav" % name
@@ -79,6 +80,25 @@ func play_card_select() -> void:
 
 func play_victory() -> void:
 	play_sfx("sfx_victory", 3.0)
+
+func play_sfx_with_pitch(name: String, pitch: float = 1.0, vol_db: float = 0.0) -> void:
+	if clips.has(name):
+		var p = AudioStreamPlayer.new()
+		p.stream = clips[name]
+		p.pitch_scale = pitch
+		p.volume_db = vol_db
+		add_child(p)
+		p.play()
+		p.finished.connect(p.queue_free)
+
+func play_exp_tick(pitch: float = 1.0, vol_db: float = 0.0) -> void:
+	play_sfx_with_pitch("sfx_exp_tick", pitch, vol_db)
+
+func play_exp_fill(vol_db: float = 0.0) -> void:
+	play_sfx("sfx_exp_fill", vol_db)
+
+func play_levelup(vol_db: float = 2.0) -> void:
+	play_sfx("sfx_levelup", vol_db)
 
 func play_voice(card_or_skill_name: String) -> void:
 	var key = _normalize_voice_key(card_or_skill_name)
