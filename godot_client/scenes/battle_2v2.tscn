@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3 uid="uid://b3g0cnqsx7wd3"]
+[gd_scene load_steps=12 format=3 uid="uid://battle2v2scene123"]
 
 [ext_resource type="Theme" uid="uid://d4af37royalgold" path="res://resources/themes/royal_gold_theme.tres" id="1_theme"]
 [ext_resource type="Script" path="res://scenes/battle_2v2.gd" id="2_script"]
@@ -555,7 +555,7 @@ text = "Tên Tướng"
 [node name="HeroStats" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/LeftCol"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 11
-text = "Phe: Trần\nMáu: 4/4\nBài trên tay: 4 lá"
+text = "Thế Lực: Trung\nMáu: 4/4\nBài trên tay: 4 lá"
 
 [node name="RightCol" type="VBoxContainer" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox"]
 layout_mode = 2

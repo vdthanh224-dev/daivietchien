@@ -638,3 +638,78 @@ func poll_draft_player_action_for_seat(room_id: String, seat: int) -> Dictionary
 						"timestamp": int(doc.get("timestamp", 0))
 					}
 	return {}
+
+func send_battle_action(act: Dictionary) -> bool:
+	var r_id = act.get("roomId", "")
+	var seat = int(act.get("casterSeat", 1))
+	if r_id.is_empty():
+		return false
+	var now = get_now_ms()
+	var nonce = act.get("nonce", str(randi() % 900000 + 100000))
+	var compact_bact = "BACT:%s:%d:%d:%d:%s:%s:%d:%s:%s" % [
+		r_id,
+		int(act.get("seq", 1)),
+		seat,
+		int(act.get("targetSeat", 0)),
+		act.get("actionType", "PLAY_CARD"),
+		act.get("cardId", ""),
+		1 if act.get("accepted", true) else 0,
+		nonce,
+		act.get("senderUserId", "")
+	]
+	var doc_id = get_deterministic_doc_id("ba_", "%s_%d" % [r_id, seat])
+	var patch_url = "%s/databases/%s/collections/%s/documents/%s" % [ENDPOINT, DATABASE_ID, COLLECTION_ID, doc_id]
+	var patch_data = {
+		"data": {
+			"roomId": "BATTLE_ACT",
+			"userName": compact_bact,
+			"rankPoints": seat,
+			"timestamp": now
+		}
+	}
+	var res = await _send_http_request(patch_url, HTTPClient.METHOD_PATCH, JSON.stringify(patch_data))
+	if res["code"] == 200:
+		return true
+
+	var docs_url = "%s/databases/%s/collections/%s/documents" % [ENDPOINT, DATABASE_ID, COLLECTION_ID]
+	var payload = {
+		"documentId": doc_id,
+		"data": {
+			"roomId": "BATTLE_ACT",
+			"userName": compact_bact,
+			"rankPoints": seat,
+			"timestamp": now
+		},
+		"permissions": PUBLIC_DOC_PERMISSIONS
+	}
+	var post_res = await _send_http_request(docs_url, HTTPClient.METHOD_POST, JSON.stringify(payload))
+	return (post_res["code"] == 201 or post_res["code"] == 200)
+
+func poll_battle_actions(room_id: String) -> Array:
+	var actions = []
+	if room_id.is_empty():
+		return actions
+	for seat in range(1, 5):
+		var doc_id = get_deterministic_doc_id("ba_", "%s_%d" % [room_id, seat])
+		var get_url = "%s/databases/%s/collections/%s/documents/%s" % [ENDPOINT, DATABASE_ID, COLLECTION_ID, doc_id]
+		var res = await _send_http_request(get_url, HTTPClient.METHOD_GET)
+		if res["code"] == 200 and res["data"] != null:
+			var doc = res["data"]
+			var uname = doc.get("userName", "")
+			if uname.begins_with("BACT:"):
+				var parts = uname.split(":")
+				if parts.size() >= 10:
+					if parts[1] == room_id:
+						actions.append({
+							"roomId": parts[1],
+							"seq": int(parts[2]),
+							"casterSeat": int(parts[3]),
+							"targetSeat": int(parts[4]),
+							"actionType": parts[5],
+							"cardId": parts[6],
+							"accepted": (parts[7] == "1"),
+							"nonce": parts[8],
+							"senderUserId": parts[9],
+							"timestamp": int(doc.get("timestamp", 0))
+						})
+	return actions

@@ -53,6 +53,11 @@ var selected_card_ui: Control = null
 var selected_target_seat: int = -1
 var is_game_over: bool = false
 
+# Remote Player State (Real Human Player on other machine)
+var is_remote_turn_active: bool = false
+var remote_turn_timer: float = 40.0
+var remote_poll_timer: float = 0.0
+
 # Waiting for Dodge reaction
 var is_waiting_dodge: bool = false
 var dodge_attacker_seat: int = -1
@@ -87,9 +92,10 @@ func _ready() -> void:
 	_init_generals_from_draft()
 	_deal_initial_hands()
 
-	_add_log("⚔️ Chào mừng đến Đấu Trường Đại Việt 2v2 (Phe Rồng vs Phe Phượng)!")
+	_add_log("⚔️ Đấu Trường Đại Việt 2v2: Phe Rồng ([1], [3]) vs Phe Phượng ([2], [4])!")
+	_add_log("📜 Thứ tự ra bài: Ghế 1 ➔ Ghế 2 ➔ Ghế 3 ➔ Ghế 4.")
 
-	# Start turn loop
+	# Bắt đầu trận chiến tại Ghế 1 (Lượt 1 - Phe Rồng)
 	_start_turn(1)
 
 	# Handle headless screenshot test
@@ -107,7 +113,7 @@ func _process(delta: float) -> void:
 	if is_game_over:
 		return
 
-	# Handle Player Turn Timer
+	# Handle Local Player Turn Timer
 	if is_player_turn:
 		current_turn_timer -= delta
 		var sec = max(0, int(ceil(current_turn_timer)))
@@ -189,7 +195,7 @@ func _init_generals_from_draft() -> void:
 	elif AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary and AppwriteMatchmaking.current_room.get("draft_slots", []).size() == 4:
 		draft = AppwriteMatchmaking.current_room["draft_slots"]
 
-	# Determine my seat
+	# Xác định ghế của người chơi tại máy
 	my_seat = 1
 	for slot in draft:
 		if slot.get("isPlayer", false) or (AuthManager and slot.get("userId", "") == AuthManager.current_user_id and AuthManager.current_user_id != ""):
@@ -198,18 +204,18 @@ func _init_generals_from_draft() -> void:
 
 	my_team_is_dragon = (my_seat == 1 or my_seat == 3)
 
-	# Fallback default heroes if draft is empty
+	# 4 Tướng mặc định chuẩn 4 thế lực Cổ - Tiền - Trung - Hậu
 	var default_heroes = [
-		{"id": 53, "name": "Trần Hưng Đạo", "faction": "Thời Trần", "maxHp": 4, "slug": "tran_hung_dao", "skills": [{"name": "⚡ HỊCH TƯỚNG", "desc": "Tập kích hiệu triệu ba quân."}]},
-		{"id": 1, "name": "Cao Lỗ", "faction": "Âu Lạc", "maxHp": 4, "slug": "cao_lo", "skills": [{"name": "🎯 CHẾ NỎ", "desc": "Bắn nỏ thần uy lực muôn dặm."}]},
-		{"id": 47, "name": "Lý Thường Kiệt", "faction": "Thời Lý", "maxHp": 4, "slug": "ly_thuong_kiet", "skills": [{"name": "📜 TIẾN THOÁI", "desc": "Công thủ vẹn toàn, biến Trảm thành Đỡ."}]},
-		{"id": 14, "name": "Triệu Quang Phục", "faction": "Vạn Xuân", "maxHp": 4, "slug": "trieu_quang_phuc", "skills": [{"name": "🌫️ DẠ TRẠCH", "desc": "Ẩn mình nơi đầm lầy Dạ Trạch."}]}
+		{"id": 53, "name": "Trần Hưng Đạo", "faction": "Trung", "maxHp": 4, "slug": "tran_hung_dao", "skills": [{"name": "⚡ HỊCH TƯỚNG", "desc": "Tập kích hiệu triệu ba quân."}]},
+		{"id": 1, "name": "Cao Lỗ", "faction": "Cổ", "maxHp": 4, "slug": "cao_lo", "skills": [{"name": "🎯 CHẾ NỎ", "desc": "Bắn nỏ thần uy lực muôn dặm."}]},
+		{"id": 47, "name": "Lý Thường Kiệt", "faction": "Trung", "maxHp": 4, "slug": "ly_thuong_kiet", "skills": [{"name": "📜 TIẾN THOÁI", "desc": "Công thủ vẹn toàn, biến Trảm thành Đỡ."}]},
+		{"id": 14, "name": "Triệu Quang Phục", "faction": "Cổ", "maxHp": 4, "slug": "trieu_quang_phuc", "skills": [{"name": "🌫️ DẠ TRẠCH", "desc": "Ẩn mình nơi đầm lầy Dạ Trạch."}]}
 	]
 
-	# Map Unity layout:
-	# Local player is ALWAYS at SeatBottomRight
+	# Ánh xạ layout bàn cờ theo chuẩn Unity:
+	# Bạn (Người chơi tại máy) luôn ngồi góc Dưới Phải (SeatBottomRight)
 	# Offset 1 (seat + 1): Top-Right
-	# Offset 2 (seat + 2): Top-Left (Ally)
+	# Offset 2 (seat + 2): Top-Left (Đồng Đội)
 	# Offset 3 (seat + 3): Mid-Left
 	var seat_to_avatar = {}
 	var seat_to_offset = {}
@@ -240,7 +246,7 @@ func _init_generals_from_draft() -> void:
 			hero_info = default_heroes[i]
 
 		var h_name = hero_info.get("name", "Tướng %d" % s_num)
-		var h_faction = hero_info.get("faction", "Đại Việt")
+		var h_faction = hero_info.get("faction", "Trung")
 		var h_hp = int(hero_info.get("maxHp", hero_info.get("hp", 4)))
 		
 		var slug = hero_info.get("slug", "")
@@ -250,10 +256,12 @@ func _init_generals_from_draft() -> void:
 				var db_h = HeroDatabase.get_hero(h_id_int)
 				if db_h and not db_h.is_empty():
 					slug = db_h.get("slug", "")
+					h_faction = db_h.get("faction", h_faction)
 		if slug == "":
 			slug = str(hero_info.get("id", s_num))
 
-		var role_str = "RỒNG" if is_drag else "PHƯỢNG"
+		# Hiển thị số thứ tự ghế và tên phe: [1] RỒNG, [2] PHƯỢNG, [3] RỒNG, [4] PHƯỢNG
+		var role_str = ("[%d] RỒNG" % s_num) if is_drag else ("[%d] PHƯỢNG" % s_num)
 
 		var avatar_node = seat_to_avatar[s_num]
 		avatar_node.setup_general(slug, h_name, h_faction, h_hp, h_hp, role_str)
@@ -263,17 +271,11 @@ func _init_generals_from_draft() -> void:
 		if ResourceLoader.exists(tex_path) and is_instance_valid(avatar_node.portrait_rect):
 			avatar_node.portrait_rect.texture = load(tex_path)
 
-		# Set visual team badge color
-		if is_drag:
-			avatar_node.set_faction_color(Color(0.2, 0.8, 1.0, 1.0))
-		else:
-			avatar_node.set_faction_color(Color(1.0, 0.4, 0.2, 1.0))
-
-		# Adjust SkillBtn position so it never overflows offscreen or overlaps UI
+		# Căn chỉnh vị trí nút kỹ năng sao cho thoáng đẹp
 		var offset = seat_to_offset[s_num]
 		var skill_btn = avatar_node.get_node_or_null("SkillBtn")
 		if skill_btn:
-			if offset == 3: # SeatMidLeft (Triệu Quang Phục) - to the right, vertically centered
+			if offset == 3: # SeatMidLeft (Triệu Quang Phục)
 				skill_btn.anchor_left = 1.0
 				skill_btn.anchor_right = 1.0
 				skill_btn.anchor_top = 0.5
@@ -282,7 +284,7 @@ func _init_generals_from_draft() -> void:
 				skill_btn.offset_right = 108.0
 				skill_btn.offset_top = -15.0
 				skill_btn.offset_bottom = 15.0
-			elif offset == 0: # Player Bottom-Right - above the avatar
+			elif offset == 0: # Player Bottom-Right
 				skill_btn.anchor_left = 0.5
 				skill_btn.anchor_right = 0.5
 				skill_btn.anchor_top = 0.0
@@ -451,7 +453,7 @@ func _on_card_play_btn_clicked() -> void:
 			return
 		var tgt = generals_data[selected_target_seat]
 		if tgt["isDragon"] == my_team_is_dragon:
-			desc_text.text = "⚠️ Không thể Trảm đồng đội của mình!"
+			desc_text.text = "⚠️ Không thể Trảm đồng minh cùng phe!"
 			return
 
 		var p_gen = generals_data[my_seat]
@@ -465,10 +467,10 @@ func _on_card_play_btn_clicked() -> void:
 		selected_card_ui = null
 		card_play_btn.visible = false
 
+		_broadcast_player_battle_action("PLAY_CARD", "tram", tgt["seat"])
 		_animate_showcase_card(c_name, "Bạn dùng [Trảm] tấn công %s!" % tgt["name"])
 		_add_log("⚔️ Bạn dùng [Trảm] lên %s (Ghế %d)." % [tgt["name"], tgt["seat"]])
 
-		# Check target reaction
 		_handle_slash_attack(my_seat, tgt["seat"])
 
 	elif c_name == "Bánh Chưng":
@@ -481,6 +483,7 @@ func _on_card_play_btn_clicked() -> void:
 		card_play_btn.visible = false
 		p_gen["hp"] = min(p_gen["max_hp"], p_gen["hp"] + 1)
 		p_gen["avatar_node"].update_hp(p_gen["hp"], p_gen["max_hp"])
+		_broadcast_player_battle_action("PLAY_CARD", "banh_chung", my_seat)
 		_animate_showcase_card(c_name, "Bạn ăn Bánh Chưng hồi 1 Máu!")
 		_add_log("🍲 Bạn hồi phục 1 Máu bằng [Bánh Chưng] (%d/%d)." % [p_gen["hp"], p_gen["max_hp"]])
 
@@ -491,6 +494,7 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		_broadcast_player_battle_action("PLAY_CARD", "nothan", my_seat)
 		_animate_showcase_card(c_name, "Bạn trang bị [Nỏ Thần Kim Quy]!")
 		_add_log("🗡️ Bạn đã trang bị Vũ Khí: [Nỏ Thần Kim Quy] (Không giới hạn Trảm)!")
 
@@ -501,6 +505,7 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		_broadcast_player_battle_action("PLAY_CARD", "khienmay", my_seat)
 		_animate_showcase_card(c_name, "Bạn trang bị [Khiên Mây Bện]!")
 		_add_log("🛡️ Bạn đã trang bị Áo Giáp: [Khiên Mây Bện]!")
 
@@ -508,8 +513,22 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		_broadcast_player_battle_action("PLAY_CARD", c_name, 0)
 		_animate_showcase_card(c_name, "Bạn đã dùng [%s]!" % c_name)
 		_add_log("🎴 Bạn đã dùng [%s]." % c_name)
+
+func _broadcast_player_battle_action(act_type: String, card_id: String, target_seat: int = 0) -> void:
+	if AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary:
+		var r_id = AppwriteMatchmaking.current_room.get("roomId", "")
+		if not r_id.is_empty():
+			AppwriteMatchmaking.send_battle_action({
+				"roomId": r_id,
+				"casterSeat": my_seat,
+				"targetSeat": target_seat,
+				"actionType": act_type,
+				"cardId": card_id,
+				"senderUserId": AuthManager.current_user_id if AuthManager else ""
+			})
 
 func _discard_player_card(card_node: Control) -> void:
 	if not card_node or not is_instance_valid(card_node):
@@ -547,7 +566,6 @@ func _prompt_dodge_reaction(attacker_seat: int) -> void:
 	dodge_desc_lbl.text = "%s (Ghế %d) đang dùng [Trảm] tấn công bạn! Bạn có muốn dùng lá [ĐỠ] trên tay không?" % [atk["name"], attacker_seat]
 	dodge_timer_lbl.text = "⏳ Còn lại: 15s"
 	
-	# Check if player has Dodge card in hand
 	var has_dodge = _find_card_in_hand("Đỡ") != null
 	dodge_confirm_btn.disabled = not has_dodge
 	if has_dodge:
@@ -572,6 +590,7 @@ func _on_dodge_confirmed() -> void:
 		_discard_player_card(dodge_card)
 		dodge_modal.visible = false
 		is_waiting_dodge = false
+		_broadcast_player_battle_action("DODGE_RESPONSE", "do", dodge_attacker_seat)
 		_animate_showcase_card("Đỡ", "Bạn dùng [Đỡ] hóa giải đòn tấn công!")
 		_add_log("🛡️ Bạn đã dùng [Đỡ] hóa giải đòn Trảm thành công!")
 	else:
@@ -582,6 +601,7 @@ func _on_dodge_passed() -> void:
 		return
 	dodge_modal.visible = false
 	is_waiting_dodge = false
+	_broadcast_player_battle_action("DODGE_RESPONSE", "pass", dodge_attacker_seat)
 	_apply_damage_to_general(my_seat, 1, dodge_attacker_seat)
 
 func _apply_damage_to_general(target_seat: int, amount: int, _attacker_seat: int = -1) -> void:
@@ -660,19 +680,92 @@ func _start_turn(seat_num: int) -> void:
 			g["hand_count"] += 1
 	g["avatar_node"].update_hand_count(g["hand_count"])
 
+	# PHÂN LUỒNG: NGƯỜI THẬT CỤC BỘ vs NGƯỜI THẬT TỪ XA vs BOT AI
 	if g["isPlayer"]:
+		# 1. Người chơi tại máy: Điều khiển tự do, 40 giây
 		is_player_turn = true
 		current_turn_timer = 40.0
 		turn_indicator.text = "⏳ LƯỢT CỦA BẠN (40s)"
 		end_turn_btn.visible = true
 		card_play_btn.visible = false
 		desc_text.text = "💡 Lượt của bạn: Rút 2 lá bài. Hãy chọn bài trên tay và mục tiêu để tấn công!"
-	else:
+	elif not g["isAI"]:
+		# 2. Người thật từ xa qua mạng: Chờ đủ 40s, không để AI đánh hộ!
 		is_player_turn = false
 		end_turn_btn.visible = false
 		card_play_btn.visible = false
-		turn_indicator.text = "🤖 Lượt của %s..." % g["name"]
+		turn_indicator.text = "⏳ LƯỢT %s (GHẾ %d) - ĐANG CHỜ RA BÀI (40s)" % [g["name"], seat_num]
+		desc_text.text = "⏳ Đang đợi người chơi %s suy nghĩ và ra đòn..." % g["name"]
+		_execute_remote_player_turn(seat_num)
+	else:
+		# 3. Bot máy (AI): Tự động tính toán xuất bài
+		is_player_turn = false
+		end_turn_btn.visible = false
+		card_play_btn.visible = false
+		turn_indicator.text = "🤖 Lượt của %s (Máy)..." % g["name"]
+		desc_text.text = "🤖 Máy %s đang tính toán nước đi..." % g["name"]
 		_execute_ai_turn(seat_num)
+
+func _execute_remote_player_turn(remote_seat: int) -> void:
+	var g = generals_data[remote_seat]
+	remote_turn_timer = 40.0
+	is_remote_turn_active = true
+	remote_poll_timer = 0.0
+	var room_id = ""
+	if AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary:
+		room_id = AppwriteMatchmaking.current_room.get("roomId", "")
+
+	_add_log("👉 Đang chờ người chơi thật %s (Ghế %d) ra bài..." % [g["name"], remote_seat])
+
+	while is_remote_turn_active and remote_turn_timer > 0.0 and not is_game_over:
+		await get_tree().create_timer(0.2).timeout
+		remote_turn_timer -= 0.2
+		var sec = max(0, int(ceil(remote_turn_timer)))
+		turn_indicator.text = "⏳ LƯỢT %s (GHẾ %d) - %ds..." % [g["name"], remote_seat, sec]
+
+		# Polling hành động người thật từ Appwrite
+		remote_poll_timer += 0.2
+		if remote_poll_timer >= 1.0 and not room_id.is_empty() and AppwriteMatchmaking:
+			remote_poll_timer = 0.0
+			var acts = await AppwriteMatchmaking.poll_battle_actions(room_id)
+			for act in acts:
+				if int(act.get("casterSeat", 0)) == remote_seat:
+					var act_type = act.get("actionType", "")
+					if act_type == "PLAY_CARD":
+						var card_id = act.get("cardId", "tram")
+						var target_seat = int(act.get("targetSeat", 0))
+						_handle_remote_card_play(remote_seat, card_id, target_seat)
+					elif act_type == "END_TURN":
+						is_remote_turn_active = false
+						break
+
+	is_remote_turn_active = false
+	if remote_turn_timer <= 0:
+		_add_log("⏰ Hết 40s thời gian lượt của %s." % g["name"])
+	await get_tree().create_timer(0.5).timeout
+	_next_turn()
+
+func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: int) -> void:
+	var caster = generals_data[caster_seat]
+	caster["hand_count"] = max(0, caster["hand_count"] - 1)
+	caster["avatar_node"].update_hand_count(caster["hand_count"])
+
+	var card_name = "Trảm"
+	if card_id.contains("banh"): card_name = "Bánh Chưng"
+	elif card_id.contains("do"): card_name = "Đỡ"
+	elif card_id.contains("nothan"): card_name = "Nỏ Thần Kim Quy"
+	elif card_id.contains("khienmay"): card_name = "Khiên Mây Bện"
+
+	if card_name == "Bánh Chưng":
+		caster["hp"] = min(caster["max_hp"], caster["hp"] + 1)
+		caster["avatar_node"].update_hp(caster["hp"], caster["max_hp"])
+		_animate_showcase_card(card_name, "%s dùng [Bánh Chưng] hồi 1 Máu!" % caster["name"])
+		_add_log("🍲 %s dùng [Bánh Chưng] hồi 1 Máu." % caster["name"])
+	elif target_seat > 0 and generals_data.has(target_seat):
+		var tgt = generals_data[target_seat]
+		_animate_showcase_card(card_name, "%s dùng [%s] tấn công %s!" % [caster["name"], card_name, tgt["name"]])
+		_add_log("⚔️ %s dùng [%s] lên %s (Ghế %d)." % [caster["name"], card_name, tgt["name"], target_seat])
+		_handle_slash_attack(caster_seat, target_seat)
 
 func _execute_ai_turn(ai_seat: int) -> void:
 	await get_tree().create_timer(1.2).timeout
@@ -739,6 +832,7 @@ func _on_end_turn_btn_clicked() -> void:
 	if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 		generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
 		selected_target_seat = -1
+	_broadcast_player_battle_action("END_TURN", "", 0)
 	_add_log("⌛ Bạn đã kết thúc lượt của mình.")
 	_next_turn()
 
@@ -782,9 +876,12 @@ func _show_general_info_modal(seat_num: int) -> void:
 	var g = generals_data.get(seat_num, null)
 	if not g:
 		return
-	info_title.text = "THÔNG TIN TƯỚNG (GHẾ %d - %s)" % [seat_num, "PHE RỒNG" if g["isDragon"] else "PHE PHƯỢNG"]
+	var is_drag = g["isDragon"]
+	info_title.text = "THÔNG TIN TƯỚNG (GHẾ %d - %s)" % [seat_num, "PHE RỒNG" if is_drag else "PHE PHƯỢNG"]
 	info_hero_name.text = g["name"]
-	info_hero_stats.text = "Phe: %s\nMáu: %d/%d\nBài trên tay: %d lá" % [g["faction"], g["hp"], g["max_hp"], g["hand_count"]]
+	var fac_name = g["faction"]
+	var fac_full = HeroDatabase.get_faction_full_name(fac_name) if HeroDatabase else fac_name
+	info_hero_stats.text = "Thế Lực: %s (%s)\nMáu: %d/%d đóa sen\nBài trên tay: %d lá" % [fac_name, fac_full, g["hp"], g["max_hp"], g["hand_count"]]
 
 	var skills = g["hero_data"].get("skills", [])
 	if not skills.is_empty():

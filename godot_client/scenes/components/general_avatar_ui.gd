@@ -219,6 +219,17 @@ func setup_general(p_id: String, p_name: String, p_faction: String = "Trần", p
 		name_label.text = p_name
 	if is_instance_valid(faction_badge):
 		faction_badge.text = " %s " % p_faction
+		match p_faction:
+			"Cổ":
+				faction_badge.add_theme_color_override("font_color", Color(0.15, 0.85, 0.55, 1.0))
+			"Tiền":
+				faction_badge.add_theme_color_override("font_color", Color(0.15, 0.75, 0.95, 1.0))
+			"Trung":
+				faction_badge.add_theme_color_override("font_color", Color(0.95, 0.75, 0.2, 1.0))
+			"Hậu":
+				faction_badge.add_theme_color_override("font_color", Color(0.95, 0.4, 0.65, 1.0))
+			_:
+				faction_badge.add_theme_color_override("font_color", Color.WHITE)
 	current_hp = p_hp
 	max_hp = p_max_hp
 

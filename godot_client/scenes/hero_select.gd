@@ -128,7 +128,7 @@ func _setup_draft_slots() -> void:
 			used_names.append(uname)
 
 			var is_drag = (s_num == 1 or s_num == 3)
-			var role_tag = "(RỒNG)" if is_drag else "(PHƯỢNG)"
+			var role_tag = ("[%d] RỒNG" % s_num) if is_drag else ("[%d] PHƯỢNG" % s_num)
 			var is_ai = false if is_me else bool(s.get("isAI", true))
 
 			draft_slots.append({
@@ -151,10 +151,10 @@ func _setup_draft_slots() -> void:
 		var b3 = AppwriteMatchmaking.get_realistic_gamer_name(303, used_names) if AppwriteMatchmaking else "Chiến Tướng 4"
 
 		draft_slots = [
-			{"seatNumber": 1, "userName": my_name, "roleTag": "(RỒNG)", "isPlayer": true, "isDragon": true, "isAI": false, "chosenHero": null, "isLocked": false},
-			{"seatNumber": 2, "userName": b1, "roleTag": "(PHƯỢNG)", "isPlayer": false, "isDragon": false, "isAI": true, "chosenHero": null, "isLocked": false},
-			{"seatNumber": 3, "userName": b2, "roleTag": "(RỒNG)", "isPlayer": false, "isDragon": true, "isAI": true, "chosenHero": null, "isLocked": false},
-			{"seatNumber": 4, "userName": b3, "roleTag": "(PHƯỢNG)", "isPlayer": false, "isDragon": false, "isAI": true, "chosenHero": null, "isLocked": false}
+			{"seatNumber": 1, "userName": my_name, "roleTag": "[1] RỒNG", "isPlayer": true, "isDragon": true, "isAI": false, "chosenHero": null, "isLocked": false},
+			{"seatNumber": 2, "userName": b1, "roleTag": "[2] PHƯỢNG", "isPlayer": false, "isDragon": false, "isAI": true, "chosenHero": null, "isLocked": false},
+			{"seatNumber": 3, "userName": b2, "roleTag": "[3] RỒNG", "isPlayer": false, "isDragon": true, "isAI": true, "chosenHero": null, "isLocked": false},
+			{"seatNumber": 4, "userName": b3, "roleTag": "[4] PHƯỢNG", "isPlayer": false, "isDragon": false, "isAI": true, "chosenHero": null, "isLocked": false}
 		]
 
 func _build_ui() -> void:
@@ -319,14 +319,14 @@ func _build_left_slots_column() -> Control:
 		s_vbox.add_child(r1_hbox)
 
 		var team_lbl = Label.new()
-		team_lbl.text = "[RỒNG]" if slot_data["isDragon"] else "[PHƯỢNG]"
+		team_lbl.text = slot_data.get("roleTag", "[RỒNG]" if slot_data["isDragon"] else "[PHƯỢNG]")
 		team_lbl.add_theme_font_size_override("font_size", 12)
 		team_lbl.add_theme_color_override("font_color", COLOR_DRAGON_CYAN if slot_data["isDragon"] else COLOR_PHOENIX_RED)
 		r1_hbox.add_child(team_lbl)
 
 		var seat_lbl = Label.new()
-		seat_lbl.text = "#%d %s %s" % [slot_data["seatNumber"], slot_data["userName"], slot_data["roleTag"]]
-		seat_lbl.add_theme_font_size_override("font_size", 11)
+		seat_lbl.text = slot_data["userName"]
+		seat_lbl.add_theme_font_size_override("font_size", 12)
 		seat_lbl.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0, 1.0) if slot_data["isPlayer"] else Color.WHITE)
 		seat_lbl.size_flags_horizontal = SIZE_EXPAND_FILL
 		r1_hbox.add_child(seat_lbl)
@@ -508,9 +508,13 @@ func _create_hero_grid_card(hero: Dictionary) -> Control:
 
 	# 3. Bottom Bar: Thế Lực + Kỹ Năng trên thanh riêng
 	var fac_lbl = Label.new()
-	fac_lbl.text = hero.get("faction", "")
+	var fac_code = hero.get("faction", "")
+	fac_lbl.text = "🏛️ %s" % fac_code
 	fac_lbl.add_theme_font_size_override("font_size", 10)
-	fac_lbl.add_theme_color_override("font_color", Color(0.7, 0.85, 1.0, 0.9))
+	if HeroDatabase:
+		fac_lbl.add_theme_color_override("font_color", HeroDatabase.get_faction_color(fac_code))
+	else:
+		fac_lbl.add_theme_color_override("font_color", Color(0.7, 0.85, 1.0, 0.9))
 	vbox.add_child(fac_lbl)
 
 	var skill_bar = PanelContainer.new()
@@ -683,8 +687,10 @@ func _inspect_hero(hero: Dictionary) -> void:
 	var is_free = bool(hero.get("is_weekly_free", false))
 	var tag = "[🌟 FREE TUẦN]" if is_free else "[ĐÃ SỞ HỮU]"
 
+	var fac = hero.get("faction", "")
+	var fac_full = HeroDatabase.get_faction_full_name(fac) if HeroDatabase else fac
 	inspect_title_lbl.text = hname.to_upper()
-	inspect_sub_lbl.text = "Thế Lực: %s • Máu: %d đóa sen %s" % [hero.get("faction", ""), hero.get("maxHp", 4), tag]
+	inspect_sub_lbl.text = "Thế Lực: %s (%s) • Máu: %d đóa sen %s" % [fac, fac_full, hero.get("maxHp", 4), tag]
 
 	var tex = HeroDatabase.get_avatar_texture(hero.get("avatarPath", "")) if HeroDatabase else null
 	if tex: inspect_avatar_rect.texture = tex
