@@ -2197,7 +2197,11 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
   const armorIndex = target.equipments.findIndex((equipment) =>
     equipment.subType === CARD_SUBTYPES.ARMOR && equipment.name?.includes("Áo Bào")
   );
-  if (armorIndex >= 0 && rawDamage > 0) {
+  const attackerSeat = state.activeCard ? state.activeCard.casterSeat : 0;
+  const attacker = state.players.find(p => p.seat === attackerSeat);
+  const attackerHasThuanThien = getEquippedWeapon(attacker, "Thuận Thiên");
+
+  if (armorIndex >= 0 && rawDamage > 0 && !attackerHasThuanThien) {
     target.aoBaoCharges = Number.isFinite(Number(target.aoBaoCharges)) ? Number(target.aoBaoCharges) : 3;
     if (target.aoBaoCharges > 0) {
       target.aoBaoCharges--;

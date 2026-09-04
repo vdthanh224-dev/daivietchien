@@ -48,6 +48,7 @@ var current_turn_seat: int = 1
 var current_turn_timer: float = 40.0
 var is_player_turn: bool = false
 var slashes_used_this_turn: int = 0
+var is_wine_buff_active: bool = false
 var deck_count: int = 80
 var selected_card_ui: Control = null
 var selected_target_seat: int = -1
@@ -62,6 +63,8 @@ var remote_poll_timer: float = 0.0
 var is_waiting_dodge: bool = false
 var dodge_attacker_seat: int = -1
 var dodge_time_left: float = 15.0
+var incoming_slash_damage: int = 1
+var incoming_slash_element: String = "NORMAL"
 
 # General Info Table (Key: seatNumber 1..4)
 var generals_data: Dictionary = {}
@@ -277,7 +280,9 @@ func _init_generals_from_draft() -> void:
 			"hero_data": hero_info,
 			"avatar_node": avatar_node,
 			"equipped_weapon": "",
-			"equipped_armor": ""
+			"equipped_armor": "",
+			"is_chained": false,
+			"ao_bao_charges": 0
 		}
 
 func _deal_initial_hands() -> void:
@@ -439,6 +444,14 @@ func _on_card_play_btn_clicked() -> void:
 			desc_text.text = "⚠️ Mỗi lượt chỉ được Trảm 1 lần (Trừ khi có Nỏ Thần)!"
 			return
 
+		var is_wine = is_wine_buff_active
+		var slash_dmg = 2 if is_wine else 1
+		is_wine_buff_active = false
+
+		var elem = "NORMAL"
+		if "Hỏa" in c_name: elem = "FIRE"
+		elif "Lôi" in c_name: elem = "LIGHTNING"
+
 		slashes_used_this_turn += 1
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
@@ -446,9 +459,9 @@ func _on_card_play_btn_clicked() -> void:
 
 		_broadcast_player_battle_action("PLAY_CARD", c_name, tgt["seat"])
 		_animate_showcase_card(c_name, "Bạn dùng [%s] tấn công %s!" % [c_name, tgt["name"]])
-		_add_log("⚔️ Bạn dùng [%s] lên %s (Ghế %d)." % [c_name, tgt["name"], tgt["seat"]])
+		_add_log("⚔️ Bạn dùng [%s]%s lên %s (Ghế %d)." % [c_name, " (kèm Hủ Rượu: 2 ST)" if is_wine else "", tgt["name"], tgt["seat"]])
 
-		_handle_slash_attack(my_seat, tgt["seat"])
+		_handle_slash_attack(my_seat, tgt["seat"], slash_dmg, elem)
 
 	elif c_name == "Bánh Chưng":
 		var p_gen = generals_data[my_seat]
@@ -465,12 +478,77 @@ func _on_card_play_btn_clicked() -> void:
 		_add_log("🍲 Bạn hồi phục 1 Máu bằng [Bánh Chưng] (%d/%d)." % [p_gen["hp"], p_gen["max_hp"]])
 
 	elif c_name == "Hủ Rượu":
+		is_wine_buff_active = true
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
 		_broadcast_player_battle_action("PLAY_CARD", "ruou", my_seat)
 		_animate_showcase_card(c_name, "Bạn uống Hủ Rượu (+1 Sát Thương)!")
-		_add_log("🍶 Bạn đã uống [Hủ Rượu], đòn Trảm kế tiếp được +1 Sát Thương!")
+		_add_log("🍶 Bạn đã uống [Hủ Rượu], đòn Trảm kế tiếp được +1 Sát Thương (Tổng 2 ST)!")
+
+	elif c_name == "Xích Tâm Tỏa":
+		_discard_player_card(selected_card_ui)
+		selected_card_ui = null
+		card_play_btn.visible = false
+		var tgt_seat = selected_target_seat if (selected_target_seat > 0 and generals_data.has(selected_target_seat)) else my_seat
+		var tgt = generals_data[tgt_seat]
+		tgt["is_chained"] = !tgt["is_chained"]
+		var chain_desc = "⛓️ Trói Xích Liên Hoàn" if tgt["is_chained"] else "🔓 Gỡ Xích Liên Hoàn"
+		_broadcast_player_battle_action("PLAY_CARD", "xichtam", tgt_seat)
+		_animate_showcase_card(c_name, "%s lên %s!" % [chain_desc, tgt["name"]])
+		_add_log("⛓️ Bạn dùng [Xích Tâm Tỏa] %s đối với %s (Ghế %d)!" % [chain_desc, tgt["name"], tgt_seat])
+
+	elif c_name == "Dụng Binh Như Thần":
+		_discard_player_card(selected_card_ui)
+		selected_card_ui = null
+		card_play_btn.visible = false
+		for k in range(2):
+			var c_draw = _draw_card_from_pile()
+			_add_card_to_player_hand(c_draw)
+		_broadcast_player_battle_action("PLAY_CARD", "dungbinh", my_seat)
+		_animate_showcase_card(c_name, "Rút ngay 2 lá bài!")
+		_add_log("📜 Bạn thi triển [Dụng Binh Như Thần], rút ngay 2 lá bài từ xấp bài!")
+
+	elif c_name == "Đột Kích Trộm Lương":
+		if selected_target_seat <= 0 or not generals_data.has(selected_target_seat):
+			desc_text.text = "⚠️ Vui lòng nhấp chọn 1 Tướng đối thủ để cướp bài!"
+			return
+		var tgt = generals_data[selected_target_seat]
+		_discard_player_card(selected_card_ui)
+		selected_card_ui = null
+		card_play_btn.visible = false
+		tgt["hand_count"] = max(0, tgt["hand_count"] - 1)
+		tgt["avatar_node"].update_hand_count(tgt["hand_count"])
+		var stolen = _draw_card_from_pile()
+		_add_card_to_player_hand(stolen)
+		_broadcast_player_battle_action("PLAY_CARD", "dotkich", tgt["seat"])
+		_animate_showcase_card(c_name, "Cướp 1 lá bài từ %s!" % tgt["name"])
+		_add_log("🗡️ Bạn dùng [Đột Kích Trộm Lương] cướp 1 lá bài từ %s!" % tgt["name"])
+
+	elif c_name == "Vườn Không Nhà Trống":
+		if selected_target_seat <= 0 or not generals_data.has(selected_target_seat):
+			desc_text.text = "⚠️ Vui lòng nhấp chọn 1 Tướng mục tiêu để phá hủy bài!"
+			return
+		var tgt = generals_data[selected_target_seat]
+		_discard_player_card(selected_card_ui)
+		selected_card_ui = null
+		card_play_btn.visible = false
+		if tgt["equipped_weapon"] != "":
+			var old_w = tgt["equipped_weapon"]
+			tgt["equipped_weapon"] = ""
+			tgt["avatar_node"].set_equipment("weapon", "", "")
+			_add_log("🌾 Bạn dùng [Vườn Không Nhà Trống] phá hủy vũ khí [%s] của %s!" % [old_w, tgt["name"]])
+		elif tgt["equipped_armor"] != "":
+			var old_a = tgt["equipped_armor"]
+			tgt["equipped_armor"] = ""
+			tgt["avatar_node"].set_equipment("armor", "", "")
+			_add_log("🌾 Bạn dùng [Vườn Không Nhà Trống] phá hủy giáp [%s] của %s!" % [old_a, tgt["name"]])
+		else:
+			tgt["hand_count"] = max(0, tgt["hand_count"] - 1)
+			tgt["avatar_node"].update_hand_count(tgt["hand_count"])
+			_add_log("🌾 Bạn dùng [Vườn Không Nhà Trống] ép %s bỏ 1 lá bài trên tay!" % tgt["name"])
+		_broadcast_player_battle_action("PLAY_CARD", "vuonkhong", tgt["seat"])
+		_animate_showcase_card(c_name, "Phá hủy bài của %s!" % tgt["name"])
 
 	elif c_name in ["Kiếm Thuận Thiên", "Song Cung Mường Nhạ", "Nỏ Thần Kim Quy", "Trường Đao Nam Sơn", "Thương Ngâu Lãng Bạc", "Súng Thần Công Hồ Triều"]:
 		var p_gen = generals_data[my_seat]
@@ -486,6 +564,8 @@ func _on_card_play_btn_clicked() -> void:
 	elif c_name in ["Giáp Đồng Sơn Vi", "Khiên Mây Bện", "Áo Bào Hoàng Tộc"]:
 		var p_gen = generals_data[my_seat]
 		p_gen["equipped_armor"] = c_name
+		if c_name == "Áo Bào Hoàng Tộc":
+			p_gen["ao_bao_charges"] = 3
 		p_gen["avatar_node"].set_equipment("armor", c_name, "")
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
@@ -535,11 +615,30 @@ func _discard_player_card(card_node: Control) -> void:
 	g["hand_count"] = max(0, g["hand_count"] - 1)
 	g["avatar_node"].update_hand_count(g["hand_count"])
 
-func _handle_slash_attack(attacker_seat: int, target_seat: int) -> void:
+func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: int = 1, damage_element: String = "NORMAL") -> void:
 	var tgt = generals_data[target_seat]
+	var atk = generals_data.get(attacker_seat, {})
+	var has_thuan_thien = (atk.get("equipped_weapon", "") == "Kiếm Thuận Thiên")
+
+	# 1. Kiểm tra Giáp Đồng Sơn Vi (chỉ chặn Trảm Thường, bị Kiếm Thuận Thiên xuyên qua)
+	if not has_thuan_thien and damage_element == "NORMAL" and tgt["equipped_armor"] == "Giáp Đồng Sơn Vi":
+		_animate_showcase_card("Giáp Đồng Sơn Vi", "Giáp Đồng vô hiệu hóa đòn Trảm Thường!")
+		_add_log("🛡️ [Giáp Đồng Sơn Vi] của %s đã vô hiệu hóa hoàn toàn đòn Trảm Thường!" % tgt["name"])
+		return
+
+	# 2. Kiểm tra Khiên Mây Bện (lật phán xét Đỏ tự động Đỡ, nếu Thuận Thiên thì xuyên)
+	if not has_thuan_thien and tgt["equipped_armor"] == "Khiên Mây Bện":
+		var judge_card = _draw_card_from_pile()
+		var is_red = (judge_card.get("suit", "") in ["Heart", "Diamond"])
+		if is_red:
+			_animate_showcase_card("Khiên Mây Bện", "Phán xét ĐỎ -> Tự động Đỡ thành công!")
+			_add_log("🛡️ [Khiên Mây Bện] của %s lật %s %d (ĐỎ) -> Tự động Đỡ thành công!" % [tgt["name"], judge_card.get("suit", ""), judge_card.get("rank", 1)])
+			return
+		else:
+			_add_log("🛡️ [Khiên Mây Bện] của %s lật %s %d (ĐEN) -> Phán xét thất bại!" % [tgt["name"], judge_card.get("suit", ""), judge_card.get("rank", 1)])
 
 	if tgt["isPlayer"]:
-		_prompt_dodge_reaction(attacker_seat)
+		_prompt_dodge_reaction(attacker_seat, damage_amount, damage_element)
 		return
 
 	# Target is AI
@@ -550,12 +649,19 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int) -> void:
 		tgt["avatar_node"].update_hand_count(tgt["hand_count"])
 		_animate_showcase_card("Đỡ", "%s dùng [Đỡ] hóa giải đòn tấn công!" % tgt["name"])
 		_add_log("🛡️ %s đã dùng [Đỡ] hóa giải đòn Trảm thành công!" % tgt["name"])
-	else:
-		_apply_damage_to_general(target_seat, 1, attacker_seat)
 
-func _prompt_dodge_reaction(attacker_seat: int) -> void:
+		# Kiểm tra Song Cung Mường Nhạ của người tấn công
+		if atk.get("equipped_weapon", "") == "Song Cung Mường Nhạ" and attacker_seat == my_seat and hand_container.get_child_count() >= 2:
+			_add_log("🏹 [Song Cung Mường Nhạ] của bạn ép %s chịu 1 sát thương!" % tgt["name"])
+			_apply_damage_to_general(target_seat, 1, attacker_seat, "NORMAL")
+	else:
+		_apply_damage_to_general(target_seat, damage_amount, attacker_seat, damage_element)
+
+func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_element: String = "NORMAL") -> void:
 	var atk = generals_data[attacker_seat]
 	dodge_attacker_seat = attacker_seat
+	incoming_slash_damage = damage_amount
+	incoming_slash_element = damage_element
 	dodge_time_left = 15.0
 	is_waiting_dodge = true
 
@@ -598,18 +704,51 @@ func _on_dodge_passed() -> void:
 	dodge_modal.visible = false
 	is_waiting_dodge = false
 	_broadcast_player_battle_action("DODGE_RESPONSE", "pass", dodge_attacker_seat)
-	_apply_damage_to_general(my_seat, 1, dodge_attacker_seat)
+	_apply_damage_to_general(my_seat, incoming_slash_damage, dodge_attacker_seat, incoming_slash_element)
 
-func _apply_damage_to_general(target_seat: int, amount: int, _attacker_seat: int = -1) -> void:
+func _apply_damage_to_general(target_seat: int, amount: int, attacker_seat: int = -1, damage_element: String = "NORMAL") -> void:
 	if not generals_data.has(target_seat):
 		return
 	var tgt = generals_data[target_seat]
+	var atk = generals_data.get(attacker_seat, {})
+	var has_thuan_thien = (atk.get("equipped_weapon", "") == "Kiếm Thuận Thiên")
+
+	# Kiểm tra Áo Bào Hoàng Tộc (giảm 1 ST, tối đa 3 lần, trừ khi bị Thuận Thiên)
+	if not has_thuan_thien and tgt["equipped_armor"] == "Áo Bào Hoàng Tộc":
+		tgt["ao_bao_charges"] = tgt.get("ao_bao_charges", 3)
+		if tgt["ao_bao_charges"] > 0:
+			tgt["ao_bao_charges"] -= 1
+			amount = max(0, amount - 1)
+			_add_log("🛡️ [Áo Bào Hoàng Tộc] của %s giảm 1 sát thương (Còn %d lần)." % [tgt["name"], tgt["ao_bao_charges"]])
+			if tgt["ao_bao_charges"] <= 0:
+				tgt["equipped_armor"] = ""
+				tgt["avatar_node"].set_equipment("armor", "", "")
+				_add_log("🛡️ [Áo Bào Hoàng Tộc] của %s đã hết linh lực và tan biến!" % tgt["name"])
+
+	# Kiểm tra Thương Ngâu Lãng Bạc của người đánh
+	if amount > 0 and atk.get("equipped_weapon", "") == "Thương Ngâu Lãng Bạc":
+		tgt["hand_count"] = max(0, tgt["hand_count"] - 1)
+		tgt["avatar_node"].update_hand_count(tgt["hand_count"])
+		_add_log("🗡️ [Thương Ngâu Lãng Bạc] của %s phá hủy 1 lá bài của %s!" % [atk.get("name", "Người đánh"), tgt["name"]])
+
 	tgt["hp"] = max(0, tgt["hp"] - amount)
 	tgt["avatar_node"].update_hp(tgt["hp"], tgt["max_hp"])
 	tgt["avatar_node"].play_damage_effect()
 	tgt["avatar_node"].spawn_damage_number(amount)
 
 	_add_log("💥 %s nhận %d sát thương! Còn (%d/%d) Máu." % [tgt["name"], amount, tgt["hp"], tgt["max_hp"]])
+
+	# Lan truyền Xích Liên Hoàn nếu là sát thương Lôi hoặc Hỏa
+	var is_elemental = (damage_element == "FIRE" or damage_element == "LIGHTNING")
+	if is_elemental and tgt.get("is_chained", false) and amount > 0:
+		tgt["is_chained"] = false
+		for other_seat in [1, 2, 3, 4]:
+			if other_seat != target_seat and generals_data.has(other_seat):
+				var other = generals_data[other_seat]
+				if other["is_alive"] and other.get("is_chained", false):
+					other["is_chained"] = false
+					_add_log("⛓️⚡ [XÍCH LIÊN HOÀN]: Sát thương %s (%d điểm) lan truyền sang %s và gỡ xích!" % ["Hỏa" if damage_element == "FIRE" else "Lôi", amount, other["name"]])
+					_apply_damage_to_general(other_seat, amount, -1, "NORMAL")
 
 	if tgt["hp"] <= 0:
 		_handle_general_death(target_seat)
