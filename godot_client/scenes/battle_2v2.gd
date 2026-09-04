@@ -25,6 +25,7 @@ const CardUIScene = preload("res://scenes/components/card_ui.tscn")
 @onready var embers_layer: Control = $EmbersLayer
 
 @onready var dodge_modal: Control = $DodgeModal
+@onready var dodge_title_lbl: Label = $DodgeModal/Dim/Box/Margin/VBox/Title
 @onready var dodge_desc_lbl: Label = $DodgeModal/Dim/Box/Margin/VBox/Desc
 @onready var dodge_timer_lbl: Label = $DodgeModal/Dim/Box/Margin/VBox/TimerLbl
 @onready var dodge_confirm_btn: Button = $DodgeModal/Dim/Box/Margin/VBox/HBox/DodgeBtn
@@ -95,6 +96,9 @@ var remote_turn_timer: float = 40.0
 var remote_poll_timer: float = 0.0
 
 # Waiting for Dodge reaction
+signal custom_reaction_finished(accepted: bool)
+var custom_reaction_callback: Callable = Callable()
+var last_custom_reaction_card_info: Dictionary = {}
 var is_waiting_dodge: bool = false
 var dodge_attacker_seat: int = -1
 var dodge_time_left: float = 15.0
@@ -811,6 +815,27 @@ func _update_action_btn() -> void:
 		else:
 			card_play_btn.text = "🗡️ CHỌN MỤC TIÊU ĐỂ CƯỚP..."
 		card_play_btn.visible = true
+	elif c_name == "Bãi Cọc Ngầm":
+		card_play_btn.text = "🪵 BÃI CỌC NGẦM (TẤT CẢ NGƯỜI KHÁC)"
+		card_play_btn.visible = true
+	elif c_name == "Mưa Tên Liên Châu":
+		card_play_btn.text = "🏹 MƯA TÊN LIÊN CHÂU (TẤT CẢ NGƯỜI KHÁC)"
+		card_play_btn.visible = true
+	elif c_name == "Thách Đấu":
+		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
+			var tgt = generals_data[selected_target_seat]
+			if tgt["seat"] != my_seat and tgt["is_alive"]:
+				card_play_btn.text = "⚔️ THÁCH ĐẤU ➜ %s" % tgt["name"]
+				card_play_btn.visible = true
+				return
+		card_play_btn.text = "⚔️ CHỌN MỤC TIÊU THÁCH ĐẤU..."
+		card_play_btn.visible = true
+	elif c_name == "Mở Kho Cứu Tế":
+		card_play_btn.text = "🌾 MỞ KHO CỨU TẾ (CHIA ĐỀU BÀI)"
+		card_play_btn.visible = true
+	elif c_name == "Dụng Binh Như Thần":
+		card_play_btn.text = "📜 RÚT 2 LÁ BÀI (DỤNG BINH)"
+		card_play_btn.visible = true
 	else:
 		card_play_btn.text = "DÙNG [%s]" % c_name
 		card_play_btn.visible = true
@@ -930,12 +955,14 @@ func _on_card_play_btn_clicked() -> void:
 		_reset_player_turn_timer()
 		AudioManager.play_voice(c_name)
 		AudioManager.play_skill()
-		for k in range(2):
+		var p_gen_db = generals_data.get(my_seat, {})
+		var draw_num = 3 if p_gen_db.get("hero_id", 0) == 68 else 2
+		for k in range(draw_num):
 			var c_draw = _draw_card_from_pile()
 			_add_card_to_player_hand(c_draw)
 		_broadcast_player_battle_action("PLAY_CARD", "dungbinh", my_seat)
-		_animate_showcase_card(c_name, "Rút ngay 2 lá bài!")
-		_add_log("📜 Bạn thi triển [Dụng Binh Như Thần], rút ngay 2 lá bài từ xấp bài!")
+		_animate_showcase_card(c_name, "Rút ngay %d lá bài!" % draw_num)
+		_add_log("📜 Bạn thi triển [Dụng Binh Như Thần], rút ngay %d lá bài từ xấp bài!" % draw_num)
 
 	elif c_name == "Đột Kích Trộm Lương":
 		if selected_target_seat <= 0 or not generals_data.has(selected_target_seat):
@@ -968,6 +995,64 @@ func _on_card_play_btn_clicked() -> void:
 			return
 		_show_card_pick_modal(false, selected_target_seat)
 		return
+
+	elif c_name == "Bãi Cọc Ngầm":
+		_discard_player_card(selected_card_ui)
+		selected_card_ui = null
+		card_play_btn.visible = false
+		_reset_player_turn_timer()
+		AudioManager.play_voice("Bãi Cọc Ngầm")
+		AudioManager.play_skill()
+		_broadcast_player_battle_action("PLAY_CARD", "D80_CN_BaiCoc", 0)
+		_animate_showcase_card(c_name, "Bãi Cọc Ngầm: Toàn bộ người chơi khác phải đánh 1 Trảm!")
+		_add_log("🪵 Bạn phát động [Bãi Cọc Ngầm]! Toàn bộ người chơi khác phải đánh 1 lá Trảm hoặc mất 1 Máu.")
+		_execute_aoe_attack(my_seat, "Bãi Cọc Ngầm", "Trảm")
+
+	elif c_name == "Mưa Tên Liên Châu":
+		_discard_player_card(selected_card_ui)
+		selected_card_ui = null
+		card_play_btn.visible = false
+		_reset_player_turn_timer()
+		AudioManager.play_voice("Mưa Tên Liên Châu")
+		AudioManager.play_skill()
+		_broadcast_player_battle_action("PLAY_CARD", "D80_CN_MuaTen", 0)
+		_animate_showcase_card(c_name, "Mưa Tên Liên Châu: Toàn bộ người chơi khác phải đánh 1 Đỡ!")
+		_add_log("🏹 Bạn thi triển [Mưa Tên Liên Châu]! Toàn bộ người chơi khác phải đánh 1 lá Đỡ hoặc mất 1 Máu.")
+		_execute_aoe_attack(my_seat, "Mưa Tên Liên Châu", "Đỡ")
+
+	elif c_name == "Thách Đấu":
+		if selected_target_seat <= 0 or not generals_data.has(selected_target_seat):
+			desc_text.text = "⚠️ Vui lòng nhấp chọn 1 Tướng đối thủ trên bàn để Thách Đấu!"
+			return
+		if selected_target_seat == my_seat:
+			desc_text.text = "⚠️ Không thể tự Thách Đấu chính mình!"
+			return
+		var tgt = generals_data[selected_target_seat]
+		if not tgt["is_alive"]:
+			desc_text.text = "⚠️ Mục tiêu đã tử trận!"
+			return
+		_discard_player_card(selected_card_ui)
+		selected_card_ui = null
+		card_play_btn.visible = false
+		_reset_player_turn_timer()
+		AudioManager.play_voice("Thách Đấu")
+		AudioManager.play_slash()
+		_broadcast_player_battle_action("PLAY_CARD", "D80_CN_ThachDau", tgt["seat"])
+		_animate_showcase_card(c_name, "Bạn thách đấu %s!" % tgt["name"])
+		_add_log("⚔️ Bạn phát động [Thách Đấu] lên %s (Ghế %d)!" % [tgt["name"], tgt["seat"]])
+		_execute_duel(my_seat, selected_target_seat)
+
+	elif c_name == "Mở Kho Cứu Tế":
+		_discard_player_card(selected_card_ui)
+		selected_card_ui = null
+		card_play_btn.visible = false
+		_reset_player_turn_timer()
+		AudioManager.play_voice("Mở Kho Cứu Tế")
+		AudioManager.play_skill()
+		_broadcast_player_battle_action("PLAY_CARD", "D80_CN_MoKho", 0)
+		_animate_showcase_card(c_name, "Mở kho phát bài cho tất cả người chơi!")
+		_add_log("🌾 Bạn thi triển [Mở Kho Cứu Tế]! Chia bài cho toàn bộ người chơi còn sống.")
+		_execute_harvest(my_seat)
 
 	elif c_name == "Thần Sấm Báo Ứng":
 		var p_gen = generals_data[my_seat]
@@ -1265,6 +1350,74 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 			_add_log("🏹 [Song Cung Mường Nhạ] của bạn ép %s chịu 1 sát thương!" % tgt["name"])
 			AudioManager.play_skill()
 			_apply_damage_to_general(target_seat, 1, attacker_seat, "NORMAL")
+
+		# Kiểm tra Trường Đao Nam Sơn của người tấn công
+		if atk.get("equipped_weapon", "") == "Trường Đao Nam Sơn":
+			if attacker_seat == my_seat:
+				var has_extra_slash = false
+				for ch in hand_container.get_children():
+					if "trảm" in _get_card_info_from_ui(ch).get("name", "").to_lower():
+						has_extra_slash = true
+						break
+				if has_extra_slash:
+					var use_td = await _prompt_custom_reaction_async(
+						"🗡️ TRƯỜNG ĐAO NAM SƠN",
+						"Mục tiêu %s vừa dùng Đỡ!\nBạn có muốn bỏ thêm 1 lá [Trảm] để ép đối phương phải Đỡ lần thứ hai không?" % tgt["name"],
+						"Trảm",
+						"BỎ QUA",
+						"🗡️ BỎ 1 TRẢM ÉP ĐỠ TIẾP",
+						10.0
+					)
+					if use_td:
+						_add_log("🗡️ [Trường Đao Nam Sơn] Bạn bỏ thêm 1 lá Trảm ép %s phải Đỡ tiếp!" % tgt["name"])
+						# AI mục tiêu kiểm tra lá Đỡ thứ 2
+						var second_d_idx = -1
+						for idx2 in range(tgt["hand_cards"].size()):
+							if tgt["hand_cards"][idx2].get("name", "") == "Đỡ":
+								second_d_idx = idx2
+								break
+						if second_d_idx >= 0:
+							var used_d2 = tgt["hand_cards"][second_d_idx]
+							tgt["hand_cards"].remove_at(second_d_idx)
+							tgt["hand_count"] = tgt["hand_cards"].size()
+							tgt["avatar_node"].update_hand_count(tgt["hand_count"])
+							_animate_showcase_card("Đỡ", "%s dùng lá Đỡ thứ 2 né đòn thành công!" % tgt["name"])
+							_add_log("🛡️ %s đã bỏ thêm lá Đỡ thứ hai né đòn Trường Đao!" % tgt["name"])
+							AudioManager.play_parry()
+							return
+						else:
+							_add_log("💥 %s không có lá Đỡ thứ 2, chịu sát thương từ Trường Đao!" % tgt["name"])
+							_apply_damage_to_general(target_seat, damage_amount, attacker_seat, damage_element)
+							return
+			elif not atk.get("isPlayer", false):
+				# AI tấn công có Trường Đao: tự động bỏ thêm Trảm nếu còn
+				var extra_s_idx = -1
+				for idx_s in range(atk["hand_cards"].size()):
+					if "trảm" in atk["hand_cards"][idx_s].get("name", "").to_lower():
+						extra_s_idx = idx_s
+						break
+				if extra_s_idx >= 0:
+					atk["hand_cards"].remove_at(extra_s_idx)
+					atk["hand_count"] = atk["hand_cards"].size()
+					atk["avatar_node"].update_hand_count(atk["hand_count"])
+					_animate_showcase_card("Trường Đao Nam Sơn", "%s bỏ thêm 1 Trảm ép %s phải Đỡ tiếp!" % [atk["name"], tgt["name"]])
+					_add_log("🗡️ [Trường Đao Nam Sơn] %s bỏ thêm 1 Trảm ép %s phải Đỡ tiếp!" % [atk["name"], tgt["name"]])
+					# Check if target has 2nd dodge
+					var tgt_d2_idx = -1
+					for idx_d in range(tgt["hand_cards"].size()):
+						if tgt["hand_cards"][idx_d].get("name", "") == "Đỡ":
+							tgt_d2_idx = idx_d
+							break
+					if tgt_d2_idx >= 0:
+						tgt["hand_cards"].remove_at(tgt_d2_idx)
+						tgt["hand_count"] = tgt["hand_cards"].size()
+						tgt["avatar_node"].update_hand_count(tgt["hand_count"])
+						_animate_showcase_card("Đỡ", "%s dùng lá Đỡ thứ 2 né đòn!" % tgt["name"])
+						_add_log("🛡️ %s dùng lá Đỡ thứ 2 né đòn thành công!" % tgt["name"])
+						return
+					else:
+						_apply_damage_to_general(target_seat, damage_amount, attacker_seat, damage_element)
+						return
 	else:
 		_apply_damage_to_general(target_seat, damage_amount, attacker_seat, damage_element)
 
@@ -1403,12 +1556,13 @@ func _select_dodge_card(card_ui: Control) -> void:
 	if card_ui == null:
 		selected_dodge_card_ui = null
 		dodge_confirm_btn.disabled = true
-		dodge_confirm_btn.text = "❌ KHÔNG CÓ [ĐỠ]"
-		dodge_pass_btn.text = "💥 CHỊU ĐÒN (-%d MÁU)" % incoming_slash_damage
+		dodge_confirm_btn.text = "❌ KHÔNG CÓ BÀI PHÙ HỢP"
+		if not custom_reaction_callback.is_valid():
+			dodge_pass_btn.text = "💥 CHỊU ĐÒN (-%d MÁU)" % incoming_slash_damage
 		dodge_pass_btn.disabled = false
 		if dodge_selected_lbl:
-			dodge_selected_lbl.text = "⚠️ Bạn chưa chọn lá Đỡ. Hãy bấm [💥 CHỊU ĐÒN] hoặc đổi bài qua kỹ năng tướng."
-		desc_text.text = "💥 Bạn không có sẵn lá Đỡ trên tay! Bấm [CHỊU ĐÒN] hoặc bấm nút kỹ năng tướng để đổi bài."
+			dodge_selected_lbl.text = "⚠️ Bạn chưa chọn lá bài phù hợp. Hãy bấm nút bỏ qua hoặc chịu đòn."
+		desc_text.text = "💥 Bạn không có sẵn lá bài phù hợp trên tay!"
 		_update_dodge_card_selector_buttons()
 		return
 
@@ -1426,13 +1580,17 @@ func _select_dodge_card(card_ui: Control) -> void:
 	var info = _get_card_info_from_ui(card_ui)
 	var suit_sym = _get_suit_icon(info.get("suit", ""))
 	var rank_str = _format_rank(info.get("rank", 1))
-	var c_name = info.get("name", "Đỡ")
+	var c_name = info.get("name", "Bài")
 
 	dodge_confirm_btn.disabled = false
-	dodge_confirm_btn.text = "🛡️ DÙNG [%s %s %s]" % [suit_sym, rank_str, c_name]
+	if custom_reaction_callback.is_valid():
+		dodge_confirm_btn.text = "✅ DÙNG [%s %s %s]" % [suit_sym, rank_str, c_name]
+	else:
+		dodge_confirm_btn.text = "🛡️ DÙNG [%s %s %s]" % [suit_sym, rank_str, c_name]
+
 	if dodge_selected_lbl:
 		dodge_selected_lbl.text = "👉 Đang chọn: %s %s [%s]" % [suit_sym, rank_str, c_name]
-	desc_text.text = "🛡️ Đã chọn lá [%s %s %s] để Đỡ đòn Trảm! Bấm nút để xác nhận hoặc nhấp lá khác trên tay." % [suit_sym, rank_str, c_name]
+	desc_text.text = "🛡️ Đã chọn lá [%s %s %s]! Bấm nút để xác nhận hoặc nhấp lá khác trên tay." % [suit_sym, rank_str, c_name]
 
 	_update_dodge_card_selector_buttons()
 
@@ -1445,7 +1603,7 @@ func _on_dodge_confirmed() -> void:
 
 	var chosen_card = selected_dodge_card_ui
 	var card_info = _get_card_info_from_ui(chosen_card)
-	var c_name = card_info.get("name", "Đỡ")
+	var c_name = card_info.get("name", "Bài")
 	var suit_sym = _get_suit_icon(card_info.get("suit", ""))
 	var rank_str = _format_rank(card_info.get("rank", 1))
 
@@ -1456,6 +1614,13 @@ func _on_dodge_confirmed() -> void:
 
 	dodge_modal.visible = false
 	is_waiting_dodge = false
+
+	if custom_reaction_callback.is_valid():
+		var cb = custom_reaction_callback
+		custom_reaction_callback = Callable()
+		last_custom_reaction_card_info = card_info
+		cb.call(true, card_info)
+		return
 
 	var card_id = card_info.get("id", "do")
 	_broadcast_player_battle_action("DODGE_RESPONSE", card_id, dodge_attacker_seat)
@@ -1473,6 +1638,23 @@ func _on_dodge_confirmed() -> void:
 		AudioManager.play_skill()
 		_apply_damage_to_general(my_seat, 1, dodge_attacker_seat, "NORMAL")
 
+	# Kiểm tra Trường Đao Nam Sơn của người tấn công
+	if atk.get("equipped_weapon", "") == "Trường Đao Nam Sơn" and dodge_attacker_seat != my_seat:
+		var has_s = false
+		for idx in range(atk.get("hand_cards", []).size()):
+			if "Trảm" in atk["hand_cards"][idx].get("name", ""):
+				has_s = true
+				atk["hand_cards"].remove_at(idx)
+				atk["hand_count"] = atk["hand_cards"].size()
+				atk["avatar_node"].update_hand_count(atk["hand_count"])
+				break
+		if has_s:
+			_animate_showcase_card("Trường Đao Nam Sơn", "%s bỏ thêm 1 Trảm ép bạn phải Đỡ tiếp!" % atk["name"])
+			_add_log("🗡️ [Trường Đao Nam Sơn] %s bỏ thêm 1 lá Trảm ép bạn phải Đỡ thêm lần nữa!" % atk["name"])
+			await get_tree().create_timer(0.6).timeout
+			_prompt_dodge_reaction(dodge_attacker_seat, incoming_slash_damage, incoming_slash_element)
+			return
+
 func _on_dodge_passed() -> void:
 	if not is_waiting_dodge:
 		return
@@ -1482,8 +1664,59 @@ func _on_dodge_passed() -> void:
 	selected_dodge_card_ui = null
 	dodge_modal.visible = false
 	is_waiting_dodge = false
+
+	if custom_reaction_callback.is_valid():
+		var cb = custom_reaction_callback
+		custom_reaction_callback = Callable()
+		last_custom_reaction_card_info = {}
+		cb.call(false, {})
+		return
+
 	_broadcast_player_battle_action("DODGE_RESPONSE", "pass", dodge_attacker_seat)
 	_apply_damage_to_general(my_seat, incoming_slash_damage, dodge_attacker_seat, incoming_slash_element)
+
+func _prompt_custom_reaction_async(title_text: String, desc_text_msg: String, required_type: String, pass_text: String, confirm_text: String, timeout_sec: float = 15.0) -> bool:
+	if dodge_title_lbl and is_instance_valid(dodge_title_lbl):
+		dodge_title_lbl.text = title_text
+	dodge_desc_lbl.text = desc_text_msg
+	dodge_timer_lbl.text = "⏳ Còn lại: %ds" % int(timeout_sec)
+	dodge_pass_btn.text = pass_text
+	dodge_pass_btn.disabled = false
+	dodge_confirm_btn.text = confirm_text
+	dodge_confirm_btn.disabled = true
+
+	dodge_time_left = timeout_sec
+	is_waiting_dodge = true
+	selected_dodge_card_ui = null
+
+	var valid_cards: Array = []
+	var my_gen = generals_data.get(my_seat, {})
+	for card_ui in hand_container.get_children():
+		var info = _get_card_info_from_ui(card_ui)
+		var c_name = info.get("name", "").to_lower()
+		if required_type == "Trảm":
+			if "trảm" in c_name:
+				valid_cards.append(card_ui)
+			elif my_gen.get("hero_id", -1) == 47 and "đỡ" in c_name:
+				valid_cards.append(card_ui)
+		elif required_type == "Đỡ":
+			if _is_card_valid_for_dodge(card_ui, 0):
+				valid_cards.append(card_ui)
+
+	_build_dodge_card_selector_buttons(valid_cards)
+
+	if valid_cards.size() > 0:
+		_select_dodge_card(valid_cards[0])
+	else:
+		_select_dodge_card(null)
+
+	dodge_modal.visible = true
+
+	custom_reaction_callback = func(accepted: bool, _card_info: Dictionary):
+		custom_reaction_finished.emit(accepted)
+
+	var accepted_res = await custom_reaction_finished
+	return accepted_res
 
 func _calculate_distance(seat_a: int, seat_b: int) -> int:
 	var diff = abs(seat_a - seat_b)
@@ -1880,14 +2113,33 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 	caster["avatar_node"].update_hand_count(caster["hand_count"])
 
 	var card_name = card_id
-	if card_id.contains("banh") or card_id == "banh_chung": card_name = "Bánh Chưng"
-	elif card_id.contains("do"): card_name = "Đỡ"
-	elif card_id.contains("nothan"): card_name = "Nỏ Thần Kim Quy"
-	elif card_id.contains("khienmay"): card_name = "Khiên Mây Bện"
-	elif card_id.contains("ruou"): card_name = "Hủ Rượu"
-	elif card_id.contains("thansam"): card_name = "Thần Sấm Báo Ứng"
-	elif card_id.contains("xichtam"): card_name = "Xích Tâm Tỏa"
-	elif card_id.contains("dungbinh"): card_name = "Dụng Binh Như Thần"
+	var cid_lower = card_id.to_lower()
+	if "banh" in cid_lower: card_name = "Bánh Chưng"
+	elif "do" in cid_lower: card_name = "Đỡ"
+	elif "nothan" in cid_lower: card_name = "Nỏ Thần Kim Quy"
+	elif "khienmay" in cid_lower: card_name = "Khiên Mây Bện"
+	elif "ruou" in cid_lower: card_name = "Hủ Rượu"
+	elif "thansam" in cid_lower or "samset" in cid_lower: card_name = "Thần Sấm Báo Ứng"
+	elif "xichtam" in cid_lower or "xich" in cid_lower: card_name = "Xích Tâm Tỏa"
+	elif "dungbinh" in cid_lower: card_name = "Dụng Binh Như Thần"
+	elif "baicoc" in cid_lower: card_name = "Bãi Cọc Ngầm"
+	elif "muaten" in cid_lower: card_name = "Mưa Tên Liên Châu"
+	elif "thachdau" in cid_lower: card_name = "Thách Đấu"
+	elif "mokho" in cid_lower: card_name = "Mở Kho Cứu Tế"
+	elif "vuonkhong" in cid_lower: card_name = "Vườn Không Nhà Trống"
+	elif "dotkich" in cid_lower: card_name = "Đột Kích Trộm Lương"
+	elif "dieuke" in cid_lower: card_name = "Diệu Kế Phá Mưu"
+	elif "catluong" in cid_lower: card_name = "Cắt Đường Lương"
+	elif "tramao" in cid_lower: card_name = "Trầm Ảo Sa Bẫy"
+	elif "thuanthien" in cid_lower: card_name = "Kiếm Thuận Thiên"
+	elif "songcung" in cid_lower: card_name = "Song Cung Mường Nhạ"
+	elif "truongdao" in cid_lower: card_name = "Trường Đao Nam Sơn"
+	elif "thuongngau" in cid_lower: card_name = "Thương Ngâu Lãng Bạc"
+	elif "sungthancong" in cid_lower: card_name = "Súng Thần Công Hồ Triều"
+	elif "giapdong" in cid_lower: card_name = "Giáp Đồng Sơn Vi"
+	elif "aobao" in cid_lower: card_name = "Áo Bào Hoàng Tộc"
+	elif "voichien" in cid_lower: card_name = "Voi Chiến Đại Việt"
+	elif "nguatrang" in cid_lower: card_name = "Ngựa Trắng Thuần Nông"
 
 	if card_name == "Bánh Chưng":
 		caster["hp"] = min(caster["max_hp"], caster["hp"] + 1)
@@ -1910,6 +2162,82 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 		AudioManager.play_skill()
 		_animate_showcase_card(card_name, "%s đặt [Thần Sấm Báo Ứng] vào khu phán xét!" % caster["name"])
 		_add_log("⚡ %s đã tự gắn [Thần Sấm Báo Ứng] vào khu phán xét!" % caster["name"])
+	elif card_name == "Bãi Cọc Ngầm":
+		AudioManager.play_voice("Bãi Cọc Ngầm")
+		AudioManager.play_skill()
+		_animate_showcase_card("Bãi Cọc Ngầm", "%s phát động [Bãi Cọc Ngầm]!" % caster["name"])
+		_add_log("🪵 %s phát động [Bãi Cọc Ngầm]! Toàn bộ người chơi khác phải đánh 1 Trảm." % caster["name"])
+		_execute_aoe_attack(caster_seat, "Bãi Cọc Ngầm", "Trảm")
+	elif card_name == "Mưa Tên Liên Châu":
+		AudioManager.play_voice("Mưa Tên Liên Châu")
+		AudioManager.play_skill()
+		_animate_showcase_card("Mưa Tên Liên Châu", "%s phát động [Mưa Tên Liên Châu]!" % caster["name"])
+		_add_log("🏹 %s phát động [Mưa Tên Liên Châu]! Toàn bộ người chơi khác phải đánh 1 Đỡ." % caster["name"])
+		_execute_aoe_attack(caster_seat, "Mưa Tên Liên Châu", "Đỡ")
+	elif card_name == "Thách Đấu":
+		if target_seat > 0 and generals_data.has(target_seat):
+			var tgt_duel = generals_data[target_seat]
+			AudioManager.play_voice("Thách Đấu")
+			AudioManager.play_slash()
+			_animate_showcase_card("Thách Đấu", "%s thách đấu %s!" % [caster["name"], tgt_duel["name"]])
+			_add_log("⚔️ %s phát động [Thách Đấu] lên %s!" % [caster["name"], tgt_duel["name"]])
+			_execute_duel(caster_seat, target_seat)
+	elif card_name == "Mở Kho Cứu Tế":
+		AudioManager.play_voice("Mở Kho Cứu Tế")
+		AudioManager.play_skill()
+		_animate_showcase_card("Mở Kho Cứu Tế", "%s phát động [Mở Kho Cứu Tế]!" % caster["name"])
+		_add_log("🌾 %s phát động [Mở Kho Cứu Tế]! Mở kho phát lương cho toàn bàn." % caster["name"])
+		_execute_harvest(caster_seat)
+	elif card_name == "Dụng Binh Như Thần":
+		var draw_num = 3 if caster.get("hero_id", 0) == 68 else 2
+		caster["hand_count"] += draw_num
+		caster["avatar_node"].update_hand_count(caster["hand_count"])
+		AudioManager.play_voice("Dụng Binh Như Thần")
+		AudioManager.play_skill()
+		_animate_showcase_card("Dụng Binh Như Thần", "%s dùng [Dụng Binh Như Thần] rút %d lá!" % [caster["name"], draw_num])
+		_add_log("📜 %s dùng [Dụng Binh Như Thần] rút %d lá bài!" % [caster["name"], draw_num])
+	elif card_name == "Đột Kích Trộm Lương":
+		if target_seat > 0 and generals_data.has(target_seat):
+			var tgt_d = generals_data[target_seat]
+			if target_seat == my_seat and hand_container.get_child_count() > 0:
+				var stolen_c = hand_container.get_child(hand_container.get_child_count() - 1)
+				_discard_player_card(stolen_c)
+			elif tgt_d["equipped_weapon"] != "":
+				tgt_d["equipped_weapon"] = ""
+				tgt_d["avatar_node"].set_equipment("weapon", "", "")
+			elif tgt_d["equipped_armor"] != "":
+				tgt_d["equipped_armor"] = ""
+				tgt_d["avatar_node"].set_equipment("armor", "", "")
+			else:
+				tgt_d["hand_count"] = max(0, tgt_d["hand_count"] - 1)
+				tgt_d["avatar_node"].update_hand_count(tgt_d["hand_count"])
+			caster["hand_count"] += 1
+			caster["avatar_node"].update_hand_count(caster["hand_count"])
+			AudioManager.play_voice("Đột Kích Trộm Lương")
+			AudioManager.play_skill()
+			_animate_showcase_card("Đột Kích Trộm Lương", "%s cướp 1 lá của %s!" % [caster["name"], tgt_d["name"]])
+			_add_log("🗡️ %s dùng [Đột Kích Trộm Lương] cướp bài của %s!" % [caster["name"], tgt_d["name"]])
+	elif card_name in ["Vườn Không Nhà Trống", "Diệu Kế Phá Mưu"]:
+		if target_seat > 0 and generals_data.has(target_seat):
+			var tgt_v = generals_data[target_seat]
+			if target_seat == my_seat and hand_container.get_child_count() > 0:
+				var rem_c = hand_container.get_child(hand_container.get_child_count() - 1)
+				_discard_player_card(rem_c)
+			elif tgt_v["equipped_weapon"] != "":
+				var old_w = tgt_v["equipped_weapon"]
+				tgt_v["equipped_weapon"] = ""
+				tgt_v["avatar_node"].set_equipment("weapon", "", "")
+			elif tgt_v["equipped_armor"] != "":
+				var old_a = tgt_v["equipped_armor"]
+				tgt_v["equipped_armor"] = ""
+				tgt_v["avatar_node"].set_equipment("armor", "", "")
+			else:
+				tgt_v["hand_count"] = max(0, tgt_v["hand_count"] - 1)
+				tgt_v["avatar_node"].update_hand_count(tgt_v["hand_count"])
+			AudioManager.play_voice(card_name)
+			AudioManager.play_skill()
+			_animate_showcase_card(card_name, "%s phá hủy 1 lá của %s!" % [caster["name"], tgt_v["name"]])
+			_add_log("🌾 %s dùng [%s] phá hủy 1 lá bài của %s!" % [caster["name"], card_name, tgt_v["name"]])
 	elif card_name in ["Kiếm Thuận Thiên", "Song Cung Mường Nhạ", "Nỏ Thần Kim Quy", "Trường Đao Nam Sơn", "Thương Ngâu Lãng Bạc", "Súng Thần Công Hồ Triều"]:
 		caster["equipped_weapon"] = card_name
 		caster["avatar_node"].set_equipment("weapon", card_name, "")
@@ -2071,6 +2399,81 @@ func _execute_ai_turn(ai_seat: int) -> void:
 			await get_tree().create_timer(0.8).timeout
 			break
 
+		if c_name == "Bãi Cọc Ngầm":
+			scroll_idx = idx
+			ai_gen["hand_cards"].remove_at(scroll_idx)
+			ai_gen["hand_count"] = ai_gen["hand_cards"].size()
+			ai_gen["avatar_node"].update_hand_count(ai_gen["hand_count"])
+			AudioManager.play_voice("Bãi Cọc Ngầm")
+			AudioManager.play_skill()
+			_broadcast_player_battle_action("PLAY_CARD", "D80_CN_BaiCoc", 0, ai_seat)
+			_animate_showcase_card("Bãi Cọc Ngầm", "%s dùng [Bãi Cọc Ngầm]!" % ai_gen["name"])
+			_add_log("🪵 %s phát động [Bãi Cọc Ngầm]! Mọi người phải đánh Trảm hoặc mất 1 Máu." % ai_gen["name"])
+			await _execute_aoe_attack(ai_seat, "Bãi Cọc Ngầm", "Trảm")
+			await get_tree().create_timer(0.8).timeout
+			break
+
+		if c_name == "Mưa Tên Liên Châu":
+			scroll_idx = idx
+			ai_gen["hand_cards"].remove_at(scroll_idx)
+			ai_gen["hand_count"] = ai_gen["hand_cards"].size()
+			ai_gen["avatar_node"].update_hand_count(ai_gen["hand_count"])
+			AudioManager.play_voice("Mưa Tên Liên Châu")
+			AudioManager.play_skill()
+			_broadcast_player_battle_action("PLAY_CARD", "D80_CN_MuaTen", 0, ai_seat)
+			_animate_showcase_card("Mưa Tên Liên Châu", "%s dùng [Mưa Tên Liên Châu]!" % ai_gen["name"])
+			_add_log("🏹 %s phát động [Mưa Tên Liên Châu]! Mọi người phải đánh Đỡ hoặc mất 1 Máu." % ai_gen["name"])
+			await _execute_aoe_attack(ai_seat, "Mưa Tên Liên Châu", "Đỡ")
+			await get_tree().create_timer(0.8).timeout
+			break
+
+		if c_name == "Thách Đấu" and not enemies.is_empty():
+			scroll_idx = idx
+			var tgt_s = enemies.pick_random()
+			var tgt_e = generals_data[tgt_s]
+			ai_gen["hand_cards"].remove_at(scroll_idx)
+			ai_gen["hand_count"] = ai_gen["hand_cards"].size()
+			ai_gen["avatar_node"].update_hand_count(ai_gen["hand_count"])
+			AudioManager.play_voice("Thách Đấu")
+			AudioManager.play_slash()
+			_broadcast_player_battle_action("PLAY_CARD", "D80_CN_ThachDau", tgt_s, ai_seat)
+			_animate_showcase_card("Thách Đấu", "%s thách đấu %s!" % [ai_gen["name"], tgt_e["name"]])
+			_add_log("⚔️ %s phát động [Thách Đấu] lên %s!" % [ai_gen["name"], tgt_e["name"]])
+			await _execute_duel(ai_seat, tgt_s)
+			await get_tree().create_timer(0.8).timeout
+			break
+
+		if c_name == "Dụng Binh Như Thần":
+			scroll_idx = idx
+			ai_gen["hand_cards"].remove_at(scroll_idx)
+			var draw_num = 3 if ai_gen.get("hero_id", 0) == 68 else 2
+			for k in range(draw_num):
+				var card_drawn = _draw_card_from_pile()
+				ai_gen["hand_cards"].append(card_drawn)
+			ai_gen["hand_count"] = ai_gen["hand_cards"].size()
+			ai_gen["avatar_node"].update_hand_count(ai_gen["hand_count"])
+			AudioManager.play_voice("Dụng Binh Như Thần")
+			AudioManager.play_skill()
+			_broadcast_player_battle_action("PLAY_CARD", "D80_CN_DungBinh", 0, ai_seat)
+			_animate_showcase_card("Dụng Binh Như Thần", "%s dùng [Dụng Binh Như Thần] rút %d lá!" % [ai_gen["name"], draw_num])
+			_add_log("📜 %s thi triển [Dụng Binh Như Thần] rút ngay %d lá bài!" % [ai_gen["name"], draw_num])
+			await get_tree().create_timer(0.8).timeout
+			break
+
+		if c_name == "Mở Kho Cứu Tế":
+			scroll_idx = idx
+			ai_gen["hand_cards"].remove_at(scroll_idx)
+			ai_gen["hand_count"] = ai_gen["hand_cards"].size()
+			ai_gen["avatar_node"].update_hand_count(ai_gen["hand_count"])
+			AudioManager.play_voice("Mở Kho Cứu Tế")
+			AudioManager.play_skill()
+			_broadcast_player_battle_action("PLAY_CARD", "D80_CN_MoKho", 0, ai_seat)
+			_animate_showcase_card("Mở Kho Cứu Tế", "%s dùng [Mở Kho Cứu Tế]!" % ai_gen["name"])
+			_add_log("🌾 %s thi triển [Mở Kho Cứu Tế]! Mở kho phát lương cho toàn bàn." % ai_gen["name"])
+			await _execute_harvest(ai_seat)
+			await get_tree().create_timer(0.8).timeout
+			break
+
 		if c_name in ["Cắt Đường Lương", "Trầm Ảo Sa Bẫy"] and not enemies.is_empty():
 			scroll_idx = idx
 			var tgt_s = enemies.pick_random()
@@ -2094,7 +2497,7 @@ func _execute_ai_turn(ai_seat: int) -> void:
 			await get_tree().create_timer(0.8).timeout
 			break
 
-		if c_name in ["Đột Kích Trộm Lương", "Vườn Không Nhà Trống", "Xích Tâm Tỏa"] and not enemies.is_empty():
+		if c_name in ["Đột Kích Trộm Lương", "Vườn Không Nhà Trống", "Diệu Kế Phá Mưu", "Xích Tâm Tỏa"] and not enemies.is_empty():
 			scroll_idx = idx
 			var tgt_s = enemies.pick_random()
 			var tgt_e = generals_data[tgt_s]
@@ -2122,17 +2525,17 @@ func _execute_ai_turn(ai_seat: int) -> void:
 				_animate_showcase_card(c_name, "%s dùng [Đột Kích Trộm Lương] lên %s!" % [ai_gen["name"], tgt_e["name"]])
 				_add_log("🗡️ %s dùng [Đột Kích Trộm Lương] cướp bài của %s!" % [ai_gen["name"], tgt_e["name"]])
 
-			elif c_name == "Vườn Không Nhà Trống":
+			elif c_name in ["Vườn Không Nhà Trống", "Diệu Kế Phá Mưu"]:
 				if tgt_e["equipped_weapon"] != "":
 					var old_w = tgt_e["equipped_weapon"]
 					tgt_e["equipped_weapon"] = ""
 					tgt_e["avatar_node"].set_equipment("weapon", "", "")
-					_add_log("🌾 %s dùng [Vườn Không Nhà Trống] phá hủy vũ khí [%s] của %s!" % [ai_gen["name"], old_w, tgt_e["name"]])
+					_add_log("🌾 %s dùng [%s] phá hủy vũ khí [%s] của %s!" % [ai_gen["name"], c_name, old_w, tgt_e["name"]])
 				elif tgt_e["equipped_armor"] != "":
 					var old_a = tgt_e["equipped_armor"]
 					tgt_e["equipped_armor"] = ""
 					tgt_e["avatar_node"].set_equipment("armor", "", "")
-					_add_log("🌾 %s dùng [Vườn Không Nhà Trống] phá hủy giáp [%s] của %s!" % [ai_gen["name"], old_a, tgt_e["name"]])
+					_add_log("🌾 %s dùng [%s] phá hủy giáp [%s] của %s!" % [ai_gen["name"], c_name, old_a, tgt_e["name"]])
 				else:
 					if tgt_e["isPlayer"] and hand_container.get_child_count() > 0:
 						var c_rem = hand_container.get_child(hand_container.get_child_count() - 1)
@@ -2141,8 +2544,8 @@ func _execute_ai_turn(ai_seat: int) -> void:
 						tgt_e["hand_cards"].pop_back()
 						tgt_e["hand_count"] = tgt_e["hand_cards"].size()
 						tgt_e["avatar_node"].update_hand_count(tgt_e["hand_count"])
-					_add_log("🌾 %s dùng [Vườn Không Nhà Trống] ép %s bỏ 1 lá bài!" % [ai_gen["name"], tgt_e["name"]])
-				_animate_showcase_card(c_name, "%s dùng [Vườn Không Nhà Trống] lên %s!" % [ai_gen["name"], tgt_e["name"]])
+					_add_log("🌾 %s dùng [%s] ép %s bỏ 1 lá bài!" % [ai_gen["name"], c_name, tgt_e["name"]])
+				_animate_showcase_card(c_name, "%s dùng [%s] lên %s!" % [ai_gen["name"], c_name, tgt_e["name"]])
 
 			elif c_name == "Xích Tâm Tỏa":
 				tgt_e["is_chained"] = !tgt_e.get("is_chained", false)
@@ -2435,6 +2838,206 @@ func _show_general_info_modal(seat_num: int) -> void:
 
 func _hide_general_info_modal() -> void:
 	general_info_modal.visible = false
+
+# ==========================================================
+# 🌪️ CẨM NANG DIỆN RỘNG (AOE): BÃI CỌC NGẦM & MƯA TÊN LIÊN CHÂU
+# ==========================================================
+func _execute_aoe_attack(caster_seat: int, aoe_name: String, required_card_name: String) -> void:
+	var caster = generals_data.get(caster_seat, {})
+	var caster_name = caster.get("name", "Tướng")
+
+	var victims_order: Array = []
+	for i in range(1, 4):
+		var s = ((caster_seat - 1 + i) % 4) + 1
+		if generals_data.has(s) and generals_data[s]["is_alive"]:
+			victims_order.append(s)
+
+	_add_log("🌪️ <b>%s</b> phát động [%s]! Lần lượt kiểm tra các tướng theo chiều kim đồng hồ..." % [caster_name, aoe_name])
+
+	for target_seat in victims_order:
+		if is_game_over:
+			break
+		var tgt = generals_data[target_seat]
+		if not tgt["is_alive"] or tgt["hp"] <= 0:
+			continue
+
+		# 1. Kiểm tra Miễn Nhiễm Tướng đối với Bãi Cọc Ngầm (Nam Man Nhập Xâm):
+		# Phạm Tu (Hero 13 - Khang Dũng), Ngô Quyền (Hero 22 - Thủy Trận), Yết Kiêu (Hero 60 - Thủy Chiến)
+		if aoe_name == "Bãi Cọc Ngầm":
+			var hero_id = tgt.get("hero_id", -1)
+			if hero_id in [13, 22, 60]:
+				var skill_reason = "Khang Dũng" if hero_id == 13 else ("Thủy Trận" if hero_id == 22 else "Thủy Chiến")
+				_animate_showcase_card("Miễn Nhiễm", "%s miễn nhiễm Bãi Cọc Ngầm nhờ [%s]!" % [tgt["name"], skill_reason])
+				_add_log("🛡️ [Miễn Nhiễm] %s miễn nhiễm sát thương từ [Bãi Cọc Ngầm] nhờ kỹ năng [%s]!" % [tgt["name"], skill_reason])
+				await get_tree().create_timer(0.6).timeout
+				continue
+
+		# 2. Kiểm tra Khiên Mây Bện đối với Mưa Tên Liên Châu (cần Đỡ):
+		if aoe_name == "Mưa Tên Liên Châu" and tgt.get("equipped_armor", "") == "Khiên Mây Bện":
+			var judge_card = _draw_card_from_pile()
+			var is_red = (judge_card.get("suit", "") in ["Heart", "Diamond"])
+			if is_red:
+				_animate_showcase_card("Khiên Mây Bện", "Khiên Mây: Phán xét ĐỎ -> Tự động Đỡ Mưa Tên!")
+				_add_log("🛡️ [Khiên Mây Bện] của %s lật %s %d (ĐỎ) -> Tự động Đỡ Mưa Tên thành công!" % [tgt["name"], judge_card.get("suit", ""), judge_card.get("rank", 1)])
+				AudioManager.play_parry()
+				await get_tree().create_timer(0.8).timeout
+				continue
+			else:
+				_add_log("🛡️ [Khiên Mây Bện] của %s lật %s %d (ĐEN) -> Phán xét thất bại!" % [tgt["name"], judge_card.get("suit", ""), judge_card.get("rank", 1)])
+				await get_tree().create_timer(0.5).timeout
+
+		# 3. Phản ứng: Người chơi thật
+		if tgt["isPlayer"]:
+			var prompt_title = "🪵 NÉ BÃI CỌC NGẦM" if aoe_name == "Bãi Cọc Ngầm" else "🏹 NÉ MƯA TÊN LIÊN CHÂU"
+			var prompt_desc = "⚠️ %s vừa dùng [%s]!\nHãy chọn 1 lá [%s] để hóa giải hoặc bấm [CHỊU ĐÒN]:" % [caster_name, aoe_name, required_card_name]
+			var pass_btn_txt = "💥 CHỊU ĐÒN (-1 MÁU)"
+			var confirm_btn_txt = "⚔️ ĐÁNH [TRẢM] ĐỂ NÉ" if aoe_name == "Bãi Cọc Ngầm" else "🛡️ ĐÁNH [ĐỠ] ĐỂ NÉ"
+
+			var satisfied = await _prompt_custom_reaction_async(
+				prompt_title,
+				prompt_desc,
+				required_card_name,
+				pass_btn_txt,
+				confirm_btn_txt,
+				15.0
+			)
+
+			if satisfied:
+				_animate_showcase_card(required_card_name, "Bạn đánh 1 lá [%s] né [%s] thành công!" % [required_card_name, aoe_name])
+				_add_log("🛡️ Bạn đã đánh lá [%s] né [%s] thành công!" % [required_card_name, aoe_name])
+				AudioManager.play_voice(required_card_name)
+				AudioManager.play_parry()
+			else:
+				_add_log("💥 Bạn không đánh lá [%s], chịu 1 sát thương từ [%s]!" % [required_card_name, aoe_name])
+				_apply_damage_to_general(target_seat, 1, caster_seat, "NORMAL")
+			await get_tree().create_timer(0.6).timeout
+
+		# 4. Phản ứng: Bot AI
+		else:
+			await get_tree().create_timer(0.8).timeout
+			var matched_idx = -1
+			for idx in range(tgt["hand_cards"].size()):
+				var c = tgt["hand_cards"][idx]
+				var c_name = c.get("name", "").to_lower()
+				if aoe_name == "Bãi Cọc Ngầm":
+					if "trảm" in c_name:
+						matched_idx = idx
+						break
+				else:
+					if "đỡ" in c_name:
+						matched_idx = idx
+						break
+
+			if matched_idx >= 0:
+				var used_c = tgt["hand_cards"][matched_idx]
+				tgt["hand_cards"].remove_at(matched_idx)
+				tgt["hand_count"] = tgt["hand_cards"].size()
+				tgt["avatar_node"].update_hand_count(tgt["hand_count"])
+				_animate_showcase_card(required_card_name, "%s dùng [%s] né [%s]!" % [tgt["name"], required_card_name, aoe_name])
+				_add_log("🛡️ %s đã đánh 1 lá [%s] né [%s]!" % [tgt["name"], required_card_name, aoe_name])
+				AudioManager.play_voice(required_card_name)
+				AudioManager.play_parry()
+			else:
+				_add_log("💥 %s không có lá [%s], chịu 1 sát thương từ [%s]!" % [tgt["name"], required_card_name, aoe_name])
+				_apply_damage_to_general(target_seat, 1, caster_seat, "NORMAL")
+			await get_tree().create_timer(0.6).timeout
+
+# ==========================================================
+# ⚔️ THÁCH ĐẤU (DUEL): ĐỐI KHÁNG 1v1 LUÂN PHIÊN ĐÁNH TRẢM
+# ==========================================================
+func _execute_duel(caster_seat: int, target_seat: int) -> void:
+	var caster = generals_data.get(caster_seat, {})
+	var target = generals_data.get(target_seat, {})
+	var caster_name = caster.get("name", "Tướng")
+	var target_name = target.get("name", "Tướng")
+
+	_animate_showcase_card("Thách Đấu", "⚔️ THÁCH ĐẤU: %s ⚔️ %s!" % [caster_name, target_name])
+	_add_log("⚔️ <b>THÁCH ĐẤU PHÁT ĐỘNG!</b> %s thách đấu %s! Hai bên luân phiên đánh Trảm." % [caster_name, target_name])
+	AudioManager.play_voice("Thách Đấu")
+	AudioManager.play_slash()
+
+	var current_duelist = target_seat
+	var other_duelist = caster_seat
+	var duel_ended = false
+
+	while not duel_ended and not is_game_over:
+		var cur_gen = generals_data.get(current_duelist, {})
+		var oth_gen = generals_data.get(other_duelist, {})
+		if not cur_gen.get("is_alive", false) or not oth_gen.get("is_alive", false):
+			break
+
+		var played_slash = false
+
+		if cur_gen["isPlayer"]:
+			played_slash = await _prompt_custom_reaction_async(
+				"⚔️ THÁCH ĐẤU ĐỐI KHÁNG",
+				"⚠️ Đến lượt bạn đáp trả [TRẢM] trong Thách Đấu với %s!\nHãy chọn 1 lá Trảm hoặc bấm [NHẬN THUA]:" % oth_gen["name"],
+				"Trảm",
+				"❌ NHẬN THUA (-1 MÁU)",
+				"⚔️ ĐÁP TRẢ [TRẢM]",
+				15.0
+			)
+			if played_slash:
+				_animate_showcase_card("Trảm", "Bạn đáp trả 1 lá [Trảm] trong Thách Đấu!")
+				_add_log("⚔️ Bạn đáp trả 1 lá [Trảm] trong Thách Đấu!")
+				AudioManager.play_voice("Trảm")
+				AudioManager.play_slash()
+		else:
+			await get_tree().create_timer(0.9).timeout
+			var s_idx = -1
+			for idx in range(cur_gen["hand_cards"].size()):
+				if "trảm" in cur_gen["hand_cards"][idx].get("name", "").to_lower():
+					s_idx = idx
+					break
+			if s_idx >= 0:
+				var s_card = cur_gen["hand_cards"][s_idx]
+				cur_gen["hand_cards"].remove_at(s_idx)
+				cur_gen["hand_count"] = cur_gen["hand_cards"].size()
+				cur_gen["avatar_node"].update_hand_count(cur_gen["hand_count"])
+				_animate_showcase_card("Trảm", "%s đáp trả [Trảm] trong Thách Đấu!" % cur_gen["name"])
+				_add_log("⚔️ %s đáp trả 1 lá [Trảm] trong Thách Đấu!" % cur_gen["name"])
+				AudioManager.play_voice("Trảm")
+				AudioManager.play_slash()
+				played_slash = true
+			else:
+				played_slash = false
+
+		if played_slash:
+			var temp = current_duelist
+			current_duelist = other_duelist
+			other_duelist = temp
+			await get_tree().create_timer(0.5).timeout
+		else:
+			duel_ended = true
+			_add_log("💥 <b>%s</b> hết Trảm đáp trả, thất bại trong Thách Đấu và mất 1 Máu!" % cur_gen["name"])
+			_animate_showcase_card("Thất Bại Thách Đấu", "%s thất bại trong Thách Đấu!" % cur_gen["name"])
+			_apply_damage_to_general(current_duelist, 1, other_duelist, "NORMAL")
+			await get_tree().create_timer(0.6).timeout
+
+# ==========================================================
+# 🌾 MỞ KHO CỨU TẾ: CHIA ĐỀU BÀI CHO TOÀN BỘ NGƯỜI CHƠI
+# ==========================================================
+func _execute_harvest(caster_seat: int) -> void:
+	var caster = generals_data.get(caster_seat, {})
+	_animate_showcase_card("Mở Kho Cứu Tế", "Mở kho phát lương cho tất cả người chơi!")
+	_add_log("🌾 <b>%s</b> thi triển [Mở Kho Cứu Tế]! Tất cả người chơi còn sống nhận được 1 lá bài." % caster.get("name", "Người chơi"))
+	AudioManager.play_voice("Mở Kho Cứu Tế")
+	AudioManager.play_skill()
+
+	for i in range(0, 4):
+		var s = ((caster_seat - 1 + i) % 4) + 1
+		if generals_data.has(s) and generals_data[s]["is_alive"]:
+			var card = _draw_card_from_pile()
+			var g = generals_data[s]
+			if g["isPlayer"]:
+				_add_card_to_player_hand(card)
+				_add_log("🌾 Bạn nhận được [%s %d %s] từ Mở Kho Cứu Tế!" % [card.get("suit", ""), card.get("rank", 1), card.get("name", "")])
+			else:
+				g["hand_cards"].append(card)
+				g["hand_count"] = g["hand_cards"].size()
+				g["avatar_node"].update_hand_count(g["hand_count"])
+				_add_log("🌾 %s nhận 1 lá bài từ Mở Kho Cứu Tế." % g["name"])
+			await get_tree().create_timer(0.4).timeout
 
 # ==========================================================
 # ⛓️ XÍCH TÂM TỎA: CHỌN ĐA MỤC TIÊU (TỐI ĐA 2 TƯỚNG)

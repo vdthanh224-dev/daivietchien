@@ -121,6 +121,9 @@ func play_voice(card_or_skill_name: String) -> void:
 		p.play()
 		p.finished.connect(p.queue_free)
 
+func has_voice(card_or_skill_name: String) -> bool:
+	return _normalize_voice_key(card_or_skill_name) != ""
+
 func _normalize_voice_key(raw_name: String) -> String:
 	var n = raw_name.to_lower()
 	if "lôi" in n or "loi" in n: return "tram_loi"

@@ -156,11 +156,16 @@ export function createDeck80() {
   list.push(createCard("D80_CM_DJ_NguaTrang", "Ngựa Trắng Thuần Nông", "Diamond", 11, 1, 8, "Ngựa Công: Giảm -1 Khoảng cách từ bạn tới tất cả người khác", 1, -1));
 
   // ==========================================
-  // 11. CẨM NANG TỨC THỜI — 3 LÁ
+  // 11. CẨM NANG TỨC THỜI — 8 LÁ
   // ==========================================
   list.push(createCard("D80_CN_HA_DieuKe", "Diệu Kế Phá Mưu", "Heart", 1, 2, 10, "Vô hiệu hóa 1 Cẩm Nang bất kỳ HOẶC hủy 1 lá trên tay/bàn người khác"));
   list.push(createCard("D80_CN_CQ_VuonKhong", "Vườn Không Nhà Trống", "Club", 12, 2, 11, "Chọn 1 mục tiêu: ép tự bỏ 1 lá trên tay HOẶC hủy 1 trang bị"));
   list.push(createCard("D80_CN_SK_DotKich", "Đột Kích Trộm Lương", "Spade", 13, 2, 12, "Cướp 1 lá tay, trang bị hoặc Trì Hoãn của mục tiêu cự ly 1"));
+  list.push(createCard("D80_CN_H3_DungBinh", "Dụng Binh Như Thần", "Heart", 3, 2, 13, "Rút ngay 2 lá bài từ xấp bài"));
+  list.push(createCard("D80_CN_ThachDau", "Thách Đấu", "Diamond", 1, 2, 14, "Thách đấu 1 mục tiêu, hai bên luân phiên đánh Trảm, ai không đánh được chịu 1 sát thương"));
+  list.push(createCard("D80_CN_D4_MoKho", "Mở Kho Cứu Tế", "Diamond", 4, 2, 16, "Mở kho phát bài cho tất cả người chơi còn sống"));
+  list.push(createCard("D80_CN_BaiCoc", "Bãi Cọc Ngầm", "Spade", 7, 2, 17, "Ép tất cả người chơi khác phải đánh 1 Trảm hoặc chịu 1 sát thương"));
+  list.push(createCard("D80_CN_MuaTen", "Mưa Tên Liên Châu", "Heart", 1, 2, 18, "Ép tất cả người chơi khác phải đánh 1 Đỡ hoặc chịu 1 sát thương"));
 
   // ==========================================
   // 12. CẨM NANG TRÌ HOÃN — 3 LÁ
@@ -289,7 +294,7 @@ export function createDeck150() {
   list.push(createCard("D150_CM_H5_NguaTrang", "Ngựa Trắng Thuần Nông", "Heart", 5, 1, 8, "Ngựa Công: -1 Khoảng cách từ bạn tới tất cả người khác", 1, -1));
 
   // ==========================================
-  // 11. CẨM NANG TỨC THỜI — 6 LÁ (2 Diệu Kế, 2 Vườn Không, 1 Đột Kích, 1 Dụng Binh)
+  // 11. CẨM NANG TỨC THỜI — 14 LÁ
   // ==========================================
   list.push(createCard("D150_CN_HA_DieuKe", "Diệu Kế Phá Mưu", "Heart", 1, 2, 10, "Vô hiệu hóa 1 Cẩm Nang HOẶC hủy 1 lá trên tay/bàn"));
   list.push(createCard("D150_CN_SA_DieuKe", "Diệu Kế Phá Mưu", "Spade", 1, 2, 10, "Vô hiệu hóa 1 Cẩm Nang HOẶC hủy 1 lá trên tay/bàn"));
@@ -297,6 +302,14 @@ export function createDeck150() {
   list.push(createCard("D150_CN_S3_VuonKhong", "Vườn Không Nhà Trống", "Spade", 3, 2, 11, "Ép mục tiêu bỏ 1 lá trên tay HOẶC hủy 1 trang bị"));
   list.push(createCard("D150_CN_SK_DotKich", "Đột Kích Trộm Lương", "Spade", 13, 2, 12, "Cướp 1 lá tay, trang bị hoặc Trì Hoãn của mục tiêu cự ly 1"));
   list.push(createCard("D150_CN_H3_DungBinh", "Dụng Binh Như Thần", "Heart", 3, 2, 13, "Rút ngay 2 lá bài từ xấp bài"));
+  list.push(createCard("D150_CN_S7_BaiCoc", "Bãi Cọc Ngầm", "Spade", 7, 2, 17, "Ép tất cả người chơi khác phải đánh 1 Trảm hoặc chịu 1 sát thương"));
+  list.push(createCard("D150_CN_C7_BaiCoc", "Bãi Cọc Ngầm", "Club", 7, 2, 17, "Ép tất cả người chơi khác phải đánh 1 Trảm hoặc chịu 1 sát thương"));
+  list.push(createCard("D150_CN_HA_MuaTen", "Mưa Tên Liên Châu", "Heart", 1, 2, 18, "Ép tất cả người chơi khác phải đánh 1 Đỡ hoặc chịu 1 sát thương"));
+  list.push(createCard("D150_CN_DA_MuaTen", "Mưa Tên Liên Châu", "Diamond", 1, 2, 18, "Ép tất cả người chơi khác phải đánh 1 Đỡ hoặc chịu 1 sát thương"));
+  list.push(createCard("D150_CN_DA_ThachDau", "Thách Đấu", "Diamond", 1, 2, 14, "Thách đấu 1 mục tiêu, hai bên luân phiên đánh Trảm, ai không đánh được chịu 1 sát thương"));
+  list.push(createCard("D150_CN_SA_ThachDau", "Thách Đấu", "Spade", 1, 2, 14, "Thách đấu 1 mục tiêu, hai bên luân phiên đánh Trảm, ai không đánh được chịu 1 sát thương"));
+  list.push(createCard("D150_CN_H3_MoKho", "Mở Kho Cứu Tế", "Heart", 3, 2, 16, "Mở kho phát bài cho tất cả người chơi còn sống"));
+  list.push(createCard("D150_CN_D4_MoKho", "Mở Kho Cứu Tế", "Diamond", 4, 2, 16, "Mở kho phát bài cho tất cả người chơi còn sống"));
 
   // ==========================================
   // 12. CẨM NANG TRÌ HOÃN — 4 LÁ (1 Thần Sấm, 2 Cắt Lương, 1 Trầm Ảo)

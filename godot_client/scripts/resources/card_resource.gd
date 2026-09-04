@@ -20,7 +20,7 @@ enum CardSubType {
 	NGUA_CONG = 8,
 	NGUA_THU = 9,
 	DIEU_KE = 10,
-	THIEN_HA_VO_SONG = 11,
+	VUON_KHONG = 11,
 	DOT_KICH = 12,
 	DUNG_BINH = 13,
 	THACH_DAU = 14,
@@ -28,7 +28,7 @@ enum CardSubType {
 	MO_KHO_CUU_TE = 16,
 	BAI_COC_NGAM = 17,
 	MUA_TEN = 18,
-	VUON_KHONG = 19,
+	THAN_SAM = 19,
 	CAT_LUONG = 20,
 	TRAM_AO = 21
 }
@@ -66,10 +66,10 @@ func get_artwork_path() -> String:
 	elif "ngựa trắng" in n: return "res://assets/ui/cards/card_mount_ngua_trang.png"
 	elif "diệu kế" in n: return "res://assets/ui/cards/card_flawless.png"
 	elif "xích" in n or "tỏa" in n: return "res://assets/ui/cards/card_iron_chain.png"
-	elif "vạn tiễn" in n or "mưa tên" in n: return "res://assets/ui/cards/card_arrow_rain.png"
-	elif "nam man" in n: return "res://assets/ui/cards/card_barbarian.png"
-	elif "quyết đấu" in n or "thách đấu" in n: return "res://assets/ui/cards/card_duel.png"
-	elif "mở kho" in n or "ngũ cốc" in n: return "res://assets/ui/cards/card_harvest.png"
+	elif "vạn tiễn" in n or "mưa tên" in n or "mua ten" in n: return "res://assets/ui/cards/card_arrow_rain.png"
+	elif "nam man" in n or "bãi cọc" in n or "bai coc" in n: return "res://assets/ui/cards/card_barbarian.png"
+	elif "quyết đấu" in n or "thách đấu" in n or "thach dau" in n: return "res://assets/ui/cards/card_duel.png"
+	elif "mở kho" in n or "ngũ cốc" in n or "mo kho" in n: return "res://assets/ui/cards/card_harvest.png"
 	elif "súng thần công" in n: return "res://assets/ui/cards/card_weapon_no_than.png"
 	elif "thương ngâu" in n: return "res://assets/ui/cards/card_weapon_thuan_thien.png"
 	elif "vườn không" in n: return "res://assets/ui/cards/card_dismantle.png"
@@ -77,7 +77,7 @@ func get_artwork_path() -> String:
 	elif "thần sấm" in n or "sấm sét" in n: return "res://assets/ui/cards/card_lightning.png"
 	elif "dụng binh" in n or "vô trung" in n or "sinh hữu" in n: return "res://assets/ui/cards/card_ex_nihilo.png"
 	elif "trầm ảo" in n or "lạc bất" in n: return "res://assets/ui/cards/card_acedia.png"
-	elif "cắt lương" in n: return "res://assets/ui/cards/card_supply_shortage.png"
+	elif "cắt lương" in n or "cắt đường" in n or "cat luong" in n: return "res://assets/ui/cards/card_supply_shortage.png"
 
 	return ""
 
