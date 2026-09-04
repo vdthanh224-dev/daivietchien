@@ -901,38 +901,28 @@ func _show_center_card(c_name: String, source: String, c_rank: String = "A", c_s
 	for child in showcase_card_slot.get_children():
 		child.queue_free()
 
-	# 2. Khởi tạo lá bài sắc nét đầy đủ tại trung tâm bàn đấu
+	# 2. Khởi tạo lá bài với kích thước chuẩn 1:1 (118x168) tại trung tâm bàn đấu
 	var card_instance = CardUIScene.instantiate()
 	showcase_card_slot.add_child(card_instance)
 	card_instance.setup_card_data("center_" + c_name, c_name, c_rank, c_suit, c_cat, c_desc)
+	if card_instance.click_button:
+		card_instance.click_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	# 3. Đặt nội dung biển hiệu
 	showcase_label.text = "%s dùng [%s]!" % [source, c_name]
 	center_showcase.visible = true
 	center_showcase.modulate.a = 1.0
 
-	# 4. Hoạt ảnh pop-out phóng to và giữ nguyên ở trung tâm 1.8s
-	center_showcase.scale = Vector2(0.3, 0.3)
+	# 4. Giữ nguyên kích thước gốc (Vector2(1.0, 1.0)), không phóng to hay viền bao quanh
+	center_showcase.scale = Vector2(1.0, 1.0)
 	showcase_tween = create_tween()
-	showcase_tween.tween_property(center_showcase, "scale", Vector2(1.15, 1.15), 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	showcase_tween.tween_property(center_showcase, "scale", Vector2(1.0, 1.0), 0.1)
 	showcase_tween.tween_interval(1.8)
 	showcase_tween.tween_property(center_showcase, "modulate:a", 0.0, 0.3)
 	showcase_tween.tween_callback(func(): center_showcase.visible = false)
 
 func _animate_card_play_to_center(card_node: Control) -> void:
-	card_node.reparent(self)
-	card_node.z_index = 45
-	var target_center = Vector2(get_viewport_rect().size.x * 0.5 - 59, get_viewport_rect().size.y * 0.5 - 50)
-	var tw = create_tween().set_parallel(true)
-	tw.tween_property(card_node, "position", target_center, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(card_node, "scale", Vector2(1.25, 1.25), 0.25)
-	tw.tween_property(card_node, "rotation_degrees", -6.0, 0.25)
-	await get_tree().create_timer(0.45).timeout
-	var fade_tw = create_tween().set_parallel(true)
-	fade_tw.tween_property(card_node, "modulate:a", 0.0, 0.2)
-	fade_tw.tween_property(card_node, "scale", Vector2(1.4, 1.4), 0.2)
-	fade_tw.chain().tween_callback(card_node.queue_free)
+	if is_instance_valid(card_node):
+		card_node.queue_free()
 
 func _play_slash_effect(target_center: Vector2) -> void:
 	var slash_line = Line2D.new()
