@@ -130,12 +130,25 @@ func _on_end_turn_pressed() -> void:
 
 func _on_khien_may_pressed() -> void:
 	append_log("🛡️ [Khiên Mây Bện]: Đang lật phán xét...")
-	# Giả lập lật phán xét ngẫu nhiên
-	var is_red = (randi() % 2 == 0)
+	var possible_suits = ["Heart", "Diamond", "Spade", "Club"]
+	var suit = possible_suits[randi() % possible_suits.size()]
+	var is_red = (suit == "Heart" or suit == "Diamond")
+	var rank = (randi() % 13) + 1
+	var dummy_dict = {
+		"id": "judge_khien_may",
+		"name": "Khiên Mây Bện",
+		"suit": suit,
+		"rank": rank,
+		"category": 1,
+		"subType": 7,
+		"desc": "Lá bài phán xét Khiên Mây Bện"
+	}
+	var c_res = CardDatabaseClass.create_card_from_dict(dummy_dict)
+	_show_card_at_center(c_res)
 	if is_red:
-		append_log("🛡️ [Khiên Mây Bện]: [color=#10B981]<b>✔ THÀNH CÔNG (CHẤT ĐỎ)! Tự động hóa giải đòn đánh!</b>[/color]")
+		append_log("🛡️ [Khiên Mây Bện]: [color=#10B981]<b>✔ THÀNH CÔNG (CHẤT ĐỎ %s%s)! Tự động hóa giải đòn đánh!</b>[/color]" % [c_res.get_suit_symbol(), c_res.get_rank_string()])
 	else:
-		append_log("🛡️ [Khiên Mây Bện]: [color=#EF4444]<b>✖ THẤT BẠI (CHẤT ĐEN)! Vui lòng đánh Đỡ trên tay.</b>[/color]")
+		append_log("🛡️ [Khiên Mây Bện]: [color=#EF4444]<b>✖ THẤT BẠI (CHẤT ĐEN %s%s)! Vui lòng đánh Đỡ trên tay.</b>[/color]" % [c_res.get_suit_symbol(), c_res.get_rank_string()])
 
 	if NetworkClient.is_connected_to_server:
 		NetworkClient.send_respond_action(true, "KHIEN_MAY")

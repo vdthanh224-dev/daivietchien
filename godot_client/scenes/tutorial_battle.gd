@@ -244,6 +244,28 @@ func _ready() -> void:
 		img.save_png("res://tutorial_avatar_slots_screenshot.png")
 		print("[Screenshot] Đã lưu tutorial_avatar_slots_screenshot.png!")
 		get_tree().quit()
+	elif "--screenshot-khien-may-red" in OS.get_cmdline_user_args():
+		_on_close_health_spotlight()
+		player_avatar.set_equipment("armor", "Khiên Mây Bện", "♦K")
+		await get_tree().process_frame
+		_execute_khien_may_judgement(player_avatar, "Lý Thường Kiệt", "Thủ Lĩnh Sơn Tặc", {"name": "Khiên Mây Bện", "rank": "K", "suit": "Diamond"})
+		await get_tree().create_timer(0.6).timeout
+		await get_tree().process_frame
+		var img = get_viewport().get_texture().get_image()
+		img.save_png("res://tutorial_khien_may_red_screenshot.png")
+		print("[Screenshot] Đã lưu tutorial_khien_may_red_screenshot.png!")
+		get_tree().quit()
+	elif "--screenshot-khien-may-black" in OS.get_cmdline_user_args():
+		_on_close_health_spotlight()
+		player_avatar.set_equipment("armor", "Khiên Mây Bện", "♦K")
+		await get_tree().process_frame
+		_execute_khien_may_judgement(player_avatar, "Lý Thường Kiệt", "Thủ Lĩnh Sơn Tặc", {"name": "Trảm Thường", "rank": "8", "suit": "Spade"})
+		await get_tree().create_timer(0.6).timeout
+		await get_tree().process_frame
+		var img = get_viewport().get_texture().get_image()
+		img.save_png("res://tutorial_khien_may_black_screenshot.png")
+		print("[Screenshot] Đã lưu tutorial_khien_may_black_screenshot.png!")
+		get_tree().quit()
 
 func _process(delta: float) -> void:
 	if arrow_node and arrow_node.visible:
@@ -642,6 +664,19 @@ func _start_step_5_boss_turn() -> void:
 	_play_slash_effect(player_avatar.global_position + Vector2(87, 119))
 	_add_log("💥 Sơn Tặc vung đao tung chiêu [TRẢM] nhắm thẳng vào bạn!")
 
+	await get_tree().create_timer(1.2).timeout
+
+	# Nếu người chơi có Khiên Mây Bện
+	if player_avatar.has_armor() and ("Khiên Mây" in player_avatar.get_armor_name() or "Khiên" in player_avatar.get_armor_name()):
+		var success = await _execute_khien_may_judgement(player_avatar, "Lý Thường Kiệt", "Thủ Lĩnh Sơn Tặc")
+		if success:
+			_add_log("🛡️ [KHIÊN MÂY BỆN]: Hóa giải thành công đòn Trảm!")
+			banner_title.text = "🛡️ KHIÊN MÂY BỆN ĐÃ ĐỠ ĐÒN!"
+			banner_desc.text = "Lá phán xét chất Đỏ đã tự động hóa giải hoàn toàn đòn Trảm của Sơn Tặc!"
+			await get_tree().create_timer(1.6).timeout
+			_show_free_battle_unlocked_banner()
+			return
+
 	banner_title.text = "🛡️ CẢNH BÁO BỊ TẤN CÔNG!"
 	banner_desc.text = "Sơn Tặc vừa tung đòn TRẢM! Hãy chọn lá [ĐỠ] trên tay để vô hiệu hóa đòn đánh!"
 
@@ -721,19 +756,31 @@ func _execute_free_card_play() -> void:
 		slashes_used_this_turn += 1
 		AudioManager.play_voice("Trảm")
 		AudioManager.play_slash()
-		AudioManager.play_damage()
 
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
 
 		_play_slash_effect(boss_avatar.global_position + Vector2(87, 119))
+		_show_center_card(c_name, "Lý Thường Kiệt")
+		_add_log("⚔️ Bạn ra đòn [TRẢM]! Nhắm thẳng vào Thủ Lĩnh Sơn Tặc.")
+
+		await get_tree().create_timer(1.2).timeout
+
+		# Kiểm tra Khiên Mây Bện của Boss
+		if boss_avatar.has_armor() and ("Khiên Mây" in boss_avatar.get_armor_name() or "Khiên" in boss_avatar.get_armor_name()):
+			var boss_judge = await _execute_khien_may_judgement(boss_avatar, "Thủ Lĩnh Sơn Tặc", "Lý Thường Kiệt")
+			if boss_judge:
+				_add_log("🛡️ [KHIÊN MÂY BỆN]: Sơn Tặc phán xét Đỏ né thành công đòn Trảm!")
+				desc_text.text = "🛡️ Sơn Tặc kích hoạt Khiên Mây Bện phán xét Đỏ né thành công đòn Trảm!"
+				return
+
+		AudioManager.play_damage()
 		boss_avatar.play_damage_effect()
 		boss_avatar.spawn_damage_number(1)
 
 		boss_hp -= 1
 		boss_avatar.update_hp(boss_hp, 3)
-		_show_center_card(c_name, "Lý Thường Kiệt")
-		_add_log("⚔️ Bạn ra đòn [TRẢM]! Sơn Tặc mất 1 Máu (Còn %d/3)." % boss_hp)
+		_add_log("⚔️ Sơn Tặc trúng đòn mất 1 Máu (Còn %d/3)." % boss_hp)
 
 		if boss_hp <= 0:
 			await get_tree().create_timer(1.0).timeout
@@ -890,6 +937,18 @@ func _boss_turn_free_play() -> void:
 		_show_center_card("Trảm Hung Hãn", "Thủ Lĩnh Sơn Tặc", "7", "Club", 0, "Tấn công gây 1 sát thương.")
 		_play_slash_effect(player_avatar.global_position + Vector2(87, 119))
 		_add_log("💥 Sơn Tặc vung đao tung chiêu [TRẢM] nhắm thẳng vào bạn!")
+
+		await get_tree().create_timer(1.2).timeout
+
+		# Kiểm tra Khiên Mây Bện của Người chơi
+		if player_avatar.has_armor() and ("Khiên Mây" in player_avatar.get_armor_name() or "Khiên" in player_avatar.get_armor_name()):
+			var success = await _execute_khien_may_judgement(player_avatar, "Lý Thường Kiệt", "Thủ Lĩnh Sơn Tặc")
+			if success:
+				_add_log("🛡️ [KHIÊN MÂY BỆN]: Đã tự động ĐỠ thành công đòn Trảm!")
+				desc_text.text = "🛡️ Khiên Mây Bện phán xét Đỏ né thành công đòn Trảm của Sơn Tặc!"
+				await get_tree().create_timer(1.2).timeout
+				_player_turn_start_free_play()
+				return
 
 		_prompt_player_dodge_reaction()
 
@@ -1133,6 +1192,172 @@ func _show_center_card(c_name: String, source: String, c_rank: String = "A", c_s
 	showcase_tween.tween_interval(1.8)
 	showcase_tween.tween_property(center_showcase, "modulate:a", 0.0, 0.3)
 	showcase_tween.tween_callback(func(): center_showcase.visible = false)
+
+func _execute_khien_may_judgement(defender_avatar: Control, defender_name: String, attacker_name: String, forced_card: Dictionary = {}) -> bool:
+	if showcase_tween and showcase_tween.is_valid():
+		showcase_tween.kill()
+
+	# 1. Âm thanh kỹ năng & Voice "Khiên Mây Bện"
+	AudioManager.play_voice("Khiên Mây Bện")
+	AudioManager.play_skill()
+	_add_log("🛡️ %s kích hoạt [KHIÊN MÂY BỆN]: Đang lật phán xét né đòn Trảm của %s..." % [defender_name, attacker_name])
+	desc_text.text = "🛡️ %s kích hoạt [KHIÊN MÂY BỆN]: Đang lật phán xét..." % defender_name
+
+	# 2. Rút 1 lá phán xét từ bộ bài
+	deck_count = max(0, deck_count - 1)
+	deck_label.text = "🎴 %d" % deck_count
+	AudioManager.play_card_draw()
+
+	await get_tree().create_timer(0.4).timeout
+
+	# 3. Xác định lá bài phán xét (có thể truyền forced_card để test)
+	var judge_card: Dictionary
+	if not forced_card.is_empty():
+		judge_card = forced_card
+	else:
+		# Lấy ngẫu nhiên lá bài từ kho bài
+		var possible_suits = ["Heart", "Diamond", "Spade", "Club"]
+		var possible_ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
+		var possible_names = ["Trảm Thường", "Đỡ", "Bánh Chưng", "Khiên Mây Bện", "Kiếm Thuận Thiên", "Voi Chiến", "Ngựa Trắng"]
+		var s = possible_suits[randi() % possible_suits.size()]
+		var r = possible_ranks[randi() % possible_ranks.size()]
+		var n = possible_names[randi() % possible_names.size()]
+		judge_card = {"name": n, "rank": r, "suit": s, "cat": 0, "desc": "Lá bài phán xét lật từ kho bài."}
+
+	var suit_str = judge_card.get("suit", "Heart")
+	var rank_str = str(judge_card.get("rank", "7"))
+	var card_name = judge_card.get("name", "Trảm Thường")
+	var is_red = (suit_str.to_lower() == "heart" or suit_str.to_lower() == "diamond" or suit_str.to_lower() == "co" or suit_str.to_lower() == "ro")
+	var suit_sym = "♥" if suit_str.to_lower() == "heart" else ("♦" if suit_str.to_lower() == "diamond" else ("♠" if suit_str.to_lower() == "spade" else "♣"))
+
+	# 4. Hiển thị lá bài phán xét ở trung tâm
+	for child in showcase_card_slot.get_children():
+		child.queue_free()
+
+	var card_instance = CardUIScene.instantiate()
+	showcase_card_slot.add_child(card_instance)
+	card_instance.setup_card_data("judge_" + card_name, card_name, rank_str, suit_str, 0, "Phán xét Khiên Mây Bện")
+	if card_instance.click_button:
+		card_instance.click_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# 4.1. Tiêu đề phán xét phía trên lá bài
+	var title_panel = PanelContainer.new()
+	title_panel.name = "JudgementTitlePanel"
+	var title_style = StyleBoxFlat.new()
+	title_style.bg_color = Color(0.04, 0.07, 0.14, 0.95)
+	title_style.border_color = Color(1.0, 0.85, 0.3, 1.0)
+	title_style.set_border_width_all(2)
+	title_style.set_corner_radius_all(6)
+	title_style.content_margin_left = 12
+	title_style.content_margin_right = 12
+	title_style.content_margin_top = 4
+	title_style.content_margin_bottom = 4
+	title_panel.add_theme_stylebox_override("panel", title_style)
+	title_panel.position = Vector2(-61, -38)
+	title_panel.size = Vector2(240, 28)
+
+	var title_lbl = Label.new()
+	title_lbl.text = "🛡️ PHÁN XÉT KHIÊN MÂY BỆN"
+	title_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.35, 1.0))
+	title_lbl.add_theme_font_size_override("font_size", 12)
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title_panel.add_child(title_lbl)
+	card_instance.add_child(title_panel)
+
+	# 4.2. Huy hiệu TICK / X ở giữa lá bài
+	var badge_panel = Control.new()
+	badge_panel.name = "JudgementBadgePanel"
+	var badge_bg = Panel.new()
+	var badge_style = StyleBoxFlat.new()
+	badge_style.bg_color = Color(0.04, 0.06, 0.12, 0.88)
+	badge_style.border_color = Color(0.2, 1.0, 0.35, 1.0) if is_red else Color(1.0, 0.25, 0.25, 1.0)
+	badge_style.set_border_width_all(3)
+	badge_style.set_corner_radius_all(38)
+	badge_bg.add_theme_stylebox_override("panel", badge_style)
+	badge_bg.size = Vector2(76, 76)
+	badge_panel.add_child(badge_bg)
+
+	badge_panel.custom_minimum_size = Vector2(76, 76)
+	badge_panel.position = Vector2(21, 46)
+	badge_panel.size = Vector2(76, 76)
+
+	if is_red:
+		# Vẽ dấu TICK ✔ chuẩn xác bằng Line2D màu xanh neon rực rỡ
+		var tick_line = Line2D.new()
+		tick_line.width = 7.0
+		tick_line.default_color = Color(0.2, 1.0, 0.35, 1.0)
+		tick_line.joint_mode = Line2D.LINE_JOINT_ROUND
+		tick_line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+		tick_line.end_cap_mode = Line2D.LINE_CAP_ROUND
+		tick_line.antialiased = true
+		tick_line.points = PackedVector2Array([
+			Vector2(20, 39),
+			Vector2(33, 53),
+			Vector2(58, 23)
+		])
+		badge_panel.add_child(tick_line)
+	else:
+		# Vẽ dấu X ✖ bằng 2 Line2D màu đỏ tươi
+		var x_line1 = Line2D.new()
+		x_line1.width = 7.0
+		x_line1.default_color = Color(1.0, 0.25, 0.25, 1.0)
+		x_line1.begin_cap_mode = Line2D.LINE_CAP_ROUND
+		x_line1.end_cap_mode = Line2D.LINE_CAP_ROUND
+		x_line1.antialiased = true
+		x_line1.points = PackedVector2Array([Vector2(24, 24), Vector2(52, 52)])
+
+		var x_line2 = Line2D.new()
+		x_line2.width = 7.0
+		x_line2.default_color = Color(1.0, 0.25, 0.25, 1.0)
+		x_line2.begin_cap_mode = Line2D.LINE_CAP_ROUND
+		x_line2.end_cap_mode = Line2D.LINE_CAP_ROUND
+		x_line2.antialiased = true
+		x_line2.points = PackedVector2Array([Vector2(52, 24), Vector2(24, 52)])
+
+		badge_panel.add_child(x_line1)
+		badge_panel.add_child(x_line2)
+
+	card_instance.add_child(badge_panel)
+
+	# 4.3. Biển hiệu kết quả phía dưới lá bài
+	if is_red:
+		showcase_label.text = "✔ PHÁN XÉT THÀNH CÔNG (%s%s) ➜ TỰ ĐỘNG ĐỠ!" % [suit_sym, rank_str]
+		showcase_label.add_theme_color_override("font_color", Color(0.35, 1.0, 0.45, 1.0))
+	else:
+		showcase_label.text = "✖ PHÁN XÉT THẤT BẠI (%s%s) ➜ CẦN DÙNG ĐỠ!" % [suit_sym, rank_str]
+		showcase_label.add_theme_color_override("font_color", Color(1.0, 0.45, 0.45, 1.0))
+
+	# 4.4. Hiệu ứng Scale Pop phóng to nhẹ nhàng (1.15x)
+	center_showcase.visible = true
+	center_showcase.modulate.a = 1.0
+	center_showcase.scale = Vector2(0.7, 0.7)
+	var tw = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(center_showcase, "scale", Vector2(1.15, 1.15), 0.25)
+
+	# 5. Phát âm thanh kết quả & Ghi Log
+	if is_red:
+		AudioManager.play_parry()
+		_add_log("🛡️ [KHIÊN MÂY BỆN - THÀNH CÔNG ✔]: Lá phán xét là chất ĐỎ [%s %s]. %s tự động ĐỠ thành công!" % [suit_sym, rank_str, defender_name])
+		desc_text.text = "🛡️ ✔ Phán xét thành công (Chất Đỏ %s%s)! %s tự động hóa giải đòn Trảm!" % [suit_sym, rank_str, defender_name]
+	else:
+		AudioManager.play_damage()
+		_add_log("🛡️ [Khiên Mây Bện - Thất Bại ✖]: Lá phán xét là chất ĐEN [%s %s]. Phán xét thất bại, tiếp tục phòng thủ." % [suit_sym, rank_str])
+		desc_text.text = "🛡️ ✖ Phán xét thất bại (Chất Đen %s%s)! %s cần dùng Đỡ trên tay để né đòn." % [suit_sym, rank_str, defender_name]
+
+	# Chờ người chơi chiêm ngưỡng kết quả phán xét
+	await get_tree().create_timer(2.0).timeout
+
+	# Thu nhỏ & ẩn showcase
+	var close_tw = create_tween()
+	close_tw.tween_property(center_showcase, "modulate:a", 0.0, 0.3)
+	close_tw.parallel().tween_property(center_showcase, "scale", Vector2(0.9, 0.9), 0.3)
+	await close_tw.finished
+	center_showcase.visible = false
+	center_showcase.scale = Vector2(1.0, 1.0)
+	center_showcase.modulate.a = 1.0
+
+	return is_red
 
 func _animate_card_play_to_center(card_node: Control) -> void:
 	if is_instance_valid(card_node):
