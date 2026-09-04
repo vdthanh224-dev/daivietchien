@@ -50,6 +50,8 @@ var turn_timer_label: Label = null
 var is_chained: bool = false
 var chain_badge: PanelContainer = null
 var lightning_badge: PanelContainer = null
+var delayed_tricks_container: HBoxContainer = null
+var active_delayed_tricks: Dictionary = {}
 
 func _ready() -> void:
 	if click_btn:
@@ -229,69 +231,102 @@ func set_chained(chained: bool) -> void:
 		if chain_badge:
 			chain_badge.visible = false
 
+func _update_delayed_tricks_position() -> void:
+	if delayed_tricks_container:
+		delayed_tricks_container.reset_size()
+		var cont_w = max(92.0, delayed_tricks_container.size.x)
+		delayed_tricks_container.position = Vector2((size.x - cont_w) * 0.5, -56.0)
+
 func set_delayed_trick(trick_type: String, active: bool) -> void:
-	if trick_type == "lightning":
-		if active:
-			if not lightning_badge:
-				lightning_badge = PanelContainer.new()
-				lightning_badge.custom_minimum_size = Vector2(96, 22)
-				lightning_badge.mouse_filter = MOUSE_FILTER_IGNORE
-				lightning_badge.z_index = 21
-				var style = StyleBoxFlat.new()
-				style.bg_color = Color(0.12, 0.15, 0.35, 0.95)
-				style.border_width_left = 1
-				style.border_width_top = 1
-				style.border_width_right = 1
-				style.border_width_bottom = 1
+	if not delayed_tricks_container:
+		delayed_tricks_container = HBoxContainer.new()
+		delayed_tricks_container.name = "DelayedTricksContainer"
+		delayed_tricks_container.alignment = BoxContainer.ALIGNMENT_CENTER
+		delayed_tricks_container.add_theme_constant_override("separation", 4)
+		delayed_tricks_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		delayed_tricks_container.z_index = 25
+		add_child(delayed_tricks_container)
+
+	if active:
+		if not active_delayed_tricks.has(trick_type):
+			var badge = PanelContainer.new()
+			badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			var style = StyleBoxFlat.new()
+			style.corner_radius_top_left = 6
+			style.corner_radius_top_right = 6
+			style.corner_radius_bottom_right = 6
+			style.corner_radius_bottom_left = 6
+			style.border_width_left = 1
+			style.border_width_top = 1
+			style.border_width_right = 1
+			style.border_width_bottom = 1
+			style.shadow_size = 4
+
+			var lbl = Label.new()
+			lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			lbl.add_theme_font_size_override("font_size", 9)
+
+			if trick_type == "lightning":
+				badge.custom_minimum_size = Vector2(92, 22)
+				style.bg_color = Color(0.12, 0.15, 0.38, 0.95)
 				style.border_color = Color(0.4, 0.8, 1.0, 1.0)
-				style.corner_radius_top_left = 6
-				style.corner_radius_top_right = 6
-				style.corner_radius_bottom_right = 6
-				style.corner_radius_bottom_left = 6
 				style.shadow_color = Color(0.2, 0.6, 1.0, 0.6)
-				style.shadow_size = 5
-				lightning_badge.add_theme_stylebox_override("panel", style)
-
-				var lbl = Label.new()
 				lbl.text = "⚡ THẦN SẤM"
-				lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-				lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-				lbl.add_theme_font_size_override("font_size", 9)
 				lbl.add_theme_color_override("font_color", Color(1.0, 0.95, 0.4, 1.0))
-				lightning_badge.add_child(lbl)
-				add_child(lightning_badge)
+			elif trick_type == "cat_luong":
+				badge.custom_minimum_size = Vector2(92, 22)
+				style.bg_color = Color(0.28, 0.18, 0.08, 0.95)
+				style.border_color = Color(0.95, 0.75, 0.2, 1.0)
+				style.shadow_color = Color(0.8, 0.5, 0.1, 0.6)
+				lbl.text = "🌾 CẮT LƯƠNG"
+				lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3, 1.0))
+			elif trick_type == "tram_ao":
+				badge.custom_minimum_size = Vector2(92, 22)
+				style.bg_color = Color(0.28, 0.08, 0.18, 0.95)
+				style.border_color = Color(0.95, 0.3, 0.5, 1.0)
+				style.shadow_color = Color(0.8, 0.2, 0.4, 0.6)
+				lbl.text = "🕸️ TRẦM ẢO"
+				lbl.add_theme_color_override("font_color", Color(1.0, 0.6, 0.7, 1.0))
 
-			lightning_badge.position = Vector2((size.x - 96) * 0.5, size.y * 0.54)
-			lightning_badge.visible = true
-		else:
-			if lightning_badge:
-				lightning_badge.visible = false
+			badge.add_theme_stylebox_override("panel", style)
+			badge.add_child(lbl)
+			delayed_tricks_container.add_child(badge)
+			active_delayed_tricks[trick_type] = badge
+	else:
+		if active_delayed_tricks.has(trick_type):
+			var badge = active_delayed_tricks[trick_type]
+			if is_instance_valid(badge):
+				badge.queue_free()
+			active_delayed_tricks.erase(trick_type)
+
+	_update_delayed_tricks_position()
 
 func _init_equipment_slots() -> void:
 	if is_instance_valid(weapon_slot):
 		weapon_slot.visible = true
 		if is_instance_valid(weapon_label):
-			weapon_label.text = "🗡️ (Trống)"
+			weapon_label.text = ""
 			weapon_label.modulate.a = 0.45
 	if is_instance_valid(armor_slot):
 		armor_slot.visible = true
 		if is_instance_valid(armor_label):
-			armor_label.text = "🛡️ (Trống)"
+			armor_label.text = ""
 			armor_label.modulate.a = 0.45
 	if is_instance_valid(defensive_mount_slot):
 		defensive_mount_slot.visible = true
 		if is_instance_valid(defensive_mount_label):
-			defensive_mount_label.text = "🐘 (+1) Trống"
+			defensive_mount_label.text = ""
 			defensive_mount_label.modulate.a = 0.45
 	if is_instance_valid(offensive_mount_slot):
 		offensive_mount_slot.visible = true
 		if is_instance_valid(offensive_mount_label):
-			offensive_mount_label.text = "🐎 (-1) Trống"
+			offensive_mount_label.text = ""
 			offensive_mount_label.modulate.a = 0.45
 	if is_instance_valid(treasure_slot):
 		treasure_slot.visible = true
 		if is_instance_valid(treasure_label):
-			treasure_label.text = "👑 (Trống)"
+			treasure_label.text = ""
 			treasure_label.modulate.a = 0.45
 
 func _on_avatar_clicked() -> void:
@@ -330,7 +365,7 @@ func set_equipment(slot_type: String, item_name: String, suit_rank: String = "")
 						weapon_label.text = _format_equip_str("🗡️", suit_rank, item_name)
 						weapon_label.modulate.a = 1.0
 					else:
-						weapon_label.text = "🗡️ (Trống)"
+						weapon_label.text = ""
 						weapon_label.modulate.a = 0.45
 		"armor", "giap":
 			key = "armor"
@@ -341,7 +376,7 @@ func set_equipment(slot_type: String, item_name: String, suit_rank: String = "")
 						armor_label.text = _format_equip_str("🛡️", suit_rank, item_name)
 						armor_label.modulate.a = 1.0
 					else:
-						armor_label.text = "🛡️ (Trống)"
+						armor_label.text = ""
 						armor_label.modulate.a = 0.45
 		"defensive_mount", "mount_defense", "ngua_thu", "mount":
 			key = "defensive_mount"
@@ -352,7 +387,7 @@ func set_equipment(slot_type: String, item_name: String, suit_rank: String = "")
 						defensive_mount_label.text = _format_equip_str("🐘 (+1)", suit_rank, item_name)
 						defensive_mount_label.modulate.a = 1.0
 					else:
-						defensive_mount_label.text = "🐘 (+1) Trống"
+						defensive_mount_label.text = ""
 						defensive_mount_label.modulate.a = 0.45
 		"offensive_mount", "mount_offense", "ngua_cong":
 			key = "offensive_mount"
@@ -363,7 +398,7 @@ func set_equipment(slot_type: String, item_name: String, suit_rank: String = "")
 						offensive_mount_label.text = _format_equip_str("🐎 (-1)", suit_rank, item_name)
 						offensive_mount_label.modulate.a = 1.0
 					else:
-						offensive_mount_label.text = "🐎 (-1) Trống"
+						offensive_mount_label.text = ""
 						offensive_mount_label.modulate.a = 0.45
 		"treasure", "bao_vat":
 			key = "treasure"
@@ -374,7 +409,7 @@ func set_equipment(slot_type: String, item_name: String, suit_rank: String = "")
 						treasure_label.text = _format_equip_str("👑", suit_rank, item_name)
 						treasure_label.modulate.a = 1.0
 					else:
-						treasure_label.text = "👑 (Trống)"
+						treasure_label.text = ""
 						treasure_label.modulate.a = 0.45
 
 	if key != "":

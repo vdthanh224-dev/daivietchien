@@ -151,19 +151,25 @@ func _ready() -> void:
 	card_play_btn.visible = false
 	end_turn_btn.visible = false
 
+	_start_ambient_effects()
+	_init_deck()
+	_init_generals_from_draft()
+	_deal_initial_hands()
+
 	# Kết nối WebSocket Realtime Local Server
 	if NetworkClient:
 		if not NetworkClient.action_received.is_connected(_on_network_action_received):
 			NetworkClient.action_received.connect(_on_network_action_received)
 		if not NetworkClient.connection_established.is_connected(_on_network_connected):
 			NetworkClient.connection_established.connect(_on_network_connected)
+		if not NetworkClient.player_joined.is_connected(_on_network_player_joined):
+			NetworkClient.player_joined.connect(_on_network_player_joined)
+		if not NetworkClient.game_state_updated.is_connected(_on_network_game_state_updated):
+			NetworkClient.game_state_updated.connect(_on_network_game_state_updated)
+		if not NetworkClient.error_received.is_connected(_on_network_error_received):
+			NetworkClient.error_received.connect(_on_network_error_received)
 		if NetworkClient.is_connected_to_server:
 			_on_network_connected()
-
-	_start_ambient_effects()
-	_init_deck()
-	_init_generals_from_draft()
-	_deal_initial_hands()
 
 	_add_log("⚔️ Đấu Trường Đại Việt 2v2: Phe Rồng ([1], [3]) vs Phe Phượng ([2], [4])!")
 	_add_log("📜 Thứ tự ra bài: Ghế 1 ➔ Ghế 2 ➔ Ghế 3 ➔ Ghế 4.")
@@ -384,15 +390,29 @@ func _init_generals_from_draft() -> void:
 	var draft = []
 	if AppwriteMatchmaking and not AppwriteMatchmaking.draft_slots.is_empty():
 		draft = AppwriteMatchmaking.draft_slots
-	elif AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary and AppwriteMatchmaking.current_room.get("draft_slots", []).size() == 4:
-		draft = AppwriteMatchmaking.current_room["draft_slots"]
+	elif AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary:
+		if AppwriteMatchmaking.current_room.get("draft_slots", []).size() == 4:
+			draft = AppwriteMatchmaking.current_room["draft_slots"]
+		elif AppwriteMatchmaking.current_room.get("slots", []).size() == 4:
+			draft = AppwriteMatchmaking.current_room["slots"]
 
 	# Xác định ghế của người chơi tại máy
 	my_seat = 1
+	var found_player_seat = false
 	for slot in draft:
-		if slot.get("isPlayer", false) or (AuthManager and slot.get("userId", "") == AuthManager.current_user_id and AuthManager.current_user_id != ""):
+		var slot_uid = slot.get("userId", "")
+		var is_slot_p = slot.get("isPlayer", false)
+		if is_slot_p:
 			my_seat = slot.get("seatNumber", 1)
+			found_player_seat = true
 			break
+		elif AuthManager and AuthManager.current_user_id != "" and slot_uid == AuthManager.current_user_id:
+			my_seat = slot.get("seatNumber", 1)
+			found_player_seat = true
+			break
+
+	if not found_player_seat and NetworkClient and NetworkClient.my_seat > 0:
+		my_seat = NetworkClient.my_seat
 
 	my_team_is_dragon = (my_seat == 1 or my_seat == 3)
 
@@ -428,11 +448,20 @@ func _init_generals_from_draft() -> void:
 		var slot_data = {}
 		if i < draft.size():
 			slot_data = draft[i]
-		
+
 		var is_p = (s_num == my_seat)
 		var is_drag = (s_num == 1 or s_num == 3)
-		var is_ai = slot_data.get("isAI", not is_p)
-		
+		var slot_uid = slot_data.get("userId", "")
+		var is_ai = false
+		if is_p:
+			is_ai = false
+		elif slot_data.has("isAI"):
+			is_ai = bool(slot_data["isAI"])
+		elif slot_uid != "" and not slot_uid.begins_with("bot_") and slot_uid != "empty":
+			is_ai = false
+		else:
+			is_ai = bool(slot_data.get("isAI", not is_p))
+
 		var hero_info = slot_data.get("chosenHero", {})
 		if hero_info.is_empty():
 			hero_info = default_heroes[i]
@@ -517,6 +546,8 @@ func _init_generals_from_draft() -> void:
 			"equipped_def_horse": "",
 			"is_chained": false,
 			"has_lightning": false,
+			"has_cat_luong": false,
+			"has_tram_ao": false,
 			"ao_bao_charges": 0
 		}
 
@@ -958,6 +989,14 @@ func _on_card_play_btn_clicked() -> void:
 			desc_text.text = "⚠️ Vui lòng nhấp chọn 1 Tướng đối thủ để dán [Cẩm Nang Trì Hoãn]!"
 			return
 		var tgt = generals_data[selected_target_seat]
+		if c_name == "Cắt Đường Lương":
+			tgt["has_cat_luong"] = true
+			if tgt.has("avatar_node") and is_instance_valid(tgt["avatar_node"]):
+				tgt["avatar_node"].set_delayed_trick("supply_shortage", true)
+		else:
+			tgt["has_tram_ao"] = true
+			if tgt.has("avatar_node") and is_instance_valid(tgt["avatar_node"]):
+				tgt["avatar_node"].set_delayed_trick("acedia", true)
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
@@ -1027,24 +1066,55 @@ func _on_card_play_btn_clicked() -> void:
 		_animate_showcase_card(c_name, "Bạn đã dùng [%s]!" % c_name)
 		_add_log("🎴 Bạn đã dùng [%s]." % c_name)
 
-func _broadcast_player_battle_action(act_type: String, card_id: String, target_seat: int = 0) -> void:
+func _broadcast_player_battle_action(act_type: String, card_id: String, target_seat: int = 0, caster_seat: int = 0) -> void:
+	var c_seat = caster_seat if caster_seat > 0 else my_seat
 	if NetworkClient and NetworkClient.is_connected_to_server:
 		if act_type == "PLAY_CARD":
-			NetworkClient.send_play_card(card_id, target_seat)
+			NetworkClient.send_play_card_for_seat(c_seat, card_id, target_seat)
 		elif act_type == "END_TURN":
-			NetworkClient.send_end_turn()
+			NetworkClient.send_end_turn_for_seat(c_seat)
 
 	if AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary:
 		var r_id = AppwriteMatchmaking.current_room.get("roomId", "")
 		if not r_id.is_empty():
 			AppwriteMatchmaking.send_battle_action({
 				"roomId": r_id,
-				"casterSeat": my_seat,
+				"casterSeat": c_seat,
 				"targetSeat": target_seat,
 				"actionType": act_type,
 				"cardId": card_id,
 				"senderUserId": AuthManager.current_user_id if AuthManager else ""
 			})
+
+func _build_initial_server_players() -> Array:
+	var players = []
+	for seat in [1, 2, 3, 4]:
+		if not generals_data.has(seat):
+			continue
+		var g = generals_data[seat]
+		var h_info = g.get("hero_data", {})
+		var h_id = str(h_info.get("id", seat))
+		var is_p = (seat == my_seat)
+		var is_ai = g.get("isAI", not is_p)
+		var u_id = ""
+		if AppwriteMatchmaking and AppwriteMatchmaking.draft_slots.size() >= seat:
+			u_id = AppwriteMatchmaking.draft_slots[seat - 1].get("userId", "")
+		elif AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary and AppwriteMatchmaking.current_room.get("slots", []).size() >= seat:
+			u_id = AppwriteMatchmaking.current_room["slots"][seat - 1].get("userId", "")
+		if u_id.is_empty():
+			u_id = ("user_%d" % seat) if not is_ai else ("bot_%d" % seat)
+
+		players.append({
+			"seat": seat,
+			"userId": u_id,
+			"heroId": h_id,
+			"generalName": g.get("name", "Tướng %d" % seat),
+			"maxHp": g.get("max_hp", 4),
+			"hp": g.get("hp", 4),
+			"isAlly": (seat == 1 or seat == 3),
+			"isAI": is_ai
+		})
+	return players
 
 func _on_network_connected() -> void:
 	if not NetworkClient:
@@ -1054,8 +1124,40 @@ func _on_network_connected() -> void:
 		var appwrite_r_id = AppwriteMatchmaking.current_room.get("roomId", "")
 		if not appwrite_r_id.is_empty():
 			r_id = appwrite_r_id
-	NetworkClient.send_join_room(r_id, my_seat)
+	var initial_players = _build_initial_server_players()
+	NetworkClient.send_join_room(r_id, my_seat, initial_players)
 	_add_log("🌐 [ĐỒNG BỘ MẠNG] Đã kết nối Local Server (Cổng 8080)! Phòng: %s, Ghế: %d" % [r_id, my_seat])
+
+func _on_network_player_joined(joined_seat: int, active_seats: Array) -> void:
+	for s in active_seats:
+		var s_num = int(s)
+		if generals_data.has(s_num) and s_num != my_seat:
+			if generals_data[s_num].get("isAI", false):
+				generals_data[s_num]["isAI"] = false
+				_add_log("👤 [KẾT NỐI MẠNG] Người chơi thật đã nhận Ghế %d! Chuyển quyền điều khiển cho người thật." % s_num)
+	if joined_seat > 0 and joined_seat != my_seat:
+		_add_log("👋 Tướng Ghế %d đã tham gia phòng qua Local Server!" % joined_seat)
+
+func _on_network_error_received(err_msg: String) -> void:
+	_add_log("⚠️ [MẠNG SERVER] %s" % err_msg)
+
+func _on_network_game_state_updated(state: Dictionary) -> void:
+	if state.is_empty():
+		return
+	var players = state.get("players", [])
+	for p in players:
+		var seat = int(p.get("seat", 0))
+		if generals_data.has(seat):
+			var g = generals_data[seat]
+			var server_hp = int(p.get("hp", g["hp"]))
+			var server_max_hp = int(p.get("maxHp", g["max_hp"]))
+			if server_hp != g["hp"]:
+				g["hp"] = server_hp
+				g["avatar_node"].update_hp(g["hp"], server_max_hp)
+			var is_chained = bool(p.get("isChained", false))
+			if is_chained != g.get("is_chained", false):
+				g["is_chained"] = is_chained
+				g["avatar_node"].set_chained(is_chained)
 
 func _on_network_action_received(delta: Dictionary) -> void:
 	if delta.is_empty():
@@ -1446,11 +1548,15 @@ func _apply_damage_to_general(target_seat: int, amount: int, attacker_seat: int 
 	var is_elemental = (damage_element == "FIRE" or damage_element == "LIGHTNING")
 	if is_elemental and tgt.get("is_chained", false) and amount > 0:
 		tgt["is_chained"] = false
+		if tgt.has("avatar_node") and is_instance_valid(tgt["avatar_node"]):
+			tgt["avatar_node"].set_chained(false)
 		for other_seat in [1, 2, 3, 4]:
 			if other_seat != target_seat and generals_data.has(other_seat):
 				var other = generals_data[other_seat]
 				if other["is_alive"] and other.get("is_chained", false):
 					other["is_chained"] = false
+					if other.has("avatar_node") and is_instance_valid(other["avatar_node"]):
+						other["avatar_node"].set_chained(false)
 					_add_log("⛓️⚡ [XÍCH LIÊN HOÀN]: Sát thương %s (%d điểm) lan truyền sang %s và gỡ xích!" % ["Hỏa" if damage_element == "FIRE" else "Lôi", amount, other["name"]])
 					_apply_damage_to_general(other_seat, amount, -1, "NORMAL")
 
@@ -1620,6 +1726,15 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 func _on_return_home_clicked() -> void:
 	get_tree().change_scene_to_file("res://scenes/home.tscn")
 
+func _is_ai_controller() -> bool:
+	var lowest_human_seat = 99
+	for s in [1, 2, 3, 4]:
+		if generals_data.has(s):
+			var g = generals_data[s]
+			if g.get("is_alive", false) and not g.get("isAI", false) and s < lowest_human_seat:
+				lowest_human_seat = s
+	return (my_seat == lowest_human_seat)
+
 func _start_turn(seat_num: int) -> void:
 	if is_game_over:
 		return
@@ -1643,22 +1758,49 @@ func _start_turn(seat_num: int) -> void:
 			generals_data[s]["avatar_node"].set_turn_active(is_active)
 			generals_data[s]["avatar_node"].update_turn_timer(40)
 
-	# GIAI ĐOẠN PHÁN XÉT (JUDGEMENT PHASE): Kiểm tra Thần Sấm Báo Ứng
+	# GIAI ĐOẠN PHÁN XÉT (JUDGEMENT PHASE)
+	# 1. Thần Sấm Báo Ứng
 	if g.get("has_lightning", false):
 		await _handle_lightning_judgement(seat_num)
 		if not g["is_alive"] or is_game_over:
 			_next_turn()
 			return
 
-	# Draw 2 cards phase
-	for k in range(2):
-		var card_info = _draw_card_from_pile()
-		if g["isPlayer"]:
-			_add_card_to_player_hand(card_info)
-		else:
-			g["hand_cards"].append(card_info)
-			g["hand_count"] = g["hand_cards"].size()
-	g["avatar_node"].update_hand_count(g["hand_count"])
+	# 2. Cắt Đường Lương (Supply Shortage)
+	var skip_draw_phase = false
+	if g.get("has_cat_luong", false):
+		skip_draw_phase = await _handle_supply_shortage_judgement(seat_num)
+		if not g["is_alive"] or is_game_over:
+			_next_turn()
+			return
+
+	# 3. Trầm Ảo Sa Bẫy (Acedia)
+	var skip_play_phase = false
+	if g.get("has_tram_ao", false):
+		skip_play_phase = await _handle_acedia_judgement(seat_num)
+		if not g["is_alive"] or is_game_over:
+			_next_turn()
+			return
+
+	# Draw Phase
+	if not skip_draw_phase:
+		for k in range(2):
+			var card_info = _draw_card_from_pile()
+			if g["isPlayer"]:
+				_add_card_to_player_hand(card_info)
+			else:
+				g["hand_cards"].append(card_info)
+				g["hand_count"] = g["hand_cards"].size()
+		g["avatar_node"].update_hand_count(g["hand_count"])
+	else:
+		_add_log("🌾 [CẮT ĐƯỜNG LƯƠNG] %s bị tước quyền rút 2 lá bài lượt này!" % g["name"])
+
+	# Play Phase
+	if skip_play_phase:
+		_add_log("🕸️ [TRẦM ẢO SA BẪY] %s bị phong ấn, mất lượt ra bài!" % g["name"])
+		await get_tree().create_timer(1.2).timeout
+		_next_turn()
+		return
 
 	# PHÂN LUỒNG: NGƯỜI THẬT CỤC BỘ vs NGƯỜI THẬT TỪ XA vs BOT AI
 	if g["isPlayer"]:
@@ -1678,13 +1820,18 @@ func _start_turn(seat_num: int) -> void:
 		desc_text.text = "⏳ Đang đợi người chơi %s suy nghĩ và ra đòn..." % g["name"]
 		_execute_remote_player_turn(seat_num)
 	else:
-		# 3. Bot máy (AI): Tự động tính toán xuất bài
+		# 3. Bot máy (AI): Chỉ Client là AI Controller (chủ phòng / lowest human seat) mới tính toán và phát sóng
 		is_player_turn = false
 		end_turn_btn.visible = false
 		card_play_btn.visible = false
-		turn_indicator.text = "🤖 Lượt của %s (Máy)..." % g["name"]
-		desc_text.text = "🤖 Máy %s đang tính toán nước đi..." % g["name"]
-		_execute_ai_turn(seat_num)
+		if _is_ai_controller():
+			turn_indicator.text = "🤖 Lượt của %s (Máy)..." % g["name"]
+			desc_text.text = "🤖 Máy %s đang tính toán nước đi..." % g["name"]
+			_execute_ai_turn(seat_num)
+		else:
+			turn_indicator.text = "⏳ LƯỢT %s (MÁY) - CHỜ ĐIỀU PHỐI..." % g["name"]
+			desc_text.text = "⏳ Đang đồng bộ lượt máy của %s từ chủ phòng..." % g["name"]
+			_execute_remote_player_turn(seat_num)
 
 func _execute_remote_player_turn(remote_seat: int) -> void:
 	var g = generals_data[remote_seat]
@@ -1796,6 +1943,26 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 				tgt_x["avatar_node"].set_chained(tgt_x["is_chained"])
 		_animate_showcase_card(card_name, "%s dùng [Xích Tâm Tỏa]!" % caster["name"])
 		_add_log("⛓️ %s dùng [Xích Tâm Tỏa]!" % caster["name"])
+	elif card_name == "Cắt Đường Lương" or card_id.contains("catluong"):
+		if target_seat > 0 and generals_data.has(target_seat):
+			var tgt_c = generals_data[target_seat]
+			tgt_c["has_cat_luong"] = true
+			if tgt_c.has("avatar_node") and is_instance_valid(tgt_c["avatar_node"]):
+				tgt_c["avatar_node"].set_delayed_trick("supply_shortage", true)
+		AudioManager.play_voice("Cắt Đường Lương")
+		AudioManager.play_skill()
+		_animate_showcase_card("Cắt Đường Lương", "%s đặt [Cắt Đường Lương] lên đối thủ!" % caster["name"])
+		_add_log("🌾 %s đặt [Cắt Đường Lương] vào khu phán xét của Ghế %d!" % [caster["name"], target_seat])
+	elif card_name == "Trầm Ảo Sa Bẫy" or card_id.contains("tramao"):
+		if target_seat > 0 and generals_data.has(target_seat):
+			var tgt_t = generals_data[target_seat]
+			tgt_t["has_tram_ao"] = true
+			if tgt_t.has("avatar_node") and is_instance_valid(tgt_t["avatar_node"]):
+				tgt_t["avatar_node"].set_delayed_trick("acedia", true)
+		AudioManager.play_voice("Trầm Ảo Sa Bẫy")
+		AudioManager.play_skill()
+		_animate_showcase_card("Trầm Ảo Sa Bẫy", "%s đặt [Trầm Ảo Sa Bẫy] lên đối thủ!" % caster["name"])
+		_add_log("🕸️ %s đặt [Trầm Ảo Sa Bẫy] vào khu phán xét của Ghế %d!" % [caster["name"], target_seat])
 	elif target_seat > 0 and generals_data.has(target_seat):
 		var tgt = generals_data[target_seat]
 		var elem = "NORMAL"
@@ -1904,6 +2071,29 @@ func _execute_ai_turn(ai_seat: int) -> void:
 			await get_tree().create_timer(0.8).timeout
 			break
 
+		if c_name in ["Cắt Đường Lương", "Trầm Ảo Sa Bẫy"] and not enemies.is_empty():
+			scroll_idx = idx
+			var tgt_s = enemies.pick_random()
+			var tgt_e = generals_data[tgt_s]
+			ai_gen["hand_cards"].remove_at(scroll_idx)
+			ai_gen["hand_count"] = ai_gen["hand_cards"].size()
+			ai_gen["avatar_node"].update_hand_count(ai_gen["hand_count"])
+			if c_name == "Cắt Đường Lương":
+				tgt_e["has_cat_luong"] = true
+				if tgt_e.has("avatar_node") and is_instance_valid(tgt_e["avatar_node"]):
+					tgt_e["avatar_node"].set_delayed_trick("supply_shortage", true)
+			else:
+				tgt_e["has_tram_ao"] = true
+				if tgt_e.has("avatar_node") and is_instance_valid(tgt_e["avatar_node"]):
+					tgt_e["avatar_node"].set_delayed_trick("acedia", true)
+			AudioManager.play_voice(c_name)
+			AudioManager.play_skill()
+			_broadcast_player_battle_action("PLAY_CARD", c_name, tgt_s, ai_seat)
+			_animate_showcase_card(c_name, "%s đặt [%s] lên %s!" % [ai_gen["name"], c_name, tgt_e["name"]])
+			_add_log("⏳ %s đặt Cẩm Nang Trì Hoãn [%s] vào khu phán xét của %s!" % [ai_gen["name"], c_name, tgt_e["name"]])
+			await get_tree().create_timer(0.8).timeout
+			break
+
 		if c_name in ["Đột Kích Trộm Lương", "Vườn Không Nhà Trống", "Xích Tâm Tỏa"] and not enemies.is_empty():
 			scroll_idx = idx
 			var tgt_s = enemies.pick_random()
@@ -1960,6 +2150,7 @@ func _execute_ai_turn(ai_seat: int) -> void:
 				_add_log("⛓️ %s dùng [Xích Tâm Tỏa] %s đối với %s!" % [ai_gen["name"], "khóa xích" if tgt_e["is_chained"] else "gỡ xích", tgt_e["name"]])
 
 			AudioManager.play_skill()
+			_broadcast_player_battle_action("PLAY_CARD", c_name, tgt_s, ai_seat)
 			await get_tree().create_timer(0.8).timeout
 			break
 
@@ -1991,6 +2182,7 @@ func _execute_ai_turn(ai_seat: int) -> void:
 
 			AudioManager.play_voice(card_name)
 			AudioManager.play_slash()
+			_broadcast_player_battle_action("PLAY_CARD", card_name, chosen_tgt_seat, ai_seat)
 			_animate_showcase_card(card_name, "%s dùng [%s] tấn công %s!" % [ai_gen["name"], card_name, tgt_gen["name"]])
 			_add_log("⚔️ %s (Ghế %d) dùng [%s] lên %s (Ghế %d)." % [ai_gen["name"], ai_seat, card_name, tgt_gen["name"], chosen_tgt_seat])
 
@@ -2018,6 +2210,7 @@ func _execute_ai_turn(ai_seat: int) -> void:
 		await get_tree().create_timer(0.8).timeout
 
 	# End AI turn
+	_broadcast_player_battle_action("END_TURN", "", 0, ai_seat)
 	await get_tree().create_timer(0.8).timeout
 	_next_turn()
 
@@ -2116,6 +2309,70 @@ func _handle_lightning_judgement(seat_num: int) -> void:
 		else:
 			_add_log("⚡ [Thần Sấm Báo Ứng] Phán xét an toàn: Lật [%s %s]. Không còn tướng nhận, lá bài bị loại bỏ!" % [suit_icon, rank_str])
 		await get_tree().create_timer(1.0).timeout
+
+func _handle_supply_shortage_judgement(seat_num: int) -> bool:
+	var g = generals_data[seat_num]
+	_add_log("🌾 [PHÁN XÉT CẮT LƯƠNG] %s bị [Cắt Đường Lương]! Bắt đầu lật bài phán xét..." % g["name"])
+	_animate_showcase_card("Cắt Đường Lương", "🌾 Phán xét: Không phải ♣ -> Cấm rút bài!")
+	await get_tree().create_timer(1.2).timeout
+
+	var judge_card = _draw_card_from_pile()
+	var j_suit = judge_card.get("suit", "")
+	var j_rank = int(judge_card.get("rank", 1))
+	var suit_icon = _get_suit_icon(j_suit)
+	var rank_str = _format_rank(j_rank)
+
+	g["has_cat_luong"] = false
+	if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
+		g["avatar_node"].set_delayed_trick("supply_shortage", false)
+
+	# Thoát nếu lật được chất Chuồn (Club ♣)
+	var is_safe = (j_suit == "Club")
+	if is_safe:
+		_animate_showcase_card("Thoát Cắt Lương", "🌾 Lật [%s %s ♣]: Thoát hiểm! Được rút bài bình thường." % [suit_icon, rank_str])
+		_add_log("🌾 [Cắt Đường Lương] Thoát hiểm: Lật [%s %s] (Chuồn ♣) -> %s được rút bài!" % [suit_icon, rank_str, g["name"]])
+		AudioManager.play_parry()
+		await get_tree().create_timer(1.0).timeout
+		return false
+	else:
+		_animate_showcase_card("Bị Cắt Lương!", "🌾 Lật [%s %s]: CẤM RÚT BÀI LƯỢT NÀY!" % [suit_icon, rank_str])
+		_add_log("🌾 [Cắt Đường Lương] Hiệu lực: Lật [%s %s] (Không phải ♣) -> %s bị tước quyền rút bài!" % [suit_icon, rank_str, g["name"]])
+		AudioManager.play_voice("Cắt Đường Lương")
+		AudioManager.play_skill()
+		await get_tree().create_timer(1.0).timeout
+		return true
+
+func _handle_acedia_judgement(seat_num: int) -> bool:
+	var g = generals_data[seat_num]
+	_add_log("🕸️ [PHÁN XÉT TRẦM ẢO] %s bị [Trầm Ảo Sa Bẫy]! Bắt đầu lật bài phán xét..." % g["name"])
+	_animate_showcase_card("Trầm Ảo Sa Bẫy", "🕸️ Phán xét: Không phải ♥ -> Cấm ra bài!")
+	await get_tree().create_timer(1.2).timeout
+
+	var judge_card = _draw_card_from_pile()
+	var j_suit = judge_card.get("suit", "")
+	var j_rank = int(judge_card.get("rank", 1))
+	var suit_icon = _get_suit_icon(j_suit)
+	var rank_str = _format_rank(j_rank)
+
+	g["has_tram_ao"] = false
+	if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
+		g["avatar_node"].set_delayed_trick("acedia", false)
+
+	# Thoát nếu lật được chất Cơ (Heart ♥)
+	var is_safe = (j_suit == "Heart")
+	if is_safe:
+		_animate_showcase_card("Thoát Trầm Ảo", "🕸️ Lật [%s %s ♥]: Thoát bẫy! Được ra bài bình thường." % [suit_icon, rank_str])
+		_add_log("🕸️ [Trầm Ảo Sa Bẫy] Thoát bẫy: Lật [%s %s] (Cơ ♥) -> %s được ra bài!" % [suit_icon, rank_str, g["name"]])
+		AudioManager.play_parry()
+		await get_tree().create_timer(1.0).timeout
+		return false
+	else:
+		_animate_showcase_card("Sa Vào Trầm Ảo!", "🕸️ Lật [%s %s]: BỎ QUA GIAI ĐOẠN RA BÀI!" % [suit_icon, rank_str])
+		_add_log("🕸️ [Trầm Ảo Sa Bẫy] Hiệu lực: Lật [%s %s] (Không phải ♥) -> %s mất lượt ra bài!" % [suit_icon, rank_str, g["name"]])
+		AudioManager.play_voice("Trầm Ảo Sa Bẫy")
+		AudioManager.play_skill()
+		await get_tree().create_timer(1.0).timeout
+		return true
 
 func _next_turn() -> void:
 	if is_game_over:
@@ -2550,4 +2807,3 @@ func _find_card_dict_by_name(c_name: String) -> Dictionary:
 		if c.get("name", "") == c_name:
 			return c
 	return {"id": "item", "name": c_name, "suit": "Club", "rank": 1, "cat": 1, "desc": c_name}
-

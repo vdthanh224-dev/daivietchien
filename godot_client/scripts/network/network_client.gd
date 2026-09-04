@@ -5,6 +5,8 @@ signal connection_closed()
 signal game_state_updated(state: Dictionary)
 signal action_received(delta: Dictionary)
 signal log_received(text: String)
+signal player_joined(seat: int, active_seats: Array)
+signal error_received(message: String)
 
 @export var server_url: String = "ws://127.0.0.1:8080"
 @export var auto_reconnect: bool = true
@@ -36,8 +38,6 @@ func _process(_delta: float) -> void:
 			is_connected_to_server = true
 			print("[NetworkClient] Đã kết nối thành công tới Server!")
 			connection_established.emit()
-			# Gửi yêu cầu tham gia phòng mặc định
-			send_join_room("room_1", my_seat)
 
 		while socket.get_available_packet_count() > 0:
 			var packet = socket.get_packet()
@@ -68,16 +68,27 @@ func _handle_server_message(raw_json: String) -> void:
 
 	var msg_type = data.get("type", "")
 
-	if msg_type == "STATE_SYNC" or data.has("state"):
+	if msg_type == "PLAYER_JOINED":
+		var j_seat = int(data.get("seat", 0))
+		var active_s = data.get("activeSeats", [])
+		player_joined.emit(j_seat, active_s)
+
+	if msg_type == "ERROR" or msg_type == "ACTION_REJECTED":
+		var err_msg = str(data.get("error", "Lỗi không xác định"))
+		print("[NetworkClient] Server phản hồi lỗi: ", err_msg)
+		error_received.emit(err_msg)
+
+	if msg_type in ["STATE_SYNC", "STATE_SNAPSHOT", "STATE_UPDATE"] or data.has("state"):
 		var state_obj = data.get("state", data)
 		last_state = state_obj
 		game_state_updated.emit(state_obj)
 
-	if data.has("delta"):
+	if data.has("delta") and data["delta"] != null:
 		var delta_obj = data["delta"]
-		action_received.emit(delta_obj)
-		if delta_obj.has("description"):
-			log_received.emit(delta_obj["description"])
+		if delta_obj is Dictionary:
+			action_received.emit(delta_obj)
+			if delta_obj.has("description"):
+				log_received.emit(delta_obj["description"])
 
 	if data.has("description"):
 		log_received.emit(data["description"])
@@ -89,21 +100,27 @@ func send_json(dict: Dictionary) -> void:
 	else:
 		print("[NetworkClient] Cảnh báo: Socket chưa sẵn sàng để gửi!")
 
-func send_join_room(target_room: String, seat: int) -> void:
+func send_join_room(target_room: String, seat: int, players_data: Array = []) -> void:
 	room_id = target_room
 	my_seat = seat
-	send_json({
+	var payload = {
 		"action": "JOIN_ROOM",
 		"roomId": target_room,
 		"seat": seat,
 		"heroId": "1"
-	})
+	}
+	if not players_data.is_empty():
+		payload["players"] = players_data
+	send_json(payload)
 
 func send_play_card(card_id: String, target_seat: int = 0) -> void:
+	send_play_card_for_seat(my_seat, card_id, target_seat)
+
+func send_play_card_for_seat(seat_num: int, card_id: String, target_seat: int = 0) -> void:
 	send_json({
 		"action": "PLAY_CARD",
 		"roomId": room_id,
-		"seat": my_seat,
+		"seat": seat_num,
 		"cardId": card_id,
 		"targetSeat": target_seat
 	})
@@ -118,8 +135,12 @@ func send_respond_action(accepted: bool, card_id: String = "") -> void:
 	})
 
 func send_end_turn() -> void:
+	send_end_turn_for_seat(my_seat)
+
+func send_end_turn_for_seat(seat_num: int) -> void:
 	send_json({
 		"action": "END_TURN",
 		"roomId": room_id,
-		"seat": my_seat
+		"seat": seat_num
 	})
+
