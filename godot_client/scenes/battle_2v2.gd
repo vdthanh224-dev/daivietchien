@@ -253,13 +253,7 @@ func _init_generals_from_draft() -> void:
 		if slug == "":
 			slug = str(hero_info.get("id", s_num))
 
-		var role_str = ""
-		if is_p:
-			role_str = "BẠN"
-		elif (is_drag and my_team_is_dragon) or (not is_drag and not my_team_is_dragon):
-			role_str = "ĐỒNG ĐỘI"
-		else:
-			role_str = "ĐỐI THỦ"
+		var role_str = "RỒNG" if is_drag else "PHƯỢNG"
 
 		var avatar_node = seat_to_avatar[s_num]
 		avatar_node.setup_general(slug, h_name, h_faction, h_hp, h_hp, role_str)
@@ -275,24 +269,28 @@ func _init_generals_from_draft() -> void:
 		else:
 			avatar_node.set_faction_color(Color(1.0, 0.4, 0.2, 1.0))
 
-		# Adjust SkillBtn position so it never overflows offscreen
+		# Adjust SkillBtn position so it never overflows offscreen or overlaps UI
 		var offset = seat_to_offset[s_num]
 		var skill_btn = avatar_node.get_node_or_null("SkillBtn")
 		if skill_btn:
-			if offset == 3: # SeatMidLeft
+			if offset == 3: # SeatMidLeft (Triệu Quang Phục) - to the right, vertically centered
 				skill_btn.anchor_left = 1.0
 				skill_btn.anchor_right = 1.0
+				skill_btn.anchor_top = 0.5
+				skill_btn.anchor_bottom = 0.5
 				skill_btn.offset_left = 8.0
 				skill_btn.offset_right = 108.0
-				skill_btn.offset_top = -32.0
-				skill_btn.offset_bottom = -2.0
-			elif offset == 0: # Player Bottom-Right
-				skill_btn.anchor_left = 0.0
-				skill_btn.anchor_right = 0.0
-				skill_btn.offset_left = -110.0
-				skill_btn.offset_right = -10.0
-				skill_btn.offset_top = -32.0
-				skill_btn.offset_bottom = -2.0
+				skill_btn.offset_top = -15.0
+				skill_btn.offset_bottom = 15.0
+			elif offset == 0: # Player Bottom-Right - above the avatar
+				skill_btn.anchor_left = 0.5
+				skill_btn.anchor_right = 0.5
+				skill_btn.anchor_top = 0.0
+				skill_btn.anchor_bottom = 0.0
+				skill_btn.offset_left = -55.0
+				skill_btn.offset_right = 55.0
+				skill_btn.offset_top = -36.0
+				skill_btn.offset_bottom = -6.0
 
 		# Set skill title if available
 		var skills = hero_info.get("skills", [])

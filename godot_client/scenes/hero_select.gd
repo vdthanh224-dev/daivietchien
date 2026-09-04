@@ -128,8 +128,7 @@ func _setup_draft_slots() -> void:
 			used_names.append(uname)
 
 			var is_drag = (s_num == 1 or s_num == 3)
-			var is_ally = (is_drag == my_is_dragon)
-			var role_tag = "(BẠN)" if is_me else ("(ĐỒNG MINH)" if is_ally else "(ĐỐI THỦ)")
+			var role_tag = "(RỒNG)" if is_drag else "(PHƯỢNG)"
 			var is_ai = false if is_me else bool(s.get("isAI", true))
 
 			draft_slots.append({
@@ -152,10 +151,10 @@ func _setup_draft_slots() -> void:
 		var b3 = AppwriteMatchmaking.get_realistic_gamer_name(303, used_names) if AppwriteMatchmaking else "Chiến Tướng 4"
 
 		draft_slots = [
-			{"seatNumber": 1, "userName": my_name, "roleTag": "(BẠN)", "isPlayer": true, "isDragon": true, "isAI": false, "chosenHero": null, "isLocked": false},
-			{"seatNumber": 2, "userName": b1, "roleTag": "(ĐỐI THỦ)", "isPlayer": false, "isDragon": false, "isAI": true, "chosenHero": null, "isLocked": false},
-			{"seatNumber": 3, "userName": b2, "roleTag": "(ĐỒNG MINH)", "isPlayer": false, "isDragon": true, "isAI": true, "chosenHero": null, "isLocked": false},
-			{"seatNumber": 4, "userName": b3, "roleTag": "(ĐỐI THỦ)", "isPlayer": false, "isDragon": false, "isAI": true, "chosenHero": null, "isLocked": false}
+			{"seatNumber": 1, "userName": my_name, "roleTag": "(RỒNG)", "isPlayer": true, "isDragon": true, "isAI": false, "chosenHero": null, "isLocked": false},
+			{"seatNumber": 2, "userName": b1, "roleTag": "(PHƯỢNG)", "isPlayer": false, "isDragon": false, "isAI": true, "chosenHero": null, "isLocked": false},
+			{"seatNumber": 3, "userName": b2, "roleTag": "(RỒNG)", "isPlayer": false, "isDragon": true, "isAI": true, "chosenHero": null, "isLocked": false},
+			{"seatNumber": 4, "userName": b3, "roleTag": "(PHƯỢNG)", "isPlayer": false, "isDragon": false, "isAI": true, "chosenHero": null, "isLocked": false}
 		]
 
 func _build_ui() -> void:

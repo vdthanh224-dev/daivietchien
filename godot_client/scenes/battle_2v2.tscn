@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3 uid="uid://battle2v2scene123"]
+[gd_scene load_steps=12 format=3 uid="uid://b3g0cnqsx7wd3"]
 
 [ext_resource type="Theme" uid="uid://d4af37royalgold" path="res://resources/themes/royal_gold_theme.tres" id="1_theme"]
 [ext_resource type="Script" path="res://scenes/battle_2v2.gd" id="2_script"]

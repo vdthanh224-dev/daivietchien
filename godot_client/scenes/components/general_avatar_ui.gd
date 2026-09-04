@@ -226,7 +226,11 @@ func setup_general(p_id: String, p_name: String, p_faction: String = "Trần", p
 		if p_role != "":
 			role_badge.visible = true
 			role_badge.text = " %s " % p_role
-			if p_role == "BẠN":
+			if p_role == "RỒNG" or p_role.contains("RỒNG"):
+				role_badge.add_theme_color_override("font_color", Color(0.2, 0.85, 1.0, 1.0))
+			elif p_role == "PHƯỢNG" or p_role.contains("PHƯỢNG"):
+				role_badge.add_theme_color_override("font_color", Color(1.0, 0.4, 0.25, 1.0))
+			elif p_role == "BẠN":
 				role_badge.add_theme_color_override("font_color", Color(0.4, 0.95, 0.5, 1.0))
 			else:
 				role_badge.add_theme_color_override("font_color", Color(1.0, 0.45, 0.45, 1.0))
