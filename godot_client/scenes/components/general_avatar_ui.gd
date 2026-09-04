@@ -49,6 +49,7 @@ var turn_timer_badge: PanelContainer = null
 var turn_timer_label: Label = null
 var is_chained: bool = false
 var chain_badge: PanelContainer = null
+var lightning_badge: PanelContainer = null
 
 func _ready() -> void:
 	if click_btn:
@@ -227,6 +228,44 @@ func set_chained(chained: bool) -> void:
 	else:
 		if chain_badge:
 			chain_badge.visible = false
+
+func set_delayed_trick(trick_type: String, active: bool) -> void:
+	if trick_type == "lightning":
+		if active:
+			if not lightning_badge:
+				lightning_badge = PanelContainer.new()
+				lightning_badge.custom_minimum_size = Vector2(96, 22)
+				lightning_badge.mouse_filter = MOUSE_FILTER_IGNORE
+				lightning_badge.z_index = 21
+				var style = StyleBoxFlat.new()
+				style.bg_color = Color(0.12, 0.15, 0.35, 0.95)
+				style.border_width_left = 1
+				style.border_width_top = 1
+				style.border_width_right = 1
+				style.border_width_bottom = 1
+				style.border_color = Color(0.4, 0.8, 1.0, 1.0)
+				style.corner_radius_top_left = 6
+				style.corner_radius_top_right = 6
+				style.corner_radius_bottom_right = 6
+				style.corner_radius_bottom_left = 6
+				style.shadow_color = Color(0.2, 0.6, 1.0, 0.6)
+				style.shadow_size = 5
+				lightning_badge.add_theme_stylebox_override("panel", style)
+
+				var lbl = Label.new()
+				lbl.text = "⚡ THẦN SẤM"
+				lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				lbl.add_theme_font_size_override("font_size", 9)
+				lbl.add_theme_color_override("font_color", Color(1.0, 0.95, 0.4, 1.0))
+				lightning_badge.add_child(lbl)
+				add_child(lightning_badge)
+
+			lightning_badge.position = Vector2((size.x - 96) * 0.5, size.y * 0.54)
+			lightning_badge.visible = true
+		else:
+			if lightning_badge:
+				lightning_badge.visible = false
 
 func _init_equipment_slots() -> void:
 	if is_instance_valid(weapon_slot):

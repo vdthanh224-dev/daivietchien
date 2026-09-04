@@ -82,7 +82,7 @@ async function decodePersistedState(value: string): Promise<any | null> {
 console.log("🎮 [Deno Server] Đại Việt Chiến 2v2 Unified Game Server is running!");
 
 // Dynamic Tick Timer: Only runs when active rooms exist, allowing Deno to scale to 0 CPU when idle
-let tickTimer: number | null = null;
+let tickTimer: ReturnType<typeof setInterval> | null = null;
 
 function ensureTickTimer() {
   if (tickTimer !== null) return;
@@ -103,7 +103,7 @@ function ensureTickTimer() {
       }
       try {
         const connectedSeats = Array.from(room.sockets.keys());
-        if (tickGameState(room.state, connectedSeats).important) {
+        if ((tickGameState as any)(room.state, connectedSeats)?.important) {
           room.lastActivity = now;
           broadcastRoom(room, {
             type: "STATE_UPDATE",

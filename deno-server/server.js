@@ -474,7 +474,7 @@ setInterval(async () => {
   }
 }, 250);
 
-Deno.serve({ port: Number(Deno.env.get("PORT")) || 8082 }, async (req) => {
+Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
   const upgrade = req.headers.get("upgrade") || "";
 
   // 1. WEBSOCKET REALTIME CONNECTION (<15ms)

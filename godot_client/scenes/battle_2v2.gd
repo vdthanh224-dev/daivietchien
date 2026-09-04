@@ -151,6 +151,15 @@ func _ready() -> void:
 	card_play_btn.visible = false
 	end_turn_btn.visible = false
 
+	# Kết nối WebSocket Realtime Local Server
+	if NetworkClient:
+		if not NetworkClient.action_received.is_connected(_on_network_action_received):
+			NetworkClient.action_received.connect(_on_network_action_received)
+		if not NetworkClient.connection_established.is_connected(_on_network_connected):
+			NetworkClient.connection_established.connect(_on_network_connected)
+		if NetworkClient.is_connected_to_server:
+			_on_network_connected()
+
 	_start_ambient_effects()
 	_init_deck()
 	_init_generals_from_draft()
@@ -167,6 +176,22 @@ func _ready() -> void:
 	if cmd_args.is_empty():
 		cmd_args = OS.get_cmdline_args()
 	if "--screenshot-battle-2v2" in cmd_args:
+		# Equip items and lightning badge to verify font size x1.4 and UI layout
+		if generals_data.has(1):
+			var p1 = generals_data[1]
+			p1["equipped_weapon"] = "Nỏ Thần Kim Quy"
+			p1["avatar_node"].set_equipment("weapon", "Nỏ Thần Kim Quy", "")
+			p1["equipped_armor"] = "Khiên Mây Bện"
+			p1["avatar_node"].set_equipment("armor", "Khiên Mây Bện", "")
+			p1["has_lightning"] = true
+			p1["avatar_node"].set_delayed_trick("lightning", true)
+		if generals_data.has(2):
+			var p2 = generals_data[2]
+			p2["equipped_weapon"] = "Kiếm Thuận Thiên"
+			p2["avatar_node"].set_equipment("weapon", "Kiếm Thuận Thiên", "")
+			p2["equipped_def_horse"] = "Voi Chiến Đại Việt"
+			p2["avatar_node"].set_equipment("def_horse", "Voi Chiến Đại Việt", "")
+
 		await get_tree().create_timer(1.5).timeout
 		var tex = get_viewport().get_texture()
 		if tex:
@@ -196,6 +221,23 @@ func _ready() -> void:
 			if img_d:
 				img_d.save_png("res://battle_2v2_dodge_screenshot.png")
 				print("[Screenshot] Đã lưu battle_2v2_dodge_screenshot.png!")
+		get_tree().quit()
+
+	if "--screenshot-dodge-nododge" in cmd_args:
+		# Discard all dodge cards from hand so player has no Dodge
+		for ch in hand_container.get_children():
+			var info = _get_card_info_from_ui(ch)
+			if "đỡ" in info.get("name", "").to_lower():
+				ch.queue_free()
+		await get_tree().create_timer(0.5).timeout
+		_prompt_dodge_reaction(2, 1, "NORMAL")
+		await get_tree().create_timer(0.6).timeout
+		var tex_nd = get_viewport().get_texture()
+		if tex_nd:
+			var img_nd = tex_nd.get_image()
+			if img_nd:
+				img_nd.save_png("res://battle_2v2_dodge_nododge_screenshot.png")
+				print("[Screenshot] Đã lưu battle_2v2_dodge_nododge_screenshot.png!")
 		get_tree().quit()
 
 	if "--screenshot-chain-modal" in cmd_args:
@@ -307,9 +349,20 @@ func _start_ambient_effects() -> void:
 		ember_particles.append(ember)
 
 func _init_deck() -> void:
-	randomize()
 	card_deck_pile.clear()
 	card_deck_pile = CardDatabase.create_deck_80()
+	var room_id = ""
+	if AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary:
+		room_id = AppwriteMatchmaking.current_room.get("roomId", "")
+	elif NetworkClient and NetworkClient.room_id != "":
+		room_id = NetworkClient.room_id
+
+	if room_id != "":
+		# Đồng bộ 100% hạt giống xáo bài giữa các máy người chơi trong cùng một phòng đấu
+		seed(hash(room_id))
+	else:
+		randomize()
+
 	# Xáo bài đa tầng (5-pass shuffle) để phá vỡ hoàn toàn các cụm bài Trảm / Đỡ khởi tạo tuần tự:
 	for p in range(5):
 		card_deck_pile.shuffle()
@@ -442,6 +495,7 @@ func _init_generals_from_draft() -> void:
 		# Connect click signals
 		avatar_node.clicked.connect(func(): _on_general_avatar_clicked(s_num))
 		avatar_node.info_clicked.connect(func(): _show_general_info_modal(s_num))
+		avatar_node.skill_clicked.connect(func(): _on_general_skill_clicked(s_num))
 
 		generals_data[s_num] = {
 			"seat": s_num,
@@ -462,8 +516,46 @@ func _init_generals_from_draft() -> void:
 			"equipped_off_horse": "",
 			"equipped_def_horse": "",
 			"is_chained": false,
+			"has_lightning": false,
 			"ao_bao_charges": 0
 		}
+
+func _on_general_skill_clicked(s_num: int) -> void:
+	if not generals_data.has(s_num):
+		return
+	var g = generals_data[s_num]
+	var h_id = int(g.get("hero_data", {}).get("id", 0))
+	var h_name = g.get("name", "")
+
+	# 1. Lý Thường Kiệt (ID 47 - Tiến Thoái): Biến Trảm thành Đỡ và ngược lại
+	if (h_id == 47 or "Lý Thường Kiệt" in h_name) and s_num == my_seat:
+		var converted_count = 0
+		for card_ui in hand_container.get_children():
+			var info = _get_card_info_from_ui(card_ui)
+			var c_name = info.get("name", "")
+			if "Trảm" in c_name:
+				card_ui.setup_card_data(info.get("id", ""), "Đỡ", info.get("rank", 1), info.get("suit", ""), 0, "Hóa giải hoàn toàn 1 đòn Trảm (Tiến Thoái)")
+				converted_count += 1
+			elif c_name == "Đỡ":
+				card_ui.setup_card_data(info.get("id", ""), "Trảm Thường", info.get("rank", 1), info.get("suit", ""), 0, "Tấn công gây 1 sát thương (Tiến Thoái)")
+				converted_count += 1
+		if converted_count > 0:
+			_animate_showcase_card("Tiến Thoái", "Lý Thường Kiệt: Hoán đổi %d lá Trảm ⟷ Đỡ!" % converted_count)
+			_add_log("✨ [TIẾN THOÁI] Lý Thường Kiệt đã hoán chuyển %d lá Trảm ⟷ Đỡ trên tay!" % converted_count)
+			AudioManager.play_skill()
+			if is_waiting_dodge:
+				var valid_cards = _get_valid_dodge_cards(dodge_attacker_seat)
+				_build_dodge_card_selector_buttons(valid_cards)
+				if valid_cards.size() > 0:
+					_select_dodge_card(valid_cards[0])
+				else:
+					_select_dodge_card(null)
+			elif selected_card_ui:
+				_update_action_btn()
+		else:
+			desc_text.text = "💡 [Tiến Thoái]: Không có lá Trảm hoặc Đỡ nào trên tay để hoán đổi!"
+	else:
+		desc_text.text = "📜 Kỹ năng của %s: %s" % [g["name"], g.get("hero_data", {}).get("skills", [{}])[0].get("desc", "")]
 
 func _deal_initial_hands() -> void:
 	for s_num in [1, 2, 3, 4]:
@@ -664,6 +756,9 @@ func _update_action_btn() -> void:
 	elif c_name == "Xích Tâm Tỏa":
 		card_play_btn.text = "⛓️ DÙNG XÍCH TÂM TỎA (CHỌN TƯỚNG)"
 		card_play_btn.visible = true
+	elif c_name == "Thần Sấm Báo Ứng":
+		card_play_btn.text = "⚡ ĐẶT [THẦN SẤM BÁO ỨNG] (VÀO BẢN THÂN)"
+		card_play_btn.visible = true
 	elif c_name == "Diệu Kế Phá Mưu":
 		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 			var tgt = generals_data[selected_target_seat]
@@ -688,6 +783,13 @@ func _update_action_btn() -> void:
 	else:
 		card_play_btn.text = "DÙNG [%s]" % c_name
 		card_play_btn.visible = true
+
+func _reset_player_turn_timer() -> void:
+	if is_player_turn:
+		current_turn_timer = 40.0
+		turn_indicator.text = "⏳ LƯỢT CỦA BẠN (40s)"
+		if generals_data.has(my_seat) and generals_data[my_seat].has("avatar_node"):
+			generals_data[my_seat]["avatar_node"].update_turn_timer(40)
 
 func _on_card_play_btn_clicked() -> void:
 	if not is_player_turn or selected_card_ui == null:
@@ -746,6 +848,7 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		_reset_player_turn_timer()
 
 		AudioManager.play_voice(c_name)
 		AudioManager.play_slash()
@@ -764,6 +867,7 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		_reset_player_turn_timer()
 		p_gen["hp"] = min(p_gen["max_hp"], p_gen["hp"] + 1)
 		p_gen["avatar_node"].update_hp(p_gen["hp"], p_gen["max_hp"])
 		AudioManager.play_voice(c_name)
@@ -777,6 +881,7 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		_reset_player_turn_timer()
 		AudioManager.play_voice(c_name)
 		AudioManager.play_skill()
 		_broadcast_player_battle_action("PLAY_CARD", "ruou", my_seat)
@@ -791,6 +896,7 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		_reset_player_turn_timer()
 		AudioManager.play_voice(c_name)
 		AudioManager.play_skill()
 		for k in range(2):
@@ -832,7 +938,22 @@ func _on_card_play_btn_clicked() -> void:
 		_show_card_pick_modal(false, selected_target_seat)
 		return
 
-	elif c_name in ["Thần Sấm Báo Ứng", "Cắt Đường Lương", "Trầm Ảo Sa Bẫy"]:
+	elif c_name == "Thần Sấm Báo Ứng":
+		var p_gen = generals_data[my_seat]
+		p_gen["has_lightning"] = true
+		if p_gen.has("avatar_node") and is_instance_valid(p_gen["avatar_node"]):
+			p_gen["avatar_node"].set_delayed_trick("lightning", true)
+		_discard_player_card(selected_card_ui)
+		selected_card_ui = null
+		card_play_btn.visible = false
+		_reset_player_turn_timer()
+		AudioManager.play_voice(c_name)
+		AudioManager.play_skill()
+		_broadcast_player_battle_action("PLAY_CARD", c_name, my_seat)
+		_animate_showcase_card(c_name, "Bạn tự đặt [Thần Sấm Báo Ứng] vào khu phán xét!")
+		_add_log("⚡ Bạn đã đặt Cẩm Nang Trì Hoãn [Thần Sấm Báo Ứng] vào khu phán xét của chính mình!")
+
+	elif c_name in ["Cắt Đường Lương", "Trầm Ảo Sa Bẫy"]:
 		if selected_target_seat <= 0 or not generals_data.has(selected_target_seat):
 			desc_text.text = "⚠️ Vui lòng nhấp chọn 1 Tướng đối thủ để dán [Cẩm Nang Trì Hoãn]!"
 			return
@@ -840,6 +961,7 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		_reset_player_turn_timer()
 		AudioManager.play_voice(c_name)
 		AudioManager.play_skill()
 		_broadcast_player_battle_action("PLAY_CARD", c_name, tgt["seat"])
@@ -853,6 +975,7 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		_reset_player_turn_timer()
 		AudioManager.play_voice(c_name)
 		AudioManager.play_skill()
 		_broadcast_player_battle_action("PLAY_CARD", c_name, my_seat)
@@ -868,6 +991,7 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		_reset_player_turn_timer()
 		AudioManager.play_voice(c_name)
 		AudioManager.play_skill()
 		_broadcast_player_battle_action("PLAY_CARD", c_name, my_seat)
@@ -885,6 +1009,7 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		_reset_player_turn_timer()
 		AudioManager.play_voice(c_name)
 		AudioManager.play_skill()
 		_broadcast_player_battle_action("PLAY_CARD", c_name, my_seat)
@@ -895,6 +1020,7 @@ func _on_card_play_btn_clicked() -> void:
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
 		card_play_btn.visible = false
+		_reset_player_turn_timer()
 		AudioManager.play_voice(c_name)
 		AudioManager.play_skill()
 		_broadcast_player_battle_action("PLAY_CARD", c_name, 0)
@@ -902,6 +1028,12 @@ func _on_card_play_btn_clicked() -> void:
 		_add_log("🎴 Bạn đã dùng [%s]." % c_name)
 
 func _broadcast_player_battle_action(act_type: String, card_id: String, target_seat: int = 0) -> void:
+	if NetworkClient and NetworkClient.is_connected_to_server:
+		if act_type == "PLAY_CARD":
+			NetworkClient.send_play_card(card_id, target_seat)
+		elif act_type == "END_TURN":
+			NetworkClient.send_end_turn()
+
 	if AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary:
 		var r_id = AppwriteMatchmaking.current_room.get("roomId", "")
 		if not r_id.is_empty():
@@ -913,6 +1045,46 @@ func _broadcast_player_battle_action(act_type: String, card_id: String, target_s
 				"cardId": card_id,
 				"senderUserId": AuthManager.current_user_id if AuthManager else ""
 			})
+
+func _on_network_connected() -> void:
+	if not NetworkClient:
+		return
+	var r_id = "room_1"
+	if AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary:
+		var appwrite_r_id = AppwriteMatchmaking.current_room.get("roomId", "")
+		if not appwrite_r_id.is_empty():
+			r_id = appwrite_r_id
+	NetworkClient.send_join_room(r_id, my_seat)
+	_add_log("🌐 [ĐỒNG BỘ MẠNG] Đã kết nối Local Server (Cổng 8080)! Phòng: %s, Ghế: %d" % [r_id, my_seat])
+
+func _on_network_action_received(delta: Dictionary) -> void:
+	if delta.is_empty():
+		return
+	var caster_seat = int(delta.get("casterSeat", delta.get("seat", 0)))
+	if caster_seat == 0 and delta.has("turnSeat"):
+		caster_seat = int(delta.get("turnSeat", 0))
+
+	# Bỏ qua hành động của chính mình để tránh xử lý 2 lần
+	if caster_seat == my_seat and caster_seat > 0:
+		return
+
+	var act_type = delta.get("actionType", delta.get("type", delta.get("action", "")))
+	var target_seat = int(delta.get("targetSeat", 0))
+	var card_id = delta.get("cardId", "")
+	if card_id.is_empty() and delta.has("activeCard") and delta["activeCard"] is Dictionary:
+		card_id = delta["activeCard"].get("name", delta["activeCard"].get("id", ""))
+
+	if act_type in ["PLAY_CARD", "play_card", "CARD_PLAYED"]:
+		if caster_seat > 0 and not card_id.is_empty():
+			_handle_remote_card_play(caster_seat, card_id, target_seat)
+	elif act_type in ["END_TURN", "end_turn", "TURN_ENDED"]:
+		if is_remote_turn_active and current_turn_seat == caster_seat:
+			is_remote_turn_active = false
+	elif act_type in ["DODGE_RESPONSE", "dodge_response"]:
+		if card_id == "pass":
+			_add_log("🛡️ Tướng Ghế %d không đỡ đòn!" % caster_seat)
+		else:
+			_add_log("🛡️ Tướng Ghế %d đã dùng Đỡ!" % caster_seat)
 
 func _discard_player_card(card_node: Control) -> void:
 	if not card_node or not is_instance_valid(card_node):
@@ -1009,8 +1181,10 @@ func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_e
 			selected_card_ui.set_selected(false)
 		selected_card_ui = null
 
-	dodge_desc_lbl.text = "%s (Ghế %d) đang dùng [Trảm] tấn công bạn!\nHãy CHỌN một lá bài trên tay để Đỡ:" % [atk["name"], attacker_seat]
+	dodge_desc_lbl.text = "%s (Ghế %d) đang dùng [Trảm] tấn công bạn!\nHãy CHỌN một lá bài trên tay để Đỡ hoặc bấm [CHỊU ĐÒN]:" % [atk["name"], attacker_seat]
 	dodge_timer_lbl.text = "⏳ Còn lại: 15s"
+	dodge_pass_btn.text = "💥 CHỊU ĐÒN (-%d MÁU)" % incoming_slash_damage
+	dodge_pass_btn.disabled = false
 
 	var valid_cards = _get_valid_dodge_cards(attacker_seat)
 	_build_dodge_card_selector_buttons(valid_cards)
@@ -1020,6 +1194,7 @@ func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_e
 		desc_text.text = "🛡️ Bị Trảm! Nhấp lá bài trên tay hoặc các nút ở trên để đổi lá Đỡ bạn muốn dùng."
 	else:
 		_select_dodge_card(null)
+		desc_text.text = "⚠️ Bị Trảm nhưng không có sẵn lá Đỡ! Bạn hãy bấm [💥 CHỊU ĐÒN] hoặc dùng kỹ năng tướng đổi bài."
 
 	dodge_modal.visible = true
 
@@ -1127,9 +1302,11 @@ func _select_dodge_card(card_ui: Control) -> void:
 		selected_dodge_card_ui = null
 		dodge_confirm_btn.disabled = true
 		dodge_confirm_btn.text = "❌ KHÔNG CÓ [ĐỠ]"
+		dodge_pass_btn.text = "💥 CHỊU ĐÒN (-%d MÁU)" % incoming_slash_damage
+		dodge_pass_btn.disabled = false
 		if dodge_selected_lbl:
-			dodge_selected_lbl.text = "❌ Bạn không có lá bài nào có thể dùng để Đỡ!"
-		desc_text.text = "💥 Bạn không có lá Đỡ nào trên tay! Bấm [CHỊU ĐÒN] hoặc đợi hết giờ."
+			dodge_selected_lbl.text = "⚠️ Bạn chưa chọn lá Đỡ. Hãy bấm [💥 CHỊU ĐÒN] hoặc đổi bài qua kỹ năng tướng."
+		desc_text.text = "💥 Bạn không có sẵn lá Đỡ trên tay! Bấm [CHỊU ĐÒN] hoặc bấm nút kỹ năng tướng để đổi bài."
 		_update_dodge_card_selector_buttons()
 		return
 
@@ -1466,6 +1643,13 @@ func _start_turn(seat_num: int) -> void:
 			generals_data[s]["avatar_node"].set_turn_active(is_active)
 			generals_data[s]["avatar_node"].update_turn_timer(40)
 
+	# GIAI ĐOẠN PHÁN XÉT (JUDGEMENT PHASE): Kiểm tra Thần Sấm Báo Ứng
+	if g.get("has_lightning", false):
+		await _handle_lightning_judgement(seat_num)
+		if not g["is_alive"] or is_game_over:
+			_next_turn()
+			return
+
 	# Draw 2 cards phase
 	for k in range(2):
 		var card_info = _draw_card_from_pile()
@@ -1542,15 +1726,21 @@ func _execute_remote_player_turn(remote_seat: int) -> void:
 	_next_turn()
 
 func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: int) -> void:
+	if not generals_data.has(caster_seat):
+		return
 	var caster = generals_data[caster_seat]
 	caster["hand_count"] = max(0, caster["hand_count"] - 1)
 	caster["avatar_node"].update_hand_count(caster["hand_count"])
 
-	var card_name = "Trảm"
-	if card_id.contains("banh"): card_name = "Bánh Chưng"
+	var card_name = card_id
+	if card_id.contains("banh") or card_id == "banh_chung": card_name = "Bánh Chưng"
 	elif card_id.contains("do"): card_name = "Đỡ"
 	elif card_id.contains("nothan"): card_name = "Nỏ Thần Kim Quy"
 	elif card_id.contains("khienmay"): card_name = "Khiên Mây Bện"
+	elif card_id.contains("ruou"): card_name = "Hủ Rượu"
+	elif card_id.contains("thansam"): card_name = "Thần Sấm Báo Ứng"
+	elif card_id.contains("xichtam"): card_name = "Xích Tâm Tỏa"
+	elif card_id.contains("dungbinh"): card_name = "Dụng Binh Như Thần"
 
 	if card_name == "Bánh Chưng":
 		caster["hp"] = min(caster["max_hp"], caster["hp"] + 1)
@@ -1559,13 +1749,63 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 		AudioManager.play_skill()
 		_animate_showcase_card(card_name, "%s dùng [Bánh Chưng] hồi 1 Máu!" % caster["name"])
 		_add_log("🍲 %s dùng [Bánh Chưng] hồi 1 Máu." % caster["name"])
+	elif card_name == "Hủ Rượu":
+		caster["is_wine_buff_active"] = true
+		AudioManager.play_voice("Hủ Rượu")
+		AudioManager.play_skill()
+		_animate_showcase_card(card_name, "%s uống Hủ Rượu (+1 Sát Thương)!" % caster["name"])
+		_add_log("🍶 %s đã uống [Hủ Rượu]!" % caster["name"])
+	elif card_name == "Thần Sấm Báo Ứng":
+		caster["has_lightning"] = true
+		if caster.has("avatar_node") and is_instance_valid(caster["avatar_node"]):
+			caster["avatar_node"].set_delayed_trick("lightning", true)
+		AudioManager.play_voice(card_name)
+		AudioManager.play_skill()
+		_animate_showcase_card(card_name, "%s đặt [Thần Sấm Báo Ứng] vào khu phán xét!" % caster["name"])
+		_add_log("⚡ %s đã tự gắn [Thần Sấm Báo Ứng] vào khu phán xét!" % caster["name"])
+	elif card_name in ["Kiếm Thuận Thiên", "Song Cung Mường Nhạ", "Nỏ Thần Kim Quy", "Trường Đao Nam Sơn", "Thương Ngâu Lãng Bạc", "Súng Thần Công Hồ Triều"]:
+		caster["equipped_weapon"] = card_name
+		caster["avatar_node"].set_equipment("weapon", card_name, "")
+		AudioManager.play_voice(card_name)
+		AudioManager.play_skill()
+		_animate_showcase_card(card_name, "%s trang bị vũ khí [%s]!" % [caster["name"], card_name])
+		_add_log("🗡️ %s trang bị Vũ Khí: [%s]!" % [caster["name"], card_name])
+	elif card_name in ["Giáp Đồng Sơn Vi", "Khiên Mây Bện", "Áo Bào Hoàng Tộc"]:
+		caster["equipped_armor"] = card_name
+		if card_name == "Áo Bào Hoàng Tộc": caster["ao_bao_charges"] = 3
+		caster["avatar_node"].set_equipment("armor", card_name, "")
+		AudioManager.play_voice(card_name)
+		AudioManager.play_skill()
+		_animate_showcase_card(card_name, "%s trang bị áo giáp [%s]!" % [caster["name"], card_name])
+		_add_log("🛡️ %s trang bị Áo Giáp: [%s]!" % [caster["name"], card_name])
+	elif card_name in ["Voi Chiến Đại Việt", "Ngựa Trắng Thuần Nông"]:
+		var slot_m = "def_horse" if card_name == "Voi Chiến Đại Việt" else "off_horse"
+		caster["equipped_" + slot_m] = card_name
+		caster["avatar_node"].set_equipment(slot_m, card_name, "")
+		AudioManager.play_voice(card_name)
+		AudioManager.play_skill()
+		_animate_showcase_card(card_name, "%s trang bị [%s]!" % [caster["name"], card_name])
+		_add_log("🐎 %s trang bị Chiến Mã: [%s]!" % [caster["name"], card_name])
+	elif card_name == "Xích Tâm Tỏa":
+		AudioManager.play_voice(card_name)
+		AudioManager.play_skill()
+		if target_seat > 0 and generals_data.has(target_seat):
+			var tgt_x = generals_data[target_seat]
+			tgt_x["is_chained"] = !tgt_x.get("is_chained", false)
+			if tgt_x.has("avatar_node") and is_instance_valid(tgt_x["avatar_node"]):
+				tgt_x["avatar_node"].set_chained(tgt_x["is_chained"])
+		_animate_showcase_card(card_name, "%s dùng [Xích Tâm Tỏa]!" % caster["name"])
+		_add_log("⛓️ %s dùng [Xích Tâm Tỏa]!" % caster["name"])
 	elif target_seat > 0 and generals_data.has(target_seat):
 		var tgt = generals_data[target_seat]
-		AudioManager.play_voice(card_name)
+		var elem = "NORMAL"
+		if "Hỏa" in card_name: elem = "FIRE"
+		elif "Lôi" in card_name: elem = "LIGHTNING"
+		AudioManager.play_voice(card_name if AudioManager.has_voice(card_name) else "Trảm")
 		AudioManager.play_slash()
 		_animate_showcase_card(card_name, "%s dùng [%s] tấn công %s!" % [caster["name"], card_name, tgt["name"]])
 		_add_log("⚔️ %s dùng [%s] lên %s (Ghế %d)." % [caster["name"], card_name, tgt["name"], target_seat])
-		_handle_slash_attack(caster_seat, target_seat)
+		_handle_slash_attack(caster_seat, target_seat, 1, elem)
 
 func _execute_ai_turn(ai_seat: int) -> void:
 	await get_tree().create_timer(1.0).timeout
@@ -1647,6 +1887,23 @@ func _execute_ai_turn(ai_seat: int) -> void:
 	for idx in range(ai_gen["hand_cards"].size()):
 		var c = ai_gen["hand_cards"][idx]
 		var c_name = c.get("name", "")
+
+		# AI tự đặt Thần Sấm Báo Ứng vào bản thân nếu chưa có
+		if c_name == "Thần Sấm Báo Ứng" and not ai_gen.get("has_lightning", false):
+			scroll_idx = idx
+			ai_gen["hand_cards"].remove_at(scroll_idx)
+			ai_gen["hand_count"] = ai_gen["hand_cards"].size()
+			ai_gen["avatar_node"].update_hand_count(ai_gen["hand_count"])
+			ai_gen["has_lightning"] = true
+			if ai_gen.has("avatar_node") and is_instance_valid(ai_gen["avatar_node"]):
+				ai_gen["avatar_node"].set_delayed_trick("lightning", true)
+			AudioManager.play_voice("Thần Sấm Báo Ứng")
+			AudioManager.play_skill()
+			_animate_showcase_card("Thần Sấm Báo Ứng", "%s tự gắn [Thần Sấm Báo Ứng] vào khu phán xét!" % ai_gen["name"])
+			_add_log("⚡ %s đã tự gắn [Thần Sấm Báo Ứng] vào khu phán xét của mình!" % ai_gen["name"])
+			await get_tree().create_timer(0.8).timeout
+			break
+
 		if c_name in ["Đột Kích Trộm Lương", "Vườn Không Nhà Trống", "Xích Tâm Tỏa"] and not enemies.is_empty():
 			scroll_idx = idx
 			var tgt_s = enemies.pick_random()
@@ -1812,10 +2069,60 @@ func _finish_player_end_turn() -> void:
 	_add_log("⌛ Bạn đã kết thúc lượt của mình.")
 	_next_turn()
 
+func _get_next_alive_seat(current_seat: int) -> int:
+	for step in range(1, 4):
+		var next_s = ((current_seat - 1 + step) % 4) + 1
+		if generals_data.has(next_s) and generals_data[next_s].get("is_alive", false):
+			return next_s
+	return -1
+
+func _handle_lightning_judgement(seat_num: int) -> void:
+	var g = generals_data[seat_num]
+	_add_log("⚡ [GIAI ĐOẠN PHÁN XÉT] %s đang mang [Thần Sấm Báo Ứng]! Bắt đầu lật bài phán xét..." % g["name"])
+	_animate_showcase_card("Thần Sấm Báo Ứng", "⚡ [Thần Sấm Báo Ứng]: Phán xét ♠2..♠9!")
+	await get_tree().create_timer(1.2).timeout
+
+	var judge_card = _draw_card_from_pile()
+	var j_suit = judge_card.get("suit", "")
+	var j_rank = int(judge_card.get("rank", 1))
+	var suit_icon = _get_suit_icon(j_suit)
+	var rank_str = _format_rank(j_rank)
+
+	# Điều kiện trúng sấm sét: Bích từ 2 đến 9 (♠2 .. ♠9)
+	var is_hit = (j_suit == "Spade" and j_rank >= 2 and j_rank <= 9)
+	if is_hit:
+		g["has_lightning"] = false
+		if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
+			g["avatar_node"].set_delayed_trick("lightning", false)
+		_animate_showcase_card("Sấm Sét Giáng Trần!", "⚡⚡⚡ Lật [%s %s]: SẤM SÉT ĐÁNH TRÚNG %s (-3 MÁU)!" % [suit_icon, rank_str, g["name"]])
+		_add_log("⚡⚡⚡ [Thần Sấm Báo Ứng] NỔ TUNG! Lật [%s %s] (Bích 2..9) ➜ %s chịu 3 Sát Thương Lôi!" % [suit_icon, rank_str, g["name"]])
+		AudioManager.play_voice("Thần Sấm Báo Ứng")
+		AudioManager.play_skill()
+		_apply_damage_to_general(seat_num, 3, seat_num, "LIGHTNING")
+		await get_tree().create_timer(1.2).timeout
+	else:
+		g["has_lightning"] = false
+		if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
+			g["avatar_node"].set_delayed_trick("lightning", false)
+
+		var next_seat = _get_next_alive_seat(seat_num)
+		if next_seat > 0 and generals_data.has(next_seat):
+			var next_g = generals_data[next_seat]
+			next_g["has_lightning"] = true
+			if next_g.has("avatar_node") and is_instance_valid(next_g["avatar_node"]):
+				next_g["avatar_node"].set_delayed_trick("lightning", true)
+			_animate_showcase_card("Thần Sấm An Toàn", "⚡ Phán xét [%s %s] thoát hiểm! Chuyển sang %s!" % [suit_icon, rank_str, next_g["name"]])
+			_add_log("⚡ [Thần Sấm Báo Ứng] Phán xét an toàn: Lật [%s %s]. Lá Thần Sấm được truyền sang khu phán xét của %s (Ghế %d)!" % [suit_icon, rank_str, next_g["name"], next_seat])
+		else:
+			_add_log("⚡ [Thần Sấm Báo Ứng] Phán xét an toàn: Lật [%s %s]. Không còn tướng nhận, lá bài bị loại bỏ!" % [suit_icon, rank_str])
+		await get_tree().create_timer(1.0).timeout
+
 func _next_turn() -> void:
 	if is_game_over:
 		return
-	var next_seat = (current_turn_seat % 4) + 1
+	var next_seat = _get_next_alive_seat(current_turn_seat)
+	if next_seat <= 0:
+		next_seat = (current_turn_seat % 4) + 1
 	_start_turn(next_seat)
 
 func _animate_showcase_card(c_name: String, banner_text: String) -> void:
@@ -2023,6 +2330,7 @@ func _on_iron_chain_confirmed() -> void:
 
 	_broadcast_player_battle_action("PLAY_CARD", "xichtam", selected_chain_seats[0])
 	selected_chain_seats.clear()
+	_reset_player_turn_timer()
 
 func _hide_iron_chain_modal() -> void:
 	iron_chain_modal.visible = false
@@ -2229,6 +2537,7 @@ func _on_card_pick_confirmed() -> void:
 
 	selected_card_pick_option.clear()
 	card_pick_target_seat = -1
+	_reset_player_turn_timer()
 
 func _hide_card_pick_modal() -> void:
 	card_pick_modal.visible = false
