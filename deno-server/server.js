@@ -1,6 +1,5 @@
 /**
- * ĐẠI VIỆT CHIẾN - UNIFIED REALTIME & REST GAME SERVER (DENO DEPLOY)
- * Tích hợp 100% WebSocket Realtime (<15ms) + REST API Fallback + Appwrite DB Backup
+ * 100% In-Memory WebSocket Realtime (<15ms) trên RAM
  */
 import {
   initGame,
@@ -18,232 +17,61 @@ import {
   hydrateGameState,
   ensureMutationVersion,
 } from "./gameEngine.js";
-
-const APPWRITE_ENDPOINT = Deno.env.get("APPWRITE_ENDPOINT") || "https://sgp.cloud.appwrite.io/v1";
-const PROJECT_ID = Deno.env.get("APPWRITE_PROJECT_ID") || "6a885457002da3f3d47e";
-const API_KEY = Deno.env.get("APPWRITE_API_KEY") || "";
-const DATABASE_ID = Deno.env.get("DATABASE_ID") || "game";
-const COLLECTION_ID = Deno.env.get("COLLECTION_ID") || "matchmaking_queue";
+import { HERO_MAX_HP } from "./heroes.js";
+import { getModeRules } from "./modeRegistry.js";
 
 const rooms = new Map();
 const startTime = Date.now();
-const localKvPath = Deno.build.os === "windows" ? ".dvc-kv" : undefined;
-const sharedKv = await Deno.openKv(Deno.env.get("DVC_KV_PATH") || localKvPath);
-const STATE_KEY_PREFIX = "dvc-game-state";
-const TICK_LEASE_KEY_PREFIX = "dvc-game-tick-lease";
-const instanceId = crypto.randomUUID();
-let roomLoopRunning = false;
 
-const STATE_ENCODING_PREFIX = "GZIP1:";
-// Appwrite string attributes are limited to 8192 characters. Keep a small
-// margin for schema/runtime differences and never persist truncated JSON.
-const MAX_PERSISTED_STATE_CHARS = 8000;
-const persistenceQueues = new Map();
+const HERO_NAME_MAP = {
+  5: "Thánh Thiên",
+  6: "Vũ Thị Thục",
+  7: "Nàng Nội",
+  8: "Triệu Quốc Đạt",
+  1: "Cao Lỗ",
+  2: "Đào Hãn",
+  3: "Thi Sách",
+  4: "Lê Chân",
+  47: "Lý Thường Kiệt",
+  53: "Trần Quốc Tuấn",
+  56: "Trần Quốc Toản",
+  68: "Trương Hán Siêu",
+  72: "Trần Duệ Tông",
+  83: "Nguyễn Cảnh Chân",
+  86: "Lê Lợi",
+  87: "Nguyễn Trãi",
+};
 
-async function encodePersistedState(value) {
-  const stream = new CompressionStream("gzip");
-  // Start consuming the readable side before writing to avoid backpressure
-  // deadlocks for larger game snapshots.
-  const output = new Response(stream.readable).arrayBuffer();
-  const writer = stream.writable.getWriter();
-  await writer.write(new TextEncoder().encode(JSON.stringify(value)));
-  await writer.close();
-  const bytes = new Uint8Array(await output);
-  let binary = "";
-  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
-  }
-  const encoded = STATE_ENCODING_PREFIX + btoa(binary);
-  if (encoded.length > MAX_PERSISTED_STATE_CHARS) {
-    throw new Error(`Serialized GameState exceeds Appwrite limit (${encoded.length} chars)`);
-  }
-  return encoded;
+function getHeroName(heroId) {
+  return HERO_NAME_MAP[Number(heroId)] || `Chiến Tướng #${heroId}`;
 }
 
-async function decodePersistedState(value) {
-  if (!value) return null;
-  // Read snapshots written before compression was introduced.
-  if (!value.startsWith(STATE_ENCODING_PREFIX)) {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return null;
-    }
-  }
-  try {
-    const binary = atob(value.slice(STATE_ENCODING_PREFIX.length));
-    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-    const stream = new DecompressionStream("gzip");
-    const output = new Response(stream.readable).text();
-    const writer = stream.writable.getWriter();
-    await writer.write(bytes);
-    await writer.close();
-    return JSON.parse(await output);
-  } catch (err) {
-    console.error("[DB Decode Error]:", err);
-    return null;
-  }
-}
+console.log("🎮 [Deno Server] Đại Việt Chiến 2v2 Unified Game Server (100% In-Memory) is running!");
 
-console.log("🎮 [Deno Server] Đại Việt Chiến 2v2 Unified Game Server is running!");
-
-async function loadStateFromDatabase(roomId) {
-  if (!API_KEY) return null;
-  const docId = `gs_${roomId.replace(/[^a-zA-Z0-9_-]/g, '')}`.substring(0, 36);
-  try {
-    const res = await fetch(`${APPWRITE_ENDPOINT}/databases/${DATABASE_ID}/collections/${COLLECTION_ID}/documents/${docId}`, {
-      headers: {
-        "X-Appwrite-Project": PROJECT_ID,
-        "X-Appwrite-Key": API_KEY,
-        "Content-Type": "application/json",
-      },
-    });
-    if (res.ok) {
-      const doc = await res.json();
-      if (doc && doc.userName) {
-        return hydrateGameState(await decodePersistedState(doc.userName), roomId);
-      }
-    }
-  } catch (err) {
-    console.error("[DB Load Error]:", err);
-  }
-  return null;
-}
-
-async function persistStateToDatabase(roomId, state) {
-  if (!API_KEY) return;
-  try {
-    const docId = `gs_${roomId.replace(/[^a-zA-Z0-9_-]/g, '')}`.substring(0, 36);
-    // Persist the full authoritative state. A client-safe snapshot omits
-    // queues/counters needed to resume AOE, duel, harvest, or near-death flows.
-    const stateJson = await encodePersistedState(state);
-
-    const docData = {
-      userId: "GAME_STATE",
-      userName: stateJson,
-      rankPoints: state.turnSeat,
-      timestamp: Date.now(),
-    };
-
-    // Keep existing Appwrite fallback compatibility; this document contains
-    // private hands/deck, so clients must use the sanitized server response.
-    const permissions = [];
-
-    const res = await fetch(`${APPWRITE_ENDPOINT}/databases/${DATABASE_ID}/collections/${COLLECTION_ID}/documents/${docId}`, {
-      method: "PATCH",
-      headers: {
-        "X-Appwrite-Project": PROJECT_ID,
-        "X-Appwrite-Key": API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ data: docData, permissions }),
-    });
-    if (!res.ok && res.status === 404) {
-      await fetch(`${APPWRITE_ENDPOINT}/databases/${DATABASE_ID}/collections/${COLLECTION_ID}/documents`, {
-        method: "POST",
-        headers: {
-          "X-Appwrite-Project": PROJECT_ID,
-          "X-Appwrite-Key": API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ documentId: docId, data: docData, permissions }),
-      });
-    }
-  } catch (err) {
-    console.error("[DB Save Error]:", err);
-  }
-}
-
-// Preserve write order so a slower request cannot overwrite a newer backup.
-function saveStateToDatabase(roomId, state) {
-  if (!API_KEY) return Promise.resolve();
-  const snapshot = structuredClone(state);
-  const previous = persistenceQueues.get(roomId) || Promise.resolve();
-  const current = previous
-    .catch(() => {})
-    .then(() => persistStateToDatabase(roomId, snapshot));
-  persistenceQueues.set(roomId, current);
-  return current.finally(() => {
-    if (persistenceQueues.get(roomId) === current) persistenceQueues.delete(roomId);
-  });
-}
-
-function stateKey(roomId) {
-  return [STATE_KEY_PREFIX, roomId];
-}
-
-function tickLeaseKey(roomId) {
-  return [TICK_LEASE_KEY_PREFIX, roomId];
-}
-
-function hydrateSharedState(entry, roomId) {
-  if (!entry?.value) return null;
-  return hydrateGameState(structuredClone(entry.value), roomId);
-}
-
-async function readSharedState(roomId) {
-  const entry = await sharedKv.get(stateKey(roomId));
-  return {
-    state: hydrateSharedState(entry, roomId),
-    versionstamp: entry.versionstamp,
-  };
-}
-
-async function loadOrCreateSharedState(roomId, players) {
-  const existing = await readSharedState(roomId);
-  if (existing.state) return existing;
-
-  const restored = await loadStateFromDatabase(roomId);
-  if (restored) {
-    const restoreCommit = await sharedKv.atomic()
-      .check({ key: stateKey(roomId), versionstamp: existing.versionstamp })
-      .set(stateKey(roomId), restored)
-      .commit();
-    if (restoreCommit.ok) {
-      return { state: restored, versionstamp: restoreCommit.versionstamp };
-    }
-    return readSharedState(roomId);
-  }
-
-  if (!Array.isArray(players) || players.length !== 4) return existing;
-  const initialState = initGame(roomId, players);
-  const createCommit = await sharedKv.atomic()
-    .check({ key: stateKey(roomId), versionstamp: existing.versionstamp })
-    .set(stateKey(roomId), initialState)
-    .commit();
-  if (createCommit.ok) {
-    return { state: initialState, versionstamp: createCommit.versionstamp };
-  }
-  return readSharedState(roomId);
-}
-
-async function ensureLocalRoom(roomId, players = null) {
-  const shared = await loadOrCreateSharedState(roomId, players);
-  if (!shared.state) return null;
-
+function ensureLocalRoom(roomId, players = null, forceReinit = false, modeId = "2v2") {
   let room = rooms.get(roomId);
   if (!room) {
+    if (!Array.isArray(players) || players.length === 0) return null;
+    const initialState = initGame(roomId, players, modeId);
     room = {
-      state: shared.state,
+      roomId,
+      state: initialState,
       sockets: new Map(),
       lastActivity: Date.now(),
-      kvVersionstamp: shared.versionstamp,
       nextTickAt: Date.now(),
     };
     rooms.set(roomId, room);
-  } else if (!room.state || shared.state.version > room.state.version
-      || shared.versionstamp !== room.kvVersionstamp) {
-    room.state = shared.state;
-    room.kvVersionstamp = shared.versionstamp;
+  } else if (forceReinit && Array.isArray(players)) {
+    room.state = initGame(roomId, players, modeId);
+    room.lastActivity = Date.now();
   }
   return room;
 }
 
-function updateLocalRoom(roomId, state, versionstamp) {
+function updateLocalRoom(roomId, state) {
   const room = rooms.get(roomId);
   if (!room) return null;
   room.state = state;
-  room.kvVersionstamp = versionstamp;
   room.lastActivity = Date.now();
   return room;
 }
@@ -252,12 +80,12 @@ function applyActionToState(state, seat, payload) {
   if (!hasSeat(state, seat)) return { error: "Ghế không thuộc phòng đấu" };
 
   if (payload.action === "USE_SKILL") {
-      return handleUseSkill(state, seat, payload.skillId, payload.targetSeat);
-    }
-    if (payload.action === "TOGGLE_SKILL") {
-      return handleToggleSkill(state, seat, payload.skillId);
-    }
-    if (payload.action === "PLAY_CARD") {
+    return handleUseSkill(state, seat, payload.skillId, payload.targetSeat, payload.cardId);
+  }
+  if (payload.action === "TOGGLE_SKILL") {
+    return handleToggleSkill(state, seat, payload.skillId);
+  }
+  if (payload.action === "PLAY_CARD") {
     return handlePlayCard(state, seat, payload.cardId, payload.targetSeat, payload);
   }
   if (payload.action === "RESPOND_ACTION") {
@@ -285,68 +113,44 @@ function applyActionToState(state, seat, payload) {
   return { error: "Hành động không hợp lệ" };
 }
 
-async function mutateSharedState(roomId, seat, payload) {
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const entry = await sharedKv.get(stateKey(roomId));
-    const state = hydrateSharedState(entry, roomId);
-    if (!state) return { error: "Phòng đấu chưa được khởi tạo", state: null };
+function mutateSharedState(roomId, seat, payload) {
+  const room = rooms.get(roomId);
+  if (!room || !room.state) return { error: "Phòng đấu chưa được khởi tạo", state: null };
 
-    const versionError = checkVersion(state, payload.expectedVersion);
-    if (versionError) return { error: versionError.error, code: versionError.code, conflict: true, state };
+  const state = room.state;
+  const versionError = checkVersion(state, payload.expectedVersion);
+  if (versionError) {
+    return { error: versionError.error, code: versionError.code, conflict: true, state };
+  }
 
-    const previousVersion = state.version;
-      let tickRes = null;
-      let result = null;
-              if (payload.action === "SERVER_TICK") {
-          tickRes = tickGameState(state);
-          result = { success: true, changed: tickRes.changed };
-        } else {
-          result = applyActionToState(state, seat, payload);
-          if (result && !result.error && state) {
-            state.timerStartAt = Date.now();
-          }
-        }
-      
-      if (result?.error) return { error: result.error, state };
-      if (result?.changed === false) return { state, result, committed: false };
-      
-      const isImportant = payload.action !== "SERVER_TICK" || (tickRes && tickRes.important);
-      if (isImportant) {
-        ensureMutationVersion(state, previousVersion);
-      }
+  const previousVersion = state.version;
+  let tickRes = null;
+  let result = null;
 
-      const commit = await sharedKv.atomic()
-        .check({ key: stateKey(roomId), versionstamp: entry.versionstamp })
-        .set(stateKey(roomId), state)
-        .commit();
-      if (commit.ok) {
-        return {
-          state,
-          result,
-          important: isImportant,
-          committed: true,
-          versionstamp: commit.versionstamp,
-        };
-      }
-
-    const latest = await readSharedState(roomId);
-    const expected = Number(payload.expectedVersion);
-    if (Number.isFinite(expected) && expected > 0 && latest.state?.version !== expected) {
-      return {
-        error: `Conflict: State version mismatch (expected: ${payload.expectedVersion}, current: ${latest.state?.version || 0})`,
-        code: "VERSION_CONFLICT",
-        conflict: true,
-        state: latest.state,
-      };
+  if (payload.action === "SERVER_TICK") {
+    tickRes = tickGameState(state);
+    result = { success: true, changed: tickRes.changed };
+  } else {
+    result = applyActionToState(state, seat, payload);
+    if (result && !result.error && state) {
+      state.timerStartAt = Date.now();
     }
   }
 
-  const latest = await readSharedState(roomId);
+  if (result?.error) return { error: result.error, state };
+  if (result?.changed === false) return { state, result, committed: false };
+
+  const isImportant = payload.action !== "SERVER_TICK" || (tickRes && tickRes.important);
+  if (isImportant) {
+    ensureMutationVersion(state, previousVersion);
+  }
+
+  room.lastActivity = Date.now();
   return {
-    error: "Máy chủ đang bận, vui lòng thử lại",
-    code: "STATE_BUSY",
-    conflict: true,
-    state: latest.state,
+    state,
+    result,
+    important: isImportant,
+    committed: true,
   };
 }
 
@@ -361,42 +165,17 @@ function broadcastStateUpdate(room, action = "STATE_UPDATE") {
   });
 }
 
-async function synchronizeRoom(roomId, room) {
-  const shared = await readSharedState(roomId);
-  if (!shared.state || shared.versionstamp === room.kvVersionstamp) return;
-  const previousVersion = room.state?.version;
-  updateLocalRoom(roomId, shared.state, shared.versionstamp);
-  if (shared.state.version !== previousVersion || room.sockets.size > 0) {
-    broadcastStateUpdate(room, "SHARED_STATE_UPDATE");
-  }
-}
-
-async function tryAcquireTickLease(roomId) {
-  const key = tickLeaseKey(roomId);
-  const now = Date.now();
-  const lease = await sharedKv.get(key);
-  if (lease.value && lease.value.expiresAt > now && lease.value.owner !== instanceId) return false;
-
-  const commit = await sharedKv.atomic()
-    .check({ key, versionstamp: lease.versionstamp })
-    .set(key, { owner: instanceId, expiresAt: now + 2500 })
-    .commit();
-  return commit.ok;
-}
-
-async function tickSharedRoom(roomId, room) {
-    if (!(await tryAcquireTickLease(roomId))) return;
-    const result = await mutateSharedState(roomId, undefined, {
-      action: "SERVER_TICK",
-    });
-    if (result.committed) {
-      updateLocalRoom(roomId, result.state, result.versionstamp);
-      if (result.important) {
-        broadcastStateUpdate(room, "SERVER_TICK");
-        saveStateToDatabase(roomId, result.state);
-      }
+function tickSharedRoom(roomId, room) {
+  const result = mutateSharedState(roomId, undefined, {
+    action: "SERVER_TICK",
+  });
+  if (result.committed) {
+    updateLocalRoom(roomId, result.state);
+    if (result.important) {
+      broadcastStateUpdate(room, "SERVER_TICK");
     }
   }
+}
 
 function broadcastRoom(room, messageObj) {
   const json = JSON.stringify(messageObj);
@@ -423,7 +202,7 @@ function broadcastRoom(room, messageObj) {
 
 function normalizeSeat(value) {
   const seat = Number(value);
-  return Number.isInteger(seat) && seat >= 1 && seat <= 4 ? seat : 0;
+  return Number.isInteger(seat) && seat >= 1 && seat <= 8 ? seat : 0;
 }
 
 function hasSeat(state, seat) {
@@ -453,26 +232,189 @@ function bindSocket(room, seat, socket) {
   room.sockets.set(seat, socket);
 }
 
-setInterval(async () => {
-  if (roomLoopRunning) return;
-  roomLoopRunning = true;
-  try {
-    for (const [roomId, room] of rooms.entries()) {
-      if (!room?.state || room.state.status === "FINISHED") continue;
-      try {
-        await synchronizeRoom(roomId, room);
-        if (Date.now() >= room.nextTickAt) {
-          room.nextTickAt = Date.now() + 1000;
-          await tickSharedRoom(roomId, room);
-        }
-      } catch (err) {
-        console.error(`[Room Loop Error room ${roomId}]:`, err);
-      }
-    }
-  } finally {
-    roomLoopRunning = false;
+function randomTeamSeats() {
+  const seats = [1, 2, 3, 4];
+  for (let i = seats.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [seats[i], seats[j]] = [seats[j], seats[i]];
   }
-}, 250);
+  return new Set(seats.slice(0, 2));
+}
+
+function resolveDraftSeat(room, requestedSeat, payload, socket) {
+    const slots = room.draft?.slots || [];
+    const normalize = (value) => String(value || "").trim().toLowerCase();
+    // Godot debug windows can share one UID/name through user://; honor their explicit seat.
+    if (Number(payload.debugSeat) === requestedSeat && requestedSeat >= 1 && requestedSeat <= 4) {
+        return requestedSeat;
+    }
+    const userId = normalize(payload.userId);
+  const userName = normalize(payload.userName);
+  const byId = userId
+    ? slots.filter((slot) => normalize(slot.userId) === userId)
+    : [];
+  if (byId.length === 1) return byId[0].seat;
+  const byName = userName
+    ? slots.filter((slot) => normalize(slot.userName) === userName)
+    : [];
+  if (byName.length === 1) return byName[0].seat;
+
+  // Duplicate debug identities use the requested per-window seat.
+  if (!room.sockets.has(requestedSeat) || room.sockets.get(requestedSeat) === socket) return requestedSeat;
+  return slots.find((slot) => !room.sockets.has(slot.seat))?.seat || 0;
+}
+
+function draftMessage(roomId, draft) {
+  return {
+    type: "DRAFT_STATE_UPDATE",
+    roomId,
+    currentPickerIndex: draft.currentPickerIndex,
+    currentSeat: draft.slots[draft.currentPickerIndex]?.seat || 1,
+    timer: draft.timer,
+    slots: draft.slots,
+    selectedHeroIds: draft.slots.filter((slot) => slot.isLocked).map((slot) => slot.heroId),
+  };
+}
+
+function makeDraftSlots(rawSlots, boundSeat, payload) {
+  const dragonSeats = randomTeamSeats();
+  return [1, 2, 3, 4].map((seat) => {
+    const matched = rawSlots.find((slot) => Number(slot?.seatNumber || slot?.seat) === seat) || rawSlots[seat - 1] || {};
+    const isAI = matched.isAI !== undefined ? Boolean(matched.isAI) : seat !== boundSeat;
+    const heroId = Number(matched.heroId || matched.hero_id || 0);
+    return {
+      seat,
+      seatNumber: seat,
+      userId: String(matched.userId || (isAI ? `bot_${seat}` : (seat === boundSeat ? (payload.userId || `user_${seat}`) : `user_${seat}`))),
+      userName: String(matched.userName || (isAI ? `AI Ghế ${seat}` : (seat === boundSeat ? (payload.userName || `Ghế ${seat}`) : `Ghế ${seat}`))),
+      isAI,
+      isDragon: dragonSeats.has(seat),
+      heroId,
+      heroName: String(matched.heroName || ""),
+      maxHp: HERO_MAX_HP[heroId] || 4,
+      isLocked: Boolean(matched.isLocked && heroId > 0),
+    };
+  });
+}
+
+function createDraftRoom(roomId, payload, boundSeat) {
+  const rawSlots = Array.isArray(payload.slots) ? payload.slots : [];
+  const room = {
+    state: null,
+    draft: {
+      roomId,
+      slots: makeDraftSlots(rawSlots, boundSeat, payload),
+      currentPickerIndex: 0,
+      timer: 40,
+      timerStartAt: Date.now(),
+      lastBroadcastTimer: 40,
+      isCompleted: false,
+    },
+    sockets: new Map(),
+    lastActivity: Date.now(),
+    nextTickAt: Date.now(),
+  };
+  rooms.set(roomId, room);
+  return room;
+}
+
+function finishDraftAndStartBattle(roomId, room) {
+  const draft = room?.draft;
+  if (!draft || draft.isCompleted || !draft.slots.every((slot) => slot.isLocked && slot.heroId > 0)) return;
+
+  const battlePlayers = draft.slots.map((slot) => ({
+    seat: slot.seat,
+    userId: slot.userId,
+    heroId: `HERO_${slot.heroId}`,
+    generalName: slot.heroName || getHeroName(slot.heroId),
+    maxHp: HERO_MAX_HP[slot.heroId] || 4,
+    hp: HERO_MAX_HP[slot.heroId] || 4,
+    isAlly: slot.isDragon,
+    isAI: slot.isAI,
+  }));
+  const state = initGame(roomId, battlePlayers);
+
+  draft.isCompleted = true;
+  room.state = state;
+  room.lastActivity = Date.now();
+  broadcastRoom(room, { type: "DRAFT_COMPLETED", roomId, slots: draft.slots, battlePlayers });
+}
+
+async function tickDraftRoom(roomId, room) {
+  const draft = room?.draft;
+  if (!draft || draft.isCompleted) return;
+  const currentSlot = draft.slots[draft.currentPickerIndex];
+  if (!currentSlot) {
+    finishDraftAndStartBattle(roomId, room);
+    return;
+  }
+
+  const elapsed = Math.floor((Date.now() - draft.timerStartAt) / 1000);
+  const isBot = currentSlot.isAI && !room.sockets.has(currentSlot.seat);
+  if ((elapsed >= 40 || (isBot && elapsed >= 3)) && !currentSlot.isLocked) {
+    const used = new Set(draft.slots.filter((slot) => slot.isLocked).map((slot) => slot.heroId));
+    const heroId = [1, 2, 3, 4, 47, 53, 56, 68, 72, 83, 86, 87].find((id) => !used.has(id)) || 1;
+    currentSlot.heroId = heroId;
+    currentSlot.heroName = getHeroName(heroId);
+    currentSlot.maxHp = HERO_MAX_HP[heroId] || 4;
+    currentSlot.isLocked = true;
+    draft.currentPickerIndex += 1;
+    draft.timerStartAt = Date.now();
+    draft.timer = 40;
+    draft.lastBroadcastTimer = 40;
+    if (draft.currentPickerIndex >= draft.slots.length) {
+      finishDraftAndStartBattle(roomId, room);
+      return;
+    }
+  } else {
+    draft.timer = Math.max(0, 40 - elapsed);
+  }
+
+  if (draft.timer !== draft.lastBroadcastTimer) {
+    draft.lastBroadcastTimer = draft.timer;
+    broadcastRoom(room, draftMessage(roomId, draft));
+  }
+}
+
+setInterval(() => {
+  if (rooms.size === 0) return;
+  const now = Date.now();
+  for (const [roomId, room] of rooms.entries()) {
+    if (!room) continue;
+    try {
+      const isFinished = room.state && room.state.status === "FINISHED";
+      const noSockets = !room.sockets || room.sockets.size === 0;
+      const isIdleTooLong = now - room.lastActivity > 900000;
+      const isFinishedTooLong = isFinished && (now - room.lastActivity > 30000);
+      const isAbandoned = noSockets && (now - room.lastActivity > 120000);
+
+      if (isIdleTooLong || isFinishedTooLong || isAbandoned) {
+        if (room.sockets) {
+          for (const ws of room.sockets.values()) {
+            try { ws.close(1000, "Room cleaned up"); } catch {}
+          }
+          room.sockets.clear();
+        }
+        rooms.delete(roomId);
+        console.log(`[Deno Server] Đã dọn dẹp phòng: ${roomId}`);
+        continue;
+      }
+
+      if (room.draft && !room.draft.isCompleted) {
+        tickDraftRoom(roomId, room);
+        continue;
+      }
+      if (!room.state || isFinished) continue;
+
+      if (now >= (room.nextTickAt || 0)) {
+        room.nextTickAt = now + 1000;
+        tickSharedRoom(roomId, room);
+      }
+    } catch (err) {
+      console.error(`[Room Loop Error room ${roomId}]:`, err);
+    }
+  }
+}, 500);
 
 Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
   const upgrade = req.headers.get("upgrade") || "";
@@ -491,14 +433,14 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
       messageQueue = messageQueue.then(async () => {
         try {
         const payload = JSON.parse(event.data);
-        const { action, roomId, cardId, targetCardId, targetSeat, accepted, cardIds, players, expectedVersion } = payload;
+        const { action, roomId, cardId, targetCardId, targetSeat, targetSeat2, targetSeats, recast, skillId, accepted, cardIds, players, modeId, expectedVersion } = payload;
         const requestSeat = normalizeSeat(payload.seat);
 
         if (!roomId) {
           return socket.send(JSON.stringify({ type: "ERROR", error: "Thiếu roomId" }));
         }
 
-        const isJoinAction = action === "JOIN_ROOM" || action === "INIT_GAME";
+        const isJoinAction = action === "JOIN_ROOM" || action === "INIT_GAME" || action === "JOIN_DRAFT";
 
         // A connection receives its identity only after a successful join.
         // Thereafter a client cannot switch rooms or impersonate another seat.
@@ -506,7 +448,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           return socket.send(JSON.stringify({ type: "ERROR", error: "Kết nối chưa tham gia phòng" }));
         }
         if (isJoinAction && requestSeat === 0) {
-          return socket.send(JSON.stringify({ type: "ERROR", error: "Ghế không hợp lệ (1-4)" }));
+          return socket.send(JSON.stringify({ type: "ERROR", error: "Ghế không hợp lệ" }));
         }
         if (currentRoomId !== null && (roomId !== currentRoomId || (requestSeat !== 0 && requestSeat !== currentSeat))) {
           return socket.send(JSON.stringify({ type: "ERROR", error: "Kết nối đã được khóa vào phòng/ghế khác" }));
@@ -518,9 +460,84 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
 
         let room = rooms.get(roomId);
 
-        // A. KHỞI TẠO HOẶC THAM GIA PHÒNG ĐẤU
+        // A. KHỞI TẠO HOẶC THAM GIA PHÒNG CHỌN TƯỚNG
+        if (action === "JOIN_DRAFT") {
+          const fresh = !room || (!room.draft?.isCompleted && room.state?.status === "FINISHED");
+          if (fresh) room = createDraftRoom(roomId, payload, boundSeat);
+          if (!room?.draft) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Không thể khởi tạo phòng chọn tướng" }));
+          }
+          const draftSeat = currentRoomId === null
+            ? resolveDraftSeat(room, boundSeat, payload, socket)
+            : boundSeat;
+          if (!draftSeat) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Phòng đã đủ 4 ghế" }));
+          }
+          const slot = room.draft.slots.find((entry) => entry.seat === draftSeat);
+          if (!slot) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Ghế không thuộc phòng chọn tướng" }));
+          }
+          if (payload.userId) slot.userId = String(payload.userId);
+          if (payload.userName) slot.userName = String(payload.userName);
+          slot.isAI = false;
+          currentRoomId = roomId;
+          currentSeat = draftSeat;
+          bindSocket(room, currentSeat, socket);
+          room.lastActivity = Date.now();
+          socket.send(JSON.stringify({ type: "DRAFT_JOINED", roomId, seat: draftSeat, assignedSeat: draftSeat }));
+          if (room.draft.isCompleted && room.state) {
+            return socket.send(JSON.stringify({
+              type: "DRAFT_COMPLETED",
+              roomId,
+              slots: room.draft.slots,
+              battlePlayers: room.state.players,
+            }));
+          }
+          broadcastRoom(room, draftMessage(roomId, room.draft));
+          return;
+        }
+
+        // B. KHÓA TƯỚNG TRONG PHÒNG CHỌN TƯỚNG
+        if (action === "PICK_HERO") {
+          if (!room?.draft || room.draft.isCompleted) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Không trong giai đoạn chọn tướng" }));
+          }
+          const currentSlot = room.draft.slots[room.draft.currentPickerIndex];
+          if (!currentSlot || currentSlot.seat !== boundSeat) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Chưa đến lượt bạn chọn tướng" }));
+          }
+          const heroId = Number(payload.heroId || payload.hero_id || 0);
+          if (!Number.isInteger(heroId) || heroId < 1 || heroId > 100) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Tướng không hợp lệ" }));
+          }
+          const selectedHeroIds = room.draft.slots.filter((entry) => entry.isLocked).map((entry) => entry.heroId);
+          if (selectedHeroIds.includes(heroId)) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Tướng này đã được chọn" }));
+          }
+          currentSlot.heroId = heroId;
+          currentSlot.heroName = String(payload.heroName || getHeroName(heroId));
+          currentSlot.maxHp = HERO_MAX_HP[heroId] || 4;
+          currentSlot.isLocked = true;
+          room.draft.currentPickerIndex += 1;
+          room.draft.timer = 40;
+          room.draft.timerStartAt = Date.now();
+          room.draft.lastBroadcastTimer = 40;
+          room.lastActivity = Date.now();
+          if (room.draft.currentPickerIndex >= room.draft.slots.length) {
+            await finishDraftAndStartBattle(roomId, room);
+          } else {
+            broadcastRoom(room, draftMessage(roomId, room.draft));
+          }
+          return;
+        }
+
+        // C. KHỞI TẠO HOẶC THAM GIA PHÒNG ĐẤU
         if (action === "JOIN_ROOM" || action === "INIT_GAME") {
-          room = await ensureLocalRoom(roomId, Array.isArray(players) ? players : null);
+          const requestedMode = getModeRules(modeId || "2v2");
+          const hasFullPlayers = Array.isArray(players) && !!requestedMode
+            && players.length >= requestedMode.minPlayers && players.length <= requestedMode.maxPlayers;
+          const forceReinit = hasFullPlayers && (!room || !room.state || room.state.status === "FINISHED");
+          room = await ensureLocalRoom(roomId, hasFullPlayers ? players : null, forceReinit, modeId || "2v2");
           if (!room) {
             return socket.send(JSON.stringify({ type: "ERROR", error: "Cần đủ thông tin 4 người chơi để khởi tạo phòng" }));
           }
@@ -586,12 +603,16 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           return socket.send(JSON.stringify({ type: "PONG", timestamp: Date.now() }));
         }
 
-        // D. XỬ LÝ ATOMIC TRÊN STATE DÙNG CHUNG
-        const outcome = await mutateSharedState(roomId, boundSeat, {
+        // D. XỬ LÝ TRÊN STATE TRONG BỘ NHỚ RAM
+        const outcome = mutateSharedState(roomId, boundSeat, {
           action,
           cardId,
           targetCardId,
           targetSeat,
+          targetSeat2,
+          targetSeats,
+          recast: recast === true,
+          skillId,
           accepted,
           cardIds,
           expectedVersion,
@@ -612,11 +633,10 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           }));
         }
 
-        // E. Cập nhật cache cục bộ và phát cho sockets trong isolate này.
+        // E. Cập nhật trạng thái phòng và phát broadcast cho toàn bộ người chơi trong phòng
         if (outcome.committed) {
-          updateLocalRoom(roomId, outcome.state, outcome.versionstamp);
+          updateLocalRoom(roomId, outcome.state);
           broadcastStateUpdate(room, action);
-          saveStateToDatabase(roomId, outcome.state);
         }
         } catch (err) {
           console.error("[WS Message Error]:", err);
@@ -658,7 +678,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
   if (req.method === "POST") {
     try {
       const payload = await req.json();
-      const { action, roomId, seat, cardId, targetCardId, targetSeat, accepted, cardIds, players, expectedVersion } = payload;
+      const { action, roomId, seat, cardId, targetCardId, targetSeat, targetSeat2, targetSeats, recast, skillId, accepted, cardIds, players, modeId, expectedVersion } = payload;
       const requestSeat = normalizeSeat(seat);
 
       if (!roomId) {
@@ -672,9 +692,9 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
 
       if (action === "INIT_GAME") {
         if (requestSeat === 0) {
-          return new Response(JSON.stringify({ success: false, error: "Ghế không hợp lệ (1-4)" }), { status: 400 });
+          return new Response(JSON.stringify({ success: false, error: "Ghế không hợp lệ" }), { status: 400 });
         }
-        room = await ensureLocalRoom(roomId, Array.isArray(players) ? players : null);
+        room = await ensureLocalRoom(roomId, Array.isArray(players) ? players : null, false, modeId || "2v2");
         if (!room) {
           return new Response(JSON.stringify({ success: false, error: "Cần đủ thông tin 4 người chơi" }), { status: 400 });
         }
@@ -692,28 +712,28 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
       }
 
       if (action !== "INIT_GAME" && requestSeat === 0) {
-        return new Response(JSON.stringify({ success: false, error: "Ghế không hợp lệ (1-4)" }), { status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+        return new Response(JSON.stringify({ success: false, error: "Ghế không hợp lệ" }), { status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
       }
       if (action !== "INIT_GAME" && !hasSeat(room.state, requestSeat)) {
         return new Response(JSON.stringify({ success: false, error: "Ghế không thuộc phòng đấu" }), { status: 403, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
       }
 
       if (action === "GET_STATE") {
-        const shared = await readSharedState(roomId);
-        if (shared.state) updateLocalRoom(roomId, shared.state, shared.versionstamp);
-        const state = shared.state || room.state;
+        const state = room.state;
         return new Response(JSON.stringify({ success: true, state: sanitizeGameStateForClient(state, requestSeat || 1) }), {
           headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
         });
       }
 
-      const outcome = await mutateSharedState(roomId, requestSeat, {
+      const outcome = mutateSharedState(roomId, requestSeat, {
         action,
         cardId,
         targetCardId,
         targetSeat,
-        targetSeat2: payload.targetSeat2,
-        targetSeats: payload.targetSeats,
+        targetSeat2,
+        targetSeats,
+        recast: recast === true,
+        skillId,
         accepted,
         cardIds,
         expectedVersion,
@@ -728,9 +748,8 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
       }
 
       if (outcome.committed) {
-        updateLocalRoom(roomId, outcome.state, outcome.versionstamp);
+        updateLocalRoom(roomId, outcome.state);
         broadcastStateUpdate(room, action);
-        saveStateToDatabase(roomId, outcome.state);
       }
 
       return new Response(JSON.stringify({ success: true, state: sanitizeGameStateForClient(outcome.state, requestSeat || 1) }), {
