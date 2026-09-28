@@ -22,6 +22,30 @@ import { getModeRules } from "./modeRegistry.js";
 
 const rooms = new Map();
 const startTime = Date.now();
+const MAX_WS_MESSAGE_BYTES = 64 * 1024;
+const MAX_ACTIONS_PER_SECOND = 30;
+const ALLOWED_WS_ACTIONS = new Set([
+  "JOIN_ROOM", "INIT_GAME", "JOIN_DRAFT", "PICK_HERO", "GET_STATE", "PING",
+  "USE_SKILL", "TOGGLE_SKILL", "PLAY_CARD", "RESPOND_ACTION", "END_TURN",
+  "DISCARD_CARDS", "AI_STEP", "AI_REACTION"
+]);
+
+function validateClientPayload(payload, rawBytes) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return "Gói tin không hợp lệ";
+  if (rawBytes > MAX_WS_MESSAGE_BYTES) return "Gói tin vượt giới hạn cho phép";
+  if (typeof payload.action !== "string" || !ALLOWED_WS_ACTIONS.has(payload.action)) return "Hành động không hợp lệ";
+  if (payload.roomId !== undefined && (typeof payload.roomId !== "string" || payload.roomId.length > 128)) return "Mã phòng không hợp lệ";
+  for (const key of ["cardId", "targetCardId", "skillId", "heroName", "userId", "userName"]) {
+    if (payload[key] !== undefined && (typeof payload[key] !== "string" || payload[key].length > 256)) return `${key} không hợp lệ`;
+  }
+  for (const key of ["seat", "targetSeat", "targetSeat2", "expectedVersion"]) {
+    if (payload[key] !== undefined && (!Number.isInteger(Number(payload[key])) || Number(payload[key]) < 0)) return `${key} không hợp lệ`;
+  }
+  if (payload.cardIds !== undefined && (!Array.isArray(payload.cardIds) || payload.cardIds.length > 20 || payload.cardIds.some((id) => typeof id !== "string" || id.length > 256))) return "Danh sách lá bài không hợp lệ";
+  if (payload.targetSeats !== undefined && (!Array.isArray(payload.targetSeats) || payload.targetSeats.length > 8)) return "Danh sách mục tiêu không hợp lệ";
+  if (payload.players !== undefined && (!Array.isArray(payload.players) || payload.players.length > 8)) return "Danh sách người chơi không hợp lệ";
+  return null;
+}
 
 const HERO_NAME_MAP = {
   5: "Thánh Thiên",
@@ -187,7 +211,6 @@ function broadcastRoom(room, messageObj) {
           const personalized = {
             ...messageObj,
             state: sanitizedState,
-            delta: sanitizedState.delta,
           };
           ws.send(JSON.stringify(personalized));
         } else {
@@ -426,13 +449,33 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
     let currentRoomId = null;
     let currentSeat = 0;
     let messageQueue = Promise.resolve();
+    let rateWindowStartedAt = Date.now();
+    let rateWindowCount = 0;
 
     socket.onopen = () => {};
 
     socket.onmessage = (event) => {
       messageQueue = messageQueue.then(async () => {
         try {
-        const payload = JSON.parse(event.data);
+        const raw = typeof event.data === "string" ? event.data : String(event.data || "");
+        const rawBytes = new TextEncoder().encode(raw).length;
+        if (rawBytes > MAX_WS_MESSAGE_BYTES) {
+          socket.close(1009, "Message too big");
+          return;
+        }
+        const payload = JSON.parse(raw);
+        const payloadError = validateClientPayload(payload, rawBytes);
+        if (payloadError) return socket.send(JSON.stringify({ type: "ERROR", error: payloadError }));
+        if (payload.action !== "PING") {
+          const now = Date.now();
+          if (now - rateWindowStartedAt >= 1000) {
+            rateWindowStartedAt = now;
+            rateWindowCount = 0;
+          }
+          if (++rateWindowCount > MAX_ACTIONS_PER_SECOND) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Gửi hành động quá nhanh, vui lòng chờ một chút" }));
+          }
+        }
         const { action, roomId, cardId, targetCardId, targetSeat, targetSeat2, targetSeats, recast, skillId, accepted, cardIds, players, modeId, expectedVersion } = payload;
         const requestSeat = normalizeSeat(payload.seat);
 

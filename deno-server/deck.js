@@ -45,6 +45,7 @@ export const CARD_SUBTYPES = {
 };
 
 export function createCard(id, name, suit, rank, category, subType, desc, range = 1, distMod = 0) {
+  if (category === CARD_CATEGORIES.BASIC && subType === CARD_SUBTYPES.ATTACK_NORMAL) name = "Trảm";
   return { id, name, suit, rank, category, subType, desc, range, distMod };
 }
 
@@ -83,40 +84,40 @@ export function createDeck80() {
   // ==========================================
   // 2. TRẢM - THỦY — 6 LÁ (Toàn bộ Đen)
   // ==========================================
-  list.push(createCard("D80_TL_S8", "Trảm - Thủy", "Spade", 8, 0, 2, "Tấn công gây 1 sát thương thuộc tính Thủy"));
-  list.push(createCard("D80_TL_S9", "Trảm - Thủy", "Spade", 9, 0, 2, "Tấn công gây 1 sát thương thuộc tính Thủy"));
-  list.push(createCard("D80_TL_C10", "Trảm - Thủy", "Club", 10, 0, 2, "Tấn công gây 1 sát thương thuộc tính Thủy"));
-  list.push(createCard("D80_TL_CJ", "Trảm - Thủy", "Club", 11, 0, 2, "Tấn công gây 1 sát thương thuộc tính Thủy"));
-  list.push(createCard("D80_TL_SK", "Trảm - Thủy", "Spade", 13, 0, 2, "Tấn công gây 1 sát thương thuộc tính Thủy"));
-  list.push(createCard("D80_TL_CA", "Trảm - Thủy", "Club", 1, 0, 2, "Tấn công gây 1 sát thương thuộc tính Thủy"));
+  list.push(createCard("D80_TL_S8", "Trảm - Thủy", "Spade", 8, 0, 2, "Tấn công gây 1 sát thương thuộc tính Thủy, lan qua Xích Tâm Tỏa"));
+  list.push(createCard("D80_TL_S9", "Trảm - Thủy", "Spade", 9, 0, 2, "Tấn công gây 1 sát thương thuộc tính Thủy, lan qua Xích Tâm Tỏa"));
+  list.push(createCard("D80_TL_C10", "Trảm - Thủy", "Club", 10, 0, 2, "Tấn công gây 1 sát thương thuộc tính Thủy, lan qua Xích Tâm Tỏa"));
+  list.push(createCard("D80_TL_CJ", "Trảm - Thủy", "Club", 11, 0, 2, "Tấn công gây 1 sát thương thuộc tính Thủy, lan qua Xích Tâm Tỏa"));
+  list.push(createCard("D80_TL_SK", "Trảm - Thủy", "Spade", 13, 0, 2, "Tấn công gây 1 sát thương thuộc tính Thủy, lan qua Xích Tâm Tỏa"));
+  list.push(createCard("D80_TL_CA", "Trảm - Thủy", "Club", 1, 0, 2, "Tấn công gây 1 sát thương thuộc tính Thủy, lan qua Xích Tâm Tỏa"));
 
   // ==========================================
   // 3. TRẢM - HỎA — 6 LÁ (Toàn bộ Đỏ)
   // ==========================================
-  list.push(createCard("D80_TH_D8", "Trảm - Hỏa", "Diamond", 8, 0, 1, "Tấn công gây 1 sát thương thuộc tính Hỏa, lan qua Xích Liên Hoàn"));
-  list.push(createCard("D80_TH_D9", "Trảm - Hỏa", "Diamond", 9, 0, 1, "Tấn công gây 1 sát thương thuộc tính Hỏa, lan qua Xích Liên Hoàn"));
-  list.push(createCard("D80_TH_H10", "Trảm - Hỏa", "Heart", 10, 0, 1, "Tấn công gây 1 sát thương thuộc tính Hỏa, lan qua Xích Liên Hoàn"));
-  list.push(createCard("D80_TH_DJ", "Trảm - Hỏa", "Diamond", 11, 0, 1, "Tấn công gây 1 sát thương thuộc tính Hỏa, lan qua Xích Liên Hoàn"));
-  list.push(createCard("D80_TH_HQ", "Trảm - Hỏa", "Heart", 12, 0, 1, "Tấn công gây 1 sát thương thuộc tính Hỏa, lan qua Xích Liên Hoàn"));
-  list.push(createCard("D80_TH_HA", "Trảm - Hỏa", "Heart", 1, 0, 1, "Tấn công gây 1 sát thương thuộc tính Hỏa, lan qua Xích Liên Hoàn"));
+  list.push(createCard("D80_TH_D8", "Trảm - Hỏa", "Diamond", 8, 0, 1, "Tấn công gây 1 sát thương thuộc tính Hỏa, lan qua Xích Tâm Tỏa"));
+  list.push(createCard("D80_TH_D9", "Trảm - Hỏa", "Diamond", 9, 0, 1, "Tấn công gây 1 sát thương thuộc tính Hỏa, lan qua Xích Tâm Tỏa"));
+  list.push(createCard("D80_TH_H10", "Trảm - Hỏa", "Heart", 10, 0, 1, "Tấn công gây 1 sát thương thuộc tính Hỏa, lan qua Xích Tâm Tỏa"));
+  list.push(createCard("D80_TH_DJ", "Trảm - Hỏa", "Diamond", 11, 0, 1, "Tấn công gây 1 sát thương thuộc tính Hỏa, lan qua Xích Tâm Tỏa"));
+  list.push(createCard("D80_TH_HQ", "Trảm - Hỏa", "Heart", 12, 0, 1, "Tấn công gây 1 sát thương thuộc tính Hỏa, lan qua Xích Tâm Tỏa"));
+  list.push(createCard("D80_TH_HA", "Trảm - Hỏa", "Heart", 1, 0, 1, "Tấn công gây 1 sát thương thuộc tính Hỏa, lan qua Xích Tâm Tỏa"));
 
   // ==========================================
   // 4. ĐỠ — 14 LÁ (Toàn bộ Đỏ)
   // ==========================================
-  list.push(createCard("D80_DO_D2", "Đỡ", "Diamond", 2, 0, 3, "Hóa giải hoàn toàn 1 đòn Trảm"));
-  list.push(createCard("D80_DO_H3", "Đỡ", "Heart", 3, 0, 3, "Hóa giải hoàn toàn 1 đòn Trảm"));
-  list.push(createCard("D80_DO_D4", "Đỡ", "Diamond", 4, 0, 3, "Hóa giải hoàn toàn 1 đòn Trảm"));
-  list.push(createCard("D80_DO_H5", "Đỡ", "Heart", 5, 0, 3, "Hóa giải hoàn toàn 1 đòn Trảm"));
-  list.push(createCard("D80_DO_D6", "Đỡ", "Diamond", 6, 0, 3, "Hóa giải hoàn toàn 1 đòn Trảm"));
-  list.push(createCard("D80_DO_H7", "Đỡ", "Heart", 7, 0, 3, "Hóa giải hoàn toàn 1 đòn Trảm"));
-  list.push(createCard("D80_DO_D8", "Đỡ", "Diamond", 8, 0, 3, "Hóa giải hoàn toàn 1 đòn Trảm"));
-  list.push(createCard("D80_DO_H9", "Đỡ", "Heart", 9, 0, 3, "Hóa giải hoàn toàn 1 đòn Trảm"));
-  list.push(createCard("D80_DO_D10", "Đỡ", "Diamond", 10, 0, 3, "Hóa giải hoàn toàn 1 đòn Trảm"));
-  list.push(createCard("D80_DO_HJ", "Đỡ", "Heart", 11, 0, 3, "Hóa giải hoàn toàn 1 đòn Trảm"));
-  list.push(createCard("D80_DO_DQ", "Đỡ", "Diamond", 12, 0, 3, "Hóa giải hoàn toàn 1 đòn Trảm"));
-  list.push(createCard("D80_DO_HQ", "Đỡ", "Heart", 12, 0, 3, "Hóa giải hoàn toàn 1 đòn Trảm"));
-  list.push(createCard("D80_DO_DK", "Đỡ", "Diamond", 13, 0, 3, "Hóa giải hoàn toàn 1 đòn Trảm"));
-  list.push(createCard("D80_DO_HK", "Đỡ", "Heart", 13, 0, 3, "Hóa giải hoàn toàn 1 đòn Trảm"));
+  list.push(createCard("D80_DO_D2", "Đỡ", "Diamond", 2, 0, 3, "Hóa giải 1 đòn Trảm"));
+  list.push(createCard("D80_DO_H3", "Đỡ", "Heart", 3, 0, 3, "Hóa giải 1 đòn Trảm"));
+  list.push(createCard("D80_DO_D4", "Đỡ", "Diamond", 4, 0, 3, "Hóa giải 1 đòn Trảm"));
+  list.push(createCard("D80_DO_H5", "Đỡ", "Heart", 5, 0, 3, "Hóa giải 1 đòn Trảm"));
+  list.push(createCard("D80_DO_D6", "Đỡ", "Diamond", 6, 0, 3, "Hóa giải 1 đòn Trảm"));
+  list.push(createCard("D80_DO_H7", "Đỡ", "Heart", 7, 0, 3, "Hóa giải 1 đòn Trảm"));
+  list.push(createCard("D80_DO_D8", "Đỡ", "Diamond", 8, 0, 3, "Hóa giải 1 đòn Trảm"));
+  list.push(createCard("D80_DO_H9", "Đỡ", "Heart", 9, 0, 3, "Hóa giải 1 đòn Trảm"));
+  list.push(createCard("D80_DO_D10", "Đỡ", "Diamond", 10, 0, 3, "Hóa giải 1 đòn Trảm"));
+  list.push(createCard("D80_DO_HJ", "Đỡ", "Heart", 11, 0, 3, "Hóa giải 1 đòn Trảm"));
+  list.push(createCard("D80_DO_DQ", "Đỡ", "Diamond", 12, 0, 3, "Hóa giải 1 đòn Trảm"));
+  list.push(createCard("D80_DO_HQ", "Đỡ", "Heart", 12, 0, 3, "Hóa giải 1 đòn Trảm"));
+  list.push(createCard("D80_DO_DK", "Đỡ", "Diamond", 13, 0, 3, "Hóa giải 1 đòn Trảm"));
+  list.push(createCard("D80_DO_HK", "Đỡ", "Heart", 13, 0, 3, "Hóa giải 1 đòn Trảm"));
 
   // ==========================================
   // 5. BÁNH CHƯNG — 6 LÁ (Toàn bộ Cơ ♥)
@@ -131,10 +132,10 @@ export function createDeck80() {
   // ==========================================
   // 6. HỦ RƯỢU — 4 LÁ
   // ==========================================
-  list.push(createCard("D80_HR_C7", "Hủ Rượu", "Club", 7, 0, 5, "Uống trước Trảm (+1 ST) hoặc tự cứu khi 0 máu"));
-  list.push(createCard("D80_HR_D7", "Hủ Rượu", "Diamond", 7, 0, 5, "Uống trước Trảm (+1 ST) hoặc tự cứu khi 0 máu"));
-  list.push(createCard("D80_HR_SQ", "Hủ Rượu", "Spade", 12, 0, 5, "Uống trước Trảm (+1 ST) hoặc tự cứu khi 0 máu"));
-  list.push(createCard("D80_HR_HJ", "Hủ Rượu", "Heart", 11, 0, 5, "Uống trước Trảm (+1 ST) hoặc tự cứu khi 0 máu"));
+  list.push(createCard("D80_HR_C7", "Hủ Rượu", "Club", 7, 0, 5, "Uống trước Trảm (+1 Sát Thương) hoặc tự cứu khi Cận Tử"));
+  list.push(createCard("D80_HR_D7", "Hủ Rượu", "Diamond", 7, 0, 5, "Uống trước Trảm (+1 Sát Thương) hoặc tự cứu khi Cận Tử"));
+  list.push(createCard("D80_HR_SQ", "Hủ Rượu", "Spade", 12, 0, 5, "Uống trước Trảm (+1 Sát Thương) hoặc tự cứu khi Cận Tử"));
+  list.push(createCard("D80_HR_HJ", "Hủ Rượu", "Heart", 11, 0, 5, "Uống trước Trảm (+1 Sát Thương) hoặc tự cứu khi Cận Tử"));
 
   // ==========================================
   // 7. XÍCH TÂM TỎA — 2 LÁ (Toàn bộ Đen)
@@ -148,10 +149,10 @@ export function createDeck80() {
   list.push(createCard("D80_VK_DA_ThuanThien", "Kiếm Thuận Thiên", "Diamond", 1, 1, 6, "Tầm 2. Trảm của bạn bỏ qua Trang bị Giáp của mục tiêu", 2));
   list.push(createCard("D80_VK_HK_SongCung", "Song Cung Mường Nhạ", "Heart", 13, 1, 6, "Tầm 2. Khi Trảm bị Đỡ, bỏ 2 lá để bỏ qua Đỡ; Trảm vẫn gây sát thương", 2));
   list.push(createCard("D80_VK_SK_SongCung", "Song Cung Mường Nhạ", "Spade", 13, 1, 6, "Tầm 2. Khi Trảm bị Đỡ, bỏ 2 lá để bỏ qua Đỡ; Trảm vẫn gây sát thương", 2));
-  list.push(createCard("D80_VK_CQ_NoThan", "Nỏ Thần Kim Quy", "Club", 12, 1, 6, "Tầm 3. Không giới hạn số lá Trảm trong cùng Giai đoạn Ra bài", 3));
+  list.push(createCard("D80_VK_CQ_NoThan", "Nỏ Thần Kim Quy", "Club", 12, 1, 6, "Tầm 1. Không giới hạn số lá Trảm trong lượt", 1));
   list.push(createCard("D80_VK_CJ_TruongDao", "Trường Đao Nam Sơn", "Club", 11, 1, 6, "Tầm 3. Khi Trảm bị Đỡ, xem như chưa sử dụng lượt Trảm trong lượt chơi này", 3));
   list.push(createCard("D80_VK_DQ_ThuongNgau", "Thương Ngâu Lãng Bạc", "Diamond", 12, 1, 6, "Tầm 4. Khi Trảm trúng, hủy 1 lá trên tay hoặc trang bị đối phương", 4));
-  list.push(createCard("D80_VK_SA_SungThanCong", "Súng Thần Công Hồ Triều", "Spade", 1, 1, 6, "Tầm 5. Mục tiêu không được sử dụng Đỡ cùng chất với lá Trảm", 5));
+  list.push(createCard("D80_VK_SA_SungThanCong", "Súng Thần Công Hồ Triều", "Spade", 1, 1, 6, "Tầm 5. Mục tiêu không được dùng Đỡ cùng màu với Trảm", 5));
   list.push(createCard("D80_VK_C5_HoaMai", "Hỏa Mai Tây Sơn", "Club", 5, 1, 6, "Tầm 4. Trảm Thường có thể xem như Trảm Hỏa", 4));
   list.push(createCard("D80_VK_D9_LiemDao", "Liêm Đao Đống Đa", "Diamond", 9, 1, 6, "Tầm 2. Lần đầu mỗi lượt gây sát thương, rút 1 lá", 2));
   list.push(createCard("D80_VK_S7_DoanDao", "Đoản Đao Lam Sơn", "Spade", 7, 1, 6, "Tầm 2. Khi Trảm trúng, có thể hủy 2 lá tay hoặc Trang bị của mục tiêu thay vì gây sát thương", 2));
@@ -159,9 +160,9 @@ export function createDeck80() {
   // ==========================================
   // 9. ÁO GIÁP — 3 LÁ
   // ==========================================
-  list.push(createCard("D80_AG_CK_GiapDong", "Giáp Đồng Sơn Vi", "Club", 13, 1, 7, "Vô hiệu hóa toàn bộ đòn Trảm Thường không mang Thủy/Hỏa"));
-  list.push(createCard("D80_AG_DK_KhienMay", "Khiên Mây Bện", "Diamond", 13, 1, 7, "Bị Trảm/Mưa Tên: lật phán xét Đỏ tự động Đỡ, Đen thất bại"));
-  list.push(createCard("D80_AG_HA_AoBao", "Áo Bào Hoàng Tộc", "Heart", 1, 1, 7, "Tất cả sát thương nhận vào được giảm 1, tối đa 3 lần"));
+  list.push(createCard("D80_AG_CK_GiapDong", "Giáp Đồng Sơn Vi", "Club", 13, 1, 7, "Vô hiệu hóa toàn bộ đòn Trảm Thường"));
+  list.push(createCard("D80_AG_DK_KhienMay", "Khiên Mây Bện", "Diamond", 13, 1, 7, "Khi cần có Đỡ: lật phán xét Đỏ xem như đã dùng Đỡ, Đen thất bại"));
+  list.push(createCard("D80_AG_HA_AoBao", "Áo Bào Hoàng Tộc", "Heart", 1, 1, 7, "Chặn tối đa 2 sát thương, rồi bị hủy"));
   list.push(createCard("D80_AG_C6_GiapTaySon", "Giáp Tây Sơn", "Club", 6, 1, 7, "Vô hiệu hóa mọi Trảm màu đen (Bích hoặc Chuồn)"));
 
   // ==========================================
@@ -179,21 +180,21 @@ export function createDeck80() {
   // ==========================================
   // 11. CẨM NANG TỨC THỜI — 8 LÁ
   // ==========================================
-  list.push(createCard("D80_CN_HA_DieuKe", "Diệu Kế Phá Mưu", "Heart", 1, 2, 10, "Vô hiệu hóa 1 Cẩm Nang bất kỳ HOẶC hủy 1 lá trên tay/bàn người khác"));
-  list.push(createCard("D80_CN_CQ_VuonKhong", "Vườn Không Nhà Trống", "Club", 12, 2, 11, "Chọn 1 mục tiêu: ép tự bỏ 1 lá trên tay HOẶC hủy 1 trang bị"));
-  list.push(createCard("D80_CN_SK_DotKich", "Đột Kích Trộm Lương", "Spade", 13, 2, 12, "Cướp 1 lá tay, trang bị hoặc Trì Hoãn của mục tiêu cự ly 1"));
-  list.push(createCard("D80_CN_H3_DungBinh", "Dụng Binh Như Thần", "Heart", 3, 2, 13, "Rút ngay 2 lá bài từ xấp bài"));
-  list.push(createCard("D80_CN_HuyetChien", "Huyết Chiến", "Diamond", 1, 2, 14, "Chọn 1 mục tiêu bất kỳ; hai bên luân phiên đánh Trảm, người dừng chịu 1 sát thương"));
+  list.push(createCard("D80_CN_HA_DieuKe", "Diệu Kế Phá Mưu", "Heart", 1, 2, 10, "Vô hiệu hóa 1 Cẩm Nang"));
+  list.push(createCard("D80_CN_CQ_VuonKhong", "Vườn Không Nhà Trống", "Club", 12, 2, 11, "Bỏ 1 lá trong vùng chơi của 1 mục tiêu"));
+  list.push(createCard("D80_CN_SK_DotKich", "Đột Kích Trộm Lương", "Spade", 13, 2, 12, "Cướp 1 lá trong vùng chơi của 1 mục tiêu trong cự ly 1 của Ngựa"));
+  list.push(createCard("D80_CN_H3_DungBinh", "Dụng Binh Như Thần", "Heart", 3, 2, 13, "Rút 2 lá bài từ xấp bài"));
+  list.push(createCard("D80_CN_HuyetChien", "Huyết Chiến", "Diamond", 1, 2, 14, "Chọn 1 mục tiêu bất kỳ; hai bên luân phiên đánh Trảm, người dừng chịu 1 sát thương, đối phương đánh trước"));
   list.push(createCard("D80_CN_D4_MoKho", "Mở Kho Cứu Tế", "Diamond", 4, 2, 16, "Mở kho phát bài cho tất cả người chơi còn sống"));
   list.push(createCard("D80_CN_GiacToi", "Giặc Tới", "Spade", 7, 2, 17, "Ép tất cả người chơi khác phải đánh 1 Trảm hoặc chịu 1 sát thương"));
   list.push(createCard("D80_CN_MuaTen", "Mưa Tên Liên Châu", "Heart", 1, 2, 18, "Ép tất cả người chơi khác phải đánh 1 Đỡ hoặc chịu 1 sát thương"));
   list.push(createCard("D80_CN_H2_ThuyTrieuRut", "Thủy Triều Rút", "Heart", 2, 2, 23, "Chọn 1 người có bài: họ đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"));
   list.push(createCard("D80_CN_H3_ThuyTrieuRut", "Thủy Triều Rút", "Heart", 3, 2, 23, "Chọn 1 người có bài: họ đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"));
   list.push(createCard("D80_CN_DQ_ThuyTrieuRut", "Thủy Triều Rút", "Diamond", 12, 2, 23, "Chọn 1 người có bài: họ đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"));
-  list.push(createCard("D80_CN_CQ_MuonGuom", "Mượn Gươm Diệt Địch", "Club", 12, 2, 24, "Buộc người có Vũ khí đánh Trảm vào mục tiêu khác; không đánh thì thu hồi Vũ khí"));
-  list.push(createCard("D80_CN_CK_MuonGuom", "Mượn Gươm Diệt Địch", "Club", 13, 2, 24, "Buộc người có Vũ khí đánh Trảm vào mục tiêu khác; không đánh thì thu hồi Vũ khí"));
-  list.push(createCard("D80_CN_HA_MoYenTiec", "Mở Yến Tiệc", "Heart", 1, 2, 25, "Lần lượt người chơi bị mất Máu được hồi 1 Máu"));
-  list.push(createCard("D80_CN_DK_HichTuongSi", "Hịch Tướng Sĩ", "Diamond", 13, 2, 26, "Bạn và 1 người khác chọn bỏ 1 lá nhận Sục Sôi (1 vòng Trảm không giới hạn, Tầm +1). Có thể đổi lá để rút lá khác."));
+  list.push(createCard("D80_CN_CQ_MuonGuom", "Mượn Gươm Diệt Địch", "Club", 12, 2, 24, "Buộc người có Vũ khí đánh Trảm vào 1 mục tiêu; không đánh thì đưa Vũ khí cho người dùng Mượn Gươm"));
+  list.push(createCard("D80_CN_CK_MuonGuom", "Mượn Gươm Diệt Địch", "Club", 13, 2, 24, "Buộc người có Vũ khí đánh Trảm vào 1 mục tiêu; không đánh thì đưa Vũ khí cho người dùng Mượn Gươm"));
+  list.push(createCard("D80_CN_HA_MoYenTiec", "Mở Yến Tiệc", "Heart", 1, 2, 25, "Lần lượt từng người chơi bị mất Máu được hồi 1 Máu"));
+  list.push(createCard("D80_CN_DK_HichTuongSi", "Hịch Tướng Sĩ", "Diamond", 13, 2, 26, "Bạn và 1 người khác bạn chọn, bỏ 1 lá để nhận Sục Sôi: 1 vòng không giới hạn Trảm, tầm đánh +1. Có thể đổi lá để rút lá khác."));
   list.push(createCard("D80_CN_S3_KhoNhuc", "Khổ Nhục Kế", "Spade", 3, 2, 28, "Nhận 1 sát thương, sau đó rút 3 lá bài"));
   list.push(createCard("D80_CN_C8_TauVi", "Tẩu Vi Thượng Sách", "Club", 8, 2, 29, "Bỏ 1 Trang bị của chính mình, rút 2 lá bài"));
   list.push(createCard("D80_CN_D5_PhuDe", "Phủ Để Trừu Tân", "Diamond", 5, 2, 30, "Đưa 1 Trang bị của mục tiêu về tay họ"));
@@ -201,9 +202,9 @@ export function createDeck80() {
   // ==========================================
   // 12. CẨM NANG TRÌ HOÃN — 3 LÁ
   // ==========================================
-  list.push(createCard("D80_TH_CA_SamSet", "Đại Hồng Thủy", "Club", 1, 3, 19, "Phán xét: Bích ♠ từ 2 đến 9 chịu 3 sát thương Thủy, trượt chuyển người kế"));
-  list.push(createCard("D80_TH_DQ_CatLuong", "Cắt Đường Lương", "Diamond", 12, 3, 20, "Phán xét: Nếu KHÔNG PHẢI Chuồn ♣ -> bỏ qua Giai đoạn Rút bài"));
-  list.push(createCard("D80_TH_HK_TramAo", "Trầm Ảo Sa Bẫy", "Heart", 13, 3, 21, "Phán xét: Nếu KHÔNG PHẢI Cơ ♥ -> bỏ qua Giai đoạn Ra bài"));
+  list.push(createCard("D80_TH_CA_SamSet", "Đại Hồng Thủy", "Club", 1, 3, 19, "Phán xét: Bích ♠ 2..9 chịu 3 sát thương Thủy, trượt chuyển tiếp cho người ngồi kế"));
+  list.push(createCard("D80_TH_DQ_CatLuong", "Cắt Đường Lương", "Diamond", 12, 3, 20, "Phán xét: Không phải Chuồn ♣ -> bỏ qua Rút bài"));
+  list.push(createCard("D80_TH_HK_TramAo", "Trầm Ảo Sa Bẫy", "Heart", 13, 3, 21, "Phán xét: Không phải Cơ ♥ -> bỏ qua Ra bài"));
   list.push(createCard("D80_TH_S9_BaiCocBachDang", "Bãi Cọc Bạch Đằng", "Spade", 9, 3, 22, "Khi mục tiêu dùng Trảm hoặc Chiến Mã, phán xét 1 lần: Đen hủy hành động và chịu 1 sát thương; Đỏ hành động được tiếp tục, sau đó Bãi Cọc rời đi"));
   list.push(createCard("D80_TH_C9_BaiCocBachDang", "Bãi Cọc Bạch Đằng", "Club", 9, 3, 22, "Khi mục tiêu dùng Trảm hoặc Chiến Mã, phán xét 1 lần: Đen hủy hành động và chịu 1 sát thương; Đỏ hành động được tiếp tục, sau đó Bãi Cọc rời đi"));
 
@@ -242,8 +243,8 @@ export function createDeck150() {
   // ==========================================
   const thuyRanks = [8, 9, 10, 11, 12, 13];
   for (let r of thuyRanks) {
-    list.push(createCard(`D150_TL_S${r}`, "Trảm - Thủy", "Spade", r, 0, 2, "Tấn công gây 1 sát thương Thủy"));
-    list.push(createCard(`D150_TL_C${r}`, "Trảm - Thủy", "Club", r, 0, 2, "Tấn công gây 1 sát thương Thủy"));
+    list.push(createCard(`D150_TL_S${r}`, "Trảm - Thủy", "Spade", r, 0, 2, "Tấn công gây 1 sát thương thuộc tính Thủy, lan qua Xích Tâm Tỏa"));
+    list.push(createCard(`D150_TL_C${r}`, "Trảm - Thủy", "Club", r, 0, 2, "Tấn công gây 1 sát thương thuộc tính Thủy, lan qua Xích Tâm Tỏa"));
   }
 
   // ==========================================
@@ -251,35 +252,35 @@ export function createDeck150() {
   // ==========================================
   const hoaRanks = [8, 9, 10, 11, 12, 13];
   for (let r of hoaRanks) {
-    list.push(createCard(`D150_TH_D${r}`, "Trảm - Hỏa", "Diamond", r, 0, 1, "Tấn công gây 1 sát thương Hỏa"));
-    list.push(createCard(`D150_TH_H${r}`, "Trảm - Hỏa", "Heart", r, 0, 1, "Tấn công gây 1 sát thương Hỏa"));
+    list.push(createCard(`D150_TH_D${r}`, "Trảm - Hỏa", "Diamond", r, 0, 1, "Tấn công gây 1 sát thương thuộc tính Hỏa, lan qua Xích Tâm Tỏa"));
+    list.push(createCard(`D150_TH_H${r}`, "Trảm - Hỏa", "Heart", r, 0, 1, "Tấn công gây 1 sát thương thuộc tính Hỏa, lan qua Xích Tâm Tỏa"));
   }
 
   // ==========================================
   // 4. ĐỠ — 26 LÁ (Toàn bộ Đỏ, 13 ♦, 13 ♥: từ 2 đến K + A)
   // ==========================================
   for (let r = 1; r <= 13; r++) {
-    list.push(createCard(`D150_DO_D${r}`, "Đỡ", "Diamond", r, 0, 3, "Hóa giải hoàn toàn 1 đòn Trảm"));
-    list.push(createCard(`D150_DO_H${r}`, "Đỡ", "Heart", r, 0, 3, "Hóa giải hoàn toàn 1 đòn Trảm"));
+    list.push(createCard(`D150_DO_D${r}`, "Đỡ", "Diamond", r, 0, 3, "Hóa giải 1 đòn Trảm"));
+    list.push(createCard(`D150_DO_H${r}`, "Đỡ", "Heart", r, 0, 3, "Hóa giải 1 đòn Trảm"));
   }
 
   // ==========================================
   // 5. BÁNH CHƯNG — 12 LÁ (Toàn bộ Cơ ♥ từ 2 đến K)
   // ==========================================
   for (let r = 2; r <= 13; r++) {
-    list.push(createCard(`D150_BC_H${r}`, "Bánh Chưng", "Heart", r, 0, 4, "Hồi 1 Máu hoặc cứu người chơi Cận Tử"));
+    list.push(createCard(`D150_BC_H${r}`, "Bánh Chưng", "Heart", r, 0, 4, "Hồi phục 1 Máu hoặc cứu người chơi Cận Tử"));
   }
 
   // ==========================================
   // 6. HỦ RƯỢU — 7 LÁ (♣J, ♦J, ♠Q, ♣Q, ♦K, ♠K, ♥A)
   // ==========================================
-  list.push(createCard("D150_HR_CJ", "Hủ Rượu", "Club", 11, 0, 5, "Uống trước Trảm (+1 ST) hoặc tự cứu khi 0 máu"));
-  list.push(createCard("D150_HR_DJ", "Hủ Rượu", "Diamond", 11, 0, 5, "Uống trước Trảm (+1 ST) hoặc tự cứu khi 0 máu"));
-  list.push(createCard("D150_HR_SQ", "Hủ Rượu", "Spade", 12, 0, 5, "Uống trước Trảm (+1 ST) hoặc tự cứu khi 0 máu"));
-  list.push(createCard("D150_HR_CQ", "Hủ Rượu", "Club", 12, 0, 5, "Uống trước Trảm (+1 ST) hoặc tự cứu khi 0 máu"));
-  list.push(createCard("D150_HR_DK", "Hủ Rượu", "Diamond", 13, 0, 5, "Uống trước Trảm (+1 ST) hoặc tự cứu khi 0 máu"));
-  list.push(createCard("D150_HR_SK", "Hủ Rượu", "Spade", 13, 0, 5, "Uống trước Trảm (+1 ST) hoặc tự cứu khi 0 máu"));
-  list.push(createCard("D150_HR_HA", "Hủ Rượu", "Heart", 1, 0, 5, "Uống trước Trảm (+1 ST) hoặc tự cứu khi 0 máu"));
+  list.push(createCard("D150_HR_CJ", "Hủ Rượu", "Club", 11, 0, 5, "Uống trước Trảm (+1 Sát Thương) hoặc tự cứu khi Cận Tử"));
+  list.push(createCard("D150_HR_DJ", "Hủ Rượu", "Diamond", 11, 0, 5, "Uống trước Trảm (+1 Sát Thương) hoặc tự cứu khi Cận Tử"));
+  list.push(createCard("D150_HR_SQ", "Hủ Rượu", "Spade", 12, 0, 5, "Uống trước Trảm (+1 Sát Thương) hoặc tự cứu khi Cận Tử"));
+  list.push(createCard("D150_HR_CQ", "Hủ Rượu", "Club", 12, 0, 5, "Uống trước Trảm (+1 Sát Thương) hoặc tự cứu khi Cận Tử"));
+  list.push(createCard("D150_HR_DK", "Hủ Rượu", "Diamond", 13, 0, 5, "Uống trước Trảm (+1 Sát Thương) hoặc tự cứu khi Cận Tử"));
+  list.push(createCard("D150_HR_SK", "Hủ Rượu", "Spade", 13, 0, 5, "Uống trước Trảm (+1 Sát Thương) hoặc tự cứu khi Cận Tử"));
+  list.push(createCard("D150_HR_HA", "Hủ Rượu", "Heart", 1, 0, 5, "Uống trước Trảm (+1 Sát Thương) hoặc tự cứu khi Cận Tử"));
 
   // ==========================================
   // 7. XÍCH TÂM TỎA — 4 LÁ (Toàn bộ Đen: ♠Q, ♣Q, ♠K, ♣A)
@@ -292,71 +293,71 @@ export function createDeck150() {
   // ==========================================
   // 8. VŨ KHÍ — 12 LÁ (Mỗi loại 2 lá)
   // ==========================================
-  list.push(createCard("D150_VK_DA_ThuanThien", "Kiếm Thuận Thiên", "Diamond", 1, 1, 6, "Tầm 2. Trảm bỏ qua Trang bị Giáp mục tiêu", 2));
-  list.push(createCard("D150_VK_D2_ThuanThien", "Kiếm Thuận Thiên", "Diamond", 2, 1, 6, "Tầm 2. Trảm bỏ qua Trang bị Giáp mục tiêu", 2));
-  list.push(createCard("D150_VK_HK_SongCung", "Song Cung Mường Nhạ", "Heart", 13, 1, 6, "Tầm 2. Khi Trảm bị Đỡ, bỏ 2 lá để bỏ qua Đỡ; Trảm vẫn gây sát thương", 2));
-  list.push(createCard("D150_VK_SK_SongCung", "Song Cung Mường Nhạ", "Spade", 13, 1, 6, "Tầm 2. Khi Trảm bị Đỡ, bỏ 2 lá để bỏ qua Đỡ; Trảm vẫn gây sát thương", 2));
-  list.push(createCard("D150_VK_CQ_NoThan", "Nỏ Thần Kim Quy", "Club", 12, 1, 6, "Tầm 3. Không giới hạn số Trảm trong lượt", 3));
-  list.push(createCard("D150_VK_SA_NoThan", "Nỏ Thần Kim Quy", "Spade", 1, 1, 6, "Tầm 3. Không giới hạn số Trảm trong lượt", 3));
+  list.push(createCard("D150_VK_DA_ThuanThien", "Kiếm Thuận Thiên", "Diamond", 1, 1, 6, "Tầm 2. Trảm bỏ qua Trang bị Giáp của mục tiêu", 2));
+  list.push(createCard("D150_VK_D2_ThuanThien", "Kiếm Thuận Thiên", "Diamond", 2, 1, 6, "Tầm 2. Trảm bỏ qua Trang bị Giáp của mục tiêu", 2));
+  list.push(createCard("D150_VK_HK_SongCung", "Song Cung Mường Nhạ", "Heart", 13, 1, 6, "Tầm 2. Khi Trảm bị Đỡ, bỏ 2 lá trên tay ép chịu sát thương", 2));
+  list.push(createCard("D150_VK_SK_SongCung", "Song Cung Mường Nhạ", "Spade", 13, 1, 6, "Tầm 2. Khi Trảm bị Đỡ, bỏ 2 lá trên tay ép chịu sát thương", 2));
+  list.push(createCard("D150_VK_CQ_NoThan", "Nỏ Thần Kim Quy", "Club", 12, 1, 6, "Tầm 1. Không giới hạn số lá Trảm trong lượt", 1));
+  list.push(createCard("D150_VK_SA_NoThan", "Nỏ Thần Kim Quy", "Spade", 1, 1, 6, "Tầm 1. Không giới hạn số lá Trảm trong lượt", 1));
   list.push(createCard("D150_VK_CJ_TruongDao", "Trường Đao Nam Sơn", "Club", 11, 1, 6, "Tầm 3. Khi Trảm bị Đỡ, xem như chưa sử dụng lượt Trảm trong lượt chơi này", 3));
   list.push(createCard("D150_VK_DQ_TruongDao", "Trường Đao Nam Sơn", "Diamond", 12, 1, 6, "Tầm 3. Khi Trảm bị Đỡ, xem như chưa sử dụng lượt Trảm trong lượt chơi này", 3));
-  list.push(createCard("D150_VK_DQ_ThuongNgau", "Thương Ngâu Lãng Bạc", "Diamond", 12, 1, 6, "Tầm 4. Trảm trúng: hủy 1 lá tay hoặc trang bị", 4));
-  list.push(createCard("D150_VK_C5_ThuongNgau", "Thương Ngâu Lãng Bạc", "Club", 5, 1, 6, "Tầm 4. Trảm trúng: hủy 1 lá tay hoặc trang bị", 4));
-  list.push(createCard("D150_VK_SA_SungThanCong", "Súng Thần Công Hồ Triều", "Spade", 1, 1, 6, "Tầm 5. Mục tiêu không được dùng Đỡ cùng chất với Trảm", 5));
-  list.push(createCard("D150_VK_DA_SungThanCong", "Súng Thần Công Hồ Triều", "Diamond", 1, 1, 6, "Tầm 5. Mục tiêu không được dùng Đỡ cùng chất với Trảm", 5));
+  list.push(createCard("D150_VK_DQ_ThuongNgau", "Thương Ngâu Lãng Bạc", "Diamond", 12, 1, 6, "Tầm 4. Khi Trảm trúng, hủy 1 lá trên tay hoặc trang bị", 4));
+  list.push(createCard("D150_VK_C5_ThuongNgau", "Thương Ngâu Lãng Bạc", "Club", 5, 1, 6, "Tầm 4. Khi Trảm trúng, hủy 1 lá trên tay hoặc trang bị", 4));
+  list.push(createCard("D150_VK_SA_SungThanCong", "Súng Thần Công Hồ Triều", "Spade", 1, 1, 6, "Tầm 5. Mục tiêu không được dùng Đỡ cùng màu với Trảm", 5));
+  list.push(createCard("D150_VK_DA_SungThanCong", "Súng Thần Công Hồ Triều", "Diamond", 1, 1, 6, "Tầm 5. Mục tiêu không được dùng Đỡ cùng màu với Trảm", 5));
 
   // ==========================================
   // 9. ÁO GIÁP — 6 LÁ (Mỗi loại 2 lá)
   // ==========================================
-  list.push(createCard("D150_AG_CK_GiapDong", "Giáp Đồng Sơn Vi", "Club", 13, 1, 7, "Vô hiệu hóa toàn bộ Trảm Thường"));
-  list.push(createCard("D150_AG_S2_GiapDong", "Giáp Đồng Sơn Vi", "Spade", 2, 1, 7, "Vô hiệu hóa toàn bộ Trảm Thường"));
-  list.push(createCard("D150_AG_DK_KhienMay", "Khiên Mây Bện", "Diamond", 13, 1, 7, "Khi bị Trảm: lật phán xét Đỏ tự động Đỡ, Đen thất bại"));
-  list.push(createCard("D150_AG_C2_KhienMay", "Khiên Mây Bện", "Club", 2, 1, 7, "Khi bị Trảm: lật phán xét Đỏ tự động Đỡ, Đen thất bại"));
-  list.push(createCard("D150_AG_HA_AoBao", "Áo Bào Hoàng Tộc", "Heart", 1, 1, 7, "Giảm 1 sát thương nhận vào, tối đa 3 lần"));
-  list.push(createCard("D150_AG_D3_AoBao", "Áo Bào Hoàng Tộc", "Diamond", 3, 1, 7, "Giảm 1 sát thương nhận vào, tối đa 3 lần"));
+  list.push(createCard("D150_AG_CK_GiapDong", "Giáp Đồng Sơn Vi", "Club", 13, 1, 7, "Vô hiệu hóa toàn bộ đòn Trảm Thường"));
+  list.push(createCard("D150_AG_S2_GiapDong", "Giáp Đồng Sơn Vi", "Spade", 2, 1, 7, "Vô hiệu hóa toàn bộ đòn Trảm Thường"));
+  list.push(createCard("D150_AG_DK_KhienMay", "Khiên Mây Bện", "Diamond", 13, 1, 7, "Khi cần có Đỡ: lật phán xét Đỏ xem như đã dùng Đỡ, Đen thất bại"));
+  list.push(createCard("D150_AG_C2_KhienMay", "Khiên Mây Bện", "Club", 2, 1, 7, "Khi cần có Đỡ: lật phán xét Đỏ xem như đã dùng Đỡ, Đen thất bại"));
+  list.push(createCard("D150_AG_HA_AoBao", "Áo Bào Hoàng Tộc", "Heart", 1, 1, 7, "Chặn tối đa 2 sát thương, rồi bị hủy"));
+  list.push(createCard("D150_AG_D3_AoBao", "Áo Bào Hoàng Tộc", "Diamond", 3, 1, 7, "Chặn tối đa 2 sát thương, rồi bị hủy"));
 
   // ==========================================
   // 10. CHIẾN MÃ — 7 LÁ (3 Voi Chiến, 4 Ngựa Trắng)
   // ==========================================
-  list.push(createCard("D150_CM_HK_VoiChien", "Voi Chiến Đại Việt", "Heart", 13, 1, 9, "Ngựa Thủ: +1 Khoảng cách từ người khác tới bạn", 1, 1));
-  list.push(createCard("D150_CM_CK_VoiChien", "Voi Chiến Đại Việt", "Club", 13, 1, 9, "Ngựa Thủ: +1 Khoảng cách từ người khác tới bạn", 1, 1));
-  list.push(createCard("D150_CM_DK_VoiChien", "Voi Chiến Đại Việt", "Diamond", 13, 1, 9, "Ngựa Thủ: +1 Khoảng cách từ người khác tới bạn", 1, 1));
-  list.push(createCard("D150_CM_SJ_NguaTrang", "Ngựa Trắng Thuần Nông", "Spade", 11, 1, 8, "Ngựa Công: -1 Khoảng cách từ bạn tới tất cả người khác", 1, -1));
-  list.push(createCard("D150_CM_DJ_NguaTrang", "Ngựa Trắng Thuần Nông", "Diamond", 11, 1, 8, "Ngựa Công: -1 Khoảng cách từ bạn tới tất cả người khác", 1, -1));
-  list.push(createCard("D150_CM_CJ_NguaTrang", "Ngựa Trắng Thuần Nông", "Club", 11, 1, 8, "Ngựa Công: -1 Khoảng cách từ bạn tới tất cả người khác", 1, -1));
-  list.push(createCard("D150_CM_H5_NguaTrang", "Ngựa Trắng Thuần Nông", "Heart", 5, 1, 8, "Ngựa Công: -1 Khoảng cách từ bạn tới tất cả người khác", 1, -1));
+  list.push(createCard("D150_CM_HK_VoiChien", "Voi Chiến Đại Việt", "Heart", 13, 1, 9, "Ngựa Thủ: Tăng +1 Khoảng cách từ người chơi khác tới bạn", 1, 1));
+  list.push(createCard("D150_CM_CK_VoiChien", "Voi Chiến Đại Việt", "Club", 13, 1, 9, "Ngựa Thủ: Tăng +1 Khoảng cách từ người chơi khác tới bạn", 1, 1));
+  list.push(createCard("D150_CM_DK_VoiChien", "Voi Chiến Đại Việt", "Diamond", 13, 1, 9, "Ngựa Thủ: Tăng +1 Khoảng cách từ người chơi khác tới bạn", 1, 1));
+  list.push(createCard("D150_CM_SJ_NguaTrang", "Ngựa Trắng Thuần Nông", "Spade", 11, 1, 8, "Ngựa Công: Giảm -1 Khoảng cách từ bạn tới tất cả người khác", 1, -1));
+  list.push(createCard("D150_CM_DJ_NguaTrang", "Ngựa Trắng Thuần Nông", "Diamond", 11, 1, 8, "Ngựa Công: Giảm -1 Khoảng cách từ bạn tới tất cả người khác", 1, -1));
+  list.push(createCard("D150_CM_CJ_NguaTrang", "Ngựa Trắng Thuần Nông", "Club", 11, 1, 8, "Ngựa Công: Giảm -1 Khoảng cách từ bạn tới tất cả người khác", 1, -1));
+  list.push(createCard("D150_CM_H5_NguaTrang", "Ngựa Trắng Thuần Nông", "Heart", 5, 1, 8, "Ngựa Công: Giảm -1 Khoảng cách từ bạn tới tất cả người khác", 1, -1));
 
   list.push(createCard("D150_BV_SK_TrongDong", "Trống Đồng Đông Sơn", "Spade", 13, 1, 27, "Điểm Trống: mục tiêu bỏ 1 lá hoặc lộ toàn bộ bài đến hết lượt"));
 
   // ==========================================
   // 11. CẨM NANG TỨC THỜI — 14 LÁ
   // ==========================================
-  list.push(createCard("D150_CN_HA_DieuKe", "Diệu Kế Phá Mưu", "Heart", 1, 2, 10, "Vô hiệu hóa 1 Cẩm Nang HOẶC hủy 1 lá trên tay/bàn"));
-  list.push(createCard("D150_CN_SA_DieuKe", "Diệu Kế Phá Mưu", "Spade", 1, 2, 10, "Vô hiệu hóa 1 Cẩm Nang HOẶC hủy 1 lá trên tay/bàn"));
-  list.push(createCard("D150_CN_CQ_VuonKhong", "Vườn Không Nhà Trống", "Club", 12, 2, 11, "Ép mục tiêu bỏ 1 lá trên tay HOẶC hủy 1 trang bị"));
-  list.push(createCard("D150_CN_S3_VuonKhong", "Vườn Không Nhà Trống", "Spade", 3, 2, 11, "Ép mục tiêu bỏ 1 lá trên tay HOẶC hủy 1 trang bị"));
-  list.push(createCard("D150_CN_SK_DotKich", "Đột Kích Trộm Lương", "Spade", 13, 2, 12, "Cướp 1 lá tay, trang bị hoặc Trì Hoãn của mục tiêu cự ly 1"));
-  list.push(createCard("D150_CN_H3_DungBinh", "Dụng Binh Như Thần", "Heart", 3, 2, 13, "Rút ngay 2 lá bài từ xấp bài"));
+  list.push(createCard("D150_CN_HA_DieuKe", "Diệu Kế Phá Mưu", "Heart", 1, 2, 10, "Vô hiệu hóa 1 Cẩm Nang"));
+  list.push(createCard("D150_CN_SA_DieuKe", "Diệu Kế Phá Mưu", "Spade", 1, 2, 10, "Vô hiệu hóa 1 Cẩm Nang"));
+  list.push(createCard("D150_CN_CQ_VuonKhong", "Vườn Không Nhà Trống", "Club", 12, 2, 11, "Bỏ 1 lá trong vùng chơi của 1 mục tiêu"));
+  list.push(createCard("D150_CN_S3_VuonKhong", "Vườn Không Nhà Trống", "Spade", 3, 2, 11, "Bỏ 1 lá trong vùng chơi của 1 mục tiêu"));
+  list.push(createCard("D150_CN_SK_DotKich", "Đột Kích Trộm Lương", "Spade", 13, 2, 12, "Cướp 1 lá trong vùng chơi của 1 mục tiêu trong cự ly 1 của Ngựa"));
+  list.push(createCard("D150_CN_H3_DungBinh", "Dụng Binh Như Thần", "Heart", 3, 2, 13, "Rút 2 lá bài từ xấp bài"));
   list.push(createCard("D150_CN_S7_GiacToi", "Giặc Tới", "Spade", 7, 2, 17, "Ép tất cả người chơi khác phải đánh 1 Trảm hoặc chịu 1 sát thương"));
   list.push(createCard("D150_CN_C7_GiacToi", "Giặc Tới", "Club", 7, 2, 17, "Ép tất cả người chơi khác phải đánh 1 Trảm hoặc chịu 1 sát thương"));
   list.push(createCard("D150_CN_HA_MuaTen", "Mưa Tên Liên Châu", "Heart", 1, 2, 18, "Ép tất cả người chơi khác phải đánh 1 Đỡ hoặc chịu 1 sát thương"));
   list.push(createCard("D150_CN_DA_MuaTen", "Mưa Tên Liên Châu", "Diamond", 1, 2, 18, "Ép tất cả người chơi khác phải đánh 1 Đỡ hoặc chịu 1 sát thương"));
-  list.push(createCard("D150_CN_DA_HuyetChien", "Huyết Chiến", "Diamond", 1, 2, 14, "Chọn 1 mục tiêu bất kỳ; hai bên luân phiên đánh Trảm, người dừng chịu 1 sát thương"));
-  list.push(createCard("D150_CN_SA_HuyetChien", "Huyết Chiến", "Spade", 1, 2, 14, "Chọn 1 mục tiêu bất kỳ; hai bên luân phiên đánh Trảm, người dừng chịu 1 sát thương"));
+  list.push(createCard("D150_CN_DA_HuyetChien", "Huyết Chiến", "Diamond", 1, 2, 14, "Chọn 1 mục tiêu bất kỳ; hai bên luân phiên đánh Trảm, người dừng chịu 1 sát thương, đối phương đánh trước"));
+  list.push(createCard("D150_CN_SA_HuyetChien", "Huyết Chiến", "Spade", 1, 2, 14, "Chọn 1 mục tiêu bất kỳ; hai bên luân phiên đánh Trảm, người dừng chịu 1 sát thương, đối phương đánh trước"));
   list.push(createCard("D150_CN_H3_MoKho", "Mở Kho Cứu Tế", "Heart", 3, 2, 16, "Mở kho phát bài cho tất cả người chơi còn sống"));
   list.push(createCard("D150_CN_D4_MoKho", "Mở Kho Cứu Tế", "Diamond", 4, 2, 16, "Mở kho phát bài cho tất cả người chơi còn sống"));
-  list.push(createCard("D150_CN_H2_ThuyTrieuRut", "Thủy Triều Rút", "Heart", 2, 2, 23, "Chọn 1 người đưa bạn 1 lá; sau đó người ít bài hơn chịu 1 sát thương Thủy"));
-  list.push(createCard("D150_CN_H3_ThuyTrieuRut", "Thủy Triều Rút", "Heart", 3, 2, 23, "Chọn 1 người đưa bạn 1 lá; sau đó người ít bài hơn chịu 1 sát thương Thủy"));
-  list.push(createCard("D150_CN_DQ_ThuyTrieuRut", "Thủy Triều Rút", "Diamond", 12, 2, 23, "Chọn 1 người đưa bạn 1 lá; sau đó người ít bài hơn chịu 1 sát thương Thủy"));
-  list.push(createCard("D150_CN_CQ_MuonGuom", "Mượn Gươm Diệt Địch", "Club", 12, 2, 24, "Buộc người có Vũ khí đánh Trảm vào mục tiêu khác; không đánh thì thu hồi Vũ khí"));
-  list.push(createCard("D150_CN_CK_MuonGuom", "Mượn Gươm Diệt Địch", "Club", 13, 2, 24, "Buộc người có Vũ khí đánh Trảm vào mục tiêu khác; không đánh thì thu hồi Vũ khí"));
-  list.push(createCard("D150_CN_HA_MoYenTiec", "Mở Yến Tiệc", "Heart", 1, 2, 25, "Lần lượt người chơi bị mất Máu được hồi 1 Máu"));
-  list.push(createCard("D150_CN_DK_HichTuongSi", "Hịch Tướng Sĩ", "Diamond", 13, 2, 26, "Bạn và 1 người khác chọn bỏ 1 lá nhận Sục Sôi (1 vòng Trảm không giới hạn, Tầm +1). Có thể đổi lá để rút lá khác."));
+  list.push(createCard("D150_CN_H2_ThuyTrieuRut", "Thủy Triều Rút", "Heart", 2, 2, 23, "Chọn 1 người có bài trên tay: người đó buộc đưa bạn 1 lá trên tay; sau đó người ít bài hơn nhận 1 sát thương Thủy"));
+  list.push(createCard("D150_CN_H3_ThuyTrieuRut", "Thủy Triều Rút", "Heart", 3, 2, 23, "Chọn 1 người có bài trên tay: người đó buộc đưa bạn 1 lá trên tay; sau đó người ít bài hơn nhận 1 sát thương Thủy"));
+  list.push(createCard("D150_CN_DQ_ThuyTrieuRut", "Thủy Triều Rút", "Diamond", 12, 2, 23, "Chọn 1 người có bài trên tay: người đó buộc đưa bạn 1 lá trên tay; sau đó người ít bài hơn nhận 1 sát thương Thủy"));
+  list.push(createCard("D150_CN_CQ_MuonGuom", "Mượn Gươm Diệt Địch", "Club", 12, 2, 24, "Buộc người có Vũ khí đánh Trảm vào 1 mục tiêu; không đánh thì đưa Vũ khí cho người dùng Mượn Gươm"));
+  list.push(createCard("D150_CN_CK_MuonGuom", "Mượn Gươm Diệt Địch", "Club", 13, 2, 24, "Buộc người có Vũ khí đánh Trảm vào 1 mục tiêu; không đánh thì đưa Vũ khí cho người dùng Mượn Gươm"));
+  list.push(createCard("D150_CN_HA_MoYenTiec", "Mở Yến Tiệc", "Heart", 1, 2, 25, "Lần lượt từng người chơi bị mất Máu được hồi 1 Máu"));
+  list.push(createCard("D150_CN_DK_HichTuongSi", "Hịch Tướng Sĩ", "Diamond", 13, 2, 26, "Bạn và 1 người khác bạn chọn, bỏ 1 lá để nhận Sục Sôi: 1 vòng không giới hạn Trảm, tầm đánh +1. Có thể đổi lá để rút lá khác."));
 
   // ==========================================
   // 12. CẨM NANG TRÌ HOÃN — 4 LÁ (1 Đại Hồng Thủy, 2 Cắt Lương, 1 Trầm Ảo)
   // ==========================================
-  list.push(createCard("D150_TH_CA_SamSet", "Đại Hồng Thủy", "Club", 1, 3, 19, "Phán xét: Bích ♠ 2..9 chịu 3 sát thương Thủy, trượt chuyển tiếp"));
+  list.push(createCard("D150_TH_CA_SamSet", "Đại Hồng Thủy", "Club", 1, 3, 19, "Phán xét: Bích ♠ 2..9 chịu 3 sát thương Thủy, trượt chuyển tiếp cho người ngồi kế"));
   list.push(createCard("D150_TH_DQ_CatLuong", "Cắt Đường Lương", "Diamond", 12, 3, 20, "Phán xét: Không phải Chuồn ♣ -> bỏ qua Rút bài"));
   list.push(createCard("D150_TH_C4_CatLuong", "Cắt Đường Lương", "Club", 4, 3, 20, "Phán xét: Không phải Chuồn ♣ -> bỏ qua Rút bài"));
   list.push(createCard("D150_TH_HK_TramAo", "Trầm Ảo Sa Bẫy", "Heart", 13, 3, 21, "Phán xét: Không phải Cơ ♥ -> bỏ qua Ra bài"));

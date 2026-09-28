@@ -14,8 +14,8 @@ signal draft_joined(assigned_seat: int)
 const CANDIDATE_SERVERS: Array[Dictionary] = [
 	{ "type": "LOCAL", "name": "Server Local (127.0.0.1)", "url": "ws://127.0.0.1:8080" },
 	{ "type": "LOCAL_FALLBACK", "name": "Server Local (localhost)", "url": "ws://localhost:8080" },
-	{ "type": "DENO_CLOUD", "name": "Server Deno Cloud", "url": "wss://dai-viet-chien.vdthanh.deno.net" },
-	{ "type": "DENO_CLOUD_OLD", "name": "Server Deno Cloud (Server)", "url": "wss://dai-viet-chien-server.vdthanh.deno.net" }
+	{ "type": "DENO_CLOUD", "name": "Server Deno Cloud", "url": "wss://dai-viet-chien-server.vdthanh.deno.net" },
+	{ "type": "DENO_CLOUD_FALLBACK", "name": "Server Deno Cloud (Dự phòng)", "url": "wss://dai-viet-chien.vdthanh.deno.net" }
 ]
 
 const CANDIDATE_CONNECT_TIMEOUT: float = 2.0
@@ -268,14 +268,16 @@ func _handle_server_message(raw_json: String) -> void:
 		print("[NetworkClient] Server phản hồi lỗi: ", err_msg)
 		error_received.emit(err_msg)
 
+	var state_obj = data.get("state", data)
 	if msg_type in ["STATE_SYNC", "STATE_SNAPSHOT", "STATE_UPDATE"] or (data.has("state") and data["state"] != null):
-		var state_obj = data.get("state", data)
 		if state_obj is Dictionary and not state_obj.is_empty():
 			last_state = state_obj
 			game_state_updated.emit(state_obj)
 
-	if data.has("delta") and data["delta"] != null:
-		var delta_obj = data["delta"]
+	var delta_obj = data.get("delta", null)
+	if delta_obj == null and state_obj is Dictionary:
+		delta_obj = state_obj.get("delta", null)
+	if delta_obj != null:
 		if delta_obj is Dictionary:
 			var seq = int(delta_obj.get("actionSeq", -1))
 			if seq > 0 and seq == last_processed_action_seq:
@@ -292,7 +294,14 @@ func _handle_server_message(raw_json: String) -> void:
 
 func send_json(dict: Dictionary) -> void:
 	if socket.get_ready_state() == WebSocketPeer.STATE_OPEN:
-		var json_str = JSON.stringify(dict)
+		var payload := dict.duplicate(true)
+		# Attach the version observed by this client to every mutating request.
+		# The server remains authoritative and rejects stale actions atomically.
+		var action := str(payload.get("action", ""))
+		if not action in ["JOIN_ROOM", "INIT_GAME", "JOIN_DRAFT", "PICK_HERO", "GET_STATE", "PING"] \
+			and last_state.has("version") and not payload.has("expectedVersion"):
+			payload["expectedVersion"] = int(last_state.get("version", 0))
+		var json_str = JSON.stringify(payload)
 		socket.send_text(json_str)
 	else:
 		print("[NetworkClient] Cảnh báo: Socket chưa sẵn sàng để gửi!")
