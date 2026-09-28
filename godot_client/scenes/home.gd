@@ -48,6 +48,8 @@ var mm_is_cancelled: bool = false
 var mm_active_room_id: String = ""
 var mm_is_host: bool = false
 var mm_current_room: Dictionary = {}
+var mm_session_user_id: String = ""
+var mm_search_started_at_ms: int = 0
 
 # Embers particle pool
 var ember_particles: Array = []
@@ -408,16 +410,23 @@ func _build_four_game_modes() -> void:
 		modes_hbox,
 		"🛡️",
 		"ĐẤU TRƯỜNG 2v2",
-		"Xếp Hạng Hoàng Triều (1,200 RP)",
+		"Xếp Hạng 2v2 (1,200 RP)",
 		"res://assets/ui/tran_hung_dao.png",
 		"Hiệp lực cùng đồng minh tranh tài đối kháng 2v2 đỉnh cao. Tích lũy RP để vươn lên đỉnh Bảng Vàng!",
 		"VÀO ĐẤU 2v2 ➜",
-		func(): _start_mode_2v2()
+		func(): _start_mode_2v2(),
+		true
 	)
 
-	# 2. Card Vương Triều
-	_create_game_mode_card(
-		modes_hbox,
+	var secondary_tabs = TabContainer.new()
+	secondary_tabs.size_flags_horizontal = SIZE_EXPAND_FILL
+	secondary_tabs.size_flags_vertical = SIZE_EXPAND_FILL
+	secondary_tabs.size_flags_stretch_ratio = 1.0
+	modes_hbox.add_child(secondary_tabs)
+
+	_create_mode_tab(
+		secondary_tabs,
+		"VƯƠNG TRIỀU",
 		"👑",
 		"VƯƠNG TRIỀU",
 		"Hoàng Tộc Tranh Bá (4-8 Người)",
@@ -427,9 +436,9 @@ func _build_four_game_modes() -> void:
 		func(): _start_mode_dynasty()
 	)
 
-	# 3. Card Quốc Chiến
-	_create_game_mode_card(
-		modes_hbox,
+	_create_mode_tab(
+		secondary_tabs,
+		"QUỐC CHIẾN",
 		"⚔️",
 		"QUỐC CHIẾN",
 		"Bốn Cõi Phân Tranh",
@@ -439,9 +448,9 @@ func _build_four_game_modes() -> void:
 		func(): _start_mode_national_war()
 	)
 
-	# 4. Card Luyện Tập / AI Practice (Tập Kích Sơn Tặc)
-	_create_game_mode_card(
-		modes_hbox,
+	_create_mode_tab(
+		secondary_tabs,
+		"LUYỆN TẬP",
 		"🏹",
 		"TẬP KÍCH SƠN TẶC",
 		"Huấn Luyện & Thực Chiến AI",
@@ -451,8 +460,9 @@ func _build_four_game_modes() -> void:
 		func(): _start_mode_practice()
 	)
 
-func _create_game_mode_card(
-	parent: Container,
+func _create_mode_tab(
+	tabs: TabContainer,
+	tab_title: String,
 	icon_str: String,
 	title: String,
 	subtitle: String,
@@ -461,9 +471,27 @@ func _create_game_mode_card(
 	btn_text: String,
 	on_click: Callable
 ) -> void:
+	var page = MarginContainer.new()
+	page.name = tab_title
+	page.add_theme_constant_override("margin_top", 8)
+	tabs.add_child(page)
+	_create_game_mode_card(page, icon_str, title, subtitle, image_path, desc, btn_text, on_click)
+
+func _create_game_mode_card(
+	parent: Container,
+	icon_str: String,
+	title: String,
+	subtitle: String,
+	image_path: String,
+	desc: String,
+	btn_text: String,
+	on_click: Callable,
+	is_primary: bool = false
+) -> void:
 	var card = PanelContainer.new()
 	card.size_flags_horizontal = SIZE_EXPAND_FILL
 	card.size_flags_vertical = SIZE_EXPAND_FILL
+	card.size_flags_stretch_ratio = 1.55 if is_primary else 1.0
 
 	# Imperial White Card with Rich Gold Border & Drop Shadow
 	var card_style = StyleBoxFlat.new()
@@ -472,7 +500,7 @@ func _create_game_mode_card(
 	card_style.border_width_top = 2
 	card_style.border_width_right = 2
 	card_style.border_width_bottom = 2
-	card_style.border_color = COLOR_GOLD_PRIMARY
+	card_style.border_color = COLOR_GOLD_PRIMARY if is_primary else Color(0.34, 0.42, 0.52, 0.9)
 	card_style.corner_radius_top_left = 12
 	card_style.corner_radius_top_right = 12
 	card_style.corner_radius_bottom_right = 12
@@ -498,12 +526,12 @@ func _create_game_mode_card(
 
 	var icon_lbl = Label.new()
 	icon_lbl.text = icon_str
-	icon_lbl.add_theme_font_size_override("font_size", 22)
+	icon_lbl.add_theme_font_size_override("font_size", 24 if is_primary else 18)
 	title_hbox.add_child(icon_lbl)
 
 	var title_lbl = Label.new()
 	title_lbl.text = title
-	title_lbl.add_theme_font_size_override("font_size", 18)
+	title_lbl.add_theme_font_size_override("font_size", 20 if is_primary else 15)
 	title_lbl.add_theme_color_override("font_color", COLOR_TEXT_DARK)
 	title_hbox.add_child(title_lbl)
 	vbox.add_child(title_hbox)
@@ -524,7 +552,7 @@ func _create_game_mode_card(
 
 	# 4. Mode Artwork Banner
 	var img_panel = PanelContainer.new()
-	img_panel.custom_minimum_size = Vector2(0, 210)
+	img_panel.custom_minimum_size = Vector2(0, 210 if is_primary else 160)
 	img_panel.size_flags_vertical = SIZE_EXPAND_FILL
 
 	var ip_style = StyleBoxFlat.new()
@@ -562,7 +590,10 @@ func _create_game_mode_card(
 	var action_btn = Button.new()
 	action_btn.custom_minimum_size = Vector2(0, 46)
 	action_btn.text = btn_text
-	_style_white_gold_action_button(action_btn)
+	if is_primary:
+		_style_white_gold_action_button(action_btn)
+	else:
+		_style_secondary_mode_button(action_btn)
 	action_btn.pressed.connect(func():
 		AudioManager.play_slash()
 		on_click.call()
@@ -570,6 +601,28 @@ func _create_game_mode_card(
 	vbox.add_child(action_btn)
 
 	parent.add_child(card)
+
+func _style_secondary_mode_button(btn: Button) -> void:
+	var normal = StyleBoxFlat.new()
+	normal.bg_color = Color(0.10, 0.15, 0.22, 0.96)
+	normal.border_width_left = 1
+	normal.border_width_top = 1
+	normal.border_width_right = 1
+	normal.border_width_bottom = 1
+	normal.border_color = Color(0.32, 0.46, 0.62, 0.9)
+	normal.corner_radius_top_left = 8
+	normal.corner_radius_top_right = 8
+	normal.corner_radius_bottom_right = 8
+	normal.corner_radius_bottom_left = 8
+	var hover = normal.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(0.15, 0.23, 0.33, 1.0)
+	hover.border_color = Color(0.54, 0.78, 0.95, 1.0)
+	btn.add_theme_stylebox_override("normal", normal)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", normal)
+	btn.add_theme_stylebox_override("focus", hover)
+	btn.add_theme_color_override("font_color", Color(0.9, 0.96, 1.0, 1.0))
+	btn.add_theme_font_size_override("font_size", 12)
 
 func _build_bottom_nav_dock() -> void:
 	var dock_panel = Panel.new()
@@ -858,6 +911,9 @@ func _start_mode_practice() -> void:
 
 func _start_mode_dynasty() -> void:
 	print("[Home] Chuyển cảnh vào Vương Triều (Chọn Tướng)...")
+	if AppwriteMatchmaking:
+		AppwriteMatchmaking.is_host = true
+		AppwriteMatchmaking.current_room = {}
 	get_tree().change_scene_to_file("res://scenes/hero_select.tscn")
 
 func _start_mode_2v2() -> void:
@@ -874,14 +930,18 @@ func _on_profile_clicked() -> void:
 func _cancel_matchmaking_internal() -> void:
 	mm_is_cancelled = true
 	is_matchmaking_active = false
-	var my_uid = AuthManager.current_user_id if AuthManager else ""
+	var my_uid = mm_session_user_id
+	if my_uid.is_empty() and AppwriteMatchmaking:
+		my_uid = AppwriteMatchmaking.my_session_user_id
+	if my_uid.is_empty() and AuthManager:
+		my_uid = AuthManager.current_user_id
 	if mm_is_host and mm_active_room_id != "":
 		AppwriteMatchmaking.delete_room(mm_active_room_id)
 	elif mm_active_room_id != "" and my_uid != "":
 		AppwriteMatchmaking.leave_room_slot(mm_active_room_id, my_uid)
 
 func _show_modal(title_text: String, content_node: Node) -> void:
-	if is_matchmaking_active and title_text != "⚔️ TÌM TRẬN 2v2 HOÀNG TRIỀU":
+	if is_matchmaking_active and title_text != "⚔️ TÌM TRẬN 2v2 XẾP HẠNG":
 		_cancel_matchmaking_internal()
 
 	AudioManager.play_card_draw()
@@ -1252,7 +1312,7 @@ func _show_level_up_modal(old_lvl: int, new_lvl: int, on_close: Callable = Calla
 	perk_hbox.custom_minimum_size = Vector2(0, 95)
 
 	var perks = [
-		{"icon": "🔓", "title": "MỞ KHÓA TÍNH NĂNG", "desc": "Đấu Trường 2v2 Hoàng Triều\nVương Triều Tranh Bá", "c": Color(0.75, 0.35, 0.15, 1.0)},
+		{"icon": "🔓", "title": "MỞ KHÓA TÍNH NĂNG", "desc": "Đấu Trường 2v2 Xếp Hạng\nVương Triều Tranh Bá", "c": Color(0.75, 0.35, 0.15, 1.0)},
 		{"icon": "🥈", "title": "BỔNG LỘC TRIỀU ĐÌNH", "desc": "+1,000 BẠC\nQuân lương triều đình phong thưởng", "c": Color(0.25, 0.45, 0.70, 1.0)},
 		{"icon": "🎖️", "title": "QUÂN CÔNG THĂNG TRẬT", "desc": "Uy Danh Vang Dội Tứ Hải\nTriều Đình Đặc Cách Gia Phong", "c": Color(0.20, 0.55, 0.25, 1.0)}
 	]
@@ -1429,7 +1489,7 @@ func _build_equipment_content() -> Control:
 		{"type": "Vũ Khí", "name": "Kiếm Thuận Thiên", "desc": "Tầm đánh +3. Khi Trảm trúng đích hồi phục 1 sinh mệnh."},
 		{"type": "Vũ Khí", "name": "Nỏ Thần Kim Quy", "desc": "Bỏ qua khoảng cách mục tiêu. Không giới hạn số lần dùng Trảm."},
 		{"type": "Phòng Cụ", "name": "Khiên Mây Bện", "desc": "Khi bị Trảm, phán xét lá trên cùng nếu chất ĐỎ tự động tính là ĐỠ."},
-		{"type": "Phòng Cụ", "name": "Áo Bào Hoàng Tộc", "desc": "Vô hiệu hóa sát thương Lôi và Hỏa của đối phương."},
+		{"type": "Phòng Cụ", "name": "Áo Bào Hoàng Tộc", "desc": "Chặn tối đa 2 sát thương, rồi bị hủy."},
 		{"type": "Thú Cưỡi", "name": "Voi Chiến Đại Việt", "desc": "Ngựa Thủ (+1): Tăng khoảng cách kẻ địch nhắm vào mình lên 1."},
 		{"type": "Bảo Vật", "name": "Ngọc Tỷ Truyền Quốc", "desc": "Mỗi lượt cho phép rút thêm 1 lá bài cẩm nang hoàng triều."},
 	]
@@ -1790,6 +1850,48 @@ func _build_settings_content() -> Control:
 	div.color = COLOR_GOLD_PRIMARY
 	container.add_child(div)
 
+	# Server Connection Setting for LAN / Multi-device
+	var srv_v = VBoxContainer.new()
+	srv_v.add_theme_constant_override("separation", 6)
+	var srv_lbl = Label.new()
+	srv_lbl.text = "🌐 Địa chỉ Máy Chủ Realtime (Cổng 8080):"
+	srv_lbl.add_theme_font_size_override("font_size", 13)
+	srv_lbl.add_theme_color_override("font_color", COLOR_TEXT_DARK)
+	srv_v.add_child(srv_lbl)
+
+	var srv_input = LineEdit.new()
+	srv_input.custom_minimum_size = Vector2(0, 38)
+	srv_input.text = NetworkClient.server_url if NetworkClient else "ws://127.0.0.1:8080"
+	srv_v.add_child(srv_input)
+
+	var srv_preset_hbox = HBoxContainer.new()
+	srv_preset_hbox.add_theme_constant_override("separation", 8)
+
+	var local_btn = Button.new()
+	local_btn.text = "💻 Localhost"
+	local_btn.pressed.connect(func(): srv_input.text = "ws://127.0.0.1:8080")
+	srv_preset_hbox.add_child(local_btn)
+
+	var lan_btn = Button.new()
+	lan_btn.text = "🏠 Mạng LAN (192.168.1.102)"
+	lan_btn.pressed.connect(func(): srv_input.text = "ws://192.168.1.102:8080")
+	srv_preset_hbox.add_child(lan_btn)
+
+	var save_srv_btn = Button.new()
+	save_srv_btn.text = "💾 Lưu & Kết Nối Lại"
+	save_srv_btn.pressed.connect(func():
+		if NetworkClient:
+			NetworkClient.save_server_url(srv_input.text.strip_edges())
+	)
+	srv_preset_hbox.add_child(save_srv_btn)
+	srv_v.add_child(srv_preset_hbox)
+	container.add_child(srv_v)
+
+	var div2 = ColorRect.new()
+	div2.custom_minimum_size = Vector2(0, 1)
+	div2.color = COLOR_GOLD_PRIMARY
+	container.add_child(div2)
+
 	# Logout Button
 	var logout_btn = Button.new()
 	logout_btn.custom_minimum_size = Vector2(0, 42)
@@ -1906,7 +2008,7 @@ func _build_2v2_content() -> Control:
 	container.add_theme_constant_override("separation", 12)
 
 	var lbl = Label.new()
-	lbl.text = "Sảnh Ghép Đội Đấu Trường 2v2 Hoàng Triều:"
+	lbl.text = "Sảnh Ghép Đội Đấu Trường 2v2 Xếp Hạng:"
 	lbl.add_theme_font_size_override("font_size", 14)
 	lbl.add_theme_color_override("font_color", COLOR_TEXT_DARK)
 	container.add_child(lbl)
@@ -1920,7 +2022,7 @@ func _build_2v2_content() -> Control:
 
 	var play_btn = Button.new()
 	play_btn.custom_minimum_size = Vector2(0, 48)
-	play_btn.text = "⚔️ TÌM TRẬN ĐẤU 2v2 NGAY"
+	play_btn.text = "⚔️ TÌM TRẬN 2v2 XẾP HẠNG"
 	_style_white_gold_action_button(play_btn)
 	play_btn.pressed.connect(func():
 		_start_2v2_matchmaking()
@@ -1963,7 +2065,7 @@ func _start_2v2_matchmaking() -> void:
 
 	var status_lbl = Label.new()
 	status_lbl.size_flags_horizontal = SIZE_EXPAND_FILL
-	status_lbl.text = "👑 Đang kết nối máy chủ Singapore..."
+	status_lbl.text = "🔍 Đang tìm trận: 1/4 người chơi..."
 	status_lbl.add_theme_font_size_override("font_size", 13)
 	status_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.65, 1.0))
 	sb_hbox.add_child(status_lbl)
@@ -2093,19 +2195,19 @@ func _start_2v2_matchmaking() -> void:
 
 		slots_vbox.add_child(s_panel)
 
-		# Initial slot visual
+		# Initial slot visual - Ẩn danh bảo mật
 		if i == 0:
-			name_l.text = "%s (BẠN)" % my_name
+			name_l.text = "BẠN"
 			name_l.add_theme_color_override("font_color", Color.WHITE)
 			status_l.text = "✅ ĐÃ SẴN SÀNG"
 			status_l.add_theme_color_override("font_color", Color(0.35, 0.95, 0.5, 1.0))
-			rank_l.text = "• %d RP" % my_rp
+			rank_l.text = ""
 			sp_style.border_color = COLOR_GOLD_PRIMARY
 			sp_style.bg_color = Color(0.1, 0.18, 0.32, 0.95)
 		else:
-			name_l.text = "Ghế %d: Đang tìm tướng lĩnh..." % (i + 1)
+			name_l.text = "Ghế %d: Đang tìm người chơi..." % (i + 1)
 			name_l.add_theme_color_override("font_color", Color(0.55, 0.62, 0.75, 1.0))
-			status_l.text = "⏳ Đang tìm kiếm trên máy chủ..."
+			status_l.text = "⏳ Đang tìm kiếm..."
 			status_l.add_theme_color_override("font_color", Color(0.45, 0.52, 0.65, 1.0))
 			rank_l.text = ""
 
@@ -2135,15 +2237,28 @@ func _start_2v2_matchmaking() -> void:
 	)
 	btn_hbox.add_child(cancel_btn)
 
-	_show_modal("⚔️ TÌM TRẬN 2v2 HOÀNG TRIỀU", container)
+	_show_modal("⚔️ TÌM TRẬN 2v2 XẾP HẠNG", container)
 
 	is_matchmaking_active = true
 	mm_is_cancelled = false
+	mm_search_started_at_ms = Time.get_ticks_msec()
 	mm_active_room_id = ""
 	mm_is_host = false
 	mm_current_room = {}
+	mm_session_user_id = ""
+	if AppwriteMatchmaking:
+		AppwriteMatchmaking.current_room = {}
+		AppwriteMatchmaking.my_session_user_id = ""
+		AppwriteMatchmaking.my_session_user_name = ""
 
 	_run_2v2_matchmaking_loop(status_lbl, timer_lbl, slot_nodes)
+	_update_matchmaking_timer(timer_lbl)
+
+func _update_matchmaking_timer(timer_lbl: Label) -> void:
+	while is_matchmaking_active and not mm_is_cancelled and is_instance_valid(timer_lbl):
+		var elapsed = max(0, int((Time.get_ticks_msec() - mm_search_started_at_ms) / 1000))
+		timer_lbl.text = "⏳ %02d:%02d" % [elapsed / 60, elapsed % 60]
+		await get_tree().create_timer(1.0).timeout
 
 func _style_cancel_red_button(btn: Button) -> void:
 	var norm = StyleBoxFlat.new()
@@ -2198,6 +2313,8 @@ func _update_matchmaking_slots_visual(room: Dictionary, my_user_id: String, slot
 
 		if i < slots.size():
 			var s = slots[i]
+			if not (s is Dictionary):
+				continue
 			var is_empty = bool(s.get("isEmpty", false)) or s.get("userId", "") == "" or s.get("userId", "") == "empty"
 			var is_drag = bool(s.get("isDragon", (i == 0 or i == 2)))
 			var is_ai = bool(s.get("isAI", false))
@@ -2209,40 +2326,53 @@ func _update_matchmaking_slots_visual(room: Dictionary, my_user_id: String, slot
 				is_me = (s.get("userId", "") == my_user_id)
 
 			if is_empty:
-				name_l.text = "Ghế %d: Đang tìm tướng lĩnh..." % (i + 1)
+				name_l.text = "Ghế %d: Đang tìm người chơi..." % (i + 1)
 				name_l.add_theme_color_override("font_color", Color(0.55, 0.62, 0.75, 1.0))
-				status_l.text = "⏳ Đang tìm kiếm trên máy chủ..."
+				status_l.text = "⏳ Đang tìm kiếm..."
 				status_l.add_theme_color_override("font_color", Color(0.45, 0.52, 0.65, 1.0))
 				rank_l.text = ""
 				sp_style.bg_color = Color(0.06, 0.09, 0.15, 0.95)
 				sp_style.border_color = Color(0.2, 0.28, 0.4, 0.7)
 			else:
-				var uname = s.get("userName", "Chiến Tướng")
-				var role_str = " (BẠN)" if is_me else (" (AI)" if is_ai else " (NGƯỜI THẬT)")
-				name_l.text = "%s%s" % [uname, role_str]
+				# Bảo mật ẩn danh: Chỉ hiển thị BẠN hoặc Người chơi, không lộ tên thật và điểm RP
 				if is_me:
+					name_l.text = "BẠN"
 					name_l.add_theme_color_override("font_color", Color(1.0, 0.92, 0.55, 1.0))
 					sp_style.bg_color = Color(0.1, 0.22, 0.38, 0.95)
 					sp_style.border_color = COLOR_GOLD_PRIMARY
 				elif is_drag:
+					name_l.text = "Người chơi %d" % (i + 1)
 					name_l.add_theme_color_override("font_color", Color(0.65, 0.9, 1.0, 1.0))
 					sp_style.bg_color = Color(0.07, 0.16, 0.26, 0.95)
 					sp_style.border_color = Color(0.25, 0.65, 0.95, 0.8)
 				else:
+					name_l.text = "Người chơi %d" % (i + 1)
 					name_l.add_theme_color_override("font_color", Color(1.0, 0.75, 0.8, 1.0))
 					sp_style.bg_color = Color(0.22, 0.08, 0.12, 0.95)
 					sp_style.border_color = Color(0.9, 0.35, 0.45, 0.8)
 
 				status_l.text = "✅ ĐÃ SẴN SÀNG"
 				status_l.add_theme_color_override("font_color", Color(0.35, 0.95, 0.5, 1.0))
-				rank_l.text = "• %d RP" % int(s.get("rankPoints", 0))
+				rank_l.text = ""
 
 func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: Array) -> void:
-	var my_user_id = AuthManager.current_user_id if AuthManager and AuthManager.current_user_id != "" else ("user_" + str(randi()).md5_text().substr(0, 8))
-	var my_user_name = AuthManager.current_user_name if AuthManager and AuthManager.current_user_name != "" else "Đại Tướng Quân"
+	var base_uid = AuthManager.current_user_id if AuthManager and AuthManager.current_user_id != "" else ""
+	var pid_suffix = str(OS.get_process_id())
+	var my_user_id = base_uid
+	if OS.is_debug_build() or base_uid.is_empty():
+		my_user_id = (base_uid if not base_uid.is_empty() else "guest") + "_" + pid_suffix
+	mm_session_user_id = my_user_id
+
+	var my_user_name = AuthManager.current_user_name if AuthManager and AuthManager.current_user_name != "" else ""
 	if (my_user_name == "" or my_user_name == "Đại Tướng Quân") and AuthManager and AuthManager.current_user_email != "":
 		my_user_name = AuthManager.current_user_email.split("@")[0].to_upper()
+	if my_user_name.is_empty() or my_user_name == "Đại Tướng Quân":
+		my_user_name = "Tướng Quân " + pid_suffix.right(3)
 	var my_rank_points = AuthManager.current_2v2_points if AuthManager else 1200
+
+	if AppwriteMatchmaking:
+		AppwriteMatchmaking.my_session_user_id = my_user_id
+		AppwriteMatchmaking.my_session_user_name = my_user_name
 
 	if is_instance_valid(status_lbl):
 		status_lbl.text = "🔍 Đang quét tìm phòng thi đấu trên máy chủ Singapore..."
@@ -2251,6 +2381,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
 		return
 
+	var saw_waiting_room = not found_room.is_empty()
 	if not found_room.is_empty():
 		if is_instance_valid(status_lbl):
 			status_lbl.text = "🌐 Đã tìm thấy phòng [%s]. Đang tham gia..." % found_room.get("roomId", "")
@@ -2261,13 +2392,42 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 			mm_current_room = joined
 			mm_active_room_id = joined.get("roomId", "")
 			mm_is_host = false
+			if AppwriteMatchmaking:
+				AppwriteMatchmaking.is_host = false
 		else:
 			found_room = {}
+			# Room may have changed while joining. Re-scan instead of creating a
+			# second room and splitting clients.
+			for retry in range(10):
+				if mm_is_cancelled:
+					return
+				await get_tree().create_timer(0.5).timeout
+				var retry_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, 500, my_user_name)
+				if retry_room.is_empty():
+					continue
+				var retry_joined = await AppwriteMatchmaking.join_room_slot(retry_room, my_user_id, my_user_name, my_rank_points)
+				if retry_joined.is_empty():
+					continue
+				mm_current_room = retry_joined
+				mm_active_room_id = retry_joined.get("roomId", "")
+				mm_is_host = false
+				found_room = retry_joined
+				if AppwriteMatchmaking:
+					AppwriteMatchmaking.is_host = false
+				break
+
+	if found_room.is_empty() and saw_waiting_room:
+		if is_instance_valid(status_lbl):
+			status_lbl.text = "❌ Phòng vừa đầy hoặc đã bắt đầu. Hãy tìm trận lại."
+		return
 
 	if found_room.is_empty() and not mm_is_cancelled:
 		if is_instance_valid(status_lbl):
 			status_lbl.text = "👑 Đang tạo phòng thi đấu mới trên máy chủ..."
 		var new_room_id = "room_" + str(randi()).md5_text().substr(0, 8)
+		var random_team_seats = [1, 2, 3, 4]
+		random_team_seats.shuffle()
+		var dragon_seats = random_team_seats.slice(0, 2)
 		var new_room = {
 			"roomId": new_room_id,
 			"hostUserId": my_user_id,
@@ -2275,10 +2435,10 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 			"version": 1,
 			"hostRankPoints": my_rank_points,
 			"slots": [
-				{ "seatNumber": 1, "isDragon": true, "isAI": false, "userId": my_user_id, "userName": my_user_name, "rankPoints": my_rank_points, "isEmpty": false },
-				{ "seatNumber": 2, "isDragon": false, "isAI": false, "userId": "", "userName": "", "rankPoints": 0, "isEmpty": true },
-				{ "seatNumber": 3, "isDragon": true, "isAI": false, "userId": "", "userName": "", "rankPoints": 0, "isEmpty": true },
-				{ "seatNumber": 4, "isDragon": false, "isAI": false, "userId": "", "userName": "", "rankPoints": 0, "isEmpty": true }
+				{ "seatNumber": 1, "isDragon": dragon_seats.has(1), "isAI": false, "userId": my_user_id, "userName": my_user_name, "rankPoints": my_rank_points, "isEmpty": false },
+				{ "seatNumber": 2, "isDragon": dragon_seats.has(2), "isAI": false, "userId": "", "userName": "", "rankPoints": 0, "isEmpty": true },
+				{ "seatNumber": 3, "isDragon": dragon_seats.has(3), "isAI": false, "userId": "", "userName": "", "rankPoints": 0, "isEmpty": true },
+				{ "seatNumber": 4, "isDragon": dragon_seats.has(4), "isAI": false, "userId": "", "userName": "", "rankPoints": 0, "isEmpty": true }
 			]
 		}
 		var created = await AppwriteMatchmaking.create_waiting_room(new_room)
@@ -2288,6 +2448,8 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		mm_current_room = new_room
 		mm_active_room_id = new_room_id
 		mm_is_host = true
+		if AppwriteMatchmaking:
+			AppwriteMatchmaking.is_host = true
 		if not created:
 			print("[Matchmaking] Appwrite notice: Đang ở chế độ dự phòng ghép bot...")
 
@@ -2296,11 +2458,11 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 
 	_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
 
-	var elapsed_timer: float = 0.0
 	var is_fast_test = "--screenshot-matchmaking-filled" in OS.get_cmdline_user_args() or "--screenshot-matchmaking-filled" in OS.get_cmdline_args()
-	var bot_fill_timeout: float = 1.0 if is_fast_test else 15.0
+	var bot_fill_timeout: float = 1.0 if is_fast_test else 30.0
 	var bot_fill_timer: float = 0.0
 	var heartbeat_timer: float = 0.0
+	var poll_timer: float = 0.0 # Thăm dò Appwrite mỗi 2.0 giây
 	var last_real_player_count: int = 1
 	var guest_wait_timer: float = 0.0
 
@@ -2308,61 +2470,73 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		if not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
 			return
 
-		elapsed_timer += 0.5
 		bot_fill_timer += 0.5
 		heartbeat_timer -= 0.5
+		poll_timer -= 0.5
 		guest_wait_timer += 0.5
 
-		var sec = int(elapsed_timer)
-		if is_instance_valid(timer_lbl):
-			timer_lbl.text = "⏳ %02d:%02d" % [sec / 60, sec % 60]
+		if poll_timer <= 0.0 or is_fast_test:
+			poll_timer = 2.0 # Đặt lại chu kỳ 2s
 
-		if mm_is_host:
-			if heartbeat_timer <= 0.0:
-				heartbeat_timer = 2.0
-				AppwriteMatchmaking.send_host_heartbeat(mm_active_room_id)
+			if mm_is_host:
+				if heartbeat_timer <= 0.0:
+					heartbeat_timer = 4.0
+					AppwriteMatchmaking.send_host_heartbeat(mm_active_room_id)
 
-			var polled = await AppwriteMatchmaking.poll_room_state(mm_active_room_id)
-			if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
-				return
-			if not polled.is_empty():
-				mm_current_room = polled
+				var polled = await AppwriteMatchmaking.poll_room_state(mm_active_room_id)
+				if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
+					return
+				if not polled.is_empty():
+					mm_current_room = polled
 
-			var current_real_count = 0
-			for s in mm_current_room.get("slots", []):
-				if not s.get("isEmpty", false) and not s.get("isAI", false) and s.get("userId", "") != "":
-					current_real_count += 1
+				var current_real_count = 0
+				for s in mm_current_room.get("slots", []):
+					if not (s is Dictionary):
+						continue
+					if not s.get("isEmpty", false) and not s.get("isAI", false) and s.get("userId", "") != "":
+						current_real_count += 1
 
-			if current_real_count > last_real_player_count:
-				bot_fill_timer = 0.0 # reset ngầm cho thêm thời gian khi có người thật
-				last_real_player_count = current_real_count
+				var filled_display_count = max(1, current_real_count)
 				if is_instance_valid(status_lbl):
-					status_lbl.text = "⚔️ Có thêm người chơi thực tham gia! Đang đợi tiếp..."
+					status_lbl.text = "🔍 Đang tìm trận: %d/4 người chơi..." % filled_display_count
 
-			_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
+				if current_real_count > last_real_player_count:
+					bot_fill_timer = 0.0 # reset ngầm cho thêm thời gian khi có người thật
+					last_real_player_count = current_real_count
 
-			if current_real_count >= 4 or bot_fill_timer >= bot_fill_timeout:
-				break
-		else:
-			var polled = await AppwriteMatchmaking.poll_room_state(mm_active_room_id)
-			if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
-				return
-			if not polled.is_empty():
-				mm_current_room = polled
-
-			if not mm_current_room.is_empty():
 				_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
 
-				if mm_current_room.get("status") == "STARTED":
+				if current_real_count >= 4 or bot_fill_timer >= bot_fill_timeout:
 					break
+			else:
+				var polled = await AppwriteMatchmaking.poll_room_state(mm_active_room_id)
+				if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
+					return
+				if not polled.is_empty():
+					mm_current_room = polled
 
-			if guest_wait_timer > 35.0:
-				if is_instance_valid(status_lbl):
-					status_lbl.text = "❌ Mất kết nối với chủ phòng!"
-					status_lbl.add_theme_color_override("font_color", Color(1.0, 0.35, 0.35, 1.0))
-				await get_tree().create_timer(2.0).timeout
-				_hide_modal()
-				return
+				if not mm_current_room.is_empty():
+					var guest_count = 0
+					for s in mm_current_room.get("slots", []):
+						if s is Dictionary and not s.get("isEmpty", false) and s.get("userId", "") != "" and s.get("userId", "") != "empty":
+							guest_count += 1
+					if is_instance_valid(status_lbl):
+						status_lbl.text = "🔍 Đang tìm trận: %d/4 người chơi..." % max(1, guest_count)
+					_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
+
+					if mm_current_room.get("status") == "STARTED":
+						break
+
+				if guest_wait_timer > 60.0:
+					if is_instance_valid(status_lbl):
+						status_lbl.text = "❌ Mất kết nối với chủ phòng!"
+						status_lbl.add_theme_color_override("font_color", Color(1.0, 0.35, 0.35, 1.0))
+					await get_tree().create_timer(2.0).timeout
+					_hide_modal()
+					return
+
+		if mm_is_host and (bot_fill_timer >= bot_fill_timeout):
+			break
 
 		await get_tree().create_timer(0.5).timeout
 
@@ -2376,6 +2550,8 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 
 		var used_names: Array = [my_user_name]
 		for s in mm_current_room.get("slots", []):
+			if not (s is Dictionary):
+				continue
 			if not s.get("isEmpty", false) and s.get("userName", "") != "":
 				used_names.append(s.get("userName"))
 
@@ -2383,6 +2559,8 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		var slots = mm_current_room.get("slots", [])
 		for i in range(slots.size()):
 			var s = slots[i]
+			if not (s is Dictionary):
+				continue
 			if s.get("isEmpty", false):
 				var bot_name = AppwriteMatchmaking.get_realistic_gamer_name(bot_seed_base + i * 17, used_names)
 				used_names.append(bot_name)
@@ -2399,16 +2577,18 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		return
 
 	if is_instance_valid(status_lbl):
-		status_lbl.text = "⚔️ ĐÃ KẾT NỐI ĐỦ 4 CHIẾN TƯỚNG! Bắt đầu vào trận..."
+		status_lbl.text = "⚔️ ĐÃ KẾT NỐI ĐỦ 4/4 NGƯỜI CHƠI! Bắt đầu vào trận..."
 		status_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
 	if is_instance_valid(timer_lbl):
-		timer_lbl.text = "⚔️ SẴN SÀNG!"
+		timer_lbl.text = "⚔️ 4/4 SẴN SÀNG!"
 		timer_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
 	AudioManager.play_victory()
 	_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
 
 	# Lưu phòng vào AppwriteMatchmaking để hero_select.tscn có thể hiển thị chính xác tên 4 người
-	AppwriteMatchmaking.current_room = mm_current_room
+	if AppwriteMatchmaking:
+		AppwriteMatchmaking.current_room = mm_current_room
+		AppwriteMatchmaking.is_host = mm_is_host
 
 	await get_tree().create_timer(1.2).timeout
 	if mm_is_cancelled:
@@ -2440,6 +2620,9 @@ func _build_national_war_content() -> Control:
 	_style_white_gold_action_button(war_btn)
 	war_btn.pressed.connect(func():
 		_hide_modal()
+		if AppwriteMatchmaking:
+			AppwriteMatchmaking.is_host = true
+			AppwriteMatchmaking.current_room = {}
 		get_tree().change_scene_to_file("res://scenes/hero_select.tscn")
 	)
 	container.add_child(war_btn)

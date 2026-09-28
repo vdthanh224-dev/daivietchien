@@ -26,6 +26,8 @@ var is_draft_active: bool = true
 var is_player_locked: bool = false
 var current_room_id: String = ""
 var is_host: bool = false
+var is_network_mode: bool = false
+var _draft_joined: bool = false
 
 # UI References
 var draft_status_lbl: Label
@@ -45,12 +47,24 @@ var lock_in_btn_lbl: Label
 func _ready() -> void:
 	var current_room = AppwriteMatchmaking.current_room if AppwriteMatchmaking else {}
 	current_room_id = current_room.get("roomId", "")
-	var my_uid = AuthManager.current_user_id if AuthManager else ""
-	var my_name = AuthManager.current_user_name if AuthManager else ""
-	if AppwriteMatchmaking:
-		is_host = AppwriteMatchmaking.is_same_user(current_room.get("hostUserId", ""), "", my_uid, my_name)
+	if current_room_id.is_empty():
+		current_room_id = "room_1"
+	var args = OS.get_cmdline_user_args() + OS.get_cmdline_args()
+	if "--guest-test" in args and AppwriteMatchmaking:
+		AppwriteMatchmaking.is_host = false
+
+	if AppwriteMatchmaking and ("is_host" in AppwriteMatchmaking):
+		is_host = AppwriteMatchmaking.is_host
 	else:
-		is_host = (current_room.get("hostUserId", "") == my_uid)
+		var my_uid = AppwriteMatchmaking.my_session_user_id if AppwriteMatchmaking and not AppwriteMatchmaking.my_session_user_id.is_empty() else (AuthManager.current_user_id if AuthManager else "")
+		var host_uid = current_room.get("hostUserId", "")
+		if host_uid.is_empty() or host_uid == my_uid:
+			is_host = true
+		elif AppwriteMatchmaking:
+			is_host = AppwriteMatchmaking.is_same_user(host_uid, "", my_uid, "")
+		else:
+			is_host = false
+	print("[HeroSelect] Vai trò phòng: %s (Room ID: %s)" % ["MÁY CHỦ (HOST)" if is_host else "MÁY KHÁCH (GUEST)", current_room_id])
 
 	# Khởi tạo dữ liệu tướng khả dụng từ HeroDatabase
 	if HeroDatabase:
@@ -64,47 +78,76 @@ func _ready() -> void:
 	if not available_heroes.is_empty():
 		_inspect_hero(available_heroes[0])
 
-	_start_draft_sequence()
+	_connect_network_draft()
 
-	# Kiểm thử tự động nếu có cờ dòng lệnh
-	var args = OS.get_cmdline_user_args() + OS.get_cmdline_args()
+	# Kiểm tra kết nối máy chủ WebSocket Deno (tối đa 1.0s nếu đang trong tiến trình dò quét)
+	if NetworkClient and not NetworkClient.is_connected_to_server and NetworkClient.is_connecting():
+		var wait_t = 0.0
+		while wait_t < 1.0 and NetworkClient.is_connecting() and not NetworkClient.is_connected_to_server:
+			await get_tree().create_timer(0.1).timeout
+			wait_t += 0.1
+		if NetworkClient.is_connected_to_server or NetworkClient.is_connecting():
+			is_network_mode = true
+		else:
+			is_network_mode = false
+
 	if "--screenshot-hero-select" in args:
 		_run_automated_screenshot()
+		return
+
+	_start_draft_sequence()
 
 func _setup_draft_slots() -> void:
 	draft_slots.clear()
 	var current_room = AppwriteMatchmaking.current_room if AppwriteMatchmaking else {}
 	var slots = current_room.get("slots", [])
 
-	var my_name = AuthManager.current_user_name if AuthManager and AuthManager.current_user_name != "" else "Đại Tướng Quân"
-	var my_uid = AuthManager.current_user_id if AuthManager and AuthManager.current_user_id != "" else ""
+	var my_name = ""
+	var my_uid = ""
+	if AppwriteMatchmaking and not AppwriteMatchmaking.my_session_user_id.is_empty():
+		my_uid = AppwriteMatchmaking.my_session_user_id
+		my_name = AppwriteMatchmaking.my_session_user_name
+	if my_uid.is_empty() and AuthManager:
+		my_uid = AuthManager.current_user_id
+	if my_name.is_empty() and AuthManager and AuthManager.current_user_name != "":
+		my_name = AuthManager.current_user_name
+	if my_name.is_empty():
+		my_name = "Đại Tướng Quân"
 
-	# Xác định chính xác vị trí ghế thực tế của người chơi
+	# Dùng UID/tên khi duy nhất; UID trùng trong debug phải giữ ghế riêng của cửa sổ.
 	var my_seat_idx = -1
 	if slots.size() == 4:
-		# 1. So khớp người chơi qua is_same_user (khớp userId nguyên bản/24 ký tự hoặc userName)
-		for i in range(4):
-			var s = slots[i]
-			if not bool(s.get("isEmpty", false)):
-				if AppwriteMatchmaking and AppwriteMatchmaking.is_same_user(s.get("userId", ""), s.get("userName", ""), my_uid, my_name):
-					my_seat_idx = i
-					break
-				elif s.get("userId", "") == my_uid or (my_name != "" and s.get("userName", "").to_lower() == my_name.to_lower()):
-					my_seat_idx = i
-					break
-		# 2. Nếu vẫn không thấy slot nào khớp, tìm ghế đầu tiên không phải AI
+		if NetworkClient and NetworkClient.seat_is_explicit and NetworkClient.my_seat in [1, 2, 3, 4]:
+			# Explicit debug seats must win over the shared local UID/name.
+			my_seat_idx = NetworkClient.my_seat - 1
+		else:
+			var identity_matches: Array[int] = []
+			for i in range(4):
+				var s = slots[i]
+				if not bool(s.get("isEmpty", false)):
+					var slot_uid = str(s.get("userId", "")).strip_edges()
+					var slot_name = str(s.get("userName", "")).strip_edges()
+					if (not my_uid.is_empty() and slot_uid == my_uid) or (not my_name.is_empty() and slot_name.to_lower() == my_name.to_lower()):
+						identity_matches.append(i)
+			if identity_matches.size() == 1:
+				my_seat_idx = identity_matches[0]
+		# Cuối cùng mới chọn ghế người thật đầu tiên.
 		if my_seat_idx == -1:
 			for i in range(4):
 				var s = slots[i]
 				if not bool(s.get("isAI", false)) and not bool(s.get("isEmpty", false)):
 					my_seat_idx = i
 					break
-		# 3. Fallback mặc định là ghế 0 (ghế 1)
-		if my_seat_idx == -1:
-			my_seat_idx = 0
+	if my_seat_idx == -1 and slots.size() != 4 and NetworkClient and NetworkClient.my_seat in [1, 2, 3, 4]:
+		my_seat_idx = NetworkClient.my_seat - 1
+
+	if my_seat_idx == -1:
+		my_seat_idx = 0
 
 	var my_seat_num = my_seat_idx + 1
-	var my_is_dragon = (my_seat_num == 1 or my_seat_num == 3)
+	if NetworkClient:
+		NetworkClient.my_seat = my_seat_num
+	print("[HeroSelect] Xác định ghế của bạn: Ghế %d (UID: %s, Tên: %s)" % [my_seat_num, my_uid, my_name])
 
 	var used_names: Array = []
 
@@ -127,12 +170,13 @@ func _setup_draft_slots() -> void:
 
 			used_names.append(uname)
 
-			var is_drag = (s_num == 1 or s_num == 3)
-			var role_tag = ("[%d] RỒNG" % s_num) if is_drag else ("[%d] PHƯỢNG" % s_num)
+			var is_drag = bool(s.get("isDragon", s_num == 1 or s_num == 3))
+			var role_tag = "[RỒNG]" if is_drag else "[PHƯỢNG]"
 			var is_ai = false if is_me else bool(s.get("isAI", true))
 
 			draft_slots.append({
 				"seatNumber": s_num,
+				"userId": s.get("userId", ""),
 				"userName": uname,
 				"roleTag": role_tag,
 				"isPlayer": is_me,
@@ -142,20 +186,57 @@ func _setup_draft_slots() -> void:
 				"isLocked": false
 			})
 	else:
-		# Mặc định 4 ghế chuẩn 2v2 với 3 tên AI ngẫu nhiên không trùng lặp
-		used_names.append(my_name)
-		var b1 = AppwriteMatchmaking.get_realistic_gamer_name(101, used_names) if AppwriteMatchmaking else "Chiến Tướng 2"
-		used_names.append(b1)
-		var b2 = AppwriteMatchmaking.get_realistic_gamer_name(202, used_names) if AppwriteMatchmaking else "Chiến Tướng 3"
-		used_names.append(b2)
-		var b3 = AppwriteMatchmaking.get_realistic_gamer_name(303, used_names) if AppwriteMatchmaking else "Chiến Tướng 4"
+		# Mặc định 4 ghế chuẩn 2v2 với ghế tương ứng với cửa sổ client
+		var local_seat = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat in [1, 2, 3, 4] else 1
+		var random_team_seats = [1, 2, 3, 4]
+		random_team_seats.shuffle()
+		var dragon_seats = random_team_seats.slice(0, 2)
+		draft_slots = []
+		for s_num in range(1, 5):
+			var is_me = (s_num == local_seat)
+			var uname = my_name if is_me else ("Chiến Tướng %d" % s_num)
+			var is_drag = dragon_seats.has(s_num)
+			var role_tag = "[RỒNG]" if is_drag else "[PHƯỢNG]"
+			draft_slots.append({
+				"seatNumber": s_num,
+				"userName": uname,
+				"roleTag": role_tag,
+				"isPlayer": is_me,
+				"isDragon": is_drag,
+				"isAI": not is_me,
+				"chosenHero": null,
+				"isLocked": false
+			})
 
-		draft_slots = [
-			{"seatNumber": 1, "userName": my_name, "roleTag": "[1] RỒNG", "isPlayer": true, "isDragon": true, "isAI": false, "chosenHero": null, "isLocked": false},
-			{"seatNumber": 2, "userName": b1, "roleTag": "[2] PHƯỢNG", "isPlayer": false, "isDragon": false, "isAI": true, "chosenHero": null, "isLocked": false},
-			{"seatNumber": 3, "userName": b2, "roleTag": "[3] RỒNG", "isPlayer": false, "isDragon": true, "isAI": true, "chosenHero": null, "isLocked": false},
-			{"seatNumber": 4, "userName": b3, "roleTag": "[4] PHƯỢNG", "isPlayer": false, "isDragon": false, "isAI": true, "chosenHero": null, "isLocked": false}
-		]
+func _get_anonymous_slot_name(slot_idx: int) -> String:
+	if slot_idx < 0 or slot_idx >= draft_slots.size():
+		return "Người chơi"
+	var s = draft_slots[slot_idx]
+	var my_seat_num = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat in [1, 2, 3, 4] else 1
+	var s_num = int(s.get("seatNumber", slot_idx + 1))
+	var is_me = bool(s.get("isPlayer", false)) or (s_num == my_seat_num)
+	if is_me:
+		return "BẠN (Đồng minh 1)"
+
+	# Phe của người chơi
+	var my_is_dragon = true
+	for local_s in draft_slots:
+		if bool(local_s.get("isPlayer", false)) or int(local_s.get("seatNumber", 0)) == my_seat_num:
+			my_is_dragon = bool(local_s.get("isDragon", true))
+			break
+
+	var is_ally = (bool(s.get("isDragon", true)) == my_is_dragon)
+	if is_ally:
+		return "Đồng minh 2"
+
+	var enemy_count = 1
+	for j in range(slot_idx):
+		var prev_s = draft_slots[j]
+		var prev_is_ally = (bool(prev_s.get("isDragon", true)) == my_is_dragon)
+		var prev_is_me = bool(prev_s.get("isPlayer", false)) or (int(prev_s.get("seatNumber", 0)) == my_seat_num)
+		if not prev_is_ally and not prev_is_me:
+			enemy_count += 1
+	return "Đối thủ %d" % enemy_count
 
 func _build_ui() -> void:
 	# 1. Nền màn hình chính
@@ -216,7 +297,7 @@ func _build_header() -> void:
 
 	# Tiêu đề game
 	var title = Label.new()
-	title.text = "👑 ĐẠI VIỆT CHIẾN • CHỌN TƯỚNG 2v2"
+	title.text = "👑 ĐẠI VIỆT CHIẾN • CHỌN TƯỚNG 2v2 XẾP HẠNG"
 	title.add_theme_font_size_override("font_size", 16)
 	title.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 	hbox.add_child(title)
@@ -325,7 +406,7 @@ func _build_left_slots_column() -> Control:
 		r1_hbox.add_child(team_lbl)
 
 		var seat_lbl = Label.new()
-		seat_lbl.text = slot_data["userName"]
+		seat_lbl.text = _get_anonymous_slot_name(i)
 		seat_lbl.add_theme_font_size_override("font_size", 12)
 		seat_lbl.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0, 1.0) if slot_data["isPlayer"] else Color.WHITE)
 		seat_lbl.size_flags_horizontal = SIZE_EXPAND_FILL
@@ -365,6 +446,8 @@ func _build_left_slots_column() -> Control:
 		left_slot_nodes.append({
 			"panel": slot_panel,
 			"style": sp_style,
+			"team": team_lbl,
+			"player": seat_lbl,
 			"avatar": av_rect,
 			"hero_name": hero_name_l,
 			"status": status_l,
@@ -391,8 +474,8 @@ func _build_center_grid_column() -> Control:
 
 	var grid = GridContainer.new()
 	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 10)
-	grid.add_theme_constant_override("v_separation", 10)
+	grid.add_theme_constant_override("h_separation", 14)
+	grid.add_theme_constant_override("v_separation", 14)
 	grid.size_flags_horizontal = SIZE_EXPAND_FILL
 	scroll.add_child(grid)
 
@@ -409,23 +492,32 @@ func _create_hero_grid_card(hero: Dictionary) -> Control:
 	var is_free = bool(hero.get("is_weekly_free", false))
 
 	var card_btn = Button.new()
-	card_btn.custom_minimum_size = Vector2(152, 206)
+	card_btn.custom_minimum_size = Vector2(144, 196)
+	card_btn.pivot_offset = Vector2(72, 98)
 	card_btn.focus_mode = Control.FOCUS_NONE
 
 	# Base Panel Style
 	var base_style = StyleBoxFlat.new()
 	base_style.bg_color = Color(0.06, 0.09, 0.16, 0.98)
-	base_style.border_width_left = 2
-	base_style.border_width_top = 2
-	base_style.border_width_right = 2
-	base_style.border_width_bottom = 2
+	base_style.border_width_left = 1
+	base_style.border_width_top = 1
+	base_style.border_width_right = 1
+	base_style.border_width_bottom = 1
 	base_style.border_color = COLOR_GOLD_PRIMARY if is_free else Color(0.30, 0.65, 0.90, 0.85)
 	base_style.corner_radius_top_left = 6
 	base_style.corner_radius_top_right = 6
 	base_style.corner_radius_bottom_right = 6
 	base_style.corner_radius_bottom_left = 6
+	var hover_style = base_style.duplicate() as StyleBoxFlat
+	hover_style.border_width_left = 2
+	hover_style.border_width_top = 2
+	hover_style.border_width_right = 2
+	hover_style.border_width_bottom = 2
+	hover_style.border_color = COLOR_GOLD_ACCENT
+	hover_style.shadow_color = Color(0.95, 0.75, 0.22, 0.35)
+	hover_style.shadow_size = 6
 	card_btn.add_theme_stylebox_override("normal", base_style)
-	card_btn.add_theme_stylebox_override("hover", base_style)
+	card_btn.add_theme_stylebox_override("hover", hover_style)
 	card_btn.add_theme_stylebox_override("pressed", base_style)
 
 	var margin = MarginContainer.new()
@@ -529,7 +621,7 @@ func _create_hero_grid_card(hero: Dictionary) -> Control:
 	vbox.add_child(skill_bar)
 
 	var skill_lbl = Label.new()
-	skill_lbl.text = "⚡ %s" % hero.get("skillName", "")
+	skill_lbl.text = "⚡ %s" % HeroDatabase.get_skill_summary(int(hero.get("id", 0)))
 	skill_lbl.add_theme_font_size_override("font_size", 10)
 	skill_lbl.add_theme_color_override("font_color", Color(0.4, 0.92, 1.0, 1.0))
 	skill_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -538,7 +630,16 @@ func _create_hero_grid_card(hero: Dictionary) -> Control:
 	# Sự kiện bấm chọn soi tướng
 	card_btn.pressed.connect(func():
 		AudioManager.play_card_select()
+		var tween = card_btn.create_tween()
+		tween.tween_property(card_btn, "scale", Vector2(1.04, 1.04), 0.08)
+		tween.tween_property(card_btn, "scale", Vector2.ONE, 0.12)
 		_inspect_hero(hero)
+	)
+	card_btn.mouse_entered.connect(func():
+		card_btn.create_tween().tween_property(card_btn, "scale", Vector2(1.025, 1.025), 0.12)
+	)
+	card_btn.mouse_exited.connect(func():
+		card_btn.create_tween().tween_property(card_btn, "scale", Vector2.ONE, 0.12)
 	)
 
 	return card_btn
@@ -661,24 +762,27 @@ func _build_right_inspect_column() -> Control:
 	# 6. Nút Khóa Tướng Lớn
 	lock_in_btn = Button.new()
 	lock_in_btn.custom_minimum_size = Vector2(0, 48)
+	lock_in_btn.focus_mode = Control.FOCUS_NONE
+	lock_in_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	lock_in_btn.text = "👑 XÁC NHẬN CHỌN TƯỚNG"
+	lock_in_btn.add_theme_font_size_override("font_size", 14)
+	lock_in_btn.add_theme_color_override("font_color", Color.WHITE)
+	lock_in_btn.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.9, 1.0))
+	lock_in_btn.add_theme_color_override("font_pressed_color", Color(0.9, 0.85, 0.7, 1.0))
+	lock_in_btn.add_theme_color_override("font_disabled_color", Color(0.6, 0.65, 0.7, 0.8))
 	_style_gold_confirm_btn(lock_in_btn)
 	vbox.add_child(lock_in_btn)
-
-	lock_in_btn_lbl = Label.new()
-	lock_in_btn_lbl.set_anchors_preset(PRESET_FULL_RECT)
-	lock_in_btn_lbl.text = "👑 XÁC NHẬN CHỌN TƯỚNG"
-	lock_in_btn_lbl.add_theme_font_size_override("font_size", 14)
-	lock_in_btn_lbl.add_theme_color_override("font_color", Color.WHITE)
-	lock_in_btn_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lock_in_btn_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	lock_in_btn.add_child(lock_in_btn_lbl)
 
 	lock_in_btn.pressed.connect(_on_confirm_pick_pressed)
 
 	return panel
 
+func _set_lock_in_text(txt: String) -> void:
+	if lock_in_btn and is_instance_valid(lock_in_btn):
+		lock_in_btn.text = txt
+
 func _inspect_hero(hero: Dictionary) -> void:
-	if hero.is_empty():
+	if not (hero is Dictionary) or hero.is_empty():
 		return
 	inspecting_hero = hero
 
@@ -688,9 +792,8 @@ func _inspect_hero(hero: Dictionary) -> void:
 	var tag = "[🌟 FREE TUẦN]" if is_free else "[ĐÃ SỞ HỮU]"
 
 	var fac = hero.get("faction", "")
-	var fac_full = HeroDatabase.get_faction_full_name(fac) if HeroDatabase else fac
 	inspect_title_lbl.text = hname.to_upper()
-	inspect_sub_lbl.text = "Thế Lực: %s (%s) • Máu: %d đóa sen %s" % [fac, fac_full, hero.get("maxHp", 4), tag]
+	inspect_sub_lbl.text = "Thế Lực: %s • Máu: %d đóa sen %s" % [fac, hero.get("maxHp", 4), tag]
 
 	var tex = HeroDatabase.get_avatar_texture(hero.get("avatarPath", "")) if HeroDatabase else null
 	if tex: inspect_avatar_rect.texture = tex
@@ -709,8 +812,8 @@ func _inspect_hero(hero: Dictionary) -> void:
 		if lotus_tex: l_rect.texture = lotus_tex
 		inspect_lotus_container.add_child(l_rect)
 
-	inspect_skill_title_lbl.text = "⚡ TUYỆT KỸ: [%s]" % hero.get("skillName", "").to_upper()
-	inspect_skill_desc_lbl.text = hero.get("skillDesc", "")
+	inspect_skill_title_lbl.text = "⚡ TUYỆT KỸ: [%s]" % HeroDatabase.get_skill_summary(int(hero.get("id", 0))).to_upper()
+	inspect_skill_desc_lbl.text = HeroDatabase.get_skill_details(int(hero.get("id", 0)))
 
 	_update_lock_in_button_state()
 
@@ -722,40 +825,138 @@ func _is_my_turn() -> bool:
 func _update_lock_in_button_state() -> void:
 	if not is_draft_active:
 		lock_in_btn.disabled = true
-		lock_in_btn_lbl.text = "⚔️ TRẬN ĐẤU SẴN SÀNG"
+		_set_lock_in_text("⚔️ TRẬN ĐẤU SẴN SÀNG")
 		return
 
 	if _is_my_turn():
 		if is_player_locked:
 			lock_in_btn.disabled = true
-			lock_in_btn_lbl.text = "✅ BẠN ĐÃ KHÓA TƯỚNG"
+			_set_lock_in_text("✅ BẠN ĐÃ KHÓA TƯỚNG")
 		else:
 			var hid = int(inspecting_hero.get("id", 0))
 			if hid in selected_hero_ids:
 				lock_in_btn.disabled = true
-				lock_in_btn_lbl.text = "⚠️ TƯỚNG NÀY ĐÃ ĐƯỢC CHỌN"
+				_set_lock_in_text("⚠️ TƯỚNG NÀY ĐÃ ĐƯỢC CHỌN")
 			else:
 				lock_in_btn.disabled = false
-				lock_in_btn_lbl.text = "👑 XÁC NHẬN CHỌN TƯỚNG"
+				_set_lock_in_text("👑 XÁC NHẬN CHỌN TƯỚNG")
 	else:
 		lock_in_btn.disabled = true
 		if is_player_locked:
-			lock_in_btn_lbl.text = "⏳ ĐANG CHỜ CÁC TƯỚNG KHÁC..."
+			_set_lock_in_text("⏳ ĐANG CHỜ CÁC TƯỚNG KHÁC...")
 		else:
-			lock_in_btn_lbl.text = "⏳ ĐANG CHỜ GHẾ #%d CHỌN..." % (current_picker_index + 1)
+			_set_lock_in_text("⏳ ĐANG CHỜ GHẾ #%d CHỌN..." % (current_picker_index + 1))
 
-# --- Luồng Chọn Tướng Theo Lượt (Turn-based Draft Sequence) ---
+# --- Luồng Chọn Tướng Theo Lượt (Turn-based Draft Sequence chuẩn Unity) ---
+func _show_no_server_modal(message: String = "") -> void:
+	is_draft_active = false
+	var dim = ColorRect.new()
+	dim.set_anchors_preset(PRESET_FULL_RECT)
+	dim.color = Color(0.0, 0.0, 0.0, 0.88)
+	add_child(dim)
+
+	var center = CenterContainer.new()
+	center.set_anchors_preset(PRESET_FULL_RECT)
+	dim.add_child(center)
+
+	var panel = PanelContainer.new()
+	panel.custom_minimum_size = Vector2(480, 240)
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.08, 0.10, 0.16, 0.98)
+	style.border_width_left = 2
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.border_width_bottom = 2
+	style.border_color = Color(0.95, 0.35, 0.35, 0.9)
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	panel.add_theme_stylebox_override("panel", style)
+	center.add_child(panel)
+
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	panel.add_child(margin)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 16)
+	margin.add_child(vbox)
+
+	var title_lbl = Label.new()
+	title_lbl.text = "⚠️ KHÔNG TÌM THẤY MÁY CHỦ TRẬN ĐẤU"
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.add_theme_font_size_override("font_size", 16)
+	title_lbl.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4))
+	vbox.add_child(title_lbl)
+
+	var desc_lbl = Label.new()
+	desc_lbl.text = message if message != "" else "Không thể kết nối đến Máy Chủ Deno (Cloud hoặc Local 8080).\nTrận đấu không thể tiếp tục khi không có máy chủ."
+	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc_lbl.add_theme_font_size_override("font_size", 13)
+	desc_lbl.add_theme_color_override("font_color", Color(0.8, 0.85, 0.9))
+	vbox.add_child(desc_lbl)
+
+	var btn = Button.new()
+	btn.text = "↩️ QUAY VỀ SẢNH CHÍNH"
+	btn.custom_minimum_size = Vector2(200, 44)
+	btn.size_flags_horizontal = SIZE_SHRINK_CENTER
+	var btn_style = StyleBoxFlat.new()
+	btn_style.bg_color = Color(0.2, 0.25, 0.35, 1.0)
+	btn_style.corner_radius_top_left = 8
+	btn_style.corner_radius_top_right = 8
+	btn_style.corner_radius_bottom_left = 8
+	btn_style.corner_radius_bottom_right = 8
+	btn.add_theme_stylebox_override("normal", btn_style)
+	btn.pressed.connect(func():
+		get_tree().change_scene_to_file("res://scenes/home.tscn")
+	)
+	vbox.add_child(btn)
+
+var _server_state_received: bool = false
+
+# --- Luồng Chọn Tướng Theo Lượt (Đồng bộ qua Deno WebSocket hoặc Chạy Local) ---
 func _start_draft_sequence() -> void:
 	current_picker_index = 0
-	_run_draft_loop()
+	if is_network_mode:
+		draft_status_lbl.text = "⚡ Đang đồng bộ tiến trình chọn tướng từ Máy chủ Deno..."
+		draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+		_start_network_draft_watchdog()
+	else:
+		_run_local_draft_loop()
 
-func _run_draft_loop() -> void:
+func _start_network_draft_watchdog() -> void:
+	_server_state_received = false
+	for retry in range(3):
+		await get_tree().create_timer(3.0).timeout
+		if _server_state_received or not is_draft_active or not is_network_mode:
+			return
+		if NetworkClient and NetworkClient.is_connected_to_server and not _draft_joined:
+			print("[HeroSelect] 🔁 Gửi lại JOIN_DRAFT lần %d." % (retry + 1))
+			_on_network_connected_for_draft()
+
+	if not _server_state_received and is_draft_active and is_network_mode:
+		draft_status_lbl.text = "⚠️ Đang chờ máy chủ chọn tướng..."
+		draft_status_lbl.add_theme_color_override("font_color", COLOR_PHOENIX_RED)
+
+func _run_local_draft_loop() -> void:
+	print("[HeroSelect] ⚙️ Đang chạy chọn tướng chế độ Cục Bộ (Local Draft)...")
+	draft_status_lbl.text = "🎮 Chọn Tướng Cục Bộ (Local vs AI)..."
+	draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+
+	var locked_hero_ids = [0, 0, 0, 0]
+
 	for slot_idx in range(draft_slots.size()):
 		if not is_draft_active:
 			return
 
 		current_picker_index = slot_idx
 		var slot = draft_slots[slot_idx]
+		turn_timer = 40.0
 		_highlight_active_picker(slot_idx)
 		_update_lock_in_button_state()
 
@@ -763,147 +964,48 @@ func _run_draft_loop() -> void:
 		var is_player = bool(slot.get("isPlayer", false))
 
 		if is_player:
-			# ══════════════════════════════════════════════════════════════
-			# 1. LƯỢT CỦA BẠN (NGƯỜI THẬT TRÊN MÁY NÀY): ĐỂ ĐỦ 40 GIÂY!
-			# Tuyệt đối không tự chọn thay bạn khi đồng hồ còn đang chạy!
-			# ══════════════════════════════════════════════════════════════
-			turn_timer = 40.0
-			turn_timer_lbl.text = "⏳ 40s"
-			draft_status_lbl.text = "👑 ĐẾN LƯỢT BẠN CHỌN TƯỚNG (#%d)! (Bạn có 40 giây)" % slot["seatNumber"]
+			draft_status_lbl.text = "👑 ĐẾN LƯỢT BẠN CHỌN TƯỚNG! (Bạn có 40 giây)"
 			draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
-
-			if is_host and not current_room_id.is_empty() and AppwriteMatchmaking:
-				AppwriteMatchmaking.send_draft_host_state({
-					"roomId": current_room_id,
-					"phase": "PICKING",
-					"currentPickerIndex": slot_idx,
-					"currentSeatNumber": slot["seatNumber"],
-					"timerLeft": turn_timer,
-					"heroId1": _get_locked_hero_id(0),
-					"heroId2": _get_locked_hero_id(1),
-					"heroId3": _get_locked_hero_id(2),
-					"heroId4": _get_locked_hero_id(3)
-				})
-
-			var host_sync_timer = 0.0
-			while turn_timer > 0.0 and not slot["isLocked"] and is_draft_active:
-				turn_timer -= 0.5
-				host_sync_timer += 0.5
-				turn_timer_lbl.text = "⏳ %ds" % maxi(0, int(ceilf(turn_timer)))
-
-				# Host đồng bộ thời gian còn lại sang máy khách mỗi 1 giây
-				if is_host and host_sync_timer >= 1.0 and not current_room_id.is_empty() and AppwriteMatchmaking:
-					host_sync_timer = 0.0
-					AppwriteMatchmaking.send_draft_host_state({
-						"roomId": current_room_id,
-						"phase": "PICKING",
-						"currentPickerIndex": slot_idx,
-						"currentSeatNumber": slot["seatNumber"],
-						"timerLeft": turn_timer,
-						"heroId1": _get_locked_hero_id(0),
-						"heroId2": _get_locked_hero_id(1),
-						"heroId3": _get_locked_hero_id(2),
-						"heroId4": _get_locked_hero_id(3)
-					})
-
-				await get_tree().create_timer(0.5).timeout
-
-			# CHỈ KHI HẾT SẠCH 40s mà người chơi vẫn chưa bấm "XÁC NHẬN CHỌN TƯỚNG",
-			# mới tự động khóa tướng đang soi (hoặc tướng đầu tiên khả dụng) làm dự phòng timeout
-			if not slot["isLocked"] and is_draft_active:
-				var candidate = inspecting_hero
-				var cid = int(candidate.get("id", 0))
-				if cid == 0 or cid in selected_hero_ids:
-					candidate = _get_first_available_candidate()
-				_lock_hero_for_slot(slot, candidate)
-				_send_pick_action_if_needed(slot["seatNumber"], int(candidate.get("id", 0)))
-
-		elif not is_bot:
-			# ══════════════════════════════════════════════════════════════
-			# 2. LƯỢT CỦA NGƯỜI THẬT KHÁC (ĐỒNG ĐỘI / ĐỐI THỦ LÀ NGƯỜI CHƠI KHÁCH):
-			# Để đủ 40 giây cho người thật đó tự suy nghĩ và chọn tướng!
-			# Tuyệt đối KHÔNG tự chọn cho họ sau 1-2s!
-			# ══════════════════════════════════════════════════════════════
-			turn_timer = 40.0
-			turn_timer_lbl.text = "⏳ 40s"
-			var seat_num = slot["seatNumber"]
-			var role_name = slot.get("roleTag", "")
-			draft_status_lbl.text = "⏳ Ghế #%d %s: %s (Người thật) đang suy nghĩ và chọn tướng (40s)..." % [seat_num, role_name, slot["userName"]]
-			draft_status_lbl.add_theme_color_override("font_color", COLOR_DRAGON_CYAN if slot["isDragon"] else COLOR_PHOENIX_RED)
-
-			var poll_timer = 0.0
-			while turn_timer > 0.0 and not slot["isLocked"] and is_draft_active:
-				turn_timer -= 0.5
-				poll_timer += 0.5
-				turn_timer_lbl.text = "⏳ %ds" % maxi(0, int(ceilf(turn_timer)))
-
-				# Lắng nghe xem người thật đó đã chọn tướng qua mạng chưa
-				if poll_timer >= 0.8 and not current_room_id.is_empty() and AppwriteMatchmaking:
-					poll_timer = 0.0
-					if is_host:
-						# Host kiểm tra xem Guest có gửi DACT chọn tướng lên không
-						var act = await AppwriteMatchmaking.poll_draft_player_action_for_seat(current_room_id, seat_num)
-						var req_id = int(act.get("requestedHeroId", 0))
-						if req_id > 0 and not req_id in selected_hero_ids:
-							var h = HeroDatabase.get_hero(req_id) if HeroDatabase else {}
-							if not h.is_empty():
-								_lock_hero_for_slot(slot, h)
-								break
-					else:
-						# Guest kiểm tra xem Host đã đồng bộ heroId cho slot này chưa
-						var h_state = await AppwriteMatchmaking.poll_draft_host_state(current_room_id)
-						var h_ids = h_state.get("heroIds", [0, 0, 0, 0])
-						if slot_idx < h_ids.size() and h_ids[slot_idx] > 0 and not h_ids[slot_idx] in selected_hero_ids:
-							var h = HeroDatabase.get_hero(h_ids[slot_idx]) if HeroDatabase else {}
-							if not h.is_empty():
-								_lock_hero_for_slot(slot, h)
-								break
-
-				await get_tree().create_timer(0.5).timeout
-
-			# Nếu hết sạch 40s mà người thật kia vẫn chưa khóa (hoặc rớt mạng), tự động chọn tướng dự phòng
-			if not slot["isLocked"] and is_draft_active:
-				var candidate = _get_first_available_candidate()
-				_lock_hero_for_slot(slot, candidate)
-
 		else:
-			# ══════════════════════════════════════════════════════════════
-			# 3. LƯỢT CỦA AI BOT: Suy nghĩ 2.0 - 3.5s rồi tự động chọn
-			# ══════════════════════════════════════════════════════════════
-			turn_timer = 15.0
-			var seat_num = slot["seatNumber"]
-			var role_name = slot.get("roleTag", "")
-			draft_status_lbl.text = "⏳ Ghế #%d (AI: %s) đang suy nghĩ..." % [seat_num, slot["userName"]]
+			draft_status_lbl.text = "⏳ %s đang suy nghĩ..." % _get_anonymous_slot_name(slot_idx)
 			draft_status_lbl.add_theme_color_override("font_color", COLOR_DRAGON_CYAN if slot["isDragon"] else COLOR_PHOENIX_RED)
 
-			var think_time = randf_range(2.0, 3.5)
-			while think_time > 0.0 and is_draft_active:
-				think_time -= 0.5
-				turn_timer -= 0.5
-				turn_timer_lbl.text = "⏳ %ds" % maxi(0, int(ceilf(turn_timer)))
-				await get_tree().create_timer(0.5).timeout
+		while locked_hero_ids[slot_idx] == 0 and turn_timer > 0.0 and is_draft_active:
+			turn_timer = maxf(0.0, turn_timer - 0.5)
+			turn_timer_lbl.text = "⏳ %ds" % maxi(0, int(ceilf(turn_timer)))
 
-			if is_draft_active and not slot["isLocked"]:
-				var bot_pick = _choose_bot_hero()
-				_lock_hero_for_slot(slot, bot_pick)
+			if is_player:
+				if slot.get("isLocked", false) and slot.has("chosenHero") and (slot["chosenHero"] is Dictionary):
+					locked_hero_ids[slot_idx] = int(slot["chosenHero"].get("id", 0))
+					break
+			else:
+				# Bot suy nghĩ 1.5 giây rồi tự chọn tướng
+				if turn_timer <= 38.5:
+					var bot_pick = _choose_bot_hero()
+					locked_hero_ids[slot_idx] = int(bot_pick.get("id", 1))
+					_lock_hero_for_slot(slot, bot_pick)
+					break
 
-		# Cập nhật phát sóng trạng thái sau mỗi lượt
-		if is_host and not current_room_id.is_empty() and AppwriteMatchmaking:
-			AppwriteMatchmaking.send_draft_host_state({
-				"roomId": current_room_id,
-				"phase": "PICKING",
-				"currentPickerIndex": slot_idx,
-				"currentSeatNumber": slot["seatNumber"],
-				"timerLeft": 0.0,
-				"heroId1": _get_locked_hero_id(0),
-				"heroId2": _get_locked_hero_id(1),
-				"heroId3": _get_locked_hero_id(2),
-				"heroId4": _get_locked_hero_id(3)
-			})
+			await get_tree().create_timer(0.5).timeout
 
-		await get_tree().create_timer(0.4).timeout
+		# Hết thời gian mà chưa khóa thì tự lấy tướng đầu tiên hợp lệ
+		if locked_hero_ids[slot_idx] == 0 and is_draft_active:
+			var fallback_pick = _get_first_available_candidate()
+			locked_hero_ids[slot_idx] = int(fallback_pick.get("id", 1))
+			_lock_hero_for_slot(slot, fallback_pick)
 
-	# Hoàn tất chọn tướng cho cả 4 ghế
+		await get_tree().create_timer(0.5).timeout
+
+	# Đếm ngược 3 giây vào trận
+	AudioManager.play_victory()
+	for c in range(3, 0, -1):
+		if not is_draft_active:
+			break
+		draft_status_lbl.text = "⚔️ CẢ 4 CHIẾN TƯỚNG ĐÃ SẴN SÀNG! VÀO TRẬN SAU %ds..." % c
+		draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+		turn_timer_lbl.text = "⚔️ %ds" % c
+		await get_tree().create_timer(1.0).timeout
+
 	_on_draft_completed()
 
 func _highlight_active_picker(idx: int) -> void:
@@ -932,7 +1034,8 @@ func _highlight_active_picker(idx: int) -> void:
 
 func _lock_hero_for_slot(slot: Dictionary, hero: Dictionary) -> void:
 	var hid = int(hero.get("id", 1))
-	selected_hero_ids.append(hid)
+	if not hid in selected_hero_ids:
+		selected_hero_ids.append(hid)
 	slot["chosenHero"] = hero
 	slot["isLocked"] = true
 
@@ -993,83 +1096,197 @@ func _get_locked_hero_id(idx: int) -> int:
 			return int(h.get("id", 0))
 	return 0
 
-func _send_pick_action_if_needed(seat_num: int, hero_id: int) -> void:
-	if not current_room_id.is_empty() and AppwriteMatchmaking:
-		if not is_host:
-			AppwriteMatchmaking.send_draft_player_action({
-				"roomId": current_room_id,
-				"seatNumber": seat_num,
-				"senderUserId": AuthManager.current_user_id if AuthManager else "",
-				"requestedHeroId": hero_id,
-				"seq": 1
-			})
-		else:
-			AppwriteMatchmaking.send_draft_host_state({
-				"roomId": current_room_id,
-				"phase": "PICKING",
-				"currentPickerIndex": current_picker_index,
-				"currentSeatNumber": seat_num,
-				"timerLeft": turn_timer,
-				"heroId1": _get_locked_hero_id(0),
-				"heroId2": _get_locked_hero_id(1),
-				"heroId3": _get_locked_hero_id(2),
-				"heroId4": _get_locked_hero_id(3)
-			})
-
 func _on_confirm_pick_pressed() -> void:
 	if _is_my_turn() and not is_player_locked:
+		if not (inspecting_hero is Dictionary) or inspecting_hero.is_empty():
+			return
 		var slot = draft_slots[current_picker_index]
+		var hid = int(inspecting_hero.get("id", 0))
+		var hname = inspecting_hero.get("name", "")
+
+		# Khóa tướng ngay lập tức trên máy cục bộ để UI phản hồi tức thì và không bị reset
+		is_player_locked = true
 		_lock_hero_for_slot(slot, inspecting_hero)
-		_send_pick_action_if_needed(slot["seatNumber"], int(inspecting_hero.get("id", 0)))
+		lock_in_btn.disabled = true
+		_set_lock_in_text("✅ BẠN ĐÃ KHÓA TƯỚNG")
+
+		if NetworkClient and NetworkClient.is_connected_to_server:
+			NetworkClient.send_pick_hero(hid, hname)
+
+# --- Kết Nối Đồng Bộ Deno Server (Authoritative Draft Phase) ---
+func _connect_network_draft() -> void:
+	if not NetworkClient:
+		return
+	if not NetworkClient.draft_state_updated.is_connected(_on_server_draft_state_updated):
+		NetworkClient.draft_state_updated.connect(_on_server_draft_state_updated)
+	if not NetworkClient.draft_completed.is_connected(_on_server_draft_completed):
+		NetworkClient.draft_completed.connect(_on_server_draft_completed)
+	if not NetworkClient.draft_joined.is_connected(_on_network_draft_joined):
+		NetworkClient.draft_joined.connect(_on_network_draft_joined)
+	if not NetworkClient.connection_closed.is_connected(_on_network_draft_closed):
+		NetworkClient.connection_closed.connect(_on_network_draft_closed)
+	if not NetworkClient.connection_established.is_connected(_on_network_connected_for_draft):
+		NetworkClient.connection_established.connect(_on_network_connected_for_draft)
+
+	if NetworkClient.is_connected_to_server:
+		is_network_mode = true
+		_on_network_connected_for_draft()
+
+func _on_network_connected_for_draft() -> void:
+	if _draft_joined or not NetworkClient:
+		return
+	is_network_mode = true
+	var my_seat_num = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat in [1, 2, 3, 4] else 1
+	var my_uid = AuthManager.current_user_id if AuthManager else ""
+	var my_name = AuthManager.current_user_name if AuthManager else "Đại Tướng Quân"
+	if AppwriteMatchmaking and not AppwriteMatchmaking.my_session_user_id.is_empty():
+		my_uid = AppwriteMatchmaking.my_session_user_id
+		my_name = AppwriteMatchmaking.my_session_user_name
+
+	var slots_data: Array = []
+	for s in draft_slots:
+			slots_data.append({
+				"seatNumber": int(s.get("seatNumber", 1)),
+				"userId": str(s.get("userId", "")),
+				"userName": str(s.get("userName", "")),
+				"isAI": bool(s.get("isAI", false)),
+				"isDragon": bool(s.get("isDragon", false))
+			})
+
+	print("[HeroSelect] Gửi JOIN_DRAFT: room=%s, seat=%d, user=%s" % [current_room_id, my_seat_num, my_name])
+	NetworkClient.send_join_draft(current_room_id, my_seat_num, my_uid, my_name, slots_data)
+
+func _on_network_draft_joined(assigned_seat: int) -> void:
+	_draft_joined = true
+	if assigned_seat >= 1 and assigned_seat <= 4 and NetworkClient:
+		NetworkClient.my_seat = assigned_seat
+
+func _on_network_draft_closed() -> void:
+	if not is_draft_active:
+		return
+	_draft_joined = false
+	_server_state_received = false
+	draft_status_lbl.text = "⚠️ Mất kết nối máy chủ chọn tướng, đang kết nối lại..."
+
+func _apply_authoritative_draft_slots(server_slots: Array) -> void:
+	if server_slots.is_empty():
+		return
+	for s_info in server_slots:
+		if not (s_info is Dictionary):
+			continue
+		var s_num = int(s_info.get("seatNumber", s_info.get("seat", 0)))
+		for local_s in draft_slots:
+			if int(local_s.get("seatNumber", local_s.get("seat", 0))) != s_num:
+				continue
+			var was_locked = bool(local_s.get("isLocked", false))
+			var old_hero = local_s.get("chosenHero", {})
+			var old_hid = int(old_hero.get("id", 0)) if old_hero is Dictionary else 0
+			local_s["userId"] = s_info.get("userId", local_s.get("userId", ""))
+			local_s["userName"] = s_info.get("userName", local_s.get("userName", ""))
+			local_s["isDragon"] = bool(s_info.get("isDragon", local_s.get("isDragon", false)))
+			local_s["roleTag"] = "[RỒNG]" if local_s["isDragon"] else "[PHƯỢNG]"
+			local_s["isAI"] = bool(s_info.get("isAI", local_s.get("isAI", false)))
+			var hid = int(s_info.get("heroId", 0))
+			var is_locked = bool(s_info.get("isLocked", false)) and hid > 0
+			if is_locked:
+				var hero = HeroDatabase.get_hero(hid) if HeroDatabase else {}
+				if not (hero is Dictionary) or hero.is_empty():
+					hero = {"id": hid, "name": s_info.get("heroName", "Tướng %d" % hid), "maxHp": int(s_info.get("maxHp", 4))}
+				local_s["chosenHero"] = hero
+				if not was_locked or old_hid != hid:
+					local_s["isLocked"] = false
+					_lock_hero_for_slot(local_s, hero)
+				else:
+					local_s["isLocked"] = true
+			else:
+				local_s["chosenHero"] = null
+				local_s["isLocked"] = false
+				if local_s.get("isPlayer", false):
+					is_player_locked = false
+			for node in left_slot_nodes:
+				if node.get("data") != local_s:
+					continue
+				var team_lbl = node.get("team")
+				if team_lbl and is_instance_valid(team_lbl):
+					team_lbl.text = "[RỒNG]" if local_s.get("isDragon", true) else "[PHƯỢNG]"
+					team_lbl.add_theme_color_override("font_color", COLOR_DRAGON_CYAN if local_s["isDragon"] else COLOR_PHOENIX_RED)
+				var seat_lbl = node.get("player")
+				if seat_lbl and is_instance_valid(seat_lbl):
+					seat_lbl.text = _get_anonymous_slot_name(draft_slots.find(local_s))
+				break
+			break
+	selected_hero_ids.clear()
+	for local_s in draft_slots:
+		if local_s.get("isLocked", false):
+			selected_hero_ids.append(int(local_s.get("chosenHero", {}).get("id", 0)))
+
+func _on_server_draft_state_updated(data: Dictionary) -> void:
+	if not is_draft_active:
+		return
+	_server_state_received = true
+
+	var phase = data.get("phase", "PICKING")
+	var t = int(data.get("timer", 0))
+	turn_timer = float(t)
+
+	if phase == "COUNTDOWN":
+		draft_status_lbl.text = "⚔️ ĐÃ KHÓA ĐỦ 4 CHIẾN TƯỚNG! TẤT CẢ VÀO 2v2 TRONG %d..." % t
+		draft_status_lbl.add_theme_color_override("font_color", Color(0.35, 0.95, 0.5, 1.0))
+		turn_timer_lbl.text = "⚔️ %ds" % t
+		return
+
+	current_picker_index = int(data.get("currentPickerIndex", 0))
+	turn_timer_lbl.text = "⏳ %ds" % t
+	var server_seat = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat in [1, 2, 3, 4] else 1
+	for local_s in draft_slots:
+		local_s["isPlayer"] = int(local_s.get("seatNumber", local_s.get("seat", 0))) == server_seat
+
+	# Đồng bộ trạng thái khóa và phe từ Server.
+	var server_slots = data.get("slots", [])
+	if server_slots is Array:
+		_apply_authoritative_draft_slots(server_slots)
+
+	_highlight_active_picker(current_picker_index)
+	_update_lock_in_button_state()
+
+	# Cập nhật nhãn trạng thái theo lượt
+	var active_slot = draft_slots[current_picker_index] if current_picker_index < draft_slots.size() else {}
+	if _is_my_turn():
+		draft_status_lbl.text = "👑 ĐẾN LƯỢT BẠN CHỌN TƯỚNG! (Còn %d giây)" % t
+		draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+	else:
+		var anon_n = _get_anonymous_slot_name(current_picker_index)
+		draft_status_lbl.text = "⏳ %s đang chọn (%ds)..." % [anon_n, t]
+		draft_status_lbl.add_theme_color_override("font_color", COLOR_DRAGON_CYAN if active_slot.get("isDragon", true) else COLOR_PHOENIX_RED)
+
+func _on_server_draft_completed(data: Dictionary) -> void:
+	if is_draft_active:
+		var server_slots = data.get("slots", [])
+		if server_slots is Array:
+			_apply_authoritative_draft_slots(server_slots)
+		current_picker_index = draft_slots.size()
+		_on_draft_completed()
 
 func _on_draft_completed() -> void:
+	if not is_draft_active:
+		return
 	is_draft_active = false
 	turn_timer_lbl.text = "⚔️ SẴN SÀNG!"
+	draft_status_lbl.text = "⚔️ TẤT CẢ XUẤT TRẬN 2v2!"
+	draft_status_lbl.add_theme_color_override("font_color", Color(0.35, 0.95, 0.5, 1.0))
 	AudioManager.play_victory()
+
+	# Đảm bảo tất cả các ghế đều đã có tướng hợp lệ
+	for slot in draft_slots:
+		if not slot.get("isLocked", false) or not slot.has("chosenHero"):
+			var cand = _get_first_available_candidate()
+			_lock_hero_for_slot(slot, cand)
 
 	# Lưu danh sách 4 tướng đã chọn vào AppwriteMatchmaking để battle_2v2.tscn sử dụng
 	if AppwriteMatchmaking:
 		if AppwriteMatchmaking.current_room is Dictionary:
 			AppwriteMatchmaking.current_room["draft_slots"] = draft_slots
 		AppwriteMatchmaking.draft_slots = draft_slots
-
-	# Đếm ngược 5 giây cùng nhau vào Đấu Trường 2v2
-	for count in [5, 4, 3, 2, 1]:
-		draft_status_lbl.text = "⚔️ ĐÃ KHÓA ĐỦ 4 CHIẾN TƯỚNG! TẤT CẢ VÀO 2v2 TRONG %d..." % count
-		draft_status_lbl.add_theme_color_override("font_color", Color(0.35, 0.95, 0.5, 1.0))
-		turn_timer_lbl.text = "⚔️ %ds" % count
-
-		if is_host and not current_room_id.is_empty() and AppwriteMatchmaking:
-			AppwriteMatchmaking.send_draft_host_state({
-				"roomId": current_room_id,
-				"phase": "COUNTDOWN",
-				"currentPickerIndex": 3,
-				"currentSeatNumber": 4,
-				"timerLeft": 0.0,
-				"countdownSec": count,
-				"heroId1": _get_locked_hero_id(0),
-				"heroId2": _get_locked_hero_id(1),
-				"heroId3": _get_locked_hero_id(2),
-				"heroId4": _get_locked_hero_id(3)
-			})
-
-		await get_tree().create_timer(1.0).timeout
-
-	draft_status_lbl.text = "⚔️ TẤT CẢ XUẤT TRẬN 2v2!"
-
-	if is_host and not current_room_id.is_empty() and AppwriteMatchmaking:
-		AppwriteMatchmaking.send_draft_host_state({
-			"roomId": current_room_id,
-			"phase": "START_BATTLE",
-			"currentPickerIndex": 3,
-			"currentSeatNumber": 4,
-			"timerLeft": 0.0,
-			"countdownSec": 0,
-			"heroId1": _get_locked_hero_id(0),
-			"heroId2": _get_locked_hero_id(1),
-			"heroId3": _get_locked_hero_id(2),
-			"heroId4": _get_locked_hero_id(3)
-		})
 
 	await get_tree().create_timer(0.4).timeout
 	get_tree().change_scene_to_file("res://scenes/battle_2v2.tscn")
@@ -1119,10 +1336,15 @@ func _show_battle_launch_dialog() -> void:
 	teams_vbox.add_theme_constant_override("separation", 8)
 	vbox.add_child(teams_vbox)
 
-	for s in draft_slots:
+	for i in range(draft_slots.size()):
+		var s = draft_slots[i]
+		if not (s is Dictionary):
+			continue
 		var hero = s.get("chosenHero", {})
+		if not (hero is Dictionary):
+			hero = {}
 		var hname = hero.get("name", "Vô Danh Tướng")
-		var is_drag = s["isDragon"]
+		var is_drag = bool(s.get("isDragon", true))
 
 		var row = HBoxContainer.new()
 		var team_tag = Label.new()
@@ -1132,7 +1354,7 @@ func _show_battle_launch_dialog() -> void:
 		row.add_child(team_tag)
 
 		var p_lbl = Label.new()
-		p_lbl.text = "Ghế #%d: %s %s ➜ Tướng: %s" % [s["seatNumber"], s["userName"], s["roleTag"], hname]
+		p_lbl.text = "%s ➜ Tướng: %s" % [_get_anonymous_slot_name(i), hname]
 		p_lbl.add_theme_font_size_override("font_size", 13)
 		p_lbl.add_theme_color_override("font_color", Color.WHITE)
 		row.add_child(p_lbl)
@@ -1212,12 +1434,15 @@ func _style_cancel_small_btn(btn: Button) -> void:
 func _run_automated_screenshot() -> void:
 	print("[HeroSelect] Chờ dựng hình giao diện Chọn Tướng...")
 	await get_tree().create_timer(0.6).timeout
-	var img = get_viewport().get_texture().get_image()
-	var path = "res://hero_select_screenshot.png"
-	var err = img.save_png(path)
-	if err == OK:
-		print("[HeroSelect] Đã lưu ảnh chụp Chọn Tướng tại: ", path)
-	else:
-		print("[HeroSelect] Lỗi lưu ảnh chụp: ", err)
+	var tex = get_viewport().get_texture()
+	if tex:
+		var img = tex.get_image()
+		if img:
+			var path = "res://hero_select_screenshot.png"
+			var err = img.save_png(path)
+			if err == OK:
+				print("[HeroSelect] Đã lưu ảnh chụp Chọn Tướng tại: ", path)
+			else:
+				print("[HeroSelect] Lỗi lưu ảnh chụp: ", err)
 	await get_tree().create_timer(0.2).timeout
 	get_tree().quit()
