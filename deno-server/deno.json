@@ -8,6 +8,6 @@
   },
   "deploy": {
     "org": "vdthanh",
-    "app": "dai-viet-chien-server"
+    "app": "dai-viet-chien"
   }
 }

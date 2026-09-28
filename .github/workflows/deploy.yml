@@ -19,5 +19,5 @@ jobs:
         uses: denoland/deployctl@v1
         with:
           project: dai-viet-chien
-          entrypoint: deploy_deno/main.ts
-          root: .
+          entrypoint: server.js
+          root: deno-server
