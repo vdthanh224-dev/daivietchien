@@ -99,13 +99,8 @@ var rescue_card_selector_hbox: HBoxContainer = null
 var rescue_card_selector_scroll: ScrollContainer = null
 
 @onready var general_info_modal: Control = $GeneralInfoModal
-@onready var info_title: Label = $GeneralInfoModal/Dim/Box/Margin/VBox/HeaderHBox/ModalTitle
-@onready var info_hero_name: Label = $GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/LeftCol/HeroName
-@onready var info_hero_stats: Label = $GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/LeftCol/HeroStats
-@onready var info_skill_title: Label = $GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/SkillBox/Margin/VBox/SkillTitle
-@onready var info_skill_desc: Label = $GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/SkillBox/Margin/VBox/SkillDesc
-@onready var info_close_x_btn: Button = $GeneralInfoModal/Dim/Box/Margin/VBox/HeaderHBox/CloseXBtn
-@onready var info_close_btn: Button = $GeneralInfoModal/Dim/Box/Margin/VBox/CloseModalBtn
+@onready var info_close_x_btn: Button = $GeneralInfoModal.get_node_or_null("Dim/Box/Margin/VBox/HeaderHBox/CloseXBtn")
+@onready var info_close_btn: Button = $GeneralInfoModal.get_node_or_null("Dim/Box/Margin/VBox/FooterHBox/CloseModalBtn")
 
 @onready var victory_defeat_modal: Control = $VictoryDefeatModal
 @onready var victory_title: Label = $VictoryDefeatModal/Dim/Box/Margin/VBox/Title
@@ -427,8 +422,10 @@ func _ready() -> void:
 
 	rescue_confirm_btn.pressed.connect(_on_rescue_confirmed)
 	rescue_pass_btn.pressed.connect(_on_rescue_passed)
-	info_close_x_btn.pressed.connect(_hide_general_info_modal)
-	info_close_btn.pressed.connect(_hide_general_info_modal)
+	if is_instance_valid(info_close_x_btn):
+		info_close_x_btn.pressed.connect(_hide_general_info_modal)
+	if is_instance_valid(info_close_btn):
+		info_close_btn.pressed.connect(_hide_general_info_modal)
 	victory_return_btn.pressed.connect(_on_return_home_clicked)
 	iron_chain_confirm_btn.pressed.connect(_on_iron_chain_confirmed)
 	iron_chain_cancel_btn.pressed.connect(_hide_iron_chain_modal)
@@ -2070,9 +2067,6 @@ func _record_local_equipment_card(card_info: Dictionary) -> void:
 			if equipment_cards[i] is Dictionary and int(equipment_cards[i].get("subType", -1)) == subtype:
 				equipment_cards.remove_at(i)
 	equipment_cards.append(new_card)
-	else:
-		# Song Cung and other weapons may coexist for heroes with two weapon slots.
-		equipment_cards.append(new_card)
 	g["equipment_cards"] = equipment_cards
 
 func _refresh_hung_suc_equipped_weapon_previews() -> void:
@@ -9906,36 +9900,16 @@ func _show_general_info_modal(seat_num: int) -> void:
 	var g = generals_data.get(seat_num, null)
 	if not g:
 		return
-	var is_drag = g["isDragon"]
-	info_title.text = "THÔNG TIN TƯỚNG (GHẾ %d - %s)" % [seat_num, "PHE RỒNG" if is_drag else "PHE PHƯỢNG"]
-	info_hero_name.text = g["name"]
-	var fac_name = g["faction"]
-	info_hero_stats.text = "Thế Lực: %s\nMáu: %d/%d đóa sen\nBài trên tay: %d lá" % [fac_name, g["hp"], g["max_hp"], g["hand_count"]]
-
-	var skills = HeroDatabase.get_hero_skills(int(g.get("hero_id", 0)))
-	if skills is Array and not skills.is_empty():
-		var skill_names: Array[String] = []
-		var skill_descriptions: Array[String] = []
-		for skill in skills:
-			if skill is Dictionary:
-				skill_names.append(str(skill.get("name", "Kỹ năng chiến đấu")))
-				skill_descriptions.append("%s: %s" % [skill.get("name", "Kỹ năng"), skill.get("desc", "Chưa có thông tin.")])
-		info_skill_title.text = "Kỹ năng: %s" % ", ".join(skill_names)
-		info_skill_desc.text = "\n".join(skill_descriptions)
+	if general_info_modal.has_method("display_general"):
+		general_info_modal.display_general(g, my_seat)
 	else:
-		info_skill_title.text = "Kỹ năng: DŨNG TƯỚNG"
-		info_skill_desc.text = "Không có kỹ năng chủ động đặc biệt."
-	var equipment_lines: Array[String] = []
-	for entry in [["Vũ khí", "equipped_weapon"], ["Giáp", "equipped_armor"], ["Ngựa công", "equipped_off_horse"], ["Ngựa thủ", "equipped_def_horse"], ["Bảo vật", "equipped_treasure"]]:
-		var item_name = str(g.get(entry[1], ""))
-		if not item_name.is_empty():
-			equipment_lines.append("• %s: %s — %s" % [entry[0], item_name, _get_equipment_description(item_name)])
-	info_skill_desc.text += "\n\nTRANG BỊ ĐANG MANG:\n%s" % ("\n".join(equipment_lines) if not equipment_lines.is_empty() else "• Không có")
-
-	general_info_modal.visible = true
+		general_info_modal.visible = true
 
 func _hide_general_info_modal() -> void:
-	general_info_modal.visible = false
+	if general_info_modal.has_method("close_modal"):
+		general_info_modal.close_modal()
+	else:
+		general_info_modal.visible = false
 
 func _get_equipment_description(item_name: String) -> String:
 	match item_name:

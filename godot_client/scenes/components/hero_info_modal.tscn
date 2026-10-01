@@ -1,0 +1,454 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Theme" uid="uid://d4af37royalgold" path="res://resources/themes/royal_gold_theme.tres" id="1_theme"]
+[ext_resource type="Script" path="res://scenes/components/hero_info_modal.gd" id="2_script"]
+[ext_resource type="Texture2D" path="res://assets/ui/hero_backgrounds/bg_hero_green.png" id="3_bg_green"]
+[ext_resource type="Texture2D" uid="uid://c332mcgi33wje" path="res://assets/ui/game_avatar.png" id="4_avatar_def"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_modal_box"]
+bg_color = Color(0.045, 0.065, 0.11, 0.98)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.92, 0.78, 0.32, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+shadow_color = Color(0.92, 0.74, 0.22, 0.28)
+shadow_size = 20
+shadow_offset = Vector2(0, 6)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card_border"]
+bg_color = Color(0.02, 0.03, 0.06, 0.9)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.92, 0.78, 0.32, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+shadow_color = Color(0, 0, 0, 0.7)
+shadow_size = 10
+shadow_offset = Vector2(0, 4)
+
+[sub_resource type="Gradient" id="Gradient_bottom_vignette"]
+colors = PackedColorArray(0.03, 0.05, 0.09, 0, 0.02, 0.03, 0.06, 0.98)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_vignette"]
+gradient = SubResource("Gradient_bottom_vignette")
+fill_from = Vector2(0.5, 0)
+fill_to = Vector2(0.5, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dynasty"]
+bg_color = Color(0.06, 0.08, 0.14, 0.92)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.85, 0.7, 0.25, 0.8)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 8.0
+content_margin_top = 2.0
+content_margin_right = 8.0
+content_margin_bottom = 2.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_stats"]
+bg_color = Color(0.06, 0.085, 0.14, 0.95)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.85, 0.72, 0.3, 0.5)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_equip_slot"]
+bg_color = Color(0.055, 0.075, 0.125, 0.92)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.7, 0.6, 0.28, 0.35)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[node name="HeroInfoModal" type="Control"]
+z_index = 350
+z_as_relative = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_theme")
+script = ExtResource("2_script")
+
+[node name="DarkMask" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.015, 0.025, 0.045, 0.85)
+
+[node name="Dim" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Box" type="PanelContainer" parent="Dim"]
+custom_minimum_size = Vector2(880, 520)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_modal_box")
+
+[node name="Margin" type="MarginContainer" parent="Dim/Box"]
+layout_mode = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 16
+
+[node name="VBox" type="VBoxContainer" parent="Dim/Box/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="HeaderHBox" type="HBoxContainer" parent="Dim/Box/Margin/VBox"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="CrestIcon" type="Label" parent="Dim/Box/Margin/VBox/HeaderHBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "⚜️"
+
+[node name="ModalTitle" type="Label" parent="Dim/Box/Margin/VBox/HeaderHBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.84, 0.45, 1)
+theme_override_colors/font_outline_color = Color(0.04, 0.02, 0.01, 1)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 18
+text = "CHI TIẾT DANH TƯỚNG"
+
+[node name="Spacer" type="Control" parent="Dim/Box/Margin/VBox/HeaderHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="TeamBadge" type="PanelContainer" parent="Dim/Box/Margin/VBox/HeaderHBox"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Dim/Box/Margin/VBox/HeaderHBox/TeamBadge"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "🐉 PHE RỒNG • GHẾ 1 (BẠN)"
+
+[node name="CloseXBtn" type="Button" parent="Dim/Box/Margin/VBox/HeaderHBox"]
+custom_minimum_size = Vector2(34, 34)
+layout_mode = 2
+focus_mode = 0
+theme_override_colors/font_color = Color(1, 0.9, 0.6, 1)
+theme_override_font_sizes/font_size = 15
+text = "✕"
+
+[node name="Divider" type="ColorRect" parent="Dim/Box/Margin/VBox"]
+custom_minimum_size = Vector2(0, 2)
+layout_mode = 2
+color = Color(0.85, 0.7, 0.25, 0.75)
+
+[node name="ContentHBox" type="HBoxContainer" parent="Dim/Box/Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 18
+
+[node name="LeftCol" type="VBoxContainer" parent="Dim/Box/Margin/VBox/ContentHBox"]
+custom_minimum_size = Vector2(250, 0)
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="PortraitCard" type="PanelContainer" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol"]
+clip_contents = true
+custom_minimum_size = Vector2(250, 290)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_card_border")
+
+[node name="CardBg" type="TextureRect" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol/PortraitCard"]
+layout_mode = 2
+mouse_filter = 2
+texture = ExtResource("3_bg_green")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="HeroPortrait" type="TextureRect" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol/PortraitCard"]
+layout_mode = 2
+mouse_filter = 2
+texture = ExtResource("4_avatar_def")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="BottomGradient" type="TextureRect" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol/PortraitCard"]
+custom_minimum_size = Vector2(0, 90)
+layout_mode = 2
+size_flags_vertical = 8
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_vignette")
+expand_mode = 1
+
+[node name="DynastyBadge" type="PanelContainer" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol/PortraitCard"]
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_dynasty")
+
+[node name="Label" type="Label" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol/PortraitCard/DynastyBadge"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.9, 0.55, 1)
+theme_override_font_sizes/font_size = 11
+text = "Triều Lý"
+
+[node name="NameBanner" type="PanelContainer" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol/PortraitCard"]
+layout_mode = 2
+size_flags_vertical = 8
+
+[node name="Margin" type="MarginContainer" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol/PortraitCard/NameBanner"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="HeroName" type="Label" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol/PortraitCard/NameBanner/Margin"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.92, 0.55, 1)
+theme_override_colors/font_outline_color = Color(0.03, 0.02, 0.01, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 16
+text = "LÝ THƯỜNG KIỆT"
+horizontal_alignment = 1
+
+[node name="StatsPanel" type="PanelContainer" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol"]
+custom_minimum_size = Vector2(0, 100)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_stats")
+
+[node name="Margin" type="MarginContainer" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol/StatsPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="VBox" type="VBoxContainer" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol/StatsPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="HpRow" type="HBoxContainer" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol/StatsPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="HpTitle" type="Label" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol/StatsPanel/Margin/VBox/HpRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.88, 0.92, 1)
+theme_override_font_sizes/font_size = 12
+text = "Sinh Lực:"
+
+[node name="HpIcons" type="Label" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol/StatsPanel/Margin/VBox/HpRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "🪷 🪷 🪷 🪷"
+
+[node name="HpText" type="Label" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol/StatsPanel/Margin/VBox/HpRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.95, 0.6, 1)
+theme_override_font_sizes/font_size = 12
+text = "4/4"
+
+[node name="HandRow" type="HBoxContainer" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol/StatsPanel/Margin/VBox"]
+layout_mode = 2
+
+[node name="HandLabel" type="Label" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol/StatsPanel/Margin/VBox/HandRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.85, 0.65, 1)
+theme_override_font_sizes/font_size = 12
+text = "🎴 Bài trên tay: 4 lá"
+
+[node name="StatusRow" type="HBoxContainer" parent="Dim/Box/Margin/VBox/ContentHBox/LeftCol/StatsPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="RightCol" type="VBoxContainer" parent="Dim/Box/Margin/VBox/ContentHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="SkillsSection" type="VBoxContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 6
+
+[node name="Title" type="Label" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/SkillsSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.78, 0.32, 1)
+theme_override_font_sizes/font_size = 13
+text = "⚡ TUYỆT KỸ CHIẾN TRẬN"
+
+[node name="Scroll" type="ScrollContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/SkillsSection"]
+custom_minimum_size = Vector2(0, 140)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="SkillsList" type="VBoxContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/SkillsSection/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="EquipSection" type="VBoxContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Title" type="Label" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.78, 0.32, 1)
+theme_override_font_sizes/font_size = 13
+text = "⚔️ VÕ BỊ & THẦN KHÍ (TRANG BỊ ĐANG MANG)"
+
+[node name="EquipGrid" type="VBoxContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="SlotWeapon" type="PanelContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_equip_slot")
+
+[node name="Margin" type="MarginContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotWeapon"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 4
+
+[node name="RichText" type="RichTextLabel" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotWeapon/Margin"]
+layout_mode = 2
+bbcode_enabled = true
+text = "🗡️ Vũ Khí: (Trống)"
+fit_content = true
+scroll_active = false
+mouse_filter = 2
+theme_override_font_sizes/normal_font_size = 11
+
+[node name="SlotArmor" type="PanelContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_equip_slot")
+
+[node name="Margin" type="MarginContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotArmor"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 4
+
+[node name="RichText" type="RichTextLabel" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotArmor/Margin"]
+layout_mode = 2
+bbcode_enabled = true
+text = "🛡️ Phòng Cụ: (Trống)"
+fit_content = true
+scroll_active = false
+mouse_filter = 2
+theme_override_font_sizes/normal_font_size = 11
+
+[node name="SlotOffHorse" type="PanelContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_equip_slot")
+
+[node name="Margin" type="MarginContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotOffHorse"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 4
+
+[node name="RichText" type="RichTextLabel" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotOffHorse/Margin"]
+layout_mode = 2
+bbcode_enabled = true
+text = "🐎 Ngựa Công: (Trống)"
+fit_content = true
+scroll_active = false
+mouse_filter = 2
+theme_override_font_sizes/normal_font_size = 11
+
+[node name="SlotDefHorse" type="PanelContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_equip_slot")
+
+[node name="Margin" type="MarginContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotDefHorse"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 4
+
+[node name="RichText" type="RichTextLabel" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotDefHorse/Margin"]
+layout_mode = 2
+bbcode_enabled = true
+text = "🐘 Ngựa Thủ: (Trống)"
+fit_content = true
+scroll_active = false
+mouse_filter = 2
+theme_override_font_sizes/normal_font_size = 11
+
+[node name="SlotTreasure" type="PanelContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_equip_slot")
+
+[node name="Margin" type="MarginContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotTreasure"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 4
+
+[node name="RichText" type="RichTextLabel" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotTreasure/Margin"]
+layout_mode = 2
+bbcode_enabled = true
+text = "👑 Thần Khí: (Trống)"
+fit_content = true
+scroll_active = false
+mouse_filter = 2
+theme_override_font_sizes/normal_font_size = 11
+
+[node name="FooterHBox" type="HBoxContainer" parent="Dim/Box/Margin/VBox"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+
+[node name="HintLabel" type="Label" parent="Dim/Box/Margin/VBox/FooterHBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.75, 0.8, 0.7)
+theme_override_font_sizes/font_size = 11
+text = "💡 Nhấn phím ESC hoặc bấm vùng tối bên ngoài để đóng nhanh"
+
+[node name="Spacer" type="Control" parent="Dim/Box/Margin/VBox/FooterHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CloseModalBtn" type="Button" parent="Dim/Box/Margin/VBox/FooterHBox"]
+custom_minimum_size = Vector2(130, 34)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 13
+text = "ĐÓNG"

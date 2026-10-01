@@ -13,9 +13,9 @@ signal draft_joined(assigned_seat: int)
 signal ping_updated(ping_ms: int)
 
 const CANDIDATE_SERVERS: Array[Dictionary] = [
-	{ "type": "LOCAL", "name": "Máy Chủ Nội Bộ (127.0.0.1:8080)", "url": "ws://127.0.0.1:8080", "timeout": 0.8 },
-	{ "type": "DENO_CLOUD", "name": "Máy Chủ Đám Mây (Deno Cloud)", "url": "wss://dai-viet-chien-server.vdthanh.deno.net", "timeout": 3.5 },
-	{ "type": "LOCAL_FALLBACK", "name": "Máy Chủ Nội Bộ (localhost:8080)", "url": "ws://localhost:8080", "timeout": 0.8 }
+	# Online matchmaking must use one shared authority. Local servers are still
+	# available through the explicit --server-url option for development.
+	{ "type": "DENO_CLOUD", "name": "Máy Chủ Đám Mây (Deno Cloud)", "url": "wss://dai-viet-chien-server.vdthanh.deno.net", "timeout": 3.5 }
 ]
 
 @export var server_url: String = "ws://127.0.0.1:8080"
@@ -148,7 +148,9 @@ func _load_server_config() -> void:
 			print("[NetworkClient] Đọc server_url từ CLI: ", server_url)
 			return
 
-	# 2. Đọc từ file cấu hình user://server_config.json nếu có
+	# 2. Chỉ dùng cấu hình đã lưu cho server từ xa. Cấu hình localhost cũ
+	#    không được phép ghi đè ưu tiên Deno Cloud, nếu không mỗi máy có thể
+	#    nối vào một backend khác nhau và draft sẽ không thể đồng bộ.
 	if FileAccess.file_exists(CONFIG_FILE):
 		var file = FileAccess.open(CONFIG_FILE, FileAccess.READ)
 		if file:
@@ -156,7 +158,8 @@ func _load_server_config() -> void:
 			var json = JSON.parse_string(text)
 			if json is Dictionary and json.has("server_url"):
 				var saved_url = str(json["server_url"]).strip_edges()
-				if saved_url != "":
+				var is_local_saved_url = saved_url.begins_with("ws://127.0.0.1") or saved_url.begins_with("ws://localhost")
+				if saved_url != "" and not is_local_saved_url:
 					server_url = saved_url
 					has_custom_saved_config = true
 					print("[NetworkClient] Đọc server_url từ cấu hình user: ", server_url)
@@ -205,6 +208,7 @@ func _process(delta: float) -> void:
 				active_server_name = "Custom Server"
 				active_server_url = server_url
 			print("[NetworkClient] ⚡ Đã kết nối thành công tới %s (%s)!" % [active_server_name, active_server_url])
+			print("[NetworkClient] DRAFT authority: server=%s" % active_server_url)
 			connection_established.emit()
 			_send_ping()
 

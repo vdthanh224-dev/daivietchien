@@ -38,6 +38,8 @@ export interface DraftState {
   currentPickerIndex: number;
   timer: number;
   timerStartAt: number;
+  // Monotonic snapshot number lets clients discard delayed/out-of-order frames.
+  revision: number;
   isCompleted: boolean;
 }
 
@@ -195,6 +197,26 @@ function randomTeamSeats(): Set<number> {
   return new Set(seats.slice(0, 2));
 }
 
+function draftStateMessage(roomId: string, draft: DraftState) {
+  // Always publish seats in canonical order so all clients apply the same
+  // picker index even when their matchmaking snapshots arrived in a different order.
+  const slots = [...draft.slots]
+    .sort((a, b) => a.seat - b.seat)
+    .map((slot) => ({ ...slot, seatNumber: slot.seat }));
+  const currentSeat = draft.slots[draft.currentPickerIndex]?.seat || 1;
+  const currentPickerIndex = slots.findIndex((slot) => slot.seat === currentSeat);
+  return {
+    type: "DRAFT_STATE_UPDATE",
+    roomId,
+    revision: draft.revision,
+    currentPickerIndex: currentPickerIndex >= 0 ? currentPickerIndex : draft.currentPickerIndex,
+    currentSeat,
+    timer: draft.timer,
+    slots,
+    selectedHeroIds: slots.filter((slot) => slot.isLocked).map((slot) => slot.heroId)
+  };
+}
+
 function finishDraftAndStartBattle(roomId: string, room: RoomData) {
   if (!room.draft) return;
   room.draft.isCompleted = true;
@@ -246,6 +268,7 @@ function ensureTickTimer() {
       if (room.draft && !room.draft.isCompleted) {
         const draft = room.draft;
         draft.timer = Math.max(0, draft.timer - 1);
+        draft.revision += 1;
         room.lastActivity = now;
 
         const currentSlot = draft.slots[draft.currentPickerIndex];
@@ -273,15 +296,7 @@ function ensureTickTimer() {
         }
 
         // Phát sóng tick đồng bộ mỗi giây cho cả 4 socket
-        broadcastRoom(room, {
-          type: "DRAFT_STATE_UPDATE",
-          roomId,
-          currentPickerIndex: draft.currentPickerIndex,
-          currentSeat: draft.slots[draft.currentPickerIndex]?.seat || 1,
-          timer: draft.timer,
-          slots: draft.slots,
-          selectedHeroIds: draft.slots.filter(s => s.isLocked).map(s => s.heroId)
-        });
+        broadcastRoom(room, draftStateMessage(roomId, draft));
         continue;
       }
 
@@ -477,6 +492,7 @@ Deno.serve({ port, hostname }, async (req) => {
                   currentPickerIndex: 0,
                   timer: 40,
                   timerStartAt: Date.now(),
+                  revision: 1,
                   isCompleted: false
                 },
                 sockets: new Map(),
@@ -491,6 +507,7 @@ Deno.serve({ port, hostname }, async (req) => {
                 currentPickerIndex: 0,
                 timer: 40,
                 timerStartAt: Date.now(),
+                revision: 1,
                 isCompleted: false
               };
               room.lastActivity = Date.now();
@@ -517,6 +534,7 @@ Deno.serve({ port, hostname }, async (req) => {
               if (payload.userName) slot.userName = String(payload.userName);
               slot.isAI = false; // Người thật đã vào ghế
             }
+            room.draft.revision += 1;
           }
 
           currentRoomId = roomId;
@@ -527,15 +545,7 @@ Deno.serve({ port, hostname }, async (req) => {
           console.log(`[Deno WS] Ghế ${currentSeat} kết nối phòng DRAFT: ${roomId} (Sockets: ${room.sockets.size})`);
 
           if (room.draft && !room.draft.isCompleted) {
-            broadcastRoom(room, {
-              type: "DRAFT_STATE_UPDATE",
-              roomId,
-              currentPickerIndex: room.draft.currentPickerIndex,
-              currentSeat: room.draft.slots[room.draft.currentPickerIndex]?.seat || 1,
-              timer: room.draft.timer,
-              slots: room.draft.slots,
-              selectedHeroIds: room.draft.slots.filter((s: any) => s.isLocked).map((s: any) => s.heroId)
-            });
+            broadcastRoom(room, draftStateMessage(roomId, room.draft));
           } else if (room.state) {
             socket.send(JSON.stringify({
               type: "DRAFT_COMPLETED",
@@ -577,21 +587,14 @@ Deno.serve({ port, hostname }, async (req) => {
           draft.currentPickerIndex++;
           draft.timer = 40;
           draft.timerStartAt = Date.now();
+          draft.revision += 1;
 
           console.log(`[Deno WS] Ghế ${boundSeat} đã khóa [${currentSlot.heroName}] (#${heroId}) trong phòng ${roomId}`);
 
           if (draft.currentPickerIndex >= draft.slots.length || draft.slots.every((s: any) => s.isLocked)) {
             finishDraftAndStartBattle(roomId, room);
           } else {
-            broadcastRoom(room, {
-              type: "DRAFT_STATE_UPDATE",
-              roomId,
-              currentPickerIndex: draft.currentPickerIndex,
-              currentSeat: draft.slots[draft.currentPickerIndex]?.seat || 1,
-              timer: draft.timer,
-              slots: draft.slots,
-              selectedHeroIds: draft.slots.filter((s: any) => s.isLocked).map((s: any) => s.heroId)
-            });
+            broadcastRoom(room, draftStateMessage(roomId, draft));
           }
           return;
         }
