@@ -989,6 +989,29 @@ function canUseCardAsDodge(player, card) {
     || (isNguyenCanhChan && card?.suit === "Club");
 }
 
+function maybeStartVanSachPrompt(state) {
+  if (state.phase !== "PLAY") return false;
+  const owner = state.players.find((player) =>
+    player?.usedSkills?.VanSachPending
+    && player.hp > 0
+    && heroHasSkill(player, "VAN_SACH")
+  );
+  if (!owner) return false;
+  owner.usedSkills.VanSachPending = false;
+  if (!owner.hand?.length) return false;
+  state.phase = "AWAIT_VAN_SACH";
+  state.waitingTargetSeat = owner.seat;
+  state.waitingReactionType = "VAN_SACH";
+  state.waitingTimer = 40;
+  state.timerStartAt = Date.now();
+  recordAction(state, {
+    type: "VAN_SACH_PROMPT",
+    casterSeat: owner.seat,
+    description: `📚 ${owner.generalName} đã dùng Cẩm Nang thứ hai trong lượt, có thể bỏ 1 lá trên tay để rút 1 lá.`
+  });
+  return true;
+}
+
 function resetWaitingState(state, clearActiveCard = true) {
   state.phase = "PLAY";
   state.waitingTargetSeat = 0;
@@ -997,6 +1020,7 @@ function resetWaitingState(state, clearActiveCard = true) {
   state.turnTimer = 40;
   state.timerStartAt = Date.now();
   if (clearActiveCard) state.activeCard = null;
+  maybeStartVanSachPrompt(state);
   refreshLastDelta(state);
 }
 

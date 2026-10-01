@@ -30,6 +30,8 @@ var is_network_mode: bool = false
 var _draft_joined: bool = false
 var _pending_pick_hero_id: int = 0
 var _pending_pick_seat: int = 0
+# Drop delayed draft snapshots so a late packet cannot roll a client back.
+var _last_draft_revision: int = 0
 
 # UI References
 var draft_status_lbl: Label
@@ -1148,9 +1150,19 @@ func _get_locked_hero_id(idx: int) -> int:
 			return int(h.get("id", 0))
 	return 0
 
+func _find_draft_slot_index(seat_number: int) -> int:
+	if seat_number <= 0:
+		return -1
+	for i in range(draft_slots.size()):
+		if int(draft_slots[i].get("seatNumber", i + 1)) == seat_number:
+			return i
+	return -1
+
 func _on_confirm_pick_pressed() -> void:
 	if _is_my_turn() and not is_player_locked:
 		if not (inspecting_hero is Dictionary) or inspecting_hero.is_empty():
+			return
+		if current_picker_index < 0 or current_picker_index >= draft_slots.size():
 			return
 		var slot = draft_slots[current_picker_index]
 		var hid = int(inspecting_hero.get("id", 0))
@@ -1212,6 +1224,8 @@ func _on_network_connected_for_draft() -> void:
 	if _draft_joined or not NetworkClient:
 		return
 	is_network_mode = true
+	# A reconnect must accept the server's current revision as the new baseline.
+	_last_draft_revision = 0
 	var my_seat_num = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat in [1, 2, 3, 4] else 1
 	var my_uid = AuthManager.current_user_id if AuthManager else ""
 	var my_name = AuthManager.current_user_name if AuthManager else "Đại Tướng Quân"
@@ -1326,6 +1340,11 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 	if not is_draft_active:
 		return
 	_server_state_received = true
+	var revision := int(data.get("revision", 0))
+	if revision > 0 and revision <= _last_draft_revision:
+		return
+	if revision > 0:
+		_last_draft_revision = revision
 
 	var phase = data.get("phase", "PICKING")
 	var t = int(data.get("timer", 0))
@@ -1337,7 +1356,14 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 		turn_timer_lbl.text = "⚔️ %ds" % t
 		return
 
-	current_picker_index = int(data.get("currentPickerIndex", 0))
+	# The server publishes a seat and a canonical index. Resolve by seat locally
+	# because matchmaking snapshots can arrive with slots in a different order.
+	var server_current_seat := int(data.get("currentSeat", 0))
+	var local_picker_index := _find_draft_slot_index(server_current_seat)
+	if local_picker_index >= 0:
+		current_picker_index = local_picker_index
+	else:
+		current_picker_index = int(data.get("currentPickerIndex", 0))
 	turn_timer_lbl.text = "⏳ %ds" % t
 	var server_seat = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat in [1, 2, 3, 4] else 1
 	for local_s in draft_slots:

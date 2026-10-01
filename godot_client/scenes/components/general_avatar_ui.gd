@@ -89,6 +89,17 @@ const NEUTRAL_TEAM_COLOR := Color(0.9, 0.75, 0.28, 1.0)
 
 func _ready() -> void:
 	frame_rest_position = frame_panel.position
+	# Keep the name and faction banner above the health rail and frame border.
+	if is_instance_valid(top_banner):
+		top_banner.z_as_relative = false
+		top_banner.z_index = 40
+		top_banner.move_to_front()
+	if is_instance_valid(name_label):
+		name_label.z_as_relative = false
+		name_label.z_index = 41
+	if is_instance_valid(role_badge):
+		role_badge.z_as_relative = false
+		role_badge.z_index = 41
 	if skill_button_stack:
 		skill_button_stack.mouse_filter = Control.MOUSE_FILTER_STOP
 		skill_button_stack.z_as_relative = false

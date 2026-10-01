@@ -241,16 +241,6 @@ function game(heroIds = ["HERO_9", "HERO_1", "HERO_2", "HERO_3"]) {
 
 {
   const state = game(["HERO_12", "HERO_1", "HERO_2", "HERO_3"]);
-  state.players[0].hand = [basic("van-cost")];
-  state._deck = [basic("van-draw"), trick("van-trick")];
-  handleUseSkill(state, 1, "Văn Sách", 0, "van-cost");
-  assert.equal(state.players[0].usedSkills.VanSach, true);
-  assert.equal(state.players[0].hand.some((card) => card.id === "van-trick"), true);
-  assert.equal(state.players[0].hand.length, 2);
-}
-
-{
-  const state = game(["HERO_12", "HERO_1", "HERO_2", "HERO_3"]);
   state._deck = [basic("han-draw-1"), basic("han-draw-2"), basic("han-top")];
   executeCardEffect(state, trick("han-trick"), 1, 1);
   assert.equal(state.phase, "AWAIT_HAN_LAM");
@@ -272,6 +262,30 @@ function game(heroIds = ["HERO_9", "HERO_1", "HERO_2", "HERO_3"]) {
   assert.equal(state.players[0].hand.some((card) => card.id === "han-next"), true, "Đặt lá xem xuống đáy thì phải rút lá kế tiếp");
   assert.equal(state.players[0].hand.some((card) => card.id === "han-revealed"), false);
   assert.equal(state._deck[0]?.id, "han-revealed", "Lá đã xem phải nằm dưới đáy xấp rút");
+}
+
+{
+  const state = game(["HERO_12", "HERO_1", "HERO_2", "HERO_3"]);
+  const ironChain = { id: "van-sach-iron-chain", name: "Xích Tâm Tỏa", suit: "Spade", rank: 12, category: CARD_CATEGORIES.INSTANT_SCROLL, subType: CARD_SUBTYPES.IRON_CHAIN };
+  const tide = { id: "van-sach-tide", name: "Thủy Triều Rút", suit: "Heart", rank: 2, category: CARD_CATEGORIES.INSTANT_SCROLL, subType: CARD_SUBTYPES.THUY_TRIEU_RUT };
+  state.players[0].hand = [ironChain, tide];
+  state.players[1].hand = [basic("tide-give")];
+  state._deck = [basic("van-sach-draw-1"), basic("van-sach-top-1"), basic("van-sach-draw-2"), basic("van-sach-top-2")];
+
+  handlePlayCard(state, 1, ironChain.id, 2);
+  assert.equal(state.phase, "AWAIT_HAN_LAM", "Xích Tâm Tỏa phải kích hoạt Hán Lâm trước");
+  handleRespondAction(state, 1, true, null);
+  assert.equal(state.phase, "PLAY");
+
+  handlePlayCard(state, 1, tide.id, 2);
+  assert.equal(state.phase, "AWAIT_HAN_LAM", "Thủy Triều Rút phải kích hoạt Hán Lâm trước");
+  handleRespondAction(state, 1, true, null);
+  assert.equal(state.phase, "AWAIT_THUY_TRIEU_RUT_GIVE");
+
+  handleRespondAction(state, 2, true, "tide-give");
+  assert.equal(state.phase, "AWAIT_VAN_SACH", "Sau khi hoàn tất Thủy Triều Rút, Văn Sách phải được hỏi ngay");
+  assert.equal(state.waitingTargetSeat, 1, "Văn Sách phải chờ đúng Tinh Thiều lựa chọn");
+  assert.equal(state.actionHistory.at(-1)?.type, "VAN_SACH_PROMPT");
 }
 
 {
