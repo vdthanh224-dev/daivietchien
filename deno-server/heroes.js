@@ -30,7 +30,10 @@ export const HEROES = {
   HERO_21: { id: 'HERO_21', name: 'Kiều Công Tiễn', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['NGHICH_Y', 'DAN_CAU'] },
   HERO_22: { id: 'HERO_22', name: 'Ngô Quyền', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['THUY_CHIEN', 'COC_NGAM'] },
   HERO_23: { id: 'HERO_23', name: 'Dương Tam Kha', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['DOAT_VI', 'XUNG_VUONG'] },
-  HERO_24: { id: 'HERO_24', name: 'Ngô Xương Ngập', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['THIEN_CAM', 'AN_TICH'] },
+  HERO_24: { id: 'HERO_24', name: 'Ngô Xương Ngập', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['THIEN_CAM', 'AN_TICH'] },  HERO_25: { id: 'HERO_25', name: 'Ngô Xương Văn', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['NAM_TAN', 'BINH_SAN'] },
+  HERO_26: { id: 'HERO_26', name: 'Đỗ Cảnh Thạc', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['CAT_CU', 'CO_THU'] },
+  HERO_27: { id: 'HERO_27', name: 'Kiều Thuận', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['HOI_HO', 'PHONG_DUYEN'] },
+  HERO_28: { id: 'HERO_28', name: 'Nguyễn Siêu', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['LIET_CHIEN', 'TAY_PHU'] },
   TRAN_HUNG_DAO: {
     id: 'TRAN_HUNG_DAO',
     name: 'Trần Hưng Đạo',
@@ -107,9 +110,9 @@ export const SKILLS = {
   XA_THUAN: { id: 'XA_THUAN', name: 'Xạ Thuẫn', type: 'PASSIVE', description: 'Mặc định tăng 2 tầm Ngựa công.' },
   PHU_TRAN: { id: 'PHU_TRAN', name: 'Phù Trấn', type: 'TRIGGERED', description: 'Khi dùng Trảm mà không đeo vũ khí, rút 1 lá bài.' },
   HICH_NGHIA: { id: 'HICH_NGHIA', name: 'Hịch Nghĩa', type: 'TRIGGERED', description: 'Khi rơi vào Cận Tử, lập tức rút 3 lá bài.' },
-  UAT_KHI: { id: 'UAT_KHI', name: 'Uất Khí', type: 'OPTIONAL', description: 'Khi mất Máu mà chưa Cận Tử, có thể cho 1 người khác rút 1 lá bài.' },
+  UAT_KHI: { id: 'UAT_KHI', name: 'Uất Khí', type: 'OPTIONAL', description: 'Khi mất Máu mà chưa Cận Tử, có thể cho 1 mục tiêu, kể cả bản thân, rút 1 lá bài.' },
   TRIEU_DANG: { id: 'TRIEU_DANG', name: 'Triều Dâng', type: 'ACTIVE', description: 'Một lần mỗi lượt, hủy 1 trang bị của người khác.' },
-  LAP_LANG: { id: 'LAP_LANG', name: 'Lập Làng', type: 'TRIGGERED', description: 'Cuối lượt, nếu chưa gây sát thương, rút 2 lá bài.' },
+  LAP_LANG: { id: 'LAP_LANG', name: 'Lập Làng', type: 'TRIGGERED', description: 'Sau khi bỏ bài cuối lượt, nếu chưa gây sát thương, rút 2 lá bài.' },
   DUNG_NU: { id: 'DUNG_NU', name: 'Dũng Nữ', type: 'PASSIVE', description: 'Mục tiêu có Máu hiện tại nhiều hơn bạn phải dùng 2 lá Đỡ để triệt tiêu Trảm của bạn.' },
   THU_MUC: { id: 'THU_MUC', name: 'Thủ Mục', type: 'OPTIONAL', description: 'Trước sát thương Trảm, có thể bỏ 1 lá Đỏ để giảm 1 sát thương.' },
   TRINH_LIET: { id: 'TRINH_LIET', name: 'Trinh Liệt', type: 'TRIGGERED', description: 'Khi chịu sát thương Trảm, rút 1 lá bài trong vùng chơi của nguồn gây sát thương.' },
@@ -124,30 +127,30 @@ export const SKILLS = {
   XUNG_DE: { id: 'XUNG_DE', name: 'Xưng Đế', type: 'PASSIVE', description: 'Khi đầy Máu, giới hạn bài giữ trên tay +2.' },
   TUNG_NGHIA: { id: 'TUNG_NGHIA', name: 'Tùng Nghĩa', type: 'TRIGGERED', description: 'Có Chiến Mã hoặc Áo Giáp: cuối lượt rút 1 lá, giới hạn trữ bài +1.' },
   TRUNG_KIEN: { id: 'TRUNG_KIEN', name: 'Trung Kiên', type: 'OPTIONAL', description: 'Khi một người sắp tử trận, có thể tự giảm 1 Máu để giúp người đó hồi đến 1 Máu.' },
-  VAN_SACH: { id: 'VAN_SACH', name: 'Văn Sách', type: 'ACTIVE', description: 'Một lần mỗi lượt, đổi 1 Bài Cơ Bản lấy 1 Cẩm Nang ngẫu nhiên rồi rút 1 lá.' },
-  HAN_LAM: { id: 'HAN_LAM', name: 'Hán Lâm', type: 'OPTIONAL', description: 'Mỗi khi dùng thành công Cẩm Nang, xem lá đầu xấp rút, chọn để trên cùng hoặc xuống đáy, sau đó rút 1 lá.' },
+  VAN_SACH: { id: 'VAN_SACH', name: 'Văn Sách', type: 'OPTIONAL', description: 'Sau khi sử dụng lá Cẩm Nang thứ hai trong lượt, có thể bỏ 1 lá bài trên tay để rút 1 lá.' },
+  HAN_LAM: { id: 'HAN_LAM', name: 'Hán Lâm', type: 'OPTIONAL', description: 'Mỗi khi dùng thành công một lá Cẩm Nang, xem lá trên cùng xấp bài rút, chọn để nguyên hoặc đặt xuống đáy, sau đó rút 1 lá.' },
   TRAN_NAM: { id: 'TRAN_NAM', name: 'Trấn Nam', type: 'PASSIVE', description: 'Miễn nhiễm sát thương Giặc Tới; Trảm thường Đen bỏ qua Giáp Đồng Sơn Vi.' },
   HOA_DAN: { id: 'HOA_DAN', name: 'Hóa Dân', type: 'OPTIONAL', description: 'Cuối lượt, nếu đang đeo Áo Giáp, có thể bỏ 1 Trang bị để hồi 1 Máu.' },
-  DA_TRACH: { id: 'DA_TRACH', name: 'Dạ Trạch', type: 'PASSIVE', description: 'Khi không còn bài trên tay, không thể trở thành mục tiêu của Trảm thường.' },
-  NO_DINH: { id: 'NO_DINH', name: 'Nỏ Đỉnh', type: 'PASSIVE', description: 'Khi còn không quá 2 Máu, Trảm có Tầm đánh không giới hạn.' },
-  PHUC_HO: { id: 'PHUC_HO', name: 'Phục Hổ', type: 'PASSIVE', description: 'Trong Huyết Chiến có Phùng Hưng, đối phương của Phùng Hưng phải ra 2 Trảm cho mỗi lần đáp trả.' },
-  AN_DAN: { id: 'AN_DAN', name: 'An Dân', type: 'OPTIONAL', description: 'Đầu Giai đoạn Rút bài, có thể bỏ qua rút bài để chuyển 1 Cẩm Nang Trì Hoãn sang người khác.' },
-  LUC_DICH: { id: 'LUC_DICH', name: 'Lực Địch', type: 'PASSIVE', description: 'Có thể trang bị tối đa 2 Vũ Khí; Tầm đánh cộng dồn.' },
-  HUNG_SUC: { id: 'HUNG_SUC', name: 'Hùng Sức', type: 'ACTIVE', description: 'Trong Giai đoạn Ra bài, bỏ 1 Vũ Khí trên tay để gây 1 sát thương cho mục tiêu trong Tầm 1.' },
+  DA_TRACH: { id: 'DA_TRACH', name: 'Dạ Trạch', type: 'PASSIVE', description: 'Khi không còn lá bài nào trên tay, bạn không thể trở thành mục tiêu của các đòn Trảm. Đầu lượt, nếu trên tay không có bài, được rút thêm 1 lá. Cuối lượt, nếu trên tay có bài, có thể bỏ thêm 1 lá nếu muốn.' },
+  NO_DINH: { id: 'NO_DINH', name: 'Nỏ Đỉnh', type: 'PASSIVE', description: 'Đòn Trảm của bạn đánh ra có Tầm đánh không giới hạn khi bạn có số Máu bé hơn hoặc bằng 2.' },
+  PHUC_HO: { id: 'PHUC_HO', name: 'Phục Hổ', type: 'PASSIVE', description: 'Khi bạn sử dụng lá Huyết Chiến hoặc bị người khác chỉ định bởi Huyết Chiến, đối phương phải ra 2 lá Trảm cho mỗi lần đáp trả.' },
+  AN_DAN: { id: 'AN_DAN', name: 'An Dân', type: 'OPTIONAL', description: 'Đầu lượt, có thể bỏ qua việc rút bài để di chuyển 1 lá Cẩm Nang Trì Hoãn đang đặt lên người bất kỳ sang người khác. Sau đó, có thể chọn 1 mục tiêu xem như sử dụng 1 lá Huyết Chiến lên họ.' },
+  LUC_DICH: { id: 'LUC_DICH', name: 'Lực Địch', type: 'PASSIVE', description: 'Có thể trang bị tối đa 2 lá Vũ Khí cùng lúc; tầm đánh và kỹ năng trang bị được cộng dồn.' },
+  HUNG_SUC: { id: 'HUNG_SUC', name: 'Hùng Sức', type: 'ACTIVE', description: 'Trong Giai đoạn Ra bài, có thể bỏ 1 lá Vũ Khí trên tay hoặc đang trang bị để gây 1 sát thương lên 1 mục tiêu trong Tầm đánh 1, sau đó rút 1 lá.' },
   VAN_AN: { id: 'VAN_AN', name: 'Vạn An', type: 'ACTIVE', description: 'Bạn có thể dùng 2 lá bài cùng màu bất kỳ trên tay để xem như sử dụng lá Cẩm Nang Bãi Cọc Bạch Đằng. Lần đầu sử dụng trong lượt, rút 1 lá bài.' },
   DE_NGHIEP: { id: 'DE_NGHIEP', name: 'Đế Nghiệp', type: 'TRIGGERED', description: 'Mỗi khi gây sát thương đơn mục tiêu bằng Cẩm Nang, rút 1 lá.' },
   KHOAN_GIAN: { id: 'KHOAN_GIAN', name: 'Khoan Giản', type: 'TRIGGERED', description: 'Sau Giai đoạn Bỏ bài, bạn được rút X lá, giới hạn trữ bài +X (X là một nửa số trang bị bạn đang mang, làm tròn lên, tối thiểu 1).' },
   CHINH_THONG: { id: 'CHINH_THONG', name: 'Chính Thống', type: 'OPTIONAL', description: 'Đầu lượt, chọn 1 người khác; họ chuyển 1 lá trên tay hoặc lộ toàn bộ bài.' },
-  KHOAN_HOA: { id: 'KHOAN_HOA', name: 'Khoan Hòa', type: 'OPTIONAL', description: 'Cuối lượt không gây sát thương: bạn và tối đa 1 người khác rút 1 lá.' },
+  KHOAN_HOA: { id: 'KHOAN_HOA', name: 'Khoan Hòa', type: 'OPTIONAL', description: 'Cuối lượt, nếu không gây sát thương cho bất kỳ ai trong lượt đó, bạn rút 1 lá, sau đó chọn tối đa 2 người chơi khác, mỗi người rút 1 lá.' },
   CAI_CACH: { id: 'CAI_CACH', name: 'Cải Cách', type: 'ACTIVE', description: 'Trong Giai đoạn Ra bài, giới hạn 1 lần, bạn có thể đổi 2 lá bài lấy 2 lá bài mới.' },
   NGHIA_TU: { id: 'NGHIA_TU', name: 'Nghĩa Tử', type: 'OPTIONAL', description: 'Bỏ 1 lá để chịu thay 1 sát thương cho người khác.' },
   DUONG_BINH: { id: 'DUONG_BINH', name: 'Dưỡng Binh', type: 'TRIGGERED', description: 'Mỗi khi chịu thay sát thương, rút 2 lá.' },
   NGHICH_Y: { id: 'NGHICH_Y', name: 'Nghịch Ý', type: 'OPTIONAL', description: 'Khi trở thành mục tiêu Trảm, bỏ 1 lá để chuyển mục tiêu sang người khác trong tầm.' },
   DAN_CAU: { id: 'DAN_CAU', name: 'Dẫn Cầu', type: 'ACTIVE', description: 'Mỗi lượt 1 lần, đưa 1 lá buộc người khác Trảm mục tiêu chỉ định; nếu không, cướp 2 lá vùng chơi.' },
-  THUY_CHIEN: { id: 'THUY_CHIEN', name: 'Thủy Chiến', type: 'ACTIVE', description: 'Dùng lá Rô hoặc Chuồn như Bãi Cọc Bạch Đằng; miễn nhiễm Bãi Cọc Bạch Đằng.' },
-  COC_NGAM: { id: 'COC_NGAM', name: 'Cọc Ngầm', type: 'TRIGGERED', description: 'Trảm Thủy gây sát thương lên mục tiêu không giáp +1 sát thương.' },
+  THUY_CHIEN: { id: 'THUY_CHIEN', name: 'Thủy Chiến', type: 'ACTIVE', description: 'Có thể dùng bất kỳ lá Rô hoặc Chuồn như Bãi Cọc Bạch Đằng; không thể trở thành mục tiêu của Bãi Cọc Bạch Đằng.' },
+  COC_NGAM: { id: 'COC_NGAM', name: 'Cọc Ngầm', type: 'TRIGGERED', description: 'Khi đòn Trảm Thủy gây sát thương lên mục tiêu đang bị Cẩm Nang Bãi Cọc Bạch Đằng, sát thương đó được tăng thêm +1.' },
   DOAT_VI: { id: 'DOAT_VI', name: 'Đoạt Vị', type: 'TRIGGERED', description: 'Khi tiêu diệt người chơi, thu toàn bộ bài tay và trang bị của họ.' },
-  XUNG_VUONG: { id: 'XUNG_VUONG', name: 'Xưng Vương', type: 'TRIGGERED', description: 'Giai đoạn Rút bài, nếu có nhiều bài tay nhất, rút thêm 1 lá.' },
+  XUNG_VUONG: { id: 'XUNG_VUONG', name: 'Xưng Vương', type: 'TRIGGERED', description: 'Giai đoạn Rút bài, nếu là người có nhiều bài trên tay nhất, rút thêm 1 lá. Nếu là người có ít bài trên tay nhất, chọn tối đa 2 người yêu cầu họ tự bỏ 1 lá trên tay hoặc trang bị.' },
   THIEN_CAM: { id: 'THIEN_CAM', name: 'Thiên Cảm', type: 'ACTIVE', description: 'Máu không quá 1: miễn nhiễm Cẩm Nang Trì Hoãn, bỏ chúng; đổi Cẩm Nang Trì Hoãn trên tay lấy 2 lá.' },
   AN_TICH: { id: 'AN_TICH', name: 'Ẩn Tích', type: 'OPTIONAL', description: 'Cuối lượt chưa gây sát thương, đặt úp 1 lá; khi cần Đỡ có thể bỏ lá đó như Đỡ.' },
   KIEP_BACH: {
@@ -249,6 +252,14 @@ export function normalizeHeroId(heroId, generalName = "") {
   if (key.includes("KHUC THUA DU")) return "HERO_18";
   if (key.includes("KHUC HAO")) return "HERO_19";
   if (key.includes("DUONG DINH NGHE")) return "HERO_20";
+  if (key.includes("KIEU CONG TIEN")) return "HERO_21";
+  if (key.includes("NGO QUYEN")) return "HERO_22";
+  if (key.includes("DUONG TAM KHA")) return "HERO_23";
+  if (key.includes("NGO XUONG NGAP")) return "HERO_24";
+  if (key.includes("NGO XUONG VAN")) return "HERO_25";
+  if (key.includes("DO CANH THAC")) return "HERO_26";
+  if (key.includes("KIEU THUAN")) return "HERO_27";
+  if (key.includes("NGUYEN SIEU")) return "HERO_28";
   if (key.includes("TRAN HUNG DAO") || key.includes("TRAN QUOC TUAN")) return "TRAN_HUNG_DAO";
   if (key.includes("LY THUONG KIET")) return "LY_THUONG_KIET";
   if (key.includes("TRAN QUOC TOAN")) return "TRAN_QUOC_TOAN";

@@ -50,4 +50,8 @@ Thumbs.db
 godot_client/.godot/
 *_screenshot.png
 *_screenshot.png.import
+*.bak
+*.idsig
+.dvc-kv*
+godot_client/tmp_match_test.gd
 

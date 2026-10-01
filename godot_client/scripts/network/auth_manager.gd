@@ -11,6 +11,7 @@ const SAVE_PATH = "user://auth_session.json"
 var current_user_name: String = "Đại Tướng Quân"
 var current_user_email: String = ""
 var current_user_id: String = ""
+var current_user_labels: PackedStringArray = PackedStringArray()
 var session_secret: String = ""
 var session_cookie: String = ""
 var is_logged_in: bool = false
@@ -44,6 +45,8 @@ const MILITARY_TIERS = [
 
 func _ready() -> void:
 	load_saved_session()
+	if is_logged_in:
+		fetch_account_info()
 
 func get_auth_headers(include_session: bool = true) -> PackedStringArray:
 	var headers = PackedStringArray([
@@ -56,6 +59,12 @@ func get_auth_headers(include_session: bool = true) -> PackedStringArray:
 		if session_cookie != "":
 			headers.append("Cookie: " + session_cookie)
 	return headers
+
+func is_admin() -> bool:
+	for account_label in current_user_labels:
+		if account_label.to_lower() == "admin":
+			return true
+	return false
 
 # --- Level Progression Formulas ---
 # Kinh nghiệm để lên level là: lên level X cần X*10 kinh nghiệm.
@@ -390,13 +399,39 @@ func _handle_login_response(result: int, response_code: int, headers: PackedStri
 					session_cookie = cookie_str
 
 			save_session()
+			# Thông báo thành công tức thì không bắt người chơi đợi nhiều vòng HTTP
+			login_succeeded.emit({
+				"name": current_user_name,
+				"email": current_user_email,
+				"userId": current_user_id,
+				"level": current_level,
+				"exp": current_exp,
+				"silver": current_silver,
+				"gold": current_gold
+			})
 			fetch_account_info()
 	else:
 		var err_msg = _parse_error_msg(body)
 		if ("session is active" in err_msg.to_lower() or "prohibited when a session is active" in err_msg.to_lower()) and original_password != "":
+			# Nếu phiên đang active đúng là tài khoản này, sử dụng luôn không cần xóa đi tạo lại
+			if current_user_email == fallback_email and session_secret != "":
+				print("[AuthManager] Phiên hiện tại của %s vẫn còn hiệu lực. Đăng nhập tức thì!" % fallback_email)
+				is_logged_in = true
+				login_succeeded.emit({
+					"name": current_user_name,
+					"email": current_user_email,
+					"userId": current_user_id,
+					"level": current_level,
+					"exp": current_exp,
+					"silver": current_silver,
+					"gold": current_gold
+				})
+				fetch_account_info()
+				return
+
 			print("[AuthManager] Phát hiện phiên cũ đang treo. Đang tự động giải phóng phiên và đăng nhập lại...")
 			delete_current_session(func():
-				await get_tree().create_timer(0.2).timeout
+				await get_tree().create_timer(0.1).timeout
 				login_email(fallback_email, original_password)
 			)
 			return
@@ -423,19 +458,16 @@ func fetch_account_info() -> void:
 				var u_email = data.get("email", "")
 				if u_email != "":
 					current_user_email = u_email
+				current_user_labels.clear()
+				var labels = data.get("labels", [])
+				if labels is Array:
+					for account_label in labels:
+						current_user_labels.append(str(account_label))
 				save_session()
 
-		# Tiếp tục đồng bộ Profile/Level từ Appwrite
+		# Đồng bộ Profile/Level từ Appwrite ngầm
 		fetch_profile_from_appwrite(func():
-			login_succeeded.emit({
-				"name": current_user_name,
-				"email": current_user_email,
-				"userId": current_user_id,
-				"level": current_level,
-				"exp": current_exp,
-				"silver": current_silver,
-				"gold": current_gold
-			})
+			profile_updated.emit()
 		)
 	)
 
@@ -450,8 +482,29 @@ func _parse_error_msg(body: PackedByteArray) -> String:
 			return d["message"]
 	return "Không thể kết nối máy chủ xác thực hoặc thông tin không chính xác."
 
+func get_save_path() -> String:
+	var inst = 1
+	if Engine.get_main_loop() and Engine.get_main_loop().has_method("get_root"):
+		var root = Engine.get_main_loop().root
+		if root and root.has_node("NetworkClient"):
+			var net = root.get_node("NetworkClient")
+			if "auto_instance_index" in net:
+				inst = net.auto_instance_index
+	if inst == 1:
+		var all_args = OS.get_cmdline_args() + OS.get_cmdline_user_args()
+		for arg in all_args:
+			if arg.begins_with("--seat=") or arg.begins_with("--tester="):
+				var val = arg.split("=")[1].to_int()
+				if val >= 1 and val <= 4:
+					inst = val
+					break
+	if inst > 1:
+		return "user://auth_session_%d.json" % inst
+	return "user://auth_session.json"
+
 func save_session() -> void:
-	var file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var path = get_save_path()
+	var file = FileAccess.open(path, FileAccess.WRITE)
 	if file:
 		var data = {
 			"name": current_user_name,
@@ -473,8 +526,9 @@ func should_show_onboarding() -> bool:
 	if current_user_email == "": return false
 	if tutorial_reward_claimed: return false
 	var key = "onboarding_" + current_user_email
-	if FileAccess.file_exists(SAVE_PATH):
-		var file = FileAccess.open(SAVE_PATH, FileAccess.READ)
+	var path = get_save_path()
+	if FileAccess.file_exists(path):
+		var file = FileAccess.open(path, FileAccess.READ)
 		if file:
 			var json = JSON.new()
 			if json.parse(file.get_as_text()) == OK:
@@ -486,9 +540,10 @@ func should_show_onboarding() -> bool:
 func set_onboarding_done() -> void:
 	if current_user_email == "": return
 	var key = "onboarding_" + current_user_email
+	var path = get_save_path()
 	var data = {}
-	if FileAccess.file_exists(SAVE_PATH):
-		var file = FileAccess.open(SAVE_PATH, FileAccess.READ)
+	if FileAccess.file_exists(path):
+		var file = FileAccess.open(path, FileAccess.READ)
 		if file:
 			var json = JSON.new()
 			if json.parse(file.get_as_text()) == OK:
@@ -508,13 +563,14 @@ func set_onboarding_done() -> void:
 	data["generals"] = current_generals
 	data["tutorialRewardClaimed"] = tutorial_reward_claimed
 
-	var wfile = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var wfile = FileAccess.open(path, FileAccess.WRITE)
 	if wfile:
 		wfile.store_string(JSON.stringify(data))
 
 func load_saved_session() -> void:
-	if FileAccess.file_exists(SAVE_PATH):
-		var file = FileAccess.open(SAVE_PATH, FileAccess.READ)
+	var path = get_save_path()
+	if FileAccess.file_exists(path):
+		var file = FileAccess.open(path, FileAccess.READ)
 		if file:
 			var json = JSON.new()
 			if json.parse(file.get_as_text()) == OK:

@@ -23,6 +23,7 @@ AuthManager="*res://scripts/network/auth_manager.gd"
 AudioManager="*res://scripts/audio_manager.gd"
 AppwriteMatchmaking="*res://scripts/network/appwrite_matchmaking.gd"
 HeroDatabase="*res://scripts/hero_database.gd"
+RankSystem="*res://scripts/rank_system.gd"
 
 [display]
 

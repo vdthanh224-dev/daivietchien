@@ -5,6 +5,7 @@ signal card_clicked(card_ui: Control)
 signal card_selected_state_changed(card_ui: Control, is_selected: bool)
 
 const CardResourceScript = preload("res://scripts/resources/card_resource.gd")
+const CardDatabaseScript = preload("res://scripts/resources/card_database.gd")
 
 @export var card_data: Resource
 
@@ -22,6 +23,7 @@ var is_hovered: bool = false
 var original_y: float = 0.0
 var tween: Tween
 var card_name: String = ""
+var equipped_badge: Label = null
 
 func _ready() -> void:
 	if click_button:
@@ -32,7 +34,7 @@ func _ready() -> void:
 	if card_data:
 		update_card(card_data)
 
-func setup_card_data(id: String, p_name: String, rank_val: Variant, suit_str: String, cat: int, desc: String) -> void:
+func setup_card_data(id: String, p_name: String, rank_val: Variant, suit_str: String, cat: int, desc: String, sub_type_val: int = -1) -> void:
 	card_name = p_name
 	var res = CardResourceScript.new()
 	res.id = id
@@ -46,12 +48,19 @@ func setup_card_data(id: String, p_name: String, rank_val: Variant, suit_str: St
 		"K", "13": res.rank = 13
 		_: res.rank = r_str.to_int()
 	res.category = cat
+	if sub_type_val >= 0:
+		res.sub_type = sub_type_val as CardResourceScript.CardSubType
 	res.description = desc
 	update_card(res)
 
 func update_card(data: Resource) -> void:
 	card_data = data
 	card_name = data.card_name
+	# Keep the hover tooltip aligned with the canonical local card description.
+	if not str(data.id).is_empty():
+		var database_card = CardDatabaseScript.get_card(str(data.id))
+		if database_card != null and not str(database_card.description).is_empty():
+			data.description = database_card.description
 	if not is_inside_tree():
 		return
 
@@ -81,6 +90,10 @@ func update_card(data: Resource) -> void:
 		else:
 			artwork_rect.visible = false
 
+	if click_button:
+		var d_text = data.description if "description" in data and data.description != "" else data.card_name
+		click_button.tooltip_text = "%s\n%s" % [data.card_name, d_text]
+
 func _on_card_mouse_entered() -> void:
 	is_hovered = true
 	mouse_entered.emit()
@@ -107,15 +120,35 @@ func set_selected(selected: bool) -> void:
 
 	if is_selected:
 		_animate_elevation(-10.0, Vector2(1.04, 1.04))
-		z_index = 10
 	else:
-		z_index = 0
 		if is_hovered:
 			_animate_elevation(-4.0, Vector2(1.02, 1.02))
 		else:
 			_animate_elevation(0.0, Vector2(1.0, 1.0))
 
 	card_selected_state_changed.emit(self, is_selected)
+
+func set_equipped_badge(visible: bool) -> void:
+	if visible and not is_instance_valid(equipped_badge):
+		equipped_badge = Label.new()
+		equipped_badge.name = "EquippedBadge"
+		equipped_badge.text = "ĐANG MANG"
+		equipped_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		equipped_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		equipped_badge.set_anchors_preset(Control.PRESET_TOP_WIDE)
+		equipped_badge.offset_left = 5.0
+		equipped_badge.offset_top = 62.0
+		equipped_badge.offset_right = -5.0
+		equipped_badge.offset_bottom = 90.0
+		equipped_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		equipped_badge.z_index = 50
+		equipped_badge.add_theme_font_size_override("font_size", 15)
+		equipped_badge.add_theme_color_override("font_color", Color(1.0, 0.08, 0.08, 1.0))
+		equipped_badge.add_theme_color_override("font_outline_color", Color(0.08, 0.0, 0.0, 1.0))
+		equipped_badge.add_theme_constant_override("outline_size", 5)
+		add_child(equipped_badge)
+	if is_instance_valid(equipped_badge):
+		equipped_badge.visible = visible
 
 func _animate_elevation(target_y: float, target_scale: Vector2) -> void:
 	if tween and tween.is_valid():

@@ -94,7 +94,7 @@ offset_right = 40.0
 offset_bottom = 25.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 2
+mouse_filter = 1
 texture = ExtResource("3_bg")
 expand_mode = 1
 stretch_mode = 6
@@ -315,6 +315,20 @@ focus_mode = 0
 theme_override_font_sizes/font_size = 12
 text = "⌛ KẾT THÚC LƯỢT"
 
+[node name="HichRecastBtn" type="Button" parent="TableTop"]
+visible = false
+custom_minimum_size = Vector2(120, 42)
+layout_mode = 1
+anchors_preset = 0
+offset_left = 930.0
+offset_top = 430.0
+offset_right = 1050.0
+offset_bottom = 472.0
+focus_mode = 0
+theme_override_font_sizes/font_size = 10
+text = "🔄 ĐỔI LÁ\nRÚT 1"
+tooltip_text = "Bỏ Hịch Tướng Sĩ để rút 1 lá bài khác."
+
 [node name="CardDescBar" type="PanelContainer" parent="TableTop"]
 custom_minimum_size = Vector2(810, 38)
 layout_mode = 1
@@ -340,7 +354,7 @@ theme_override_font_sizes/font_size = 11
 text = "💡 Chạm chọn một lá bài trên tay để xem mô tả & sử dụng..."
 vertical_alignment = 1
 
-[node name="HandCards" type="HBoxContainer" parent="TableTop"]
+[node name="HandCards" type="Control" parent="TableTop"]
 layout_mode = 1
 anchors_preset = 0
 offset_left = 240.0
@@ -348,8 +362,6 @@ offset_top = 535.0
 offset_right = 1050.0
 offset_bottom = 705.0
 mouse_filter = 1
-theme_override_constants/separation = 10
-alignment = 1
 
 [node name="CenterArea" type="Control" parent="."]
 layout_mode = 1
@@ -362,6 +374,8 @@ mouse_filter = 2
 
 [node name="CardShowcase" type="Control" parent="CenterArea"]
 visible = false
+z_as_relative = false
+z_index = 280
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -415,6 +429,9 @@ vertical_alignment = 1
 
 [node name="DodgeModal" type="Control" parent="."]
 visible = false
+z_as_relative = false
+z_index = 320
+mouse_filter = 2
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -427,17 +444,19 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_top = 230.0
 offset_bottom = -225.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.02, 0.03, 0.06, 0.7)
+color = Color(0.02, 0.03, 0.06, 0.0)
 
 [node name="Dim" type="CenterContainer" parent="DodgeModal"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_top = 230.0
 offset_bottom = -225.0
 grow_horizontal = 2
 grow_vertical = 2
@@ -475,6 +494,7 @@ horizontal_alignment = 1
 autowrap_mode = 2
 
 [node name="CardSelectorScroll" type="ScrollContainer" parent="DodgeModal/Dim/Box/Margin/VBox"]
+visible = false
 custom_minimum_size = Vector2(0, 42)
 layout_mode = 2
 horizontal_scroll_mode = 1
@@ -521,6 +541,9 @@ text = "💥 CHỊU ĐÒN"
 
 [node name="RescueModal" type="Control" parent="."]
 visible = false
+z_as_relative = false
+z_index = 320
+mouse_filter = 2
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -533,17 +556,19 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_top = 230.0
 offset_bottom = -225.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.02, 0.03, 0.06, 0.75)
+color = Color(0.02, 0.03, 0.06, 0.0)
 
 [node name="Dim" type="CenterContainer" parent="RescueModal"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_top = 230.0
 offset_bottom = -225.0
 grow_horizontal = 2
 grow_vertical = 2
@@ -608,6 +633,8 @@ text = "❌ BỎ QUA"
 
 [node name="GeneralInfoModal" type="Control" parent="."]
 visible = false
+z_as_relative = false
+z_index = 320
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -633,16 +660,16 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Box" type="PanelContainer" parent="GeneralInfoModal/Dim"]
-custom_minimum_size = Vector2(500, 300)
+custom_minimum_size = Vector2(620, 380)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
 
 [node name="Margin" type="MarginContainer" parent="GeneralInfoModal/Dim/Box"]
 layout_mode = 2
-theme_override_constants/margin_left = 20
-theme_override_constants/margin_top = 16
-theme_override_constants/margin_right = 20
-theme_override_constants/margin_bottom = 16
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 22
 
 [node name="VBox" type="VBoxContainer" parent="GeneralInfoModal/Dim/Box/Margin"]
 layout_mode = 2
@@ -655,11 +682,11 @@ layout_mode = 2
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.831373, 0.686275, 0.215686, 1)
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 16
 text = "THÔNG TIN TƯỚNG"
 
 [node name="CloseXBtn" type="Button" parent="GeneralInfoModal/Dim/Box/Margin/VBox/HeaderHBox"]
-custom_minimum_size = Vector2(28, 28)
+custom_minimum_size = Vector2(34, 34)
 layout_mode = 2
 text = "✕"
 
@@ -669,18 +696,18 @@ size_flags_vertical = 3
 theme_override_constants/separation = 16
 
 [node name="LeftCol" type="VBoxContainer" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox"]
-custom_minimum_size = Vector2(160, 0)
+custom_minimum_size = Vector2(190, 0)
 layout_mode = 2
 
 [node name="HeroName" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/LeftCol"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.9, 0.45, 1)
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 17
 text = "Tên Tướng"
 
 [node name="HeroStats" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/LeftCol"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 11
+theme_override_font_sizes/font_size = 13
 text = "Thế Lực: Trung\nMáu: 4/4\nBài trên tay: 4 lá"
 
 [node name="RightCol" type="VBoxContainer" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox"]
@@ -704,24 +731,26 @@ layout_mode = 2
 [node name="SkillTitle" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/SkillBox/Margin/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.831373, 0.686275, 0.215686, 1)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 14
 text = "Kỹ Năng: DŨNG TƯỚNG"
 
 [node name="SkillDesc" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/SkillBox/Margin/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_font_sizes/font_size = 10
+theme_override_font_sizes/font_size = 13
 text = "Mô tả kỹ năng tướng."
 autowrap_mode = 2
 
 [node name="CloseModalBtn" type="Button" parent="GeneralInfoModal/Dim/Box/Margin/VBox"]
-custom_minimum_size = Vector2(140, 36)
+custom_minimum_size = Vector2(160, 42)
 layout_mode = 2
 size_flags_horizontal = 4
 text = "ĐÓNG"
 
 [node name="VictoryDefeatModal" type="Control" parent="."]
 visible = false
+z_as_relative = false
+z_index = 320
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -787,6 +816,8 @@ text = "🏠 VỀ SẢNH CHÍNH"
 
 [node name="IronChainModal" type="Control" parent="."]
 visible = false
+z_as_relative = false
+z_index = 320
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -799,17 +830,19 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_top = 230.0
 offset_bottom = -225.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.02, 0.03, 0.06, 0.75)
+color = Color(0.02, 0.03, 0.06, 0.0)
 
 [node name="Dim" type="CenterContainer" parent="IronChainModal"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_top = 230.0
 offset_bottom = -225.0
 grow_horizontal = 2
 grow_vertical = 2
@@ -879,6 +912,8 @@ text = "✕ HỦY BỎ"
 
 [node name="CardPickModal" type="Control" parent="."]
 visible = false
+z_as_relative = false
+z_index = 320
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -891,24 +926,26 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_bottom = -225.0
+offset_top = 250.0
+offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.02, 0.03, 0.06, 0.75)
+color = Color(0.02, 0.03, 0.06, 0.0)
 
 [node name="Dim" type="CenterContainer" parent="CardPickModal"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_bottom = -225.0
+offset_top = 250.0
+offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
 [node name="Box" type="PanelContainer" parent="CardPickModal/Dim"]
-custom_minimum_size = Vector2(680, 270)
+custom_minimum_size = Vector2(680, 455)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
 
@@ -945,6 +982,18 @@ horizontal_scroll_mode = 1
 vertical_scroll_mode = 0
 
 [node name="OptionsHBox" type="HBoxContainer" parent="CardPickModal/Dim/Box/Margin/VBox/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="EquipmentScroll" type="ScrollContainer" parent="CardPickModal/Dim/Box/Margin/VBox"]
+custom_minimum_size = Vector2(0, 174)
+layout_mode = 2
+horizontal_scroll_mode = 1
+vertical_scroll_mode = 0
+
+[node name="OptionsHBox" type="HBoxContainer" parent="CardPickModal/Dim/Box/Margin/VBox/EquipmentScroll"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 12

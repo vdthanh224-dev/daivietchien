@@ -80,16 +80,16 @@ func _ready() -> void:
 
 	_connect_network_draft()
 
-	# Kiểm tra kết nối máy chủ WebSocket Deno (tối đa 1.0s nếu đang trong tiến trình dò quét)
-	if NetworkClient and not NetworkClient.is_connected_to_server and NetworkClient.is_connecting():
-		var wait_t = 0.0
-		while wait_t < 1.0 and NetworkClient.is_connecting() and not NetworkClient.is_connected_to_server:
-			await get_tree().create_timer(0.1).timeout
-			wait_t += 0.1
-		if NetworkClient.is_connected_to_server or NetworkClient.is_connecting():
-			is_network_mode = true
-		else:
-			is_network_mode = false
+	# Kiểm tra kết nối máy chủ WebSocket Deno
+	if NetworkClient:
+		if not NetworkClient.is_connected_to_server and NetworkClient.is_connecting():
+			var wait_t = 0.0
+			while wait_t < 1.5 and NetworkClient.is_connecting() and not NetworkClient.is_connected_to_server:
+				await get_tree().create_timer(0.1).timeout
+				wait_t += 0.1
+		is_network_mode = NetworkClient.is_connected_to_server
+	else:
+		is_network_mode = false
 
 	if "--screenshot-hero-select" in args:
 		_run_automated_screenshot()
@@ -940,8 +940,13 @@ func _start_network_draft_watchdog() -> void:
 			_on_network_connected_for_draft()
 
 	if not _server_state_received and is_draft_active and is_network_mode:
-		draft_status_lbl.text = "⚠️ Đang chờ máy chủ chọn tướng..."
-		draft_status_lbl.add_theme_color_override("font_color", COLOR_PHOENIX_RED)
+		print("[HeroSelect] ⚠️ Máy chủ không phản hồi lượt chọn tướng. Tự động chuyển sang Chọn Tướng Tự Động...")
+		draft_status_lbl.text = "⚡ Đang chuyển sang Chọn Tướng Tự Động..."
+		draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+		await get_tree().create_timer(1.0).timeout
+		if is_draft_active and not _server_state_received:
+			is_network_mode = false
+			_run_local_draft_loop()
 
 func _run_local_draft_loop() -> void:
 	print("[HeroSelect] ⚙️ Đang chạy chọn tướng chế độ Cục Bộ (Local Draft)...")

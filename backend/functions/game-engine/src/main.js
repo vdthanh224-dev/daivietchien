@@ -54,7 +54,7 @@ async function decodePersistedState(value) {
 export default async ({ req, res, log, error }) => {
   try {
     const payload = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-    const { action, roomId, seat, cardId, targetCardId, targetSeat, accepted, cardIds, players, expectedVersion } = payload;
+    const { action, roomId, seat, cardId, targetCardId, targetSeat, targetSeat2, targetSeats, recast, accepted, cardIds, players, modeId, expectedVersion } = payload;
 
     if (!roomId) {
       return res.json({ success: false, error: "Thiếu roomId" }, 400);
@@ -80,10 +80,10 @@ export default async ({ req, res, log, error }) => {
         }
         return res.json({ success: true, state: sanitizeGameStateForClient(state, requestedSeat) });
       }
-      if (!Array.isArray(players) || players.length !== 4) {
-        return res.json({ success: false, error: "Cần đủ thông tin 4 người chơi để bắt đầu trận" }, 400);
+      if (!Array.isArray(players)) {
+        return res.json({ success: false, error: "Cần thông tin người chơi để bắt đầu trận" }, 400);
       }
-      state = initGame(roomId, players);
+      state = initGame(roomId, players, modeId || "2v2");
       liveGames.set(roomId, state);
       await saveStateToDatabase(roomId, state, log, error);
       return res.json({ success: true, state: sanitizeGameStateForClient(state, seat) });
@@ -122,7 +122,11 @@ export default async ({ req, res, log, error }) => {
 
     // 3. Đánh bài (PLAY_CARD)
     if (action === "PLAY_CARD") {
-      const result = handlePlayCard(state, seat, cardId, targetSeat);
+      const result = handlePlayCard(state, seat, cardId, targetSeat, {
+        targetSeat2,
+        targetSeats: Array.isArray(targetSeats) ? targetSeats : [],
+        recast: recast === true
+      });
       if (result.error) {
         return res.json({ success: false, error: result.error, state: sanitizeGameStateForClient(state, seat) });
       }

@@ -2497,8 +2497,6 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		AppwriteMatchmaking.my_session_user_id = my_user_id
 		AppwriteMatchmaking.my_session_user_name = my_user_name
 
-	_update_matchmaking_status_count(status_lbl, own_room)
-
 	# Every client publishes its own one-player room first. This gives all
 	# clients a shared starting point, then the merge step below consolidates
 	# rooms into the one with the most real players.
@@ -2530,7 +2528,10 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	if AppwriteMatchmaking:
 		AppwriteMatchmaking.is_host = true
 
-	var found_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, 500, my_user_name)
+	# Include our own room in this first election. If every client excludes its
+	# own host room, the smallest two rooms can make a cycle (A joins B while B
+	# joins A). A shared smallest-room tie-break gives all clients one anchor.
+	var found_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, 500, my_user_name, own_room_id)
 	if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
 		return
 
@@ -2609,7 +2610,9 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 				AppwriteMatchmaking.is_host = false
 			break
 
-	if found_room.is_empty() and not mm_is_cancelled:
+	# The client already published its own room before the election. If that
+	# room wins the stable tie-break, keep it; never create a second room.
+	if found_room.is_empty() and mm_active_room_id.is_empty() and not mm_is_cancelled:
 		if is_instance_valid(status_lbl):
 			status_lbl.text = "🔍 Đang tìm trận..."
 		var new_room_id = "room_" + str(randi()).md5_text().substr(0, 8)

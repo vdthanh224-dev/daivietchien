@@ -23,7 +23,7 @@
 | **Blood Crimson (Đỏ Son Huyết Chiến)** | `#E63946` / `#B82323` | Phe Phượng, Nút [KHÔNG NÉ], Cảnh báo Cận Tử, Sát thương |
 | **Azure Dragon (Lam Long Đại Việt)** | `#3B82F6` / `#2563EB` | Phe Rồng, Thanh chọn mục tiêu, Hiệu ứng Nước/Băng |
 | **Lotus Jade (Ngọc Bích Sen Ngọc)** | `#2A9D8F` / `#55FF55` | Nút [DÙNG BÀI], Hồi phục Máu, Khóa Diệu Kế thành công |
-| **Thunder Violet (Lôi Điện Hồ Triều)** | `#9D4EDD` / `#7B2CBF` | Sát thương Lôi, Thần Sấm Báo Ứng, Kỹ năng đặc biệt |
+| **Flood Azure (Đại Hồng Thủy)** | `#3B82F6` / `#2563EB` | Sát thương Thủy, Đại Hồng Thủy, Kỹ năng đặc biệt |
 | **Obsidian Dark (Màn Đêm Chiến Trận)** | `#060912` / `rgba(6,9,18,0.95)` | Nền Modal, Nền Khung chứa bài, Thanh Thông tin trận đấu |
 | **Text Primary (Bạch Kim Soi Sáng)** | `#F8FAFC` / `#FFFFFF` | Tiêu đề, Tên tướng, Số lượng máu, Số giây đếm ngược |
 | **Text Muted (Vàng Trầm Cổ Kính)** | `#E2D9B8` / `#CBD5E1` | Mô tả kỹ năng, Lời thoại lịch sử, Chi tiết cẩm nang |
@@ -71,7 +71,7 @@
 
 1. **Tia Sáng Tấn Công (Attack Beam):** Tia năng lượng vàng/đỏ lượn sóng đi từ thẻ bài đến avatar mục tiêu với Particle Trail.
 2. **Rút Bài & Đánh Bài (Card Physics):** Chuyển động mượt mà với đường cong Bezier và Cubic Easing (0.25s - 0.35s).
-3. **Hiệu Ứng Sát Thương (Damage Numbers & Shake):** Số sát thương nảy lên (`Floating Text`) kèm hiệu ứng rung màn hình nhẹ (Screen Shake) 0.15s khi dính đòn chí mạng hoặc Thần Sấm Báo Ứng.
+3. **Hiệu Ứng Sát Thương (Damage Numbers & Shake):** Số sát thương nảy lên (`Floating Text`) kèm hiệu ứng rung màn hình nhẹ (Screen Shake) 0.15s khi dính đòn chí mạng hoặc Đại Hồng Thủy.
 4. **Phản Hồi Âm Thanh (Sound Design Sync):** Mỗi thao tác ra bài, đỡ đòn, tiếng xúc xắc gieo, tiếng binh khí va chạm (Clang/Parry) đều đồng bộ chính xác với khung hình xuất hiện hiệu ứng.
 
 ---

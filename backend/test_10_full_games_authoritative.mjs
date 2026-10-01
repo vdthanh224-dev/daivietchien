@@ -5,7 +5,8 @@ import {
   handleEndTurn,
   handleDiscardCards,
   handleAIStep,
-  handleAIReaction
+  handleAIReaction,
+  tickGameState
 } from './functions/game-engine/src/gameEngine.js';
 
 console.log("================================================================================");
@@ -13,6 +14,7 @@ console.log("🎮 BẮT ĐẦU CHẠY KIỂM THỬ GIẢ LẬP 10 TRẬN ĐẤU 
 console.log("================================================================================\n");
 
 let totalGamesPassed = 0;
+let totalGamesFailed = 0;
 
 for (let gameIdx = 1; gameIdx <= 10; gameIdx++) {
   const roomId = `room_sim_game_${gameIdx}`;
@@ -25,10 +27,17 @@ for (let gameIdx = 1; gameIdx <= 10; gameIdx++) {
 
   let state = initGame(roomId, players);
   let stepCount = 0;
+  let firstActionError = null;
   const maxSteps = 3000;
 
   while (state.status !== "FINISHED" && stepCount < maxSteps) {
     stepCount++;
+
+    if (state.phase === "AWAIT_JUDGEMENT") {
+      state.timerStartAt = Date.now() - 3000;
+      tickGameState(state);
+      continue;
+    }
 
     // 1. Chờ phản ứng (AWAIT_NULLIFY, AWAIT_HARVEST, AWAIT_SLASH_DEFENSE, AWAIT_AOE, AWAIT_DUEL, AWAIT_NEAR_DEATH)
     if (state.phase !== "PLAY" && state.phase !== "DISCARD") {
@@ -38,17 +47,21 @@ for (let gameIdx = 1; gameIdx <= 10; gameIdx++) {
           const p = state.players.find(x => x.seat === waitingSeat);
           const nullifyCard = p ? p.hand.find(c => c.subType === 10 || (c.name && c.name.includes("Diệu Kế"))) : null;
           if (nullifyCard && Math.random() < 0.35) {
-            handleRespondAction(state, waitingSeat, true, nullifyCard.id);
+            const result = handleRespondAction(state, waitingSeat, true, nullifyCard.id);
+            if (result?.error && !firstActionError) firstActionError = { phase: state.phase, waitingSeat, result };
           } else {
-            handleRespondAction(state, waitingSeat, false, null);
+            const result = handleRespondAction(state, waitingSeat, false, null);
+            if (result?.error && !firstActionError) firstActionError = { phase: state.phase, waitingSeat, result };
           }
         }
         else if (state.phase === "AWAIT_HARVEST") {
           const poolCard = (state.harvestPool && state.harvestPool.length > 0) ? state.harvestPool[0].id : null;
-          handleRespondAction(state, waitingSeat, true, poolCard);
+          const result = handleRespondAction(state, waitingSeat, true, poolCard);
+          if (result?.error && !firstActionError) firstActionError = { phase: state.phase, waitingSeat, result };
         }
         else {
-          handleAIReaction(state, waitingSeat);
+          const result = handleAIReaction(state, waitingSeat);
+          if (result?.error && !firstActionError) firstActionError = { phase: state.phase, waitingSeat, result };
         }
       } else {
         state.phase = "PLAY";
@@ -87,10 +100,39 @@ for (let gameIdx = 1; gameIdx <= 10; gameIdx++) {
     console.log(`✅ [TRẬN ${gameIdx}/10] KẾT THÚC THÀNH CÔNG sau ${stepCount} bước! Kết quả: ${winningTeam}`);
     console.log(`   - Máu cuối trận: S1: ${state.players[0].hp}, S2: ${state.players[1].hp}, S3: ${state.players[2].hp}, S4: ${state.players[3].hp}`);
   } else {
+    totalGamesFailed++;
     console.error(`❌ [TRẬN ${gameIdx}/10] LỖI: Trận đấu vượt quá ${maxSteps} bước mà chưa kết thúc!`);
+    console.error(JSON.stringify({
+      gameIdx,
+      phase: state.phase,
+      turnSeat: state.turnSeat,
+      waitingTargetSeat: state.waitingTargetSeat,
+      waitingReactionType: state.waitingReactionType,
+      activeCard: state.activeCard,
+      firstActionError,
+      nullifyChain: state.nullifyChain,
+      targetCardSelection: state.targetCardSelection,
+      pendingAfterNearDeath: state.pendingAfterNearDeath,
+      pendingChainSpread: state.pendingChainSpread,
+      aoeVictimsQueue: state.aoeVictimsQueue,
+      nearDeathAskerQueue: state.nearDeathAskerQueue,
+      harvestPickers: state.harvestPickers,
+      harvestPool: state.harvestPool?.map(card => card.id),
+      players: state.players.map(player => ({
+        seat: player.seat,
+        hp: player.hp,
+        isAlive: player.isAlive,
+        handCount: player.hand?.length || 0,
+        equipments: player.equipments?.map(card => card.id) || [],
+        judgements: player.judgements?.map(card => card.id) || []
+      })),
+      lastAction: state.lastAction,
+      recentActions: state.actionHistory?.slice(-8)
+    }, null, 2));
   }
 }
 
 console.log("\n================================================================================");
 console.log(`🏆 TỔNG KẾT KIỂM THỬ: ${totalGamesPassed}/10 TRẬN ĐẤU ĐÃ CHẠY HOÀN HẢO 100% TRÊN SERVER!`);
 console.log("================================================================================");
+if (totalGamesFailed > 0) process.exitCode = 1;

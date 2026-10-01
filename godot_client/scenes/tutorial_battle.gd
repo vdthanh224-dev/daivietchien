@@ -61,6 +61,7 @@ var slashes_used_this_turn: int = 0
 var is_player_turn: bool = true
 var is_waiting_dodge_reaction: bool = false
 var is_in_free_discard_phase: bool = false
+var khien_may_reaction_btn: Button = null
 
 func _ready() -> void:
 	# Bắt đầu phát nhạc nền chiến trận hào hùng
@@ -85,6 +86,32 @@ func _ready() -> void:
 	claim_reward_btn.pressed.connect(_on_claim_reward_clicked)
 	info_close_x_btn.pressed.connect(_hide_general_info_modal)
 	info_close_btn.pressed.connect(_hide_general_info_modal)
+
+	# Nút bấm Khiên Mây Bện phán xét phản ứng
+	khien_may_reaction_btn = Button.new()
+	khien_may_reaction_btn.custom_minimum_size = Vector2(210, 38)
+	khien_may_reaction_btn.focus_mode = Control.FOCUS_NONE
+	khien_may_reaction_btn.text = "🎲 LẬT KHIÊN MÂY (ĐỎ = ĐỠ)"
+	khien_may_reaction_btn.add_theme_font_size_override("font_size", 11)
+
+	var km_st = StyleBoxFlat.new()
+	km_st.bg_color = Color(0.12, 0.22, 0.35, 0.95)
+	km_st.border_width_left = 2
+	km_st.border_width_top = 2
+	km_st.border_width_right = 2
+	km_st.border_width_bottom = 2
+	km_st.border_color = Color(0.35, 0.75, 1.0, 0.9)
+	km_st.corner_radius_top_left = 6
+	km_st.corner_radius_top_right = 6
+	km_st.corner_radius_bottom_right = 6
+	km_st.corner_radius_bottom_left = 6
+	khien_may_reaction_btn.add_theme_stylebox_override("normal", km_st)
+	khien_may_reaction_btn.add_theme_color_override("font_color", Color(0.65, 0.9, 1.0, 1.0))
+
+	card_play_btn.get_parent().add_child(khien_may_reaction_btn)
+	khien_may_reaction_btn.position = card_play_btn.position + Vector2(0, -44)
+	khien_may_reaction_btn.pressed.connect(_on_khien_may_reaction_clicked)
+	khien_may_reaction_btn.visible = false
 
 	# 4. Hiển thị Bước 1: Máu hoa sen
 	_setup_spotlight_lotus_icons()
@@ -153,7 +180,7 @@ func _ready() -> void:
 	elif "--screenshot-showcase" in OS.get_cmdline_user_args():
 		_on_close_health_spotlight()
 		_start_step_3_slash()
-		_show_center_card("Trảm Thường", "Lý Thường Kiệt", "A", "Spade", 0, "Tấn công gây 1 sát thương.")
+		_show_center_card("Trảm", "Lý Thường Kiệt", "A", "Spade", 0, "Tấn công gây 1 sát thương.")
 		await get_tree().create_timer(0.35).timeout
 		await get_tree().process_frame
 		var img = get_viewport().get_texture().get_image()
@@ -208,7 +235,7 @@ func _ready() -> void:
 		# Remove any existing Đỡ cards from hand to test "no dodge" scenario
 		for c in hand_container.get_children():
 			if "Đỡ" in c.card_name:
-				c.setup_card_data(c.card_data.id, "Trảm Thường", "2", "Club", 0, "Tấn công gây 1 sát thương.")
+				c.setup_card_data(c.card_data.id, "Trảm", "2", "Club", 0, "Tấn công gây 1 sát thương.")
 		_prompt_player_dodge_reaction()
 		await get_tree().process_frame
 		await get_tree().process_frame
@@ -221,7 +248,7 @@ func _ready() -> void:
 		_start_free_battle_mode()
 		for c in hand_container.get_children():
 			if "Đỡ" in c.card_name:
-				c.setup_card_data(c.card_data.id, "Trảm Thường", "2", "Club", 0, "Tấn công gây 1 sát thương.")
+				c.setup_card_data(c.card_data.id, "Trảm", "2", "Club", 0, "Tấn công gây 1 sát thương.")
 		_prompt_player_dodge_reaction()
 		# Player clicks skill Tiến Thoái!
 		_on_player_skill_clicked()
@@ -283,7 +310,7 @@ func _ready() -> void:
 		_on_close_health_spotlight()
 		player_avatar.set_equipment("armor", "Khiên Mây Bện", "♦K")
 		await get_tree().process_frame
-		_execute_khien_may_judgement(player_avatar, "Lý Thường Kiệt", "Thủ Lĩnh Sơn Tặc", {"name": "Trảm Thường", "rank": "8", "suit": "Spade"})
+		_execute_khien_may_judgement(player_avatar, "Lý Thường Kiệt", "Thủ Lĩnh Sơn Tặc", {"name": "Trảm", "rank": "8", "suit": "Spade"})
 		await get_tree().create_timer(0.6).timeout
 		await get_tree().process_frame
 		var img = get_viewport().get_texture().get_image()
@@ -375,8 +402,8 @@ func _spawn_initial_cards() -> void:
 		c.queue_free()
 
 	var cards_data = [
-		{"name": "Trảm Thường", "rank": "A", "suit": "Spade", "cat": 0, "desc": "Tấn công gây 1 sát thương."},
-		{"name": "Trảm Thường", "rank": "2", "suit": "Spade", "cat": 0, "desc": "Tấn công gây 1 sát thương."},
+		{"name": "Trảm", "rank": "A", "suit": "Spade", "cat": 0, "desc": "Tấn công gây 1 sát thương."},
+		{"name": "Trảm", "rank": "2", "suit": "Spade", "cat": 0, "desc": "Tấn công gây 1 sát thương."},
 		{"name": "Đỡ", "rank": "3", "suit": "Diamond", "cat": 0, "desc": "Hóa giải 1 đòn Trảm."},
 		{"name": "Bánh Chưng", "rank": "4", "suit": "Heart", "cat": 0, "desc": "Hồi phục 1 Máu."},
 		{"name": "Khiên Mây Bện", "rank": "K", "suit": "Diamond", "cat": 1, "desc": "Phán xét Đỏ tự động Đỡ."}
@@ -620,7 +647,7 @@ func _execute_slash() -> void:
 	boss_hp -= 1
 	boss_avatar.update_hp(boss_hp, 3)
 
-	_show_center_card("Trảm Thường", "Lý Thường Kiệt", "A", "Spade", 0, "Tấn công gây 1 sát thương.")
+	_show_center_card("Trảm", "Lý Thường Kiệt", "A", "Spade", 0, "Tấn công gây 1 sát thương.")
 	_add_log("⚔️ Bạn đã dùng TRẢM! Thủ Lĩnh Sơn Tặc trúng đòn mất 1 máu (%d/3)." % boss_hp)
 
 	current_step = 4
@@ -651,7 +678,7 @@ func _on_player_skill_clicked() -> void:
 			c.setup_card_data(c.card_data.id, "Đỡ", c.card_data.get_rank_string(), c.card_data.suit, 0, "Hóa giải 1 đòn Trảm.")
 			count_tram += 1
 		elif "Đỡ" in c.card_name:
-			c.setup_card_data(c.card_data.id, "Trảm Thường", c.card_data.get_rank_string(), c.card_data.suit, 0, "Tấn công gây 1 sát thương.")
+			c.setup_card_data(c.card_data.id, "Trảm", c.card_data.get_rank_string(), c.card_data.suit, 0, "Tấn công gây 1 sát thương.")
 			count_do += 1
 
 	_add_log("✨ LÝ THƯỜNG KIỆT [TIẾN THOÁI]! Đã hoán chuyển %d Trảm ➜ Đỡ và %d Đỡ ➜ Trảm trên tay!" % [count_tram, count_do])
@@ -677,7 +704,7 @@ func _start_step_4_8_discard_lesson() -> void:
 	var hand_count = hand_container.get_child_count()
 	if hand_count <= player_hp:
 		# Rút thêm 1 lá để thừa bài (5 lá trên tay > 4 Máu)
-		_create_card_in_hand("Trảm Thường", "7", "Club", 0, "Tấn công gây 1 sát thương.")
+		_create_card_in_hand("Trảm", "7", "Club", 0, "Tấn công gây 1 sát thương.")
 		deck_count -= 1
 		deck_label.text = "🎴 %d" % deck_count
 		AudioManager.play_card_draw()
@@ -810,7 +837,7 @@ func _player_turn_start_free_play() -> void:
 	AudioManager.play_card_draw()
 
 	var new_cards = [
-		{"name": "Trảm Thường", "rank": "7", "suit": "Spade", "cat": 0, "desc": "Tấn công gây 1 sát thương."},
+		{"name": "Trảm", "rank": "7", "suit": "Spade", "cat": 0, "desc": "Tấn công gây 1 sát thương."},
 		{"name": "Bánh Chưng", "rank": "8", "suit": "Heart", "cat": 0, "desc": "Hồi phục 1 Máu."}
 	]
 	for data in new_cards:
@@ -1013,16 +1040,6 @@ func _boss_turn_free_play() -> void:
 
 		await get_tree().create_timer(1.2).timeout
 
-		# Kiểm tra Khiên Mây Bện của Người chơi
-		if player_avatar.has_armor() and ("Khiên Mây" in player_avatar.get_armor_name() or "Khiên" in player_avatar.get_armor_name()):
-			var success = await _execute_khien_may_judgement(player_avatar, "Lý Thường Kiệt", "Thủ Lĩnh Sơn Tặc")
-			if success:
-				_add_log("🛡️ [KHIÊN MÂY BỆN]: Đã tự động ĐỠ thành công đòn Trảm!")
-				desc_text.text = "🛡️ Khiên Mây Bện phán xét Đỏ né thành công đòn Trảm của Sơn Tặc!"
-				await get_tree().create_timer(1.2).timeout
-				_player_turn_start_free_play()
-				return
-
 		_prompt_player_dodge_reaction()
 
 func _prompt_player_dodge_reaction() -> void:
@@ -1046,6 +1063,15 @@ func _update_dodge_reaction_ui() -> void:
 			has_slash = true
 			break
 
+	var has_khien_may = player_avatar.has_armor() and ("Khiên Mây" in player_avatar.get_armor_name() or "Khiên" in player_avatar.get_armor_name())
+
+	if khien_may_reaction_btn:
+		if has_khien_may:
+			khien_may_reaction_btn.visible = true
+			khien_may_reaction_btn.disabled = false
+		else:
+			khien_may_reaction_btn.visible = false
+
 	card_play_btn.visible = true
 	end_turn_btn.visible = true
 	end_turn_btn.disabled = false
@@ -1054,17 +1080,48 @@ func _update_dodge_reaction_ui() -> void:
 	if has_dodge:
 		card_play_btn.disabled = false
 		card_play_btn.text = "🛡️ DÙNG ĐỠ (NÉ ĐÒN)"
-		desc_text.text = "⚠️ SƠN TẶC VỪA TẤN CÔNG BẠN! Bạn có %d lá [ĐỠ]. Hãy bấm [🛡️ DÙNG ĐỠ (NÉ ĐÒN)] hoặc [💔 CHỊU ĐÒN (-1)]!" % dodge_count
+		if has_khien_may:
+			desc_text.text = "⚠️ SƠN TẶC VỪA TẤN CÔNG BẠN! Bạn có %d lá [ĐỠ] và [Khiên Mây Bện]. Hãy bấm [🛡️ DÙNG ĐỠ], [🎲 LẬT KHIÊN MÂY] hoặc [💔 CHỊU ĐÒN (-1)]!" % dodge_count
+		else:
+			desc_text.text = "⚠️ SƠN TẶC VỪA TẤN CÔNG BẠN! Bạn có %d lá [ĐỠ]. Hãy bấm [🛡️ DÙNG ĐỠ (NÉ ĐÒN)] hoặc [💔 CHỊU ĐÒN (-1)]!" % dodge_count
 	else:
 		card_play_btn.disabled = true
 		card_play_btn.text = "🛡️ CHƯA CÓ ĐỠ"
-		if has_slash:
+		if has_khien_may:
+			desc_text.text = "⚠️ SƠN TẶC VỪA TẤN CÔNG BẠN! Bạn có thể bấm [🎲 LẬT KHIÊN MÂY (ĐỎ = ĐỠ)] để né, hoặc bấm [💔 CHỊU ĐÒN (-1)]!"
+		elif has_slash:
 			desc_text.text = "⚠️ Bạn chưa có [ĐỠ], nhưng có thể bấm [⚡ TIẾN THOÁI] đổi Trảm ➜ Đỡ, hoặc bấm [💔 CHỊU ĐÒN (-1)]!"
 		else:
 			desc_text.text = "⚠️ Trên tay không có lá [ĐỠ]! Bạn hãy bấm nút [💔 CHỊU ĐÒN (-1)] để tiếp tục trận đấu."
 
+func _on_khien_may_reaction_clicked() -> void:
+	if not is_waiting_dodge_reaction:
+		return
+	if khien_may_reaction_btn:
+		khien_may_reaction_btn.disabled = true
+
+	var success = await _execute_khien_may_judgement(player_avatar, "Lý Thường Kiệt", "Thủ Lĩnh Sơn Tặc")
+	if success:
+		is_waiting_dodge_reaction = false
+		if khien_may_reaction_btn:
+			khien_may_reaction_btn.visible = false
+		card_play_btn.visible = false
+		end_turn_btn.text = "KẾT THÚC LƯỢT ➜"
+		_add_log("🛡️ [KHIÊN MÂY BỆN]: Bạn kích hoạt phán xét ĐỎ thành công né đòn Trảm!")
+		desc_text.text = "🛡️ Khiên Mây Bện phán xét Đỏ né thành công đòn Trảm của Sơn Tặc!"
+		await get_tree().create_timer(1.2).timeout
+		_player_turn_start_free_play()
+	else:
+		if khien_may_reaction_btn:
+			khien_may_reaction_btn.visible = false
+		_add_log("🛡️ [KHIÊN MÂY BỆN]: Phán xét ĐEN thất bại! Hãy chọn lá Đỡ trên tay hoặc bấm Chịu đòn.")
+		desc_text.text = "⚠️ Khiên Mây Bện phán xét ĐEN (Thất bại)! Hãy chọn lá [ĐỠ] hoặc bấm [💔 CHỊU ĐÒN (-1)]!"
+		_update_dodge_reaction_ui()
+
 func _execute_free_play_dodge() -> void:
 	is_waiting_dodge_reaction = false
+	if khien_may_reaction_btn:
+		khien_may_reaction_btn.visible = false
 	card_play_btn.visible = false
 	end_turn_btn.text = "KẾT THÚC LƯỢT ➜"
 
@@ -1093,6 +1150,8 @@ func _execute_free_play_dodge() -> void:
 	_player_turn_start_free_play()
 
 func _player_take_boss_damage() -> void:
+	if khien_may_reaction_btn:
+		khien_may_reaction_btn.visible = false
 	player_hp = max(1, player_hp - 1)
 	player_avatar.play_damage_effect()
 	player_avatar.spawn_damage_number(1)
@@ -1644,7 +1703,7 @@ func _execute_khien_may_judgement(defender_avatar: Control, defender_name: Strin
 		# Lấy ngẫu nhiên lá bài từ kho bài
 		var possible_suits = ["Heart", "Diamond", "Spade", "Club"]
 		var possible_ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
-		var possible_names = ["Trảm Thường", "Đỡ", "Bánh Chưng", "Khiên Mây Bện", "Kiếm Thuận Thiên", "Voi Chiến", "Ngựa Trắng"]
+		var possible_names = ["Trảm", "Đỡ", "Bánh Chưng", "Khiên Mây Bện", "Kiếm Thuận Thiên", "Voi Chiến", "Ngựa Trắng"]
 		var s = possible_suits[randi() % possible_suits.size()]
 		var r = possible_ranks[randi() % possible_ranks.size()]
 		var n = possible_names[randi() % possible_names.size()]
@@ -1652,7 +1711,7 @@ func _execute_khien_may_judgement(defender_avatar: Control, defender_name: Strin
 
 	var suit_str = judge_card.get("suit", "Heart")
 	var rank_str = str(judge_card.get("rank", "7"))
-	var card_name = judge_card.get("name", "Trảm Thường")
+	var card_name = judge_card.get("name", "Trảm")
 	var is_red = (suit_str.to_lower() == "heart" or suit_str.to_lower() == "diamond" or suit_str.to_lower() == "co" or suit_str.to_lower() == "ro")
 	var suit_sym = "♥" if suit_str.to_lower() == "heart" else ("♦" if suit_str.to_lower() == "diamond" else ("♠" if suit_str.to_lower() == "spade" else "♣"))
 

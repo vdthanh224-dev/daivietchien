@@ -6,14 +6,14 @@ const AudioManagerScript = preload("res://scripts/audio_manager.gd")
 
 func _init() -> void:
 	print("==========================================================")
-	print("  TỔNG RÀ SOÁT 29 LÁ BÀI — ĐẠI VIỆT CHIẾN (GODOT ENGINE)")
+	print("  TỔNG RÀ SOÁT 35 LÁ BÀI — ĐẠI VIỆT CHIẾN (GODOT ENGINE)")
 	print("==========================================================")
 
 	var expected_cards = [
 		# Cơ Bản (6)
-		{"name": "Trảm Thường", "cat": 0, "sub": 0},
+		{"name": "Trảm", "cat": 0, "sub": 0},
 		{"name": "Trảm - Hỏa", "cat": 0, "sub": 1},
-		{"name": "Trảm - Lôi", "cat": 0, "sub": 2},
+		{"name": "Trảm - Thủy", "cat": 0, "sub": 2, "voice": false},
 		{"name": "Đỡ", "cat": 0, "sub": 3},
 		{"name": "Bánh Chưng", "cat": 0, "sub": 4},
 		{"name": "Hủ Rượu", "cat": 0, "sub": 5},
@@ -36,22 +36,37 @@ func _init() -> void:
 		{"name": "Vườn Không Nhà Trống", "cat": 2, "sub": 11},
 		{"name": "Đột Kích Trộm Lương", "cat": 2, "sub": 12},
 		{"name": "Dụng Binh Như Thần", "cat": 2, "sub": 13},
-		{"name": "Thách Đấu", "cat": 2, "sub": 14},
+		{"name": "Huyết Chiến", "cat": 2, "sub": 14},
 		{"name": "Xích Tâm Tỏa", "cat": 2, "sub": 15},
 		{"name": "Mở Kho Cứu Tế", "cat": 2, "sub": 16},
-		{"name": "Bãi Cọc Ngầm", "cat": 2, "sub": 17},
+		{"name": "Giặc Tới", "cat": 2, "sub": 17},
 		{"name": "Mưa Tên Liên Châu", "cat": 2, "sub": 18},
+		{"name": "Thủy Triều Rút", "cat": 2, "sub": 23, "voice": false},
+		{"name": "Mượn Gươm Diệt Địch", "cat": 2, "sub": 24, "voice": false},
+		{"name": "Mở Yến Tiệc", "cat": 2, "sub": 25, "voice": false},
+		{"name": "Hịch Tướng Sĩ", "cat": 2, "sub": 26, "voice": false},
 		# Cẩm Nang Trì Hoãn (3)
-		{"name": "Thần Sấm Báo Ứng", "cat": 3, "sub": 19},
+		{"name": "Đại Hồng Thủy", "cat": 3, "sub": 19, "voice": false},
 		{"name": "Cắt Đường Lương", "cat": 3, "sub": 20},
-		{"name": "Trầm Ảo Sa Bẫy", "cat": 3, "sub": 21}
+		{"name": "Trầm Ảo Sa Bẫy", "cat": 3, "sub": 21},
+		{"name": "Bãi Cọc Bạch Đằng", "cat": 3, "sub": 22},
+		{"name": "Trống Đồng Đông Sơn", "cat": 1, "sub": 27, "voice": false}
 	]
 
 	print("Tổng số lá cần kiểm tra: %d" % expected_cards.size())
-	assert(expected_cards.size() == 29, "Phải có đúng 29 loại lá bài!")
+	assert(expected_cards.size() == 35, "Phải có đúng 35 loại lá bài!")
 
 	var pass_count = 0
 	var errors = []
+	var canonical_cards = [
+		{"id": "D80_TL_S8", "name": "Trảm - Thủy", "sub": 2, "desc": "sát thương thuộc tính Thủy"},
+		{"id": "D80_TH_CA_SamSet", "name": "Đại Hồng Thủy", "sub": 19, "desc": "sát thương Thủy"},
+		{"id": "D80_CN_H2_ThuyTrieuRut", "name": "Thủy Triều Rút", "sub": 23, "desc": "người đó đưa bạn 1 lá"}
+	]
+	for item in canonical_cards:
+		var card = CardDatabaseScript.create_card_from_id(item["id"])
+		if card.card_name != item["name"] or card.sub_type != item["sub"] or item["desc"] not in card.description:
+			errors.append("❌ Dữ liệu lá không chuẩn: %s" % item["id"])
 
 	for item in expected_cards:
 		var c_name = item["name"]
@@ -72,12 +87,12 @@ func _init() -> void:
 		# 2. Kiểm tra Voice mapping
 		var am = AudioManagerScript.new()
 		var voice_key = am._normalize_voice_key(c_name)
-		if voice_key == "":
+		if item.get("voice", true) and voice_key == "":
 			errors.append("❌ [%s]: Chưa có voice key mapping trong AudioManager!" % c_name)
 			continue
 
 		pass_count += 1
-		print("  [OK] Lá #%02d: %-26s | Cat: %d | Sub: %02d | Art: %s | Voice: %s" % [pass_count, c_name, item["cat"], item["sub"], art_path.get_file(), voice_key])
+		print("  [OK] Lá #%02d: %-26s | Cat: %d | Sub: %02d | Art: %s | Voice: %s" % [pass_count, c_name, item["cat"], item["sub"], art_path.get_file(), voice_key if item.get("voice", true) else "SFX"])
 
 	# 3. Kiểm tra Deck 80 và Deck 150
 	var d80 = CardDatabaseScript.create_deck_80()
@@ -110,7 +125,7 @@ func _init() -> void:
 
 	print("\n==========================================================")
 	if errors.is_empty():
-		print("  ✅ TẤT CẢ 29 LÁ BÀI ĐÃ HOÀN THIỆN 100% VÀ HỢP LỆ!")
+		print("  ✅ TẤT CẢ 35 LÁ BÀI ĐÃ HOÀN THIỆN 100% VÀ HỢP LỆ!")
 		print("==========================================================")
 		quit(0)
 	else:

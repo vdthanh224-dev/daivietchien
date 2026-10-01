@@ -16,8 +16,16 @@ const vCheck1 = checkVersion(state, 1);
 console.log('Client A checkVersion (exp=1):', vCheck1 === null ? 'VALID ✅' : 'FAILED ❌');
 
 // Client A plays a card, incrementing version to 2
-const card1 = state.players[0].hand[0];
-handlePlayCard(state, 1, card1.id, 2);
+const playerOne = state.players[0];
+let slashCard = playerOne.hand.find((card) => card.name && card.name.includes('Trảm'));
+if (!slashCard) {
+  const deckIndex = state._deck.findIndex((card) => card.name && card.name.includes('Trảm'));
+  if (deckIndex < 0) throw new Error('Test setup needs one Trảm card in deck');
+  slashCard = state._deck.splice(deckIndex, 1)[0];
+  playerOne.hand.push(slashCard);
+}
+const playResult = handlePlayCard(state, 1, slashCard.id, 2);
+if (!playResult.success) throw new Error(`Valid Trảm rejected: ${playResult.error || 'unknown error'}`);
 console.log('State version after Card Play:', state.version);
 
 // 2. Client B sends stale action with expectedVersion = 1 (Old version)

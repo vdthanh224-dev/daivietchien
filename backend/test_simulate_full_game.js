@@ -145,7 +145,7 @@ console.log(`       Hỏi AOE theo thứ tự: G${state.waitingTargetSeat} đầ
 while (state.phase === "AWAIT_AOE") {
   const who = state.waitingTargetSeat;
   const wp  = state.players.find(p => p.seat === who);
-  const hasSlash = wp.hand.some(c => c.subType === CARD_SUBTYPES.ATTACK_NORMAL || c.subType === CARD_SUBTYPES.ATTACK_THUNDER || c.subType === CARD_SUBTYPES.ATTACK_FIRE);
+  const hasSlash = wp.hand.some(c => c.subType === CARD_SUBTYPES.ATTACK_NORMAL || c.subType === CARD_SUBTYPES.ATTACK_WATER || c.subType === CARD_SUBTYPES.ATTACK_FIRE);
 
   if (who === 3) {
     // G3 chỉ còn 1 máu, không có Trảm → mất máu → Hấp Hối

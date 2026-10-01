@@ -10,15 +10,13 @@ signal error_received(message: String)
 signal draft_state_updated(draft_data: Dictionary)
 signal draft_completed(battle_data: Dictionary)
 signal draft_joined(assigned_seat: int)
+signal ping_updated(ping_ms: int)
 
 const CANDIDATE_SERVERS: Array[Dictionary] = [
-	{ "type": "LOCAL", "name": "Server Local (127.0.0.1)", "url": "ws://127.0.0.1:8080" },
-	{ "type": "LOCAL_FALLBACK", "name": "Server Local (localhost)", "url": "ws://localhost:8080" },
-	{ "type": "DENO_CLOUD", "name": "Server Deno Cloud", "url": "wss://dai-viet-chien-server.vdthanh.deno.net" },
-	{ "type": "DENO_CLOUD_FALLBACK", "name": "Server Deno Cloud (Dự phòng)", "url": "wss://dai-viet-chien.vdthanh.deno.net" }
+	{ "type": "LOCAL", "name": "Máy Chủ Nội Bộ (127.0.0.1:8080)", "url": "ws://127.0.0.1:8080", "timeout": 0.8 },
+	{ "type": "DENO_CLOUD", "name": "Máy Chủ Đám Mây (Deno Cloud)", "url": "wss://dai-viet-chien-server.vdthanh.deno.net", "timeout": 3.5 },
+	{ "type": "LOCAL_FALLBACK", "name": "Máy Chủ Nội Bộ (localhost:8080)", "url": "ws://localhost:8080", "timeout": 0.8 }
 ]
-
-const CANDIDATE_CONNECT_TIMEOUT: float = 2.0
 
 @export var server_url: String = "ws://127.0.0.1:8080"
 @export var auto_reconnect: bool = true
@@ -32,6 +30,11 @@ var last_state: Dictionary = {}
 var last_heartbeat_time: float = 0.0
 var last_processed_action_seq: int = -1
 
+var current_ping: int = -1
+var _ping_timer: float = 2.5
+var _last_ping_send_time: int = 0
+var _ping_awaiting_pong: bool = false
+
 var active_server_type: String = "NONE" # "DENO_CLOUD", "LOCAL", "APPWRITE_FALLBACK"
 var active_server_name: String = ""
 var active_server_url: String = ""
@@ -39,6 +42,9 @@ var candidate_index: int = 0
 var is_scanning_candidates: bool = false
 var candidate_timer: float = 0.0
 var has_custom_cli_url: bool = false
+var has_custom_saved_config: bool = false
+var _reconnect_timer: float = 0.0
+var _custom_url_retry_count: int = 0
 
 const CONFIG_FILE: String = "user://server_config.json"
 
@@ -77,6 +83,8 @@ func _ready() -> void:
 	_load_server_config()
 	if has_custom_cli_url:
 		connect_to_server(server_url)
+	elif has_custom_saved_config:
+		connect_to_server(server_url)
 	else:
 		_start_priority_connection()
 
@@ -86,6 +94,9 @@ func is_connecting() -> bool:
 	if socket and socket.get_ready_state() == WebSocketPeer.STATE_CONNECTING:
 		return true
 	return false
+
+func get_ping_ms() -> int:
+	return current_ping
 
 func _start_priority_connection() -> void:
 	candidate_index = 0
@@ -98,6 +109,9 @@ func _try_candidate(index: int) -> void:
 		active_server_type = "NONE"
 		active_server_name = "Không có máy chủ"
 		active_server_url = ""
+		current_ping = -1
+		_ping_awaiting_pong = false
+		ping_updated.emit(-1)
 		print("[NetworkClient] ❌ Tất cả WebSocket Server (Deno Cloud & Local) đều không kết nối được! Không sử dụng Appwrite cho trận đấu.")
 		error_received.emit("Không thể kết nối đến Máy Chủ Trận Đấu (Deno Cloud hoặc Local 8080)!")
 		return
@@ -117,12 +131,15 @@ func _try_candidate(index: int) -> void:
 		_on_candidate_failed("Mã lỗi kết nối: %d" % err)
 
 func _on_candidate_failed(reason: String) -> void:
+	current_ping = -1
+	_ping_awaiting_pong = false
+	ping_updated.emit(-1)
 	var cand = CANDIDATE_SERVERS[candidate_index] if candidate_index < CANDIDATE_SERVERS.size() else {}
 	print("[NetworkClient] ❌ Kết nối tới %s thất bại: %s. Chuyển sang ưu tiên tiếp theo..." % [cand.get("name", "Server"), reason])
 	_try_candidate(candidate_index + 1)
 
 func _load_server_config() -> void:
-	# 1. Đọc từ đối số dòng lệnh nếu có (ví dụ: --server-url=ws://192.168.1.102:8080)
+	# 1. Đọc từ đối số dòng lệnh nếu có (ví dụ: --server-url=ws://127.0.0.1:8080)
 	var all_args = OS.get_cmdline_args() + OS.get_cmdline_user_args()
 	for arg in all_args:
 		if arg.begins_with("--server-url="):
@@ -141,12 +158,12 @@ func _load_server_config() -> void:
 				var saved_url = str(json["server_url"]).strip_edges()
 				if saved_url != "":
 					server_url = saved_url
-					has_custom_cli_url = true
+					has_custom_saved_config = true
 					print("[NetworkClient] Đọc server_url từ cấu hình user: ", server_url)
 
 func save_server_url(new_url: String) -> void:
 	server_url = new_url.strip_edges()
-	has_custom_cli_url = true
+	has_custom_saved_config = true
 	var file = FileAccess.open(CONFIG_FILE, FileAccess.WRITE)
 	if file:
 		file.store_string(JSON.stringify({"server_url": server_url}))
@@ -156,8 +173,7 @@ func save_server_url(new_url: String) -> void:
 func connect_to_server(url: String = "") -> void:
 	if url != "":
 		server_url = url
-		has_custom_cli_url = true
-	if not has_custom_cli_url:
+	if not has_custom_cli_url and not has_custom_saved_config:
 		_start_priority_connection()
 		return
 
@@ -177,6 +193,8 @@ func _process(delta: float) -> void:
 		if not is_connected_to_server:
 			is_connected_to_server = true
 			is_scanning_candidates = false
+			_ping_timer = 0.0
+			candidate_timer = 0.0
 			if candidate_index < CANDIDATE_SERVERS.size() and not has_custom_cli_url:
 				var cand = CANDIDATE_SERVERS[candidate_index]
 				active_server_type = cand["type"]
@@ -188,17 +206,13 @@ func _process(delta: float) -> void:
 				active_server_url = server_url
 			print("[NetworkClient] ⚡ Đã kết nối thành công tới %s (%s)!" % [active_server_name, active_server_url])
 			connection_established.emit()
+			_send_ping()
 
-		# Nhịp đập Heartbeat PING mỗi 15s chuẩn Unity DenoGameClient
-		last_heartbeat_time += delta
-		if last_heartbeat_time >= 15.0:
-			last_heartbeat_time = 0.0
-			if not room_id.is_empty():
-				send_json({
-					"action": "PING",
-					"roomId": room_id,
-					"seat": my_seat
-				})
+		# Nhịp đập Heartbeat PING & Đo độ trễ thời gian thực mỗi 3 giây
+		_ping_timer += delta
+		if _ping_timer >= 3.0:
+			_ping_timer = 0.0
+			_send_ping()
 
 		while socket.get_available_packet_count() > 0:
 			var packet = socket.get_packet()
@@ -206,31 +220,73 @@ func _process(delta: float) -> void:
 			_handle_server_message(msg_text)
 
 	elif state == WebSocketPeer.STATE_CONNECTING:
+		candidate_timer += delta
 		if is_scanning_candidates:
-			candidate_timer += delta
-			if candidate_timer >= CANDIDATE_CONNECT_TIMEOUT:
-				_on_candidate_failed("Quá thời gian kết nối (Timeout 2.5s)")
+			var max_to = 3.5
+			if candidate_index < CANDIDATE_SERVERS.size():
+				max_to = float(CANDIDATE_SERVERS[candidate_index].get("timeout", 2.5))
+			if candidate_timer >= max_to:
+				_on_candidate_failed("Quá thời gian kết nối (Timeout %.1fs)" % max_to)
+		else:
+			if candidate_timer >= 2.5:
+				candidate_timer = 0.0
+				print("[NetworkClient] ⚠️ Kết nối tới %s quá 2.5s timeout. Đóng socket..." % server_url)
+				socket.close()
+				if has_custom_saved_config:
+					print("[NetworkClient] ⚠️ Cấu hình server đã lưu (%s) không phản hồi. Tự động chuyển sang dò tìm máy chủ tối ưu..." % server_url)
+					has_custom_saved_config = false
+					_start_priority_connection()
 
 	elif state == WebSocketPeer.STATE_CLOSED:
+		candidate_timer = 0.0
 		if is_scanning_candidates:
 			var code = socket.get_close_code()
 			var reason = socket.get_close_reason()
 			_on_candidate_failed("Đóng kết nối (Code %d, Reason: %s)" % [code, reason])
 		elif is_connected_to_server:
 			is_connected_to_server = false
+			current_ping = -1
+			_ping_awaiting_pong = false
+			ping_updated.emit(-1)
 			var code = socket.get_close_code()
 			var reason = socket.get_close_reason()
 			print("[NetworkClient] Mất kết nối tới server. Code: %d, Reason: %s" % [code, reason])
 			connection_closed.emit()
-			if auto_reconnect:
-				if reason == "Seat reconnected":
-					print("[NetworkClient] 🛑 Ghế này đã được kết nối từ một cửa sổ/thiết bị khác (%s). Dừng tự động kết nối lại để tránh xung đột." % reason)
-					return
-				await get_tree().create_timer(2.0).timeout
-				if has_custom_cli_url:
-					connect_to_server(server_url)
-				else:
-					_start_priority_connection()
+			_reconnect_timer = 0.0
+		else:
+			current_ping = -1
+			_ping_awaiting_pong = false
+			ping_updated.emit(-1)
+			if auto_reconnect and not is_scanning_candidates:
+				_reconnect_timer += delta
+				if _reconnect_timer >= 2.5:
+					_reconnect_timer = 0.0
+					if has_custom_saved_config:
+						_custom_url_retry_count += 1
+						if _custom_url_retry_count >= 1:
+							print("[NetworkClient] ⚠️ Server tùy chỉnh (%s) không thể kết nối. Tự động chuyển sang dò tìm máy chủ tối ưu..." % server_url)
+							has_custom_saved_config = false
+							_start_priority_connection()
+						else:
+							connect_to_server(server_url)
+					elif has_custom_cli_url:
+						connect_to_server(server_url)
+					else:
+						_start_priority_connection()
+
+func _send_ping() -> void:
+	if socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
+		return
+	_last_ping_send_time = Time.get_ticks_msec()
+	_ping_awaiting_pong = true
+	var ping_payload: Dictionary = {
+		"action": "PING",
+		"clientTime": _last_ping_send_time
+	}
+	if not room_id.is_empty():
+		ping_payload["roomId"] = room_id
+		ping_payload["seat"] = my_seat
+	send_json(ping_payload)
 
 func _handle_server_message(raw_json: String) -> void:
 	var json = JSON.new()
@@ -244,6 +300,26 @@ func _handle_server_message(raw_json: String) -> void:
 		return
 
 	var msg_type = data.get("type", "")
+
+	if msg_type == "PONG":
+		var now = Time.get_ticks_msec()
+		var client_time = int(data.get("clientTime", 0))
+		if client_time > 0:
+			current_ping = max(1, now - client_time)
+		elif _last_ping_send_time > 0:
+			current_ping = max(1, now - _last_ping_send_time)
+		_ping_awaiting_pong = false
+		ping_updated.emit(current_ping)
+		return
+
+	if msg_type == "ERROR" and _ping_awaiting_pong:
+		var err_str = str(data.get("error", ""))
+		if err_str == "Thiếu roomId" or err_str == "Kết nối chưa tham gia phòng":
+			var now = Time.get_ticks_msec()
+			current_ping = max(1, now - _last_ping_send_time)
+			_ping_awaiting_pong = false
+			ping_updated.emit(current_ping)
+			return
 
 	if msg_type == "DRAFT_JOINED":
 		var assigned_seat = int(data.get("assignedSeat", data.get("seat", 0)))

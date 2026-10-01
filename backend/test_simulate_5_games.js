@@ -17,8 +17,10 @@ import {
   handleRespondAction,
   handleEndTurn,
   handleDiscardCards,
-  sanitizeGameStateForClient
+  sanitizeGameStateForClient,
+  tickGameState
 } from './functions/game-engine/src/gameEngine.js';
+import assert from 'node:assert/strict';
 import {
   isSlash,
   isDodge,
@@ -43,15 +45,71 @@ function resolvePendingReactions(state) {
   let safetyCounter = 0;
   while (state.status !== "FINISHED" && state.phase !== "PLAY" && state.phase !== "DISCARD" && safetyCounter < 30) {
     safetyCounter++;
+
+    if (state.phase === "AWAIT_JUDGEMENT") {
+      state.timerStartAt = Date.now() - 4000;
+      tickGameState(state);
+      continue;
+    }
+
     const waitSeat = state.waitingTargetSeat;
     if (!waitSeat || waitSeat === 0) break;
 
     const p = state.players.find(x => x.seat === waitSeat);
     if (!p) break;
 
+    if (state.phase === "AWAIT_NULLIFY") {
+      handleRespondAction(state, waitSeat, false, null);
+      continue;
+    }
+
+    if (state.phase === "AWAIT_TARGET_CARD") {
+      const token = state.targetCardSelection?.options?.[0]?.token;
+      if (!token) throw new Error("AWAIT_TARGET_CARD không có lựa chọn hợp lệ");
+      handleRespondAction(state, waitSeat, true, null, token);
+      continue;
+    }
+
+    if (state.phase === "AWAIT_BORROW_SWORD") {
+      const slash = p.hand.find(c => isSlash(c));
+      handleRespondAction(state, waitSeat, !!slash, slash ? slash.id : null);
+      continue;
+    }
+
+    if (state.phase === "AWAIT_HARVEST") {
+      const picked = state.harvestPool?.[0];
+      handleRespondAction(state, waitSeat, true, picked ? picked.id : null);
+      continue;
+    }
+
+    if (state.phase === "AWAIT_SONG_CUNG_FOLLOW_UP" || state.phase === "AWAIT_NAM_SON_FOLLOW_UP") {
+      handleRespondAction(state, waitSeat, false, null);
+      continue;
+    }
+
+    if (state.phase === "AWAIT_HICH_CASTER_DISCARD" || state.phase === "AWAIT_HICH_TARGET_DISCARD") {
+      const discard = p.hand[0];
+      handleRespondAction(state, waitSeat, !!discard, discard ? discard.id : null);
+      continue;
+    }
+
+    if (state.phase === "AWAIT_THUY_TRIEU_RUT_GIVE") {
+      const given = p.hand[0];
+      handleRespondAction(state, waitSeat, !!given, given ? given.id : null);
+      continue;
+    }
+
+    if (state.phase === "AWAIT_DRUM_CHOICE") {
+      handleRespondAction(state, waitSeat, false, null);
+      continue;
+    }
+
     // 1. Phản ứng ĐỠ đòn Trảm
     if (state.phase === "AWAIT_SLASH_DEFENSE") {
-      const dodge = p.hand.find(c => isDodge(c));
+      const caster = state.players.find((player) => player.seat === state.activeCard?.casterSeat);
+      const hasHolyCannon = caster?.equipments?.some((equipment) => equipment.name?.includes("Súng Thần Công"));
+      const dodge = p.hand.find((c) => isDodge(c)
+        && (!hasHolyCannon || c.suit !== state.activeCard?.suit));
       if (dodge) {
         handleRespondAction(state, waitSeat, true, dodge.id);
       } else {
@@ -252,7 +310,7 @@ function runSingleGameSimulation(gameIndex) {
   console.log(`   🔵 Đội Long : G2 (${state.players[1].generalName}) & G4 (${state.players[3].generalName} - AI)`);
 
   let turnCount = 0;
-  const maxTurns = 80;
+  const maxTurns = 400;
 
   while (state.status !== "FINISHED" && turnCount < maxTurns) {
     turnCount++;
@@ -277,6 +335,12 @@ function runSingleGameSimulation(gameIndex) {
       console.log(`     -> HP: ${hpSummary}`);
     }
   }
+
+  assert.equal(
+    state.status,
+    "FINISHED",
+    `Ván ${gameIndex} chưa kết thúc: phase=${state.phase}, turnSeat=${state.turnSeat}, waitingSeat=${state.waitingTargetSeat}`
+  );
 
   // Kết quả ván
   const gameOver = (state.actionHistory || []).find(a => a.type === "GAME_OVER") || state.lastAction;

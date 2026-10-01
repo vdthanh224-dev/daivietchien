@@ -7,6 +7,42 @@ var voice_player: AudioStreamPlayer
 var clips: Dictionary = {}
 var voice_cache: Dictionary = {}
 
+const SKILL_VOICE_KEYS := {
+	"chế nỏ": "che_no",
+	"liên châu": "lien_chau",
+	"xạ thuẫn": "xa_thuan",
+	"phù trấn": "phu_tran",
+	"hịch nghĩa": "hich_nghia",
+	"uất khí": "uat_khi",
+	"triều dâng": "trieu_dang",
+	"lập làng": "lap_lang",
+	"dũng nữ": "dung_nu",
+	"thủ mục": "thu_muc",
+	"trinh liệt": "trinh_liet",
+	"bát nạ": "bat_na",
+	"tiên phong": "tien_phong",
+	"trận tiền": "tran_tien",
+	"khởi binh": "khoi_binh",
+	"huynh trưởng": "huynh_truong",
+	"chiến tượng": "chien_tuong",
+	"oai nhược": "oai_nhuoc",
+	"dựng nước": "dung_nuoc",
+	"xưng đế": "xung_de",
+	"tùng nghĩa": "tung_nghia",
+	"trung kiên": "trung_kien",
+	"văn sách": "van_sach",
+	"hán lâm": "han_lam",
+	"trấn nam": "tran_nam",
+	"hóa dân": "hoa_dan",
+	"dạ trạch": "da_trach",
+	"nỏ đỉnh": "no_dinh",
+	"phục hổ": "phuc_ho",
+	"an dân": "an_dan",
+	"ẩn tích": "an_tich",
+	"lực địch": "luc_dich",
+	"hùng sức": "hung_suc"
+}
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
@@ -67,6 +103,12 @@ func play_slash() -> void:
 func play_damage() -> void:
 	play_sfx("sfx_damage", 1.0)
 
+func play_hurt() -> void:
+	play_damage()
+
+func play_defeat() -> void:
+	play_sfx("sfx_damage", 2.0)
+
 func play_parry() -> void:
 	play_sfx("sfx_parry", 2.0)
 
@@ -78,6 +120,9 @@ func play_card_draw() -> void:
 
 func play_card_select() -> void:
 	play_sfx("sfx_card_select", -3.0)
+
+func play_card_sound(card_name: String) -> void:
+	play_voice(card_name)
 
 func play_victory() -> void:
 	play_sfx("sfx_victory", 3.0)
@@ -122,12 +167,18 @@ func play_voice(card_or_skill_name: String) -> void:
 		p.finished.connect(p.queue_free)
 
 func has_voice(card_or_skill_name: String) -> bool:
-	return _normalize_voice_key(card_or_skill_name) != ""
+	var key = _normalize_voice_key(card_or_skill_name)
+	return not key.is_empty() and (ResourceLoader.exists("res://assets/audio/Voice/%s.wav" % key) or ResourceLoader.exists("res://assets/audio/voice/%s.wav" % key))
 
 func _normalize_voice_key(raw_name: String) -> String:
-	var n = raw_name.to_lower()
-	if "lôi" in n or "loi" in n: return "tram_loi"
-	elif "hỏa" in n or "hoa" in n: return "tram_hoa"
+	var n = raw_name.to_lower().strip_edges()
+	if SKILL_VOICE_KEYS.has(n):
+		return str(SKILL_VOICE_KEYS[n])
+	if ("thủy" in n or "thuy" in n) and ("trảm" in n or "tram" in n): return "tram_thuy"
+	elif "đại hồng thủy" in n or "dai hong thuy" in n: return "dai_hong_thuy"
+	# Only the actual fire slash card uses the Trảm Hỏa voice. Equipment such as
+	# Hỏa Mai Tây Sơn must not fall through to this generic substring match.
+	elif n == "trảm hỏa" or n == "tram hoa" or n == "hỏa" or n == "hoa": return "tram_hoa"
 	elif "trảm" in n or "tram" in n: return "tram"
 	elif "đỡ" in n or "do" in n: return "do"
 	elif "bánh chưng" in n or "banh chung" in n: return "banh_chung"
@@ -148,12 +199,19 @@ func _normalize_voice_key(raw_name: String) -> String:
 	elif "vô trung" in n or "dụng binh" in n or "dung binh" in n: return "dung_binh_nhu_than"
 	elif "vườn không" in n or "vuon khong" in n or "rút ván" in n: return "vuon_khong_nha_trong"
 	elif "đột kích" in n or "dot kich" in n or "trộm lương" in n or "dắt dê" in n: return "dot_kich_trom_luong"
-	elif "xích tâm" in n or "xich tam" in n or "xích" in n or "xich" in n: return "xich_tho"
+	elif "xích tâm" in n or "xich tam" in n: return "xich_tam_toa"
+	elif "huyết chiến" in n or "huyet chien" in n: return "huyet_chien"
 	elif "quyết đấu" in n or "thách đấu" in n or "thach dau" in n: return "thach_dau"
 	elif "mưa tên" in n or "vạn tiễn" in n or "mua ten" in n: return "mua_ten_lien_chau"
-	elif "cọc ngầm" in n or "bãi cọc" in n or "bai coc" in n: return "bai_coc_ngam"
+	elif "giặc tới" in n or "giac toi" in n: return "giac_toi"
+	elif "bãi cọc bạch đằng" in n or "bai coc bach dang" in n: return "bai_coc_bach_dang"
+	elif "cọc ngầm" in n or "coc ngam" in n: return "bai_coc_ngam"
 	elif "mở kho" in n or "mo kho" in n: return "mo_kho_cuu_te"
+	elif "thủy triều rút" in n or "thuy trieu rut" in n: return "thuy_trieu_rut"
+	elif "mượn gươm" in n or "muon guom" in n: return "muon_guom_diet_dich"
+	elif "mở yến tiệc" in n or "mo yen tiec" in n: return "mo_yen_tiec"
+	elif "hịch tướng sĩ" in n or "hich tuong si" in n: return "hich_tuong_si"
+	elif "trống đồng" in n or "trong dong" in n: return "trong_dong_dong_son"
 	elif "trầm ảo" in n or "tram ao" in n or "sa bẫy" in n or "sa bay" in n: return "tram_ao_sa_bay"
 	elif "cắt lương" in n or "cat luong" in n or "cắt đường" in n or "cat duong" in n: return "cat_duong_luong"
-	elif "thần sấm" in n or "than sam" in n: return "than_sam_bao_ung"
 	return ""

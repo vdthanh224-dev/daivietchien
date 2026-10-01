@@ -197,7 +197,7 @@ export function createDeck80() {
   list.push(createCard("D80_CN_DK_HichTuongSi", "Hịch Tướng Sĩ", "Diamond", 13, 2, 26, "Bạn và 1 người khác bạn chọn, bỏ 1 lá để nhận Sục Sôi: 1 vòng không giới hạn Trảm, tầm đánh +1. Có thể đổi lá để rút lá khác."));
   list.push(createCard("D80_CN_S3_KhoNhuc", "Khổ Nhục Kế", "Spade", 3, 2, 28, "Nhận 1 sát thương, sau đó rút 3 lá bài"));
   list.push(createCard("D80_CN_C8_TauVi", "Tẩu Vi Thượng Sách", "Club", 8, 2, 29, "Bỏ 1 Trang bị của chính mình, rút 2 lá bài"));
-  list.push(createCard("D80_CN_D5_PhuDe", "Phủ Để Trừu Tân", "Diamond", 5, 2, 30, "Đưa 1 Trang bị của mục tiêu về tay họ"));
+  list.push(createCard("D80_CN_D5_PhuDe", "Phủ Để Trừu Tân", "Diamond", 5, 2, 30, "Đưa 1 Trang bị của mục tiêu về tay họ, sau đó rút 1 lá bài"));
 
   // ==========================================
   // 12. CẨM NANG TRÌ HOÃN — 3 LÁ
