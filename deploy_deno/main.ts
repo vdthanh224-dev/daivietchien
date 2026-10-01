@@ -1,6 +1,6 @@
 /**
  * ĐẠI VIỆT CHIẾN - UNIFIED REALTIME & REST GAME SERVER (DENO DEPLOY)
- * Tích hợp 100% WebSocket Realtime (<15ms) + REST API Fallback + Appwrite DB Backup
+ * 100% In-Memory WebSocket Realtime (<15ms) trên RAM
  */
 import {
   initGame,
@@ -14,72 +14,212 @@ import {
   handleToggleSkill,
   handleUseSkill,
   tickGameState,
-  hydrateGameState,
   sanitizeGameStateForClient,
   ensureMutationVersion,
 } from "./functions/game-engine/src/gameEngine.js";
+import { HERO_MAX_HP } from "./functions/game-engine/src/heroes.js";
+import { getModeRules } from "./functions/game-engine/src/modeRegistry.js";
 
-const APPWRITE_ENDPOINT = Deno.env.get("APPWRITE_ENDPOINT") || "https://sgp.cloud.appwrite.io/v1";
-const PROJECT_ID = Deno.env.get("APPWRITE_PROJECT_ID") || "6a885457002da3f3d47e";
-const API_KEY = Deno.env.get("APPWRITE_API_KEY") || "";
-const DATABASE_ID = Deno.env.get("DATABASE_ID") || "game";
-const COLLECTION_ID = Deno.env.get("COLLECTION_ID") || "matchmaking_queue";
+export interface DraftSlot {
+  seat: number;
+  userId: string;
+  userName: string;
+  isAI: boolean;
+  isDragon: boolean;
+  heroId: number;
+  heroName: string;
+  maxHp: number;
+  isLocked: boolean;
+}
+
+export interface DraftState {
+  roomId: string;
+  slots: DraftSlot[];
+  currentPickerIndex: number;
+  timer: number;
+  timerStartAt: number;
+  isCompleted: boolean;
+}
 
 // Bộ nhớ In-Memory lưu trữ toàn bộ các phòng đấu đang diễn ra trên RAM
 interface RoomData {
   state: any;
+  draft?: DraftState;
   sockets: Map<number, WebSocket>;
   lastActivity: number;
 }
 
 const rooms = new Map<string, RoomData>();
+interface MatchmakingRoom {
+  roomId: string;
+  hostUserId: string;
+  status: string;
+  version: number;
+  hostRankPoints: number;
+  createdAt: number;
+  updatedAt: number;
+  slots: any[];
+}
+const matchmakingRooms = new Map<string, MatchmakingRoom>();
 const startTime = Date.now();
+const MAX_WS_MESSAGE_BYTES = 64 * 1024;
+const MAX_ACTIONS_PER_SECOND = 30;
+const ALLOWED_WS_ACTIONS = new Set([
+  "JOIN_ROOM", "INIT_GAME", "JOIN_DRAFT", "PICK_HERO", "GET_STATE", "PING",
+  "USE_SKILL", "TOGGLE_SKILL", "PLAY_CARD", "RESPOND_ACTION", "END_TURN",
+  "DISCARD_CARDS", "AI_STEP", "AI_REACTION"
+]);
 
-const STATE_ENCODING_PREFIX = "GZIP1:";
-// Appwrite string attributes are limited to 8192 characters. Keep a small
-// margin for schema/runtime differences and never persist a truncated JSON.
-const MAX_PERSISTED_STATE_CHARS = 8000;
-const persistenceQueues = new Map<string, Promise<void>>();
-
-async function encodePersistedState(value: unknown): Promise<string> {
-  const stream = new CompressionStream("gzip");
-  const output = new Response(stream.readable).arrayBuffer();
-  const writer = stream.writable.getWriter();
-  await writer.write(new TextEncoder().encode(JSON.stringify(value)));
-  await writer.close();
-  const bytes = new Uint8Array(await output);
-  let binary = "";
-  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
-  }
-  const encoded = STATE_ENCODING_PREFIX + btoa(binary);
-  if (encoded.length > MAX_PERSISTED_STATE_CHARS) {
-    throw new Error(`Serialized GameState exceeds Appwrite limit (${encoded.length} chars)`);
-  }
-  return encoded;
+function matchmakingJson(data: any, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json; charset=utf-8", "Access-Control-Allow-Origin": "*" },
+  });
 }
 
-async function decodePersistedState(value: string): Promise<any | null> {
-  if (!value) return null;
-  if (!value.startsWith(STATE_ENCODING_PREFIX)) {
-    try { return JSON.parse(value); } catch { return null; }
+function cleanupMatchmakingRooms() {
+  const now = Date.now();
+  for (const [id, room] of matchmakingRooms) {
+    if ((room.status === "WAITING" && now - room.updatedAt > 180000) || now - room.updatedAt > 900000) {
+      matchmakingRooms.delete(id);
+    }
   }
-  try {
-    const binary = atob(value.slice(STATE_ENCODING_PREFIX.length));
-    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-    const stream = new DecompressionStream("gzip");
-    const output = new Response(stream.readable).text();
-    const writer = stream.writable.getWriter();
-    await writer.write(bytes);
-    await writer.close();
-    return JSON.parse(await output);
-  } catch (err) {
-    console.error("[DB Decode Error]:", err);
-    return null;
+}
+
+function findMatchmakingRoom(userId: string, rankPoints: number, maxRankDiff: number) {
+  cleanupMatchmakingRooms();
+  let best: MatchmakingRoom | null = null;
+  let bestDiff = Number.MAX_SAFE_INTEGER;
+  for (const room of matchmakingRooms.values()) {
+    if (room.status !== "WAITING") continue;
+    if (room.slots.some((slot) => !slot.isEmpty && slot.userId === userId)) continue;
+    if (!room.slots.some((slot) => slot.isEmpty)) continue;
+    const diff = Math.abs(Number(room.hostRankPoints) - rankPoints);
+    if (diff <= maxRankDiff && diff < bestDiff) {
+      best = room;
+      bestDiff = diff;
+    }
   }
+  return best;
+}
+
+function isValidMatchmakingRoom(room: any): boolean {
+  return !!room && typeof room.roomId === "string" && room.roomId.length > 0 && room.roomId.length <= 128
+    && typeof room.hostUserId === "string" && Array.isArray(room.slots) && room.slots.length === 4;
+}
+
+function isEmptyMatchSlot(slot: any): boolean {
+  return !slot || slot.isEmpty === true || !slot.userId;
+}
+
+function validateClientPayload(payload: any, rawBytes: number): string | null {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return "Gói tin không hợp lệ";
+  if (rawBytes > MAX_WS_MESSAGE_BYTES) return "Gói tin vượt giới hạn cho phép";
+  if (typeof payload.action !== "string" || !ALLOWED_WS_ACTIONS.has(payload.action)) return "Hành động không hợp lệ";
+  if (payload.roomId !== undefined && (typeof payload.roomId !== "string" || payload.roomId.length > 128)) return "Mã phòng không hợp lệ";
+  for (const key of ["cardId", "targetCardId", "skillId", "heroName", "userId", "userName"]) {
+    if (payload[key] !== undefined && (typeof payload[key] !== "string" || payload[key].length > 256)) return `${key} không hợp lệ`;
+  }
+  for (const key of ["seat", "targetSeat", "targetSeat2", "expectedVersion"]) {
+    if (payload[key] !== undefined && (!Number.isInteger(Number(payload[key])) || Number(payload[key]) < 0)) return `${key} không hợp lệ`;
+  }
+  if (payload.cardIds !== undefined && (!Array.isArray(payload.cardIds) || payload.cardIds.length > 20 || payload.cardIds.some((id: any) => typeof id !== "string" || id.length > 256))) return "Danh sách lá bài không hợp lệ";
+  if (payload.targetSeats !== undefined && (!Array.isArray(payload.targetSeats) || payload.targetSeats.length > 8)) return "Danh sách mục tiêu không hợp lệ";
+  if (payload.players !== undefined && (!Array.isArray(payload.players) || payload.players.length > 8)) return "Danh sách người chơi không hợp lệ";
+  return null;
 }
 
 console.log("🎮 [Deno Server] Đại Việt Chiến 2v2 Unified Game Server is running!");
+
+const HERO_NAME_MAP: Record<number, string> = {
+  1: "Cao Lỗ",
+  2: "Đào Hãn",
+  3: "Thi Sách",
+  4: "Lê Chân",
+  5: "Thánh Thiên",
+  6: "Vũ Thị Thục",
+  7: "Nàng Nội",
+  8: "Triệu Quốc Đạt",
+  9: "Triệu Thị Trinh",
+  10: "Lý Bí",
+  11: "Triệu Túc",
+  12: "Tinh Thiều",
+  13: "Phạm Tu",
+  14: "Triệu Quang Phục",
+  15: "Phùng Hưng",
+  16: "Phùng Hải",
+  17: "Mai Thúc Loan",
+  18: "Khúc Thừa Dụ",
+  19: "Khúc Hạo",
+  20: "Dương Đình Nghệ",
+  21: "Kiều Công Tiễn",
+  22: "Ngô Quyền",
+  23: "Dương Tam Kha",
+  24: "Ngô Xương Ngập",
+  25: "Ngô Xương Văn",
+  26: "Đỗ Cảnh Thạc",
+  27: "Kiều Thuận",
+  28: "Nguyễn Siêu",
+  47: "Lý Thường Kiệt",
+  53: "Trần Quốc Tuấn",
+  56: "Trần Quốc Toản",
+  68: "Trương Hán Siêu",
+  72: "Trần Duệ Tông",
+  83: "Nguyễn Cảnh Chân",
+  86: "Lê Lợi",
+  87: "Nguyễn Trãi",
+};
+
+function getHeroName(heroId: number): string {
+  return HERO_NAME_MAP[heroId] || `Chiến Tướng #${heroId}`;
+}
+
+const DEFAULT_HERO_POOL = Array.from({ length: 28 }, (_, i) => i + 1);
+
+function getAutoPickHeroId(excludeIds: number[]): number {
+  for (const id of DEFAULT_HERO_POOL) {
+    if (!excludeIds.includes(id)) return id;
+  }
+  for (let id = 1; id <= 84; id++) {
+    if (!excludeIds.includes(id)) return id;
+  }
+  return 1;
+}
+
+function randomTeamSeats(): Set<number> {
+  const seats = [1, 2, 3, 4];
+  for (let i = seats.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [seats[i], seats[j]] = [seats[j], seats[i]];
+  }
+  return new Set(seats.slice(0, 2));
+}
+
+function finishDraftAndStartBattle(roomId: string, room: RoomData) {
+  if (!room.draft) return;
+  room.draft.isCompleted = true;
+  const battlePlayers = room.draft.slots.map(s => ({
+    seat: s.seat,
+    userId: s.userId,
+    heroId: `HERO_${s.heroId}`,
+    generalName: s.heroName || getHeroName(s.heroId),
+    maxHp: HERO_MAX_HP[s.heroId] || 4,
+    hp: HERO_MAX_HP[s.heroId] || 4,
+    isAlly: s.isDragon,
+    isAI: s.isAI
+  }));
+
+  room.state = initGame(roomId, battlePlayers);
+  console.log(`[Deno Server] Chọn tướng hoàn tất phòng: ${roomId}! Bắt đầu trận đấu 2v2!`);
+
+  broadcastRoom(room, {
+    type: "DRAFT_COMPLETED",
+    roomId,
+    slots: room.draft.slots,
+    battlePlayers,
+    state: room.state
+  });
+}
 
 // Dynamic Tick Timer: Only runs when active rooms exist, allowing Deno to scale to 0 CPU when idle
 let tickTimer: ReturnType<typeof setInterval> | null = null;
@@ -97,107 +237,82 @@ function ensureTickTimer() {
     const now = Date.now();
     for (const [roomId, room] of rooms.entries()) {
       // Dọn dẹp phòng đã kết thúc hoặc không hoạt động quá 15 phút
-      if (!room?.state || room.state.status === "FINISHED" || (now - room.lastActivity > 900000)) {
+      if ((!room?.state && !room?.draft) || (room.state && room.state.status === "FINISHED") || (now - room.lastActivity > 900000)) {
         rooms.delete(roomId);
         continue;
       }
-      try {
-        const connectedSeats = Array.from(room.sockets.keys());
-        if ((tickGameState as any)(room.state, connectedSeats)?.important) {
-          room.lastActivity = now;
-          broadcastRoom(room, {
-            type: "STATE_UPDATE",
-            state: room.state,
-            delta: room.state.lastDelta || null,
-            version: room.state.version,
-            action: "SERVER_TICK",
-          });
-          saveStateToDatabase(roomId, room.state);
+
+      // 1. Tick giai đoạn DRAFT (Chọn Tướng)
+      if (room.draft && !room.draft.isCompleted) {
+        const draft = room.draft;
+        draft.timer = Math.max(0, draft.timer - 1);
+        room.lastActivity = now;
+
+        const currentSlot = draft.slots[draft.currentPickerIndex];
+        const hasHumanSocket = currentSlot && room.sockets.has(currentSlot.seat);
+        const isBot = currentSlot && currentSlot.isAI && !hasHumanSocket;
+        // Bot suy nghĩ 3 giây (khi timer <= 37). Ghế có người thật (hoặc có socket kết nối) chờ đủ 40s (khi timer <= 0)
+        const shouldAutoPick = (draft.timer <= 0) || (isBot && draft.timer <= 37);
+
+        if (shouldAutoPick && currentSlot && !currentSlot.isLocked) {
+          const lockedIds = draft.slots.filter(s => s.isLocked).map(s => s.heroId);
+          const autoHeroId = getAutoPickHeroId(lockedIds);
+          currentSlot.heroId = autoHeroId;
+          currentSlot.heroName = getHeroName(autoHeroId);
+          currentSlot.isLocked = true;
+          console.log(`[Deno Draft AutoPick] Ghế ${currentSlot.seat} (${isBot ? "Bot" : "Timeout"}) đã tự chọn tướng ${currentSlot.heroName} (#${autoHeroId})`);
+
+          draft.currentPickerIndex++;
+          draft.timer = 40;
+          draft.timerStartAt = now;
+
+          if (draft.currentPickerIndex >= draft.slots.length || draft.slots.every(s => s.isLocked)) {
+            finishDraftAndStartBattle(roomId, room);
+            continue;
+          }
         }
-      } catch (err) {
-        console.error(`[Tick Error room ${roomId}]:`, err);
+
+        // Phát sóng tick đồng bộ mỗi giây cho cả 4 socket
+        broadcastRoom(room, {
+          type: "DRAFT_STATE_UPDATE",
+          roomId,
+          currentPickerIndex: draft.currentPickerIndex,
+          currentSeat: draft.slots[draft.currentPickerIndex]?.seat || 1,
+          timer: draft.timer,
+          slots: draft.slots,
+          selectedHeroIds: draft.slots.filter(s => s.isLocked).map(s => s.heroId)
+        });
+        continue;
+      }
+
+      // 2. Tick giai đoạn BATTLE (Trận Đấu) - Đồng bộ mỗi giây cho cả 4 người chơi
+      if (room.state) {
+        try {
+          const connectedSeats = Array.from(room.sockets.keys());
+          const startingActionSeq = room.state.actionSeq || 0;
+          const tickRes = (tickGameState as any)(room.state, connectedSeats);
+          if (tickRes?.changed || tickRes?.important) {
+            room.lastActivity = now;
+            const hasNewAction = (room.state.actionSeq || 0) > startingActionSeq;
+            const tickDelta = hasNewAction ? (room.state.lastDelta || null) : null;
+            broadcastRoom(room, {
+              type: "STATE_UPDATE",
+              state: room.state,
+              delta: tickDelta,
+              version: room.state.version,
+              action: "SERVER_TICK",
+            });
+            if (tickDelta) {
+              room.state.lastDelta = null;
+            }
+            // 100% In-Memory RAM: Không gọi Appwrite trong trận đấu
+          }
+        } catch (err) {
+          console.error(`[Tick Error room ${roomId}]:`, err);
+        }
       }
     }
   }, 1000);
-}
-
-
-async function loadStateFromDatabase(roomId: string) {
-  const docId = `gs_${roomId.replace(/[^a-zA-Z0-9_-]/g, '')}`.substring(0, 36);
-  try {
-    const res = await fetch(`${APPWRITE_ENDPOINT}/databases/${DATABASE_ID}/collections/${COLLECTION_ID}/documents/${docId}`, {
-      headers: {
-        "X-Appwrite-Project": PROJECT_ID,
-        "X-Appwrite-Key": API_KEY,
-        "Content-Type": "application/json",
-      },
-    });
-    if (res.ok) {
-      const doc = await res.json();
-      if (doc && doc.userName) {
-        return hydrateGameState(await decodePersistedState(doc.userName), roomId);
-      }
-    }
-  } catch (err) {
-    console.error("[DB Load Error]:", err);
-  }
-  return null;
-}
-
-async function persistStateToDatabase(roomId: string, state: any): Promise<void> {
-  if (!API_KEY) return; // Nếu không có API Key, chỉ chạy In-Memory
-  try {
-    const docId = `gs_${roomId.replace(/[^a-zA-Z0-9_-]/g, '')}`.substring(0, 36);
-    const stateJson = await encodePersistedState({
-      ...state,
-    });
-
-    const docData = {
-      userId: "GAME_STATE",
-      userName: stateJson,
-      rankPoints: state.turnSeat,
-      timestamp: Date.now(),
-    };
-
-    const permissions: string[] = [];
-
-    const res = await fetch(`${APPWRITE_ENDPOINT}/databases/${DATABASE_ID}/collections/${COLLECTION_ID}/documents/${docId}`, {
-      method: "PATCH",
-      headers: {
-        "X-Appwrite-Project": PROJECT_ID,
-        "X-Appwrite-Key": API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ data: docData, permissions }),
-    });
-    if (!res.ok && res.status === 404) {
-      await fetch(`${APPWRITE_ENDPOINT}/databases/${DATABASE_ID}/collections/${COLLECTION_ID}/documents`, {
-        method: "POST",
-        headers: {
-          "X-Appwrite-Project": PROJECT_ID,
-          "X-Appwrite-Key": API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ documentId: docId, data: docData, permissions }),
-      });
-    }
-  } catch (err) {
-    console.error("[DB Save Error]:", err);
-  }
-}
-
-// Preserve write order so a slower request cannot overwrite a newer backup.
-function saveStateToDatabase(roomId: string, state: any): Promise<void> {
-  if (!API_KEY) return Promise.resolve();
-  const snapshot = structuredClone(state);
-  const previous = persistenceQueues.get(roomId) || Promise.resolve();
-  const current = previous
-    .catch(() => {})
-    .then(() => persistStateToDatabase(roomId, snapshot));
-  persistenceQueues.set(roomId, current);
-  return current.finally(() => {
-    if (persistenceQueues.get(roomId) === current) persistenceQueues.delete(roomId);
-  });
 }
 
 function broadcastRoom(room: RoomData, messageObj: any) {
@@ -205,12 +320,12 @@ function broadcastRoom(room: RoomData, messageObj: any) {
   for (const [seat, ws] of room.sockets.entries()) {
     if (ws.readyState === WebSocket.OPEN) {
       try {
-        if (messageObj.type === "STATE_UPDATE" && messageObj.state) {
+        // Any broadcast carrying game state must hide other players' hands.
+        if (messageObj.state && room.state) {
           const sanitizedState = sanitizeGameStateForClient(room.state, seat);
           const personalized = {
             ...messageObj,
             state: sanitizedState,
-            delta: messageObj.delta || room.state.lastDelta || null,
           };
           ws.send(JSON.stringify(personalized));
         } else {
@@ -225,11 +340,21 @@ function broadcastRoom(room: RoomData, messageObj: any) {
 
 function normalizeSeat(value: unknown): number {
   const seat = Number(value);
-  return Number.isInteger(seat) && seat >= 1 && seat <= 4 ? seat : 0;
+  return Number.isInteger(seat) && seat >= 1 && seat <= 8 ? seat : 0;
 }
 
-function hasSeat(state: any, seat: number): boolean {
-  return !!state?.players?.some((player: any) => player.seat === seat);
+function hasSeat(target: any, seat: number): boolean {
+  if (!target) return false;
+  if (target.draft) {
+    return !!target.draft.slots?.some((s: any) => s.seat === seat);
+  }
+  if (target.players) {
+    return !!target.players?.some((player: any) => player.seat === seat);
+  }
+  if (target.state?.players) {
+    return !!target.state.players?.some((player: any) => player.seat === seat);
+  }
+  return false;
 }
 
 /** Bind one socket to one immutable room/seat identity. */
@@ -244,6 +369,27 @@ function bindSocket(room: RoomData, seat: number, socket: WebSocket): void {
   room.sockets.set(seat, socket);
 }
 
+function resolveDraftSeat(room: RoomData, requestedSeat: number, payload: any, socket: WebSocket): number {
+  const slots = room.draft?.slots || [];
+  const normalize = (value: unknown) => String(value || "").trim().toLowerCase();
+
+  // Godot debug windows can share one UID/name through user://; honor their explicit seat.
+  if (Number(payload.debugSeat) === requestedSeat && requestedSeat >= 1 && requestedSeat <= 4) {
+    return requestedSeat;
+  }
+
+  const userId = normalize(payload.userId);
+  const userName = normalize(payload.userName);
+  const byId = userId ? slots.filter((slot: any) => normalize(slot.userId) === userId) : [];
+  if (byId.length === 1) return byId[0].seat;
+  const byName = userName ? slots.filter((slot: any) => normalize(slot.userName) === userName) : [];
+  if (byName.length === 1) return byName[0].seat;
+
+  // Duplicate debug identities use the requested per-window seat.
+  if (!room.sockets.has(requestedSeat) || room.sockets.get(requestedSeat) === socket) return requestedSeat;
+  return slots.find((slot: any) => !room.sockets.has(slot.seat))?.seat || 0;
+}
+
 const port = Number(Deno.env.get("PORT")) || 8080;
 const hostname = Deno.env.get("HOST") || "0.0.0.0";
 Deno.serve({ port, hostname }, async (req) => {
@@ -255,52 +401,250 @@ Deno.serve({ port, hostname }, async (req) => {
 
     let currentRoomId: string | null = null;
     let currentSeat = 0;
+    let rateWindowStartedAt = Date.now();
+    let rateWindowCount = 0;
 
     socket.onopen = () => {};
 
     socket.onmessage = (event) => {
       try {
-        const payload = JSON.parse(event.data);
-        const { action, roomId, cardId, targetCardId, targetSeat, accepted, cardIds, players, expectedVersion } = payload;
+        const raw = typeof event.data === "string" ? event.data : String(event.data || "");
+        const rawBytes = new TextEncoder().encode(raw).length;
+        if (rawBytes > MAX_WS_MESSAGE_BYTES) { socket.close(1009, "Message too big"); return; }
+        const payload = JSON.parse(raw);
+        const payloadError = validateClientPayload(payload, rawBytes);
+        if (payloadError) return socket.send(JSON.stringify({ type: "ERROR", error: payloadError }));
+        if (payload.action !== "PING") {
+          const now = Date.now();
+          if (now - rateWindowStartedAt >= 1000) { rateWindowStartedAt = now; rateWindowCount = 0; }
+          if (++rateWindowCount > MAX_ACTIONS_PER_SECOND) return socket.send(JSON.stringify({ type: "ERROR", error: "Gửi hành động quá nhanh, vui lòng chờ một chút" }));
+        }
+        const { action, roomId, cardId, targetCardId, targetSeat, accepted, cardIds, players, modeId, expectedVersion } = payload;
         const requestSeat = normalizeSeat(payload.seat);
 
         if (!roomId) {
           return socket.send(JSON.stringify({ type: "ERROR", error: "Thiếu roomId" }));
         }
 
-        const isJoinAction = action === "JOIN_ROOM" || action === "INIT_GAME";
+        const isJoinAction = action === "JOIN_ROOM" || action === "INIT_GAME" || action === "JOIN_DRAFT";
         if (!isJoinAction && currentRoomId === null) {
           return socket.send(JSON.stringify({ type: "ERROR", error: "Kết nối chưa tham gia phòng" }));
         }
         if (isJoinAction && requestSeat === 0) {
-          return socket.send(JSON.stringify({ type: "ERROR", error: "Ghế không hợp lệ (1-4)" }));
+          return socket.send(JSON.stringify({ type: "ERROR", error: "Ghế không hợp lệ" }));
         }
-        if (currentRoomId !== null && (roomId !== currentRoomId || (requestSeat !== 0 && requestSeat !== currentSeat))) {
-          return socket.send(JSON.stringify({ type: "ERROR", error: "Kết nối đã được khóa vào phòng/ghế khác" }));
+        if (currentRoomId !== null) {
+          if (roomId !== currentRoomId) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Kết nối đã được khóa vào phòng khác" }));
+          }
+          if (requestSeat !== 0 && requestSeat !== currentSeat) {
+            console.log(`[Deno WS] Socket phòng ${roomId} gửi requestSeat=${requestSeat}, nhưng đã khóa vào ghế ${currentSeat}. Tiếp tục dùng ghế ${currentSeat}.`);
+          }
         }
 
         const boundSeat = currentRoomId !== null ? currentSeat : requestSeat;
 
         let room = rooms.get(roomId);
 
-        // A. KHỞI TẠO HOẶC THAM GIA PHÒNG ĐẤU
-        if (action === "JOIN_ROOM" || action === "INIT_GAME") {
-          if (!room) {
-            if (!Array.isArray(players) || players.length !== 4) {
-              return socket.send(JSON.stringify({ type: "ERROR", error: "Cần đủ thông tin 4 người chơi để khởi tạo phòng" }));
+        // A.0. THAM GIA HOẶC KHỞI TẠO CHỌN TƯỚNG (DRAFT)
+        if (action === "JOIN_DRAFT") {
+          const isFreshDraft = !room || (!room.draft?.isCompleted && room.state?.status === "FINISHED");
+          if (isFreshDraft) {
+            const rawSlots = Array.isArray(payload.slots) ? payload.slots : [];
+            const dragonSeats = randomTeamSeats();
+            const defaultSlots: DraftSlot[] = [1, 2, 3, 4].map((s) => {
+              const matched = rawSlots.find((x: any) => Number(x.seatNumber || x.seat) === s) || rawSlots[s - 1] || {};
+              const isAI = Boolean(matched.isAI ?? (s !== boundSeat));
+              return {
+                seat: s,
+                userId: String(matched.userId || (isAI ? `bot_${s}` : (s === boundSeat ? (payload.userId || `user_${s}`) : `user_${s}`))),
+                userName: String(matched.userName || (isAI ? `AI Ghế ${s}` : (s === boundSeat ? (payload.userName || `Ghế ${s}`) : `Ghế ${s}`))),
+                isAI: isAI,
+                isDragon: dragonSeats.has(s),
+                heroId: Number(matched.heroId || 0),
+                heroName: String(matched.heroName || ""),
+                maxHp: HERO_MAX_HP[Number(matched.heroId || 0)] || 4,
+                isLocked: Boolean(matched.isLocked || false)
+              };
+            });
+
+            if (!room) {
+              room = {
+                state: null,
+                draft: {
+                  roomId,
+                  slots: defaultSlots,
+                  currentPickerIndex: 0,
+                  timer: 40,
+                  timerStartAt: Date.now(),
+                  isCompleted: false
+                },
+                sockets: new Map(),
+                lastActivity: Date.now()
+              };
+              rooms.set(roomId, room);
+            } else {
+              room.state = null;
+              room.draft = {
+                roomId,
+                slots: defaultSlots,
+                currentPickerIndex: 0,
+                timer: 40,
+                timerStartAt: Date.now(),
+                isCompleted: false
+              };
+              room.lastActivity = Date.now();
             }
-            room = {
-              state: initGame(roomId, players),
-              sockets: new Map(),
-              lastActivity: Date.now(),
-            };
-            rooms.set(roomId, room);
             ensureTickTimer();
-            console.log(`[Deno WS] Phòng mới: ${roomId}`);
-            saveStateToDatabase(roomId, room.state);
+            console.log(`[Deno WS] Khởi tạo phòng DRAFT mới: ${roomId}`);
           }
 
-          if (!hasSeat(room.state, boundSeat)) {
+          if (!room) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Không thể khởi tạo phòng chọn tướng" }));
+          }
+
+          const draftSeat = currentRoomId === null
+            ? resolveDraftSeat(room, boundSeat, payload, socket)
+            : boundSeat;
+          if (!draftSeat) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Phòng đã đủ 4 ghế" }));
+          }
+
+          if (room.draft) {
+            const slot = room.draft.slots.find((s: any) => s.seat === draftSeat);
+            if (slot) {
+              if (payload.userId) slot.userId = String(payload.userId);
+              if (payload.userName) slot.userName = String(payload.userName);
+              slot.isAI = false; // Người thật đã vào ghế
+            }
+          }
+
+          currentRoomId = roomId;
+          currentSeat = draftSeat;
+          bindSocket(room, currentSeat, socket);
+          room.lastActivity = Date.now();
+          socket.send(JSON.stringify({ type: "DRAFT_JOINED", roomId, seat: draftSeat, assignedSeat: draftSeat }));
+          console.log(`[Deno WS] Ghế ${currentSeat} kết nối phòng DRAFT: ${roomId} (Sockets: ${room.sockets.size})`);
+
+          if (room.draft && !room.draft.isCompleted) {
+            broadcastRoom(room, {
+              type: "DRAFT_STATE_UPDATE",
+              roomId,
+              currentPickerIndex: room.draft.currentPickerIndex,
+              currentSeat: room.draft.slots[room.draft.currentPickerIndex]?.seat || 1,
+              timer: room.draft.timer,
+              slots: room.draft.slots,
+              selectedHeroIds: room.draft.slots.filter((s: any) => s.isLocked).map((s: any) => s.heroId)
+            });
+          } else if (room.state) {
+            socket.send(JSON.stringify({
+              type: "DRAFT_COMPLETED",
+              roomId,
+              slots: room.draft ? room.draft.slots : [],
+              battlePlayers: room.state.players,
+              state: sanitizeGameStateForClient(room.state, currentSeat)
+            }));
+          }
+          return;
+        }
+
+        // A.0.1. NGƯỜI CHƠI KHÓA TƯỚNG (PICK_HERO)
+        if (action === "PICK_HERO") {
+          if (!room || !room.draft || room.draft.isCompleted) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Không trong giai đoạn chọn tướng" }));
+          }
+          const draft = room.draft;
+          const currentSlot = draft.slots[draft.currentPickerIndex];
+          if (!currentSlot || currentSlot.seat !== boundSeat) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Chưa đến lượt bạn chọn tướng" }));
+          }
+
+          const heroId = Number(payload.heroId || payload.hero_id || 0);
+          if (heroId <= 0) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Tướng không hợp lệ" }));
+          }
+
+          const selectedHeroIds = draft.slots.filter((s: any) => s.isLocked).map((s: any) => s.heroId);
+          if (selectedHeroIds.includes(heroId)) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Tướng này đã được chọn" }));
+          }
+
+          currentSlot.heroId = heroId;
+          currentSlot.heroName = payload.heroName || getHeroName(heroId);
+          currentSlot.maxHp = HERO_MAX_HP[heroId] || 4;
+          currentSlot.isLocked = true;
+
+          draft.currentPickerIndex++;
+          draft.timer = 40;
+          draft.timerStartAt = Date.now();
+
+          console.log(`[Deno WS] Ghế ${boundSeat} đã khóa [${currentSlot.heroName}] (#${heroId}) trong phòng ${roomId}`);
+
+          if (draft.currentPickerIndex >= draft.slots.length || draft.slots.every((s: any) => s.isLocked)) {
+            finishDraftAndStartBattle(roomId, room);
+          } else {
+            broadcastRoom(room, {
+              type: "DRAFT_STATE_UPDATE",
+              roomId,
+              currentPickerIndex: draft.currentPickerIndex,
+              currentSeat: draft.slots[draft.currentPickerIndex]?.seat || 1,
+              timer: draft.timer,
+              slots: draft.slots,
+              selectedHeroIds: draft.slots.filter((s: any) => s.isLocked).map((s: any) => s.heroId)
+            });
+          }
+          return;
+        }
+
+        // A. KHỞI TẠO HOẶC THAM GIA PHÒNG ĐẤU (BATTLE)
+        if (action === "JOIN_ROOM" || action === "INIT_GAME") {
+          const requestedMode = getModeRules(modeId || "2v2");
+          const hasFullPlayers = Array.isArray(players) && !!requestedMode
+            && players.length >= requestedMode.minPlayers && players.length <= requestedMode.maxPlayers;
+          const isFreshMatch = (!room || !room.state || room.state.status === "FINISHED");
+          if (!room || !room.state || isFreshMatch) {
+            let battlePlayers = hasFullPlayers ? players : null;
+            if (!battlePlayers) {
+              if (room?.draft?.slots && room.draft.slots.length === 4 && room.draft.slots.every((s: any) => s.isLocked && s.heroId > 0)) {
+                battlePlayers = room.draft.slots.map((s: any) => ({
+                  seat: s.seat,
+                  userId: s.userId,
+                  heroId: `HERO_${s.heroId || 1}`,
+                  generalName: s.heroName || getHeroName(s.heroId || 1),
+                  maxHp: HERO_MAX_HP[s.heroId || 1] || 4,
+                  hp: HERO_MAX_HP[s.heroId || 1] || 4,
+                  isAlly: s.isDragon,
+                  isAI: s.isAI
+                }));
+              } else {
+                const fallbackDragonSeats = new Set([1, 2, 3, 4].sort(() => Math.random() - 0.5).slice(0, 2));
+                battlePlayers = [1, 2, 3, 4].map(seat => ({
+                  seat,
+                  userId: seat === boundSeat ? (payload.userId || `user_${seat}`) : `bot_${seat}`,
+                  heroId: `HERO_${seat}`,
+                  generalName: getHeroName(seat),
+                  maxHp: HERO_MAX_HP[seat] || 4,
+                  hp: HERO_MAX_HP[seat] || 4,
+                  isAlly: fallbackDragonSeats.has(seat),
+                  isAI: seat !== boundSeat
+                }));
+              }
+            }
+            if (!room) {
+              room = {
+                state: initGame(roomId, battlePlayers, modeId || "2v2"),
+                sockets: new Map(),
+                lastActivity: Date.now(),
+              };
+              rooms.set(roomId, room);
+            } else {
+              room.state = initGame(roomId, battlePlayers, modeId || "2v2");
+            }
+            ensureTickTimer();
+            console.log(`[Deno WS] Khởi tạo trận đấu (Authoritative Battle State): ${roomId} với 4 tướng:`, battlePlayers.map((p: any) => `${p.generalName} (Ghế ${p.seat})`).join(", "));
+          }
+
+          if (!hasSeat(room, boundSeat)) {
             return socket.send(JSON.stringify({ type: "ERROR", error: "Ghế không thuộc phòng đấu" }));
           }
           if (currentRoomId !== null) {
@@ -313,13 +657,21 @@ Deno.serve({ port, hostname }, async (req) => {
           currentSeat = boundSeat;
           bindSocket(room, currentSeat, socket);
           room.lastActivity = Date.now();
+          console.log(`[Deno WS] Ghế ${currentSeat} đã vào phòng: ${roomId} (Tổng sockets: ${room.sockets.size})`);
+
+          const joinedPlayer = room.state?.players?.find((p: any) => p.seat === boundSeat);
+          if (joinedPlayer) {
+            joinedPlayer.isAI = false;
+          }
 
           // Gửi Snapshot đầy đủ cho người vừa kết nối
-          socket.send(JSON.stringify({
-            type: "STATE_SNAPSHOT",
-            state: sanitizeGameStateForClient(room.state, currentSeat),
-            version: room.state.version,
-          }));
+          if (room.state) {
+            socket.send(JSON.stringify({
+              type: "STATE_SNAPSHOT",
+              state: sanitizeGameStateForClient(room.state, currentSeat),
+              version: room.state.version,
+            }));
+          }
 
           broadcastRoom(room, {
             type: "PLAYER_JOINED",
@@ -333,7 +685,7 @@ Deno.serve({ port, hostname }, async (req) => {
           return socket.send(JSON.stringify({ type: "ERROR", error: "Phòng đấu không tồn tại hoặc đã kết thúc" }));
         }
 
-        if (!hasSeat(room.state, boundSeat)) {
+        if (!hasSeat(room, boundSeat)) {
           return socket.send(JSON.stringify({ type: "ERROR", error: "Ghế không thuộc phòng đấu" }));
         }
         bindSocket(room, boundSeat, socket);
@@ -341,6 +693,10 @@ Deno.serve({ port, hostname }, async (req) => {
 
         if (action === "PING") {
           return socket.send(JSON.stringify({ type: "PONG", timestamp: Date.now() }));
+        }
+
+        if (!room.state) {
+          return socket.send(JSON.stringify({ type: "ERROR", error: "Trận đấu chưa bắt đầu (đang trong giai đoạn chọn tướng)" }));
         }
 
         // B. LẤY SNAPSHOT TRẠNG THÁI HIỆN TẠI
@@ -405,9 +761,7 @@ Deno.serve({ port, hostname }, async (req) => {
           version: room.state.version,
           action: action,
         });
-
-        // Tự động lưu DB bất đồng bộ không chặn luồng RAM
-        saveStateToDatabase(roomId, room.state);
+        room.state.lastDelta = null;
       } catch (err: any) {
         console.error("[WS Message Error]:", err);
         socket.send(JSON.stringify({ type: "ERROR", error: err.message }));
@@ -425,6 +779,7 @@ Deno.serve({ port, hostname }, async (req) => {
           // Do not remove a newer connection that replaced this socket.
           if (room.sockets.get(closedSeat) === socket) {
             room.sockets.delete(closedSeat);
+            console.log(`[Deno WS] Ghế ${closedSeat} đã ngắt kết nối phòng: ${closedRoomId} (Còn lại: ${room.sockets.size})`);
           }
           if (room.sockets.size === 0) {
             setTimeout(() => {
@@ -443,10 +798,10 @@ Deno.serve({ port, hostname }, async (req) => {
   }
 
   // 2. HTTP REST API (FALLBACK & EXTERNAL CALLS)
-  if (req.method === "POST") {
+  if (req.method === "POST" && !new URL(req.url).pathname.startsWith("/matchmaking/")) {
     try {
       const payload = await req.json();
-      const { action, roomId, cardId, targetCardId, targetSeat, accepted, cardIds, players, expectedVersion } = payload;
+      const { action, roomId, cardId, targetCardId, targetSeat, accepted, cardIds, players, modeId, expectedVersion } = payload;
       const requestSeat = normalizeSeat(payload.seat);
 
       if (!roomId) {
@@ -460,7 +815,7 @@ Deno.serve({ port, hostname }, async (req) => {
 
       if (action === "INIT_GAME") {
         if (requestSeat === 0) {
-          return new Response(JSON.stringify({ success: false, error: "Ghế không hợp lệ (1-4)" }), { status: 400 });
+          return new Response(JSON.stringify({ success: false, error: "Ghế không hợp lệ" }), { status: 400 });
         }
         if (room) {
           if (!hasSeat(room.state, requestSeat)) {
@@ -470,32 +825,27 @@ Deno.serve({ port, hostname }, async (req) => {
             headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
           });
         }
-        if (!Array.isArray(players) || players.length !== 4) {
-          return new Response(JSON.stringify({ success: false, error: "Cần đủ thông tin 4 người chơi" }), { status: 400 });
+        if (!Array.isArray(players)) {
+          return new Response(JSON.stringify({ success: false, error: "Cần thông tin người chơi" }), { status: 400 });
         }
-        const state = initGame(roomId, players);
+        const state = initGame(roomId, players, modeId || "2v2");
         room = { state, sockets: new Map(), lastActivity: Date.now() };
         rooms.set(roomId, room);
         ensureTickTimer();
-        saveStateToDatabase(roomId, state);
         return new Response(JSON.stringify({ success: true, state: sanitizeGameStateForClient(state, requestSeat || 1) }), {
           headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
         });
       }
 
       if (!room) {
-        const dbState = await loadStateFromDatabase(roomId);
-        if (dbState) {
-          room = { state: dbState, sockets: new Map(), lastActivity: Date.now() };
-          rooms.set(roomId, room);
-          ensureTickTimer();
-        } else {
-          return new Response(JSON.stringify({ success: false, error: "Phòng đấu chưa được khởi tạo" }), { status: 404 });
-        }
+        return new Response(JSON.stringify({ success: false, error: "Phòng đấu không tồn tại hoặc đã kết thúc" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        });
       }
 
       if (action !== "INIT_GAME" && requestSeat === 0) {
-        return new Response(JSON.stringify({ success: false, error: "Ghế không hợp lệ (1-4)" }), {
+        return new Response(JSON.stringify({ success: false, error: "Ghế không hợp lệ" }), {
           status: 400,
           headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
         });
@@ -558,8 +908,6 @@ Deno.serve({ port, hostname }, async (req) => {
         action: action,
       });
 
-      saveStateToDatabase(roomId, room.state);
-
       return new Response(JSON.stringify({ success: true, state: sanitizeGameStateForClient(room.state, requestSeat || 1) }), {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
       });
@@ -568,7 +916,118 @@ Deno.serve({ port, hostname }, async (req) => {
     }
   }
 
-  // 3. HTTP HEALTH CHECK & DASHBOARD
+  // 3. Matchmaking REST API. Queue state lives beside the WebSocket rooms so
+  // clients do not need a second backend service for finding a match.
+  if (req.method === "GET" && new URL(req.url).pathname === "/matchmaking/find") {
+    const url = new URL(req.url);
+    const userId = url.searchParams.get("userId") || "";
+    const rankPoints = Number(url.searchParams.get("rankPoints") || 0);
+    const maxRankDiff = Number(url.searchParams.get("maxRankDiff") || 500);
+    if (!userId) return matchmakingJson({ success: false, error: "Thiếu userId" }, 400);
+    const room = findMatchmakingRoom(userId, rankPoints, maxRankDiff);
+    return matchmakingJson({ success: true, room });
+  }
+
+  if (req.method === "POST" && new URL(req.url).pathname === "/matchmaking/rooms") {
+    try {
+      const payload = await req.json();
+      const room = payload?.room;
+      if (!isValidMatchmakingRoom(room)) {
+        return matchmakingJson({ success: false, error: "Phòng tìm trận không hợp lệ" }, 400);
+      }
+      if (matchmakingRooms.has(room.roomId)) {
+        return matchmakingJson({ success: false, error: "Mã phòng đã tồn tại" }, 409);
+      }
+      const now = Date.now();
+      const stored: MatchmakingRoom = {
+        ...room,
+        status: "WAITING",
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+        slots: room.slots.map((slot: any, index: number) => ({
+          ...slot,
+          seatNumber: index + 1,
+          isEmpty: isEmptyMatchSlot(slot),
+          isAI: Boolean(slot?.isAI),
+        })),
+      };
+      matchmakingRooms.set(stored.roomId, stored);
+      return matchmakingJson({ success: true, room: stored }, 201);
+    } catch (err: any) {
+      return matchmakingJson({ success: false, error: err.message }, 400);
+    }
+  }
+
+  if (req.method === "POST" && new URL(req.url).pathname.startsWith("/matchmaking/rooms/") && new URL(req.url).pathname.endsWith("/join")) {
+    const parts = new URL(req.url).pathname.split("/");
+    const roomId = decodeURIComponent(parts[parts.length - 2] || "");
+    const current = matchmakingRooms.get(roomId);
+    if (!current || current.status !== "WAITING") return matchmakingJson({ success: false, error: "Phòng không còn nhận người" }, 409);
+    try {
+      const payload = await req.json();
+      const userId = String(payload?.userId || "");
+      const userName = String(payload?.userName || "");
+      const rankPoints = Number(payload?.rankPoints || 0);
+      if (!userId || userId.length > 256) return matchmakingJson({ success: false, error: "Thiếu userId" }, 400);
+      const existing = current.slots.find((slot: any) => !isEmptyMatchSlot(slot) && slot.userId === userId);
+      if (existing) return matchmakingJson({ success: true, room: current });
+      const target = current.slots.find((slot: any) => isEmptyMatchSlot(slot));
+      if (!target) return matchmakingJson({ success: false, error: "Phòng đã đầy" }, 409);
+      target.userId = userId;
+      target.userName = userName;
+      target.rankPoints = rankPoints;
+      target.isAI = false;
+      target.isEmpty = false;
+      current.version += 1;
+      current.updatedAt = Date.now();
+      return matchmakingJson({ success: true, room: current });
+    } catch (err: any) {
+      return matchmakingJson({ success: false, error: err.message }, 400);
+    }
+  }
+
+  if (req.method === "PATCH" && new URL(req.url).pathname.startsWith("/matchmaking/rooms/")) {
+    const roomId = decodeURIComponent(new URL(req.url).pathname.split("/").pop() || "");
+    const current = matchmakingRooms.get(roomId);
+    if (!current) return matchmakingJson({ success: false, error: "Không tìm thấy phòng" }, 404);
+    try {
+      const payload = await req.json();
+      const updated = payload?.room || payload;
+      const expectedVersion = payload?.expectedVersion;
+      if (expectedVersion !== undefined && Number(expectedVersion) !== current.version) {
+        return matchmakingJson({ success: false, error: "Phòng đã được cập nhật, hãy tải lại", code: "STALE_ROOM" }, 409);
+      }
+      if (updated.hostUserId !== undefined && updated.hostUserId !== current.hostUserId) {
+        return matchmakingJson({ success: false, error: "Không được đổi chủ phòng" }, 403);
+      }
+      if (!Array.isArray(updated.slots) || updated.slots.length !== 4) {
+        return matchmakingJson({ success: false, error: "Danh sách ghế không hợp lệ" }, 400);
+      }
+      const nextVersion = Number(updated.version);
+      if (!Number.isInteger(nextVersion) || nextVersion !== current.version + 1) {
+        return matchmakingJson({ success: false, error: "Phiên bản phòng không hợp lệ" }, 409);
+      }
+      const next: MatchmakingRoom = { ...current, ...updated, roomId, updatedAt: Date.now(), version: nextVersion };
+      matchmakingRooms.set(roomId, next);
+      return matchmakingJson({ success: true, room: next });
+    } catch (err: any) {
+      return matchmakingJson({ success: false, error: err.message }, 400);
+    }
+  }
+
+  if (req.method === "GET" && new URL(req.url).pathname.startsWith("/matchmaking/rooms/")) {
+    const roomId = decodeURIComponent(new URL(req.url).pathname.split("/").pop() || "");
+    return matchmakingJson({ success: true, room: matchmakingRooms.get(roomId) || null });
+  }
+
+  if (req.method === "DELETE" && new URL(req.url).pathname.startsWith("/matchmaking/rooms/")) {
+    const roomId = decodeURIComponent(new URL(req.url).pathname.split("/").pop() || "");
+    matchmakingRooms.delete(roomId);
+    return matchmakingJson({ success: true });
+  }
+
+  // 4. HTTP HEALTH CHECK & DASHBOARD
   let totalConnections = 0;
   for (const r of rooms.values()) {
     totalConnections += r.sockets ? r.sockets.size : 0;

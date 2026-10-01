@@ -17,7 +17,7 @@ import {
   hydrateGameState,
   ensureMutationVersion,
 } from "./gameEngine.js";
-import { HERO_MAX_HP } from "./heroes.js";
+import { HERO_MAX_HP, HEROES } from "./heroes.js";
 import { getModeRules } from "./modeRegistry.js";
 
 const rooms = new Map();
@@ -48,14 +48,34 @@ function validateClientPayload(payload, rawBytes) {
 }
 
 const HERO_NAME_MAP = {
-  5: "Thánh Thiên",
-  6: "Vũ Thị Thục",
-  7: "Nàng Nội",
-  8: "Triệu Quốc Đạt",
   1: "Cao Lỗ",
   2: "Đào Hãn",
   3: "Thi Sách",
   4: "Lê Chân",
+  5: "Thánh Thiên",
+  6: "Vũ Thị Thục",
+  7: "Nàng Nội",
+  8: "Triệu Quốc Đạt",
+  9: "Triệu Thị Trinh",
+  10: "Lý Bí",
+  11: "Triệu Túc",
+  12: "Tinh Thiều",
+  13: "Phạm Tu",
+  14: "Triệu Quang Phục",
+  15: "Phùng Hưng",
+  16: "Phùng Hải",
+  17: "Mai Thúc Loan",
+  18: "Khúc Thừa Dụ",
+  19: "Khúc Hạo",
+  20: "Dương Đình Nghệ",
+  21: "Kiều Công Tiễn",
+  22: "Ngô Quyền",
+  23: "Dương Tam Kha",
+  24: "Ngô Xương Ngập",
+  25: "Ngô Xương Văn",
+  26: "Đỗ Cảnh Thạc",
+  27: "Kiều Thuận",
+  28: "Nguyễn Siêu",
   47: "Lý Thường Kiệt",
   53: "Trần Quốc Tuấn",
   56: "Trần Quốc Toản",
@@ -67,7 +87,13 @@ const HERO_NAME_MAP = {
 };
 
 function getHeroName(heroId) {
-  return HERO_NAME_MAP[Number(heroId)] || `Chiến Tướng #${heroId}`;
+  const numericId = Number(heroId);
+  if (HERO_NAME_MAP[numericId]) return HERO_NAME_MAP[numericId];
+  const heroKey = `HERO_${numericId}`;
+  if (HEROES?.[heroKey]?.name && HEROES[heroKey].name !== heroKey) {
+    return HEROES[heroKey].name;
+  }
+  return `Chiến Tướng #${heroId}`;
 }
 
 console.log("🎮 [Deno Server] Đại Việt Chiến 2v2 Unified Game Server (100% In-Memory) is running!");
@@ -376,7 +402,7 @@ async function tickDraftRoom(roomId, room) {
   const isBot = currentSlot.isAI && !room.sockets.has(currentSlot.seat);
   if ((elapsed >= 40 || (isBot && elapsed >= 3)) && !currentSlot.isLocked) {
     const used = new Set(draft.slots.filter((slot) => slot.isLocked).map((slot) => slot.heroId));
-    const heroId = [1, 2, 3, 4, 47, 53, 56, 68, 72, 83, 86, 87].find((id) => !used.has(id)) || 1;
+    const heroId = Array.from({ length: 28 }, (_, i) => i + 1).find((id) => !used.has(id)) || 1;
     currentSlot.heroId = heroId;
     currentSlot.heroName = getHeroName(heroId);
     currentSlot.maxHp = HERO_MAX_HP[heroId] || 4;
@@ -466,6 +492,13 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
         const payload = JSON.parse(raw);
         const payloadError = validateClientPayload(payload, rawBytes);
         if (payloadError) return socket.send(JSON.stringify({ type: "ERROR", error: payloadError }));
+        if (payload.action === "PING") {
+          return socket.send(JSON.stringify({
+            type: "PONG",
+            clientTime: payload.clientTime ?? null,
+            timestamp: Date.now()
+          }));
+        }
         if (payload.action !== "PING") {
           const now = Date.now();
           if (now - rateWindowStartedAt >= 1000) {
