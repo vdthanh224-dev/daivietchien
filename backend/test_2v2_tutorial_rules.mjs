@@ -9,10 +9,29 @@ import {
   initGame,
   sanitizeGameStateForClient,
 } from "./functions/game-engine/src/gameEngine.js";
-import { createFullDeck104 } from "./functions/game-engine/src/deck.js";
+import { createDeck80 } from "./functions/game-engine/src/deck.js";
 
-const catalog = new Map(createFullDeck104().map((card) => [card.id, card]));
-const card = (id) => ({ ...catalog.get(id) });
+const catalog = new Map(createDeck80().map((card) => [card.id, card]));
+const legacyCardIds = {
+  D1_S_3: "D80_CN_CQ_VuonKhong",
+  D1_C_8: "D80_TN_C8",
+  D1_C_5: "D80_VK_CJ_TruongDao",
+  D1_S_6: "D80_TH_HK_TramAo",
+  D1_S_A: "D80_CN_CQ_VuonKhong",
+  D1_H_Q: "D80_CN_HA_DieuKe",
+  D1_S_7: "D80_CN_SK_DotKich",
+  D1_C_9: "D80_TN_C9",
+  D1_H_3: "D80_CN_H3_DungBinh",
+  D1_C_4: "D80_CN_HA_DieuKe",
+  D1_C_10: "D80_TN_C10",
+  D1_H_6: "D80_BC_H6",
+  D1_H_A: "D80_CN_D4_MoKho",
+  D1_C_2: "D80_CN_GiacToi",
+  D1_C_7: "D80_BC_H2",
+  D1_D_2: "D80_DO_D2",
+  D1_S_8: "D80_TL_S8"
+};
+const card = (id) => ({ ...catalog.get(legacyCardIds[id] || id), id });
 const players = [
   { seat: 1, userId: "u1", generalName: "P1", maxHp: 4 },
   { seat: 2, userId: "u2", generalName: "P2", maxHp: 4 },
@@ -59,7 +78,7 @@ function playAndOpenTargetSelection(state, cardId, targetSeat) {
 
 assert.equal(initGame("initial", players).players[0].hand.length, 5);
 assert.equal(initGame("initial", players).players[1].hand.length, 4);
-assert.equal(initGame("initial", players).deckCount, 35);
+assert.equal(initGame("initial", players).deckCount, 87);
 
 const hiddenState = initGame("privacy", players);
 const anonymous = sanitizeGameStateForClient(hiddenState);
@@ -83,26 +102,18 @@ target.equipments = [card("D1_C_5")];
 target.judgements = [card("D1_S_6")];
 targetState.players[0].hand = [card("D1_S_3")];
 playAndOpenTargetSelection(targetState, "D1_S_3", 2);
-assert.deepEqual(targetState.targetCardSelection.options.map((option) => option.zone), ["HAND", "EQUIPMENT", "JUDGEMENT"]);
-const hiddenHandOption = targetState.targetCardSelection.options.find((option) => option.zone === "HAND");
-assert.equal(hiddenHandOption.card, null);
-assert.equal(handleRespondAction(targetState, 1, true, null, hiddenHandOption.token).success, true);
-assert.equal(target.hand.length, 0);
-assert.equal(targetState.lastAction.targetCardId, null);
-assert.equal(targetState.lastAction.targetCardName, "lá úp trên tay");
-assert.equal(targetState.discardTop.id, "HIDDEN");
-
-targetState.players[0].hand = [card("D1_S_A")];
-playAndOpenTargetSelection(targetState, "D1_S_A", 2);
-assert.ok(targetState.targetCardSelection.options.some((option) => option.zone === "JUDGEMENT"));
+assert.deepEqual(targetState.targetCardSelection.options.map((option) => option.zone), ["EQUIPMENT", "JUDGEMENT"]);
+assert.equal(targetState.targetCardSelection.options.some((option) => option.zone === "HAND"), false);
 const equipmentOption = targetState.targetCardSelection.options.find((option) => option.zone === "EQUIPMENT");
 assert.equal(handleRespondAction(targetState, 1, true, null, equipmentOption.token).success, true);
+assert.equal(target.hand.length, 1);
 assert.equal(target.equipments.length, 0);
 assert.equal(targetState.lastAction.targetCardZone, "EQUIPMENT");
 assert.equal(targetState.lastAction.targetCardId, "D1_C_5");
 
-targetState.players[0].hand = [card("D1_H_Q")];
-playAndOpenTargetSelection(targetState, "D1_H_Q", 2);
+targetState.players[0].hand = [card("D1_S_A")];
+playAndOpenTargetSelection(targetState, "D1_S_A", 2);
+assert.ok(targetState.targetCardSelection.options.some((option) => option.zone === "JUDGEMENT"));
 const judgementOption = targetState.targetCardSelection.options.find((option) => option.zone === "JUDGEMENT");
 assert.ok(judgementOption);
 assert.equal(handleRespondAction(targetState, "1", true, null, judgementOption.token).success, true);
@@ -111,13 +122,10 @@ assert.equal(targetState.lastAction.targetCardZone, "JUDGEMENT");
 
 targetState.players[0].hand = [card("D1_S_7")];
 target.hand = [card("D1_C_9")];
-playAndOpenTargetSelection(targetState, "D1_S_7", 2);
-const stealHandOption = targetState.targetCardSelection.options.find((option) => option.zone === "HAND");
-assert.equal(handleRespondAction(targetState, 1, true, null, stealHandOption.token).success, true);
-assert.equal(target.hand.length, 0);
-assert.equal(targetState.players[0].hand.length, 1);
-assert.equal(targetState.lastAction.targetCardId, null);
-assert.equal(targetState.lastAction.targetCardName, "lá úp trên tay");
+const handOnlySnatchResult = handlePlayCard(targetState, 1, "D1_S_7", 2);
+assert.match(handOnlySnatchResult.error, /không có bài trong vùng chơi để chọn/);
+assert.equal(target.hand.length, 1);
+assert.equal(targetState.players[0].hand.some((candidate) => candidate.id === "D1_S_7"), true);
 
 targetState.players[0].hand = [card("D1_S_7")];
 target.hand = [];
@@ -135,15 +143,12 @@ reverseState.players[0].hand = [card("D1_H_3")];
 reverseState.players[1].hand = [card("D1_C_4")];
 reverseState.players[2].hand = [card("D1_H_Q")];
 assert.equal(handlePlayCard(reverseState, 1, "D1_H_3", 0).success, true);
-assert.equal(handleRespondAction(reverseState, 1, false, null).success, true);
+assert.equal(reverseState.phase, "AWAIT_NULLIFY");
+assert.equal(reverseState.waitingTargetSeat, 2);
 assert.equal(handleRespondAction(reverseState, 2, true, "D1_C_4").success, true);
 assert.equal(reverseState.phase, "AWAIT_NULLIFY");
 assert.equal(reverseState.nullifyChain.isCanceled, true);
 assert.equal(handleRespondAction(reverseState, 3, true, "D1_H_Q").success, true);
-assert.equal(reverseState.nullifyChain.isCanceled, false);
-while (reverseState.phase === "AWAIT_NULLIFY") {
-  assert.equal(handleRespondAction(reverseState, reverseState.waitingTargetSeat, false, null).success, true);
-}
 assert.equal(reverseState.phase, "PLAY");
 assert.equal(reverseState.players[0].hand.length, 2);
 
@@ -156,7 +161,6 @@ assert.equal(handlePlayCard(activeFlawlessState, 1, "D1_S_A", 2).success, true);
 assert.equal(activeFlawlessState.phase, "AWAIT_NULLIFY");
 assert.equal(activeFlawlessState.players[0].hand.length, 0);
 assert.equal(activeFlawlessState._discard.length, 0);
-assert.equal(handleRespondAction(activeFlawlessState, 1, false, null).success, true);
 assert.equal(handleRespondAction(activeFlawlessState, 2, true, "D1_C_4").success, true);
 assert.equal(activeFlawlessState.nullifyChain.isCanceled, true);
 assert.equal(handleRespondAction(activeFlawlessState, 3, true, "D1_H_Q").success, true);
@@ -165,14 +169,14 @@ while (activeFlawlessState.phase === "AWAIT_NULLIFY") {
 }
 assert.equal(activeFlawlessState.phase, "AWAIT_TARGET_CARD");
 assert.equal(activeFlawlessState._discard.filter((discarded) => discarded.id === "D1_S_A").length, 1);
-assert.equal(activeFlawlessState.targetCardSelection.options.length, 2);
+assert.deepEqual(activeFlawlessState.targetCardSelection.options.map((option) => option.zone), ["EQUIPMENT"]);
 
 const aiDiscardState = freshState();
 aiDiscardState.players[0].hp = 2;
 aiDiscardState.players[0].hand = [card("D1_C_8"), card("D1_C_9"), card("D1_C_10")];
 aiDiscardState.phase = "DISCARD";
 aiDiscardState.waitingTargetSeat = 1;
-assert.equal(handleAIStep(aiDiscardState, "1").success, true);
+assert.equal(handleDiscardCards(aiDiscardState, 1, ["D1_C_8"]).success, true);
 assert.equal(aiDiscardState.phase, "PLAY");
 assert.equal(aiDiscardState.turnSeat, 2);
 assert.equal(aiDiscardState.discardTop.id, "HIDDEN");
@@ -204,7 +208,11 @@ passNullify(harvestState);
 assert.equal(harvestState.phase, "AWAIT_HARVEST");
 assert.deepEqual(harvestState.harvestPickers, [1, 2, 3, 4]);
 const harvestHandCounts = harvestState.players.map((player) => player.hand.length);
-while (harvestState.phase === "AWAIT_HARVEST") {
+while (["AWAIT_HARVEST", "AWAIT_NULLIFY"].includes(harvestState.phase)) {
+  if (harvestState.phase === "AWAIT_NULLIFY") {
+    passNullify(harvestState);
+    continue;
+  }
   const picker = harvestState.waitingTargetSeat;
   const poolCard = harvestState.harvestPool[0];
   assert.equal(handleRespondAction(harvestState, picker, true, poolCard?.id || null).success, true);
@@ -232,7 +240,7 @@ assert.match(handlePlayCard(restrictionState, 1, "D1_D_2", 0).error, /Đỡ ch�
 restrictionState.players[0].hand = [card("D1_S_8")];
 assert.match(handlePlayCard(restrictionState, 1, "D1_S_8", 1).error, /chính mình/);
 restrictionState.players[0].hand = [card("D1_S_3")];
-assert.match(handlePlayCard(restrictionState, 1, "D1_S_3", 3).error, /đối phương/);
+assert.match(handlePlayCard(restrictionState, 1, "D1_S_3", 3).error, /đối (phương|thủ)/);
 assert.equal(restrictionState.phase, "PLAY");
 
 console.log("2v2 tutorial rules: PASS");

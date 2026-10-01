@@ -1,4 +1,4 @@
-import { initGame, handlePlayCard, handleRespondAction, handleEndTurn, handleDiscardCards, handleAIStep } from './functions/game-engine/src/gameEngine.js';
+import { initGame, handlePlayCard, handleRespondAction, handleEndTurn, handleDiscardCards, handleAIStep, handleAIReaction, tickGameState } from './functions/game-engine/src/gameEngine.js';
 import { isSlash, isDodge, isPeach, isWine } from './functions/game-engine/src/deck.js';
 
 const state = initGame('test-room', [
@@ -13,6 +13,12 @@ const MAX_STEPS = 5000;
 
 function autoRespond(st) {
     if (st.status === 'FINISHED') return;
+
+    if (st.phase === 'AWAIT_JUDGEMENT') {
+        st.timerStartAt = Date.now() - 3000;
+        tickGameState(st);
+        return;
+    }
 
     if (st.phase === 'AWAIT_SLASH_DEFENSE') {
         const target = st.players.find(p => p.seat === st.waitingTargetSeat);
@@ -35,6 +41,11 @@ function autoRespond(st) {
         if (!target || target.hp <= 0) { handleRespondAction(st, st.waitingTargetSeat, false, null); return; }
         const slash = target.hand.find(c => isSlash(c));
         handleRespondAction(st, target.seat, !!slash, slash ? slash.id : null);
+    } else if (st.phase === 'AWAIT_BORROW_SWORD') {
+        const owner = st.players.find(p => p.seat === st.waitingTargetSeat);
+        if (!owner || owner.hp <= 0) { handleRespondAction(st, st.waitingTargetSeat, false, null); return; }
+        const slash = owner.hand.find(c => isSlash(c));
+        handleRespondAction(st, owner.seat, !!slash, slash ? slash.id : null);
     } else if (st.phase === 'AWAIT_NEAR_DEATH') {
         const victim = st.players.find(p => p.seat === st.nearDeathVictimSeat);
         const asker = st.players.find(p => p.seat === st.waitingTargetSeat);
@@ -67,6 +78,8 @@ function autoRespond(st) {
             ? caster.hand.slice(0, 2).map(c => c.id)
             : [];
         handleRespondAction(st, st.waitingTargetSeat, cardIds.length === 2, null, null, cardIds);
+    } else if (st.phase.startsWith('AWAIT_')) {
+        handleAIReaction(st, st.waitingTargetSeat);
     } else if (st.phase === 'DISCARD') {
         const p = st.players.find(pl => pl.seat === st.waitingTargetSeat);
         const excess = p.hand.length - p.hp;
