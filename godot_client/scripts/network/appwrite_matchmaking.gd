@@ -232,6 +232,11 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 				has_empty = true
 			elif is_same_user(str(slot.get("userId", "")), str(slot.get("userName", "")), my_user_id, my_user_name):
 				present = true
+				# When evaluating our own published room, count our slot too.
+				# Otherwise every client treats its own room as empty and hosts can
+				# elect different rooms at the same time.
+				if is_requested_room:
+					real_count += 1
 			elif not slot.get("isAI", false) and slot.get("userId", "") != "":
 				real_count += 1
 		if (present and not is_requested_room) or not has_empty:
@@ -240,11 +245,39 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 		var best_room_id = str(best_room.get("roomId", "~"))
 		# Always choose the same room when player count/MMR are tied. This makes
 		# several one-player rooms converge instead of choosing each other.
-		if diff <= max_rank_diff and (real_count > best_real_count or (real_count == best_real_count and (diff < min_diff or (diff == min_diff and str(room.get("roomId", "")) < best_room_id)))):
+		# Rank difference only decides whether a room is eligible. Once eligible,
+		# all clients must choose the same deterministic anchor: fullest room,
+		# then smallest roomId. Choosing closest MMR here makes clients with
+		# different ratings select different one-player rooms and never merge.
+		if diff <= max_rank_diff and (real_count > best_real_count or (real_count == best_real_count and str(room.get("roomId", "")) < best_room_id)):
 			min_diff = diff
 			best_real_count = real_count
 			best_room = room
 	return best_room
+
+func cleanup_user_waiting_rooms(my_user_id: String) -> void:
+	if my_user_id.is_empty():
+		return
+	var q_equal = "{\"method\":\"equal\",\"attribute\":\"userId\",\"values\":[\"ROOM_WAITING\"]}".uri_encode()
+	var q_limit = "{\"method\":\"limit\",\"values\":[100]}".uri_encode()
+	var get_url = "%s/databases/%s/collections/%s/documents?queries[0]=%s&queries[1]=%s" % [ENDPOINT, DATABASE_ID, COLLECTION_ID, q_equal, q_limit]
+	var res = await _send_http_request(get_url, HTTPClient.METHOD_GET)
+	if res["code"] != 200 or res["data"] == null:
+		return
+	for doc in res["data"].get("documents", []):
+		if not (doc is Dictionary):
+			continue
+		var room = decode_room_string(str(doc.get("userName", "")), int(doc.get("timestamp", 0)), int(doc.get("rankPoints", 0)))
+		if room.is_empty() or room.get("status") != "WAITING":
+			continue
+		var owns_room = str(room.get("hostUserId", "")) == my_user_id
+		if not owns_room:
+			for slot in room.get("slots", []):
+				if str(slot.get("userId", "")) == my_user_id:
+					owns_room = true
+					break
+		if owns_room and str(doc.get("$id", "")) != "":
+			await _send_http_request("%s/databases/%s/collections/%s/documents/%s" % [ENDPOINT, DATABASE_ID, COLLECTION_ID, doc.get("$id", "")], HTTPClient.METHOD_DELETE)
 
 # --- 2. Create Waiting Room ---
 func create_waiting_room(room: Dictionary) -> bool:
@@ -318,7 +351,10 @@ func join_room_slot(room: Dictionary, my_user_id: String, my_user_name: String, 
 		if target_index < 0:
 			await _release_room_lock(room_id)
 			return {}
-		latest_room["slots"][target_index].merge({"userId": my_user_id, "userName": my_user_name, "rankPoints": my_rank_points, "isAI": false, "isEmpty": false})
+		# Dictionary.merge does not overwrite existing keys by default. Empty
+		# slots already contain userId="empty", so use overwrite=true or the
+		# successful PATCH would still serialize an empty slot.
+		latest_room["slots"][target_index].merge({"userId": my_user_id, "userName": my_user_name, "rankPoints": my_rank_points, "isAI": false, "isEmpty": false}, true)
 		latest_room["version"] = int(latest_room.get("version", 1)) + 1
 		var doc_id = get_deterministic_doc_id("r_", room_id)
 		var patch_url = "%s/databases/%s/collections/%s/documents/%s" % [ENDPOINT, DATABASE_ID, COLLECTION_ID, doc_id]
@@ -326,11 +362,12 @@ func join_room_slot(room: Dictionary, my_user_id: String, my_user_name: String, 
 		var res = await _send_http_request(patch_url, HTTPClient.METHOD_PATCH, JSON.stringify({"data": {"userId": "ROOM_WAITING", "userName": encode_room_string(latest_room), "rankPoints": int(latest_room.get("hostRankPoints", 0)), "timestamp": now}, "permissions": PUBLIC_DOC_PERMISSIONS}))
 		print("[AppwriteMatchmaking] JOIN PATCH room=%s code=%d attempt=%d" % [room_id, int(res["code"]), attempt + 1])
 		if res["code"] == 200:
-			var verified_room = await poll_room_state(room_id)
-			for slot in verified_room.get("slots", []):
-				if is_same_user(str(slot.get("userId", "")), str(slot.get("userName", "")), my_user_id, my_user_name):
-					await _release_room_lock(room_id)
-					return verified_room
+			# The room lock serializes slot claims. Do not immediately read the
+			# document again: Appwrite can briefly return an older replica, which
+			# made a successful join look failed and caused a stale retry to erase
+			# the previous player's slot.
+			await _release_room_lock(room_id)
+			return latest_room
 		await _release_room_lock(room_id)
 
 		if attempt < 5:

@@ -417,14 +417,35 @@ func _build_left_slots_column() -> Control:
 		r2_hbox.add_theme_constant_override("separation", 8)
 		s_vbox.add_child(r2_hbox)
 
+		var av_panel = PanelContainer.new()
+		av_panel.custom_minimum_size = Vector2(56, 72)
+		var av_style = StyleBoxFlat.new()
+		av_style.bg_color = Color(0, 0, 0, 0)
+		av_style.corner_radius_top_left = 6
+		av_style.corner_radius_top_right = 6
+		av_style.corner_radius_bottom_right = 6
+		av_style.corner_radius_bottom_left = 6
+		av_panel.add_theme_stylebox_override("panel", av_style)
+		av_panel.clip_contents = true
+
+		var av_bg = TextureRect.new()
+		av_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+		av_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		av_bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		av_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		av_bg.texture = preload("res://assets/ui/hero_backgrounds/bg_hero_green.png") if slot_data["isDragon"] else preload("res://assets/ui/hero_backgrounds/bg_hero_red.png")
+		av_panel.add_child(av_bg)
+
 		var av_rect = TextureRect.new()
-		av_rect.custom_minimum_size = Vector2(56, 72)
+		av_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 		av_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		av_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		av_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var def_tex = HeroDatabase.get_avatar_texture("") if HeroDatabase else null
 		if def_tex: av_rect.texture = def_tex
 		av_rect.modulate = Color(1.0, 1.0, 1.0, 0.4)
-		r2_hbox.add_child(av_rect)
+		av_panel.add_child(av_rect)
+		r2_hbox.add_child(av_panel)
 
 		var info_v = VBoxContainer.new()
 		info_v.size_flags_horizontal = SIZE_EXPAND_FILL
@@ -449,6 +470,7 @@ func _build_left_slots_column() -> Control:
 			"team": team_lbl,
 			"player": seat_lbl,
 			"avatar": av_rect,
+			"bg": av_bg,
 			"hero_name": hero_name_l,
 			"status": status_l,
 			"data": slot_data
@@ -1215,6 +1237,9 @@ func _apply_authoritative_draft_slots(server_slots: Array) -> void:
 				if team_lbl and is_instance_valid(team_lbl):
 					team_lbl.text = "[RỒNG]" if local_s.get("isDragon", true) else "[PHƯỢNG]"
 					team_lbl.add_theme_color_override("font_color", COLOR_DRAGON_CYAN if local_s["isDragon"] else COLOR_PHOENIX_RED)
+				var av_bg = node.get("bg")
+				if av_bg and is_instance_valid(av_bg):
+					av_bg.texture = preload("res://assets/ui/hero_backgrounds/bg_hero_green.png") if local_s.get("isDragon", true) else preload("res://assets/ui/hero_backgrounds/bg_hero_red.png")
 				var seat_lbl = node.get("player")
 				if seat_lbl and is_instance_valid(seat_lbl):
 					seat_lbl.text = _get_anonymous_slot_name(draft_slots.find(local_s))

@@ -371,12 +371,6 @@ func _handle_server_message(raw_json: String) -> void:
 func send_json(dict: Dictionary) -> void:
 	if socket.get_ready_state() == WebSocketPeer.STATE_OPEN:
 		var payload := dict.duplicate(true)
-		# Attach the version observed by this client to every mutating request.
-		# The server remains authoritative and rejects stale actions atomically.
-		var action := str(payload.get("action", ""))
-		if not action in ["JOIN_ROOM", "INIT_GAME", "JOIN_DRAFT", "PICK_HERO", "GET_STATE", "PING"] \
-			and last_state.has("version") and not payload.has("expectedVersion"):
-			payload["expectedVersion"] = int(last_state.get("version", 0))
 		var json_str = JSON.stringify(payload)
 		socket.send_text(json_str)
 	else:

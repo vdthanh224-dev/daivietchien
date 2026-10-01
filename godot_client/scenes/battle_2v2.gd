@@ -1506,8 +1506,11 @@ func _init_generals_from_draft() -> void:
 		avatar_node.setup_general(slug, h_name, h_faction, h_hp, h_hp, role_str, s_num)
 
 		# Explicitly verify portrait texture
+		var trans_path = "res://assets/heroes_transparent/" + slug + ".png"
 		var tex_path = "res://assets/ui/" + slug + ".png"
-		if ResourceLoader.exists(tex_path) and is_instance_valid(avatar_node.portrait_rect):
+		if ResourceLoader.exists(trans_path) and is_instance_valid(avatar_node.portrait_rect):
+			avatar_node.portrait_rect.texture = load(trans_path)
+		elif ResourceLoader.exists(tex_path) and is_instance_valid(avatar_node.portrait_rect):
 			avatar_node.portrait_rect.texture = load(tex_path)
 
 		# Every active skill is rendered in the avatar's left-side button stack.
@@ -1954,6 +1957,123 @@ func _clear_hung_suc_equipped_weapon_previews() -> void:
 			hand_container.remove_child(child)
 			child.queue_free()
 	_relayout_hand_cards()
+
+func _clear_song_cung_equipped_previews() -> void:
+	for child in hand_container.get_children():
+		if child.has_meta("song_cung_equipped_preview"):
+			selected_song_cung_card_nodes.erase(child)
+			if selected_card_ui == child:
+				selected_card_ui = null
+			hand_container.remove_child(child)
+			child.queue_free()
+	_relayout_hand_cards()
+
+func _refresh_song_cung_equipped_previews() -> void:
+	if not is_waiting_song_cung or not generals_data.has(my_seat):
+		return
+	var desired: Dictionary = {}
+	var equipment_cards = _get_local_equipment_cards_for_song_cung(generals_data[my_seat])
+	if equipment_cards is Array:
+		for equipment in equipment_cards:
+			if equipment is Dictionary and not _is_song_cung_equipment(equipment):
+				desired[str(equipment.get("id", ""))] = equipment
+	for child in hand_container.get_children():
+		if not child.has_meta("song_cung_equipped_preview"):
+			continue
+		var preview_id := str(child.get_meta("song_cung_equipped_preview"))
+		if desired.has(preview_id):
+			desired.erase(preview_id)
+		else:
+			selected_song_cung_card_nodes.erase(child)
+			if selected_card_ui == child:
+				selected_card_ui = null
+			hand_container.remove_child(child)
+			child.queue_free()
+	for equipment_id in desired:
+		var equipment: Dictionary = desired[equipment_id]
+		var card_ui = CardUIScene.instantiate()
+		hand_container.add_child(card_ui)
+		card_ui.setup_card_data(
+			str(equipment.get("id", "")),
+			_get_card_display_name(equipment),
+			equipment.get("rank", 1),
+			str(equipment.get("suit", "Spade")),
+			int(equipment.get("category", 1)),
+			str(equipment.get("desc", "")),
+			int(equipment.get("subType", -1))
+		)
+		card_ui.set_meta("song_cung_equipped_preview", equipment_id)
+		if card_ui.has_method("set_equipped_badge"):
+			card_ui.set_equipped_badge(true)
+		var c_info = {
+			"id": equipment_id,
+			"name": _get_card_display_name(equipment),
+			"rank": equipment.get("rank", 1),
+			"suit": str(equipment.get("suit", "Spade")),
+			"cat": int(equipment.get("category", 1)),
+			"desc": str(equipment.get("desc", "")),
+			"subType": int(equipment.get("subType", -1)),
+			"is_equipped": true,
+			"card_node": card_ui
+		}
+		card_ui.card_clicked.connect(func(_c): _on_player_hand_card_clicked(card_ui, c_info))
+	_relayout_hand_cards()
+
+func _is_song_cung_equipment(equipment: Dictionary) -> bool:
+	var equipment_name := _get_card_display_name(equipment).to_lower()
+	var equipment_id := str(equipment.get("id", "")).to_lower()
+	return "song cung" in equipment_name or "songcung" in equipment_id
+
+func _get_local_equipment_cards_for_song_cung(g: Dictionary) -> Array:
+	var equipment_cards = g.get("equipment_cards", [])
+	var result: Array = equipment_cards.duplicate(true) if equipment_cards is Array else []
+	var known_names: Dictionary = {}
+	for equipment in result:
+		if equipment is Dictionary:
+			known_names[_get_card_display_name(equipment).to_lower()] = true
+	# Older local sessions only tracked slot names. Rebuild lightweight cards so
+	# Song Cung can still offer those equipped slots as costs.
+	var slots = [
+		["equipped_weapon", 6],
+		["equipped_armor", 7],
+		["equipped_def_horse", 9],
+		["equipped_off_horse", 8],
+		["equipped_treasure", 27]
+	]
+	for slot in slots:
+		var item_name := str(g.get(slot[0], "")).strip_edges()
+		if item_name.is_empty() or known_names.has(item_name.to_lower()):
+			continue
+		var fallback_card := {
+			"id": "LOCAL_EQUIP_%s" % slot[0],
+			"name": item_name,
+			"category": 1,
+			"subType": int(slot[1]),
+			"desc": ""
+		}
+		result.append(fallback_card)
+		known_names[item_name.to_lower()] = true
+	return result
+
+func _record_local_equipment_card(card_info: Dictionary) -> void:
+	if not generals_data.has(my_seat):
+		return
+	var g = generals_data[my_seat]
+	var equipment_cards: Array = g.get("equipment_cards", []).duplicate(true)
+	var new_card := card_info.duplicate(true)
+	new_card["category"] = int(new_card.get("cat", new_card.get("category", 1)))
+	new_card["subType"] = int(new_card.get("subType", -1))
+	new_card["name"] = str(new_card.get("name", ""))
+	var subtype := int(new_card.get("subType", -1))
+	if subtype != 6:
+		for i in range(equipment_cards.size() - 1, -1, -1):
+			if equipment_cards[i] is Dictionary and int(equipment_cards[i].get("subType", -1)) == subtype:
+				equipment_cards.remove_at(i)
+	equipment_cards.append(new_card)
+	else:
+		# Song Cung and other weapons may coexist for heroes with two weapon slots.
+		equipment_cards.append(new_card)
+	g["equipment_cards"] = equipment_cards
 
 func _refresh_hung_suc_equipped_weapon_previews() -> void:
 	if not (is_targeting_hung_suc or is_targeting_cai_cach or is_targeting_binh_san) or not generals_data.has(my_seat):
@@ -2553,7 +2673,7 @@ func _get_card_info_from_ui(ui_node: Control) -> Dictionary:
 		"desc": desc,
 		"cat": cat,
 		"subType": ui_node.card_data.sub_type if ui_node.get("card_data") and ui_node.card_data != null else -1,
-		"is_equipped": ui_node.has_meta("hung_suc_equipped_preview"),
+		"is_equipped": ui_node.has_meta("hung_suc_equipped_preview") or ui_node.has_meta("song_cung_equipped_preview"),
 		"card_node": ui_node
 	}
 
@@ -3616,6 +3736,7 @@ func _on_card_play_btn_clicked() -> void:
 		card_play_btn.visible = false
 		_reset_player_turn_timer()
 		_broadcast_player_battle_action("PLAY_CARD", c_id, tide_target["seat"])
+		AudioManager.play_voice(c_name)
 		_animate_showcase_card(c_name, "Bạn dùng [Thủy Triều Rút] lên %s!" % tide_target["name"], c_info)
 		_add_log("🌊 Bạn dùng [Thủy Triều Rút] lên %s." % tide_target["name"])
 		if not is_network_mode:
@@ -3647,6 +3768,7 @@ func _on_card_play_btn_clicked() -> void:
 		card_play_btn.visible = false
 		_reset_player_turn_timer()
 		_broadcast_player_battle_action("PLAY_CARD", c_id, sword_owner["seat"], my_seat, forced_target["seat"])
+		AudioManager.play_voice(c_name)
 		_animate_showcase_card(c_name, "Bạn mượn gươm của %s, buộc đánh %s!" % [sword_owner["name"], forced_target["name"]], c_info)
 		_add_log("🗡️ Bạn mượn gươm của %s, chọn %s làm mục tiêu bị buộc Trảm." % [sword_owner["name"], forced_target["name"]])
 		_clear_borrow_sword_targets()
@@ -3705,6 +3827,8 @@ func _on_card_play_btn_clicked() -> void:
 		card_play_btn.visible = false
 		_reset_player_turn_timer()
 		_broadcast_player_battle_action("PLAY_CARD", c_id, 0, my_seat, 0, hich_targets)
+		AudioManager.play_voice(c_name)
+		AudioManager.play_skill()
 		_animate_showcase_card(c_name, "Bạn phát Hịch Tướng Sĩ!", c_info)
 		_add_log("📣 Bạn phát [Hịch Tướng Sĩ]%s." % (" cùng %s" % generals_data[hich_targets[0]]["name"] if not hich_targets.is_empty() else ""))
 		if not is_network_mode:
@@ -3717,12 +3841,15 @@ func _on_card_play_btn_clicked() -> void:
 		card_play_btn.visible = false
 		_reset_player_turn_timer()
 		_broadcast_player_battle_action("PLAY_CARD", c_id, 0)
+		AudioManager.play_voice(c_name)
+		AudioManager.play_skill()
 		_animate_showcase_card(c_name, "Bạn mở Yến Tiệc cho toàn bàn!", c_info)
 		_add_log("🍽️ Bạn dùng [Mở Yến Tiệc].")
 
 	elif c_name in ["Trống Đồng Đông Sơn", "Hổ Phù Trần Triều"]:
 		var drum_gen = generals_data[my_seat]
 		drum_gen["equipped_treasure"] = c_name
+		_record_local_equipment_card(c_info)
 		if drum_gen.has("avatar_node") and is_instance_valid(drum_gen["avatar_node"]):
 			drum_gen["avatar_node"].set_equipment("treasure", c_name, "♠K")
 			drum_gen["avatar_node"].set_skill("🥁 ĐIỂM TRỐNG" if c_name == "Trống Đồng Đông Sơn" else "🐯 HỔ PHÙ")
@@ -3731,6 +3858,8 @@ func _on_card_play_btn_clicked() -> void:
 		card_play_btn.visible = false
 		_reset_player_turn_timer()
 		_broadcast_player_battle_action("PLAY_CARD", c_id, my_seat)
+		AudioManager.play_voice(c_name)
+		AudioManager.play_skill()
 		_animate_showcase_card(c_name, "Bạn trang bị [Trống Đồng Đông Sơn]!", c_info)
 		_add_log("🥁 Bạn trang bị [Trống Đồng Đông Sơn].")
 
@@ -3794,6 +3923,7 @@ func _on_card_play_btn_clicked() -> void:
 	elif c_name in ["Kiếm Thuận Thiên", "Song Cung Mường Nhạ", "Nỏ Thần Kim Quy", "Trường Đao Nam Sơn", "Thương Ngâu Lãng Bạc", "Súng Thần Công Hồ Triều", "Hỏa Mai Tây Sơn", "Liêm Đao Đống Đa", "Đoản Đao Lam Sơn"]:
 		var p_gen = generals_data[my_seat]
 		p_gen["equipped_weapon"] = c_name
+		_record_local_equipment_card(c_info)
 		if p_gen.has("avatar_node") and is_instance_valid(p_gen["avatar_node"]):
 			p_gen["avatar_node"].set_equipment("weapon", c_name, "")
 		_discard_player_card(selected_card_ui)
@@ -3809,6 +3939,7 @@ func _on_card_play_btn_clicked() -> void:
 	elif c_name in ["Giáp Đồng Sơn Vi", "Khiên Mây Bện", "Áo Bào Hoàng Tộc", "Giáp Tây Sơn"]:
 		var p_gen = generals_data[my_seat]
 		p_gen["equipped_armor"] = c_name
+		_record_local_equipment_card(c_info)
 		if c_name == "Áo Bào Hoàng Tộc":
 			p_gen["ao_bao_charges"] = 2
 		if p_gen.has("avatar_node") and is_instance_valid(p_gen["avatar_node"]):
@@ -3836,6 +3967,7 @@ func _on_card_play_btn_clicked() -> void:
 			p_gen["equipped_def_horse"] = c_name
 		else:
 			p_gen["equipped_off_horse"] = c_name
+		_record_local_equipment_card(c_info)
 		if p_gen.has("avatar_node") and is_instance_valid(p_gen["avatar_node"]):
 			var horse_rank := int(c_info.get("rank", 0))
 			var horse_suit_rank := _get_suit_icon(str(c_info.get("suit", ""))) + (_format_rank(horse_rank) if horse_rank > 0 else "")
@@ -3963,6 +4095,10 @@ func _sync_player_hand_from_server(server_hand: Array) -> void:
 	# khỏi UI và người chơi không thể chọn để bỏ tiếp.
 	if server_hand.is_empty():
 		for child in hand_container.get_children():
+			if child.has_meta("song_cung_equipped_preview"):
+				continue
+			selected_song_cung_card_nodes.erase(child)
+			hand_container.remove_child(child)
 			child.queue_free()
 		selected_card_ui = null
 		if generals_data.has(my_seat):
@@ -3992,7 +4128,7 @@ func _sync_player_hand_from_server(server_hand: Array) -> void:
 
 	var current_cards: Array = []
 	for child in hand_container.get_children():
-		if child.has_meta("hung_suc_equipped_preview"):
+		if child.has_meta("hung_suc_equipped_preview") or child.has_meta("song_cung_equipped_preview"):
 			continue
 		var info = _get_card_info_from_ui(child)
 		current_cards.append([str(info.get("id", "")), str(info.get("name", "")), int(info.get("subType", -1))])
@@ -4009,8 +4145,16 @@ func _sync_player_hand_from_server(server_hand: Array) -> void:
 	var selected_reaction_card_id := ""
 	if selected_dodge_card_ui and is_instance_valid(selected_dodge_card_ui):
 		selected_reaction_card_id = str(_get_card_info_from_ui(selected_dodge_card_ui).get("id", ""))
+	var selected_song_cung_ids: Array[String] = []
+	for node in selected_song_cung_card_nodes:
+		if is_instance_valid(node) and not node.has_meta("song_cung_equipped_preview"):
+			selected_song_cung_ids.append(str(_get_card_info_from_ui(node).get("id", "")))
 
 	for child in hand_container.get_children():
+		if child.has_meta("song_cung_equipped_preview"):
+			continue
+		selected_song_cung_card_nodes.erase(child)
+		hand_container.remove_child(child)
 		child.queue_free()
 
 	selected_card_ui = null
@@ -4042,6 +4186,9 @@ func _sync_player_hand_from_server(server_hand: Array) -> void:
 			"card_node": card_ui
 		}
 		card_ui.card_clicked.connect(func(_c): _on_player_hand_card_clicked(card_ui, c_info))
+		if is_waiting_song_cung and c_id in selected_song_cung_ids:
+			selected_song_cung_card_nodes.append(card_ui)
+			card_ui.set_selected(true)
 	_relayout_hand_cards()
 	if not selected_card_id.is_empty() and (current_server_phase == "AWAIT_DA_TRACH_DISCARD" or is_targeting_dan_cau or is_targeting_thuy_chien or is_targeting_nghich_y or is_targeting_thien_cam):
 		for card_ui in hand_container.get_children():
@@ -4216,6 +4363,9 @@ func _sync_player_equipments_from_server(seat: int, equips: Array) -> void:
 	_refresh_local_skill_buttons(seat)
 	if seat == my_seat and (is_targeting_hung_suc or is_targeting_cai_cach):
 		_refresh_hung_suc_equipped_weapon_previews()
+	if seat == my_seat and is_waiting_song_cung:
+		_refresh_song_cung_equipped_previews()
+		_update_song_cung_ui()
 
 func _has_equipped_weapon_name(general: Dictionary, weapon_name: String) -> bool:
 	return weapon_name in str(general.get("equipped_weapon", ""))
@@ -5258,7 +5408,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 
 		if server_waiting_seat == my_seat:
 			if not is_waiting_song_cung:
-				_prompt_song_cung_modal(target_s, server_waiting_timer)
+				_prompt_song_cung_modal(target_s, server_waiting_timer, int(active_c.get("damage", 1)), str(active_c.get("element", "NORMAL")))
 			if dodge_timer_lbl:
 				dodge_timer_lbl.text = "⏳ Còn lại: %ds" % server_waiting_timer
 			turn_indicator.text = "🏹 BẠN CÓ MUỐN KÍCH HOẠT SONG CUNG ÉP %s CHỊU ĐÒN (%ds)?" % [tgt_name.to_upper(), server_waiting_timer]
@@ -5271,7 +5421,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			var wait_gen = generals_data.get(server_waiting_seat, {})
 			var wait_name = wait_gen.get("name", "Ghế %d" % server_waiting_seat) if wait_gen is Dictionary else "Ghế %d" % server_waiting_seat
 			turn_indicator.text = "🏹 SONG CUNG: ĐANG CHỜ %s QUYẾT ĐỊNH (%ds)..." % [wait_name, server_waiting_timer]
-			desc_text.text = "🏹 %s đang chọn bỏ 2 lá trên tay để ép %s chịu sát thương..." % [wait_name, tgt_name]
+			desc_text.text = "🏹 %s đang chọn bỏ 2 lá trên tay hoặc đang mang để ép %s chịu sát thương..." % [wait_name, tgt_name]
 
 	elif server_phase == "AWAIT_NEAR_DEATH":
 		var victim_seat = int(state.get("nearDeathVictimSeat", 0))
@@ -6170,9 +6320,11 @@ func _on_network_action_received(delta: Dictionary) -> void:
 				_show_drum_reveal_modal(t_seat, rev_cards)
 	elif act_type == "SONG_CUNG_PROMPT":
 		_animate_showcase_card("Song Cung Mường Nhạ", delta.get("description", "Song Cung Mường Nhạ"))
+		AudioManager.play_voice("Song Cung Mường Nhạ")
 		AudioManager.play_skill()
 	elif act_type == "SONG_CUNG_TRIGGERED":
 		_show_remote_card_use(delta, "kích hoạt Song Cung")
+		AudioManager.play_voice("Song Cung Mường Nhạ")
 		AudioManager.play_skill()
 		_animate_showcase_card("Song Cung Mường Nhạ", delta.get("description", "Bỏ qua Đỡ để Trảm gây sát thương!"))
 	elif act_type == "SONG_CUNG_PASSED":
@@ -7992,14 +8144,17 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 		if not is_network_mode:
 			_execute_harvest(caster_seat)
 	elif card_name == "Thủy Triều Rút":
+		AudioManager.play_voice("Thủy Triều Rút")
 		AudioManager.play_skill()
 		_animate_showcase_card(card_name, "%s dùng [Thủy Triều Rút]!" % caster["name"], used_card)
 		_add_log("🌊 %s dùng [Thủy Triều Rút]." % caster["name"])
 	elif card_name == "Mượn Gươm Diệt Địch":
+		AudioManager.play_voice("Mượn Gươm Diệt Địch")
 		AudioManager.play_skill()
 		_animate_showcase_card(card_name, "%s dùng [Mượn Gươm Diệt Địch]!" % caster["name"], used_card)
 		_add_log("🗡️ %s dùng [Mượn Gươm Diệt Địch]." % caster["name"])
 	elif card_name == "Mở Yến Tiệc":
+		AudioManager.play_voice("Mở Yến Tiệc")
 		AudioManager.play_skill()
 		_animate_showcase_card(card_name, "%s mở [Mở Yến Tiệc]!" % caster["name"], used_card)
 		_add_log("🍽️ %s mở [Mở Yến Tiệc]." % caster["name"])
@@ -8014,6 +8169,7 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 			var drum_rank = _format_rank(used_card.get("rank", 0)) if int(used_card.get("rank", 0)) > 0 else ""
 			caster["avatar_node"].set_equipment("treasure", card_name, (drum_suit + drum_rank).strip_edges())
 			caster["avatar_node"].set_skill("🥁 ĐIỂM TRỐNG" if caster_seat == my_seat else "")
+		AudioManager.play_voice("Trống Đồng Đông Sơn")
 		AudioManager.play_skill()
 		_animate_showcase_card(card_name, "%s trang bị [Trống Đồng Đông Sơn]!" % caster["name"], used_card)
 		_add_log("🥁 %s trang bị [Trống Đồng Đông Sơn]." % caster["name"])
@@ -11223,7 +11379,7 @@ func _prompt_song_cung_modal(target_seat: int, timeout_sec: float = 40.0, damage
 	var tgt_name = tgt.get("name", "Ghế %d" % target_seat) if tgt is Dictionary else "Ghế %d" % target_seat
 
 	dodge_title_lbl.text = "🏹 SONG CUNG MƯỜNG NHẠ"
-	dodge_desc_lbl.text = "⚠️ Trảm bị Đỡ! Bỏ 2 lá để bỏ qua Đỡ: Trảm vẫn gây %d sát thương lên %s." % [song_cung_pending_damage, tgt_name]
+	dodge_desc_lbl.text = "⚠️ Trảm bị Đỡ! Bỏ 2 lá trên tay hoặc trang bị đang mang để bỏ qua Đỡ: Trảm vẫn gây %d sát thương lên %s." % [song_cung_pending_damage, tgt_name]
 	if dodge_timer_lbl:
 		dodge_timer_lbl.text = "⏳ Còn lại: %ds" % int(timeout_sec)
 
@@ -11241,6 +11397,7 @@ func _prompt_song_cung_modal(target_seat: int, timeout_sec: float = 40.0, damage
 	dodge_card_selector_scroll.visible = false
 	_build_song_cung_card_selector_buttons()
 
+	_refresh_song_cung_equipped_previews()
 	_set_reaction_hand_focus(true, "Bài", 0, false, false)
 
 	_update_song_cung_ui()
@@ -11294,11 +11451,11 @@ func _update_song_cung_ui() -> void:
 		var n1 = _get_card_info_from_ui(selected_song_cung_card_nodes[0]).get("name", "Lá 1")
 		if dodge_selected_lbl:
 			dodge_selected_lbl.text = "👉 Đã chọn 1 lá: [%s]. Hãy chọn thêm 1 lá nữa (1/2)." % n1
-		desc_text.text = "🏹 Hãy chọn thêm 1 lá nữa trên tay (1/2) hoặc bấm BỎ QUA."
+		desc_text.text = "🏹 Hãy chọn thêm 1 lá trên tay hoặc đang mang (1/2), hoặc bấm BỎ QUA."
 	else:
 		if dodge_selected_lbl:
-			dodge_selected_lbl.text = "👉 Hãy chạm chọn 2 lá bài trên tay để bỏ (hoặc bấm BỎ QUA)"
-		desc_text.text = "🏹 Chạm chọn 2 lá bài trên tay để bỏ, hoặc bấm [❌ BỎ QUA]."
+			dodge_selected_lbl.text = "👉 Chọn 2 lá trên tay hoặc đang mang để bỏ (hoặc bấm BỎ QUA)"
+		desc_text.text = "🏹 Chạm chọn 2 lá bài trên tay hoặc đang mang để bỏ, hoặc bấm [❌ BỎ QUA]."
 
 func _close_song_cung_modal() -> void:
 	is_waiting_song_cung = false
@@ -11308,6 +11465,7 @@ func _close_song_cung_modal() -> void:
 		if node and is_instance_valid(node) and node.has_method("set_selected"):
 			node.set_selected(false)
 	selected_song_cung_card_nodes.clear()
+	_clear_song_cung_equipped_previews()
 	_set_reaction_hand_focus(false)
 
 func _on_song_cung_confirmed() -> void:
@@ -11325,27 +11483,32 @@ func _on_song_cung_confirmed() -> void:
 			card_ids.append(str(info.get("id", info.get("name", ""))))
 			card_names.append(str(info.get("name", "Bài")))
 
-	_close_song_cung_modal()
-
 	if is_network_mode:
+		_close_song_cung_modal()
 		reaction_submission_pending = true
 		reaction_submission_version = last_server_version
 		NetworkClient.send_respond_action(true, "", "", card_ids)
 		_animate_showcase_card("Song Cung Mường Nhạ", "Bạn bỏ 2 lá kích hoạt Song Cung!")
 		_add_log("🏹 Bạn bỏ 2 lá [%s, %s] kích hoạt [Song Cung Mường Nhạ]!" % [card_names[0], card_names[1]])
+		AudioManager.play_voice("Song Cung Mường Nhạ")
 		AudioManager.play_skill()
 	else:
-		# Local Mode: Remove 2 discarded cards from hand
+		# Local Mode: selected equipment is discarded from its equipped slot too.
 		for node in card_nodes:
 			if node and is_instance_valid(node) and node.get_parent() == hand_container:
+				var card_info = _get_card_info_from_ui(node)
+				if bool(card_info.get("is_equipped", false)):
+					_remove_local_equipment_for_song_cung(str(card_info.get("id", "")))
 				hand_container.remove_child(node)
 				node.queue_free()
+		_close_song_cung_modal()
 		if generals_data.has(my_seat):
 			var g = generals_data[my_seat]
 			g["hand_count"] = hand_container.get_child_count()
 			if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
 				g["avatar_node"].update_hand_count(g["hand_count"])
 		_relayout_hand_cards()
+		AudioManager.play_voice("Song Cung Mường Nhạ")
 		AudioManager.play_card_draw()
 
 		if song_cung_local_callback.is_valid():
@@ -11353,6 +11516,37 @@ func _on_song_cung_confirmed() -> void:
 			song_cung_local_callback = Callable()
 			cb.call(true, card_nodes)
 		song_cung_response_finished.emit(true)
+
+func _remove_local_equipment_for_song_cung(equipment_id: String) -> void:
+	if equipment_id.is_empty() or not generals_data.has(my_seat):
+		return
+	var g = generals_data[my_seat]
+	if equipment_id.begins_with("LOCAL_EQUIP_"):
+		var slot_key := equipment_id.trim_prefix("LOCAL_EQUIP_")
+		var slot_to_avatar := {
+			"equipped_weapon": ["weapon", ""],
+			"equipped_armor": ["armor", ""],
+			"equipped_def_horse": ["def_horse", ""],
+			"equipped_off_horse": ["off_horse", ""],
+			"equipped_treasure": ["treasure", ""]
+		}
+		if slot_to_avatar.has(slot_key):
+			g[slot_key] = ""
+			var avatar = g.get("avatar_node")
+			if is_instance_valid(avatar):
+				avatar.set_equipment(str(slot_to_avatar[slot_key][0]), "", "")
+			return
+	var equips: Array = g.get("equipment_cards", [])
+	var index := -1
+	for i in range(equips.size()):
+		if equips[i] is Dictionary and str(equips[i].get("id", "")) == equipment_id:
+			index = i
+			break
+	if index < 0:
+		return
+	equips.remove_at(index)
+	g["equipment_cards"] = equips
+	_sync_player_equipments_from_server(my_seat, equips)
 
 func _on_song_cung_passed() -> void:
 	if not is_waiting_song_cung:
@@ -11389,9 +11583,13 @@ func _resolve_local_song_cung_if_applicable(attacker_seat: int, target_seat: int
 
 	# Case 1: Attacker is the Local Player
 	if attacker_seat == my_seat:
-		var hand_cards_count = hand_container.get_child_count()
+		var usable_equipment_count := 0
+		for equipment in atk.get("equipment_cards", []):
+			if equipment is Dictionary and _get_card_display_name(equipment) != "Song Cung Mường Nhạ":
+				usable_equipment_count += 1
+		var hand_cards_count = hand_container.get_child_count() + usable_equipment_count
 		if hand_cards_count < 2:
-			_add_log("🏹 [Song Cung Mường Nhạ]: Bạn không đủ 2 lá bài trên tay để kích hoạt.")
+			_add_log("🏹 [Song Cung Mường Nhạ]: Bạn không đủ 2 lá trên tay hoặc đang mang để kích hoạt.")
 			return
 		var accepted = await _prompt_song_cung_async(target_seat, 40.0, damage_amount, damage_element)
 		if accepted:

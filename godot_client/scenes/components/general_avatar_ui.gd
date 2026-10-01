@@ -6,6 +6,10 @@ signal skill_button_clicked(skill_key: String)
 signal info_clicked()
 
 @onready var portrait_rect: TextureRect = $Frame/Portrait
+@onready var background_rect: TextureRect = $Frame.get_node_or_null("Background")
+
+const BG_DRAGON_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_green.png")
+const BG_PHOENIX_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_red.png")
 @onready var name_label: Label = $Frame/TopBanner/Margin/HBox/NameLabel
 @onready var role_badge: Label = $Frame/TopBanner/Margin/HBox/RoleBadge
 @onready var health_rail: PanelContainer = $HealthRail
@@ -185,11 +189,40 @@ func _apply_team_presentation(p_role: String) -> void:
 		team_color = DRAGON_TEAM_COLOR
 	elif p_role.contains("PHƯỢNG"):
 		team_color = PHOENIX_TEAM_COLOR
+	# Keep the team surfaces visibly colored while preserving readable text.
+	var team_surface := Color(
+		0.035 + team_color.r * 0.20,
+		0.045 + team_color.g * 0.20,
+		0.075 + team_color.b * 0.20,
+		0.97
+	)
 
 	_apply_team_style(frame_panel, team_color, 3, 0.62)
 	_apply_team_style(inner_rim, Color(team_color.r, team_color.g, team_color.b, 0.78), 1, 0.0)
-	_apply_team_style(top_banner, Color(team_color.r, team_color.g, team_color.b, 0.92), 1, 0.0)
+	_apply_team_style(top_banner, Color(team_color.r, team_color.g, team_color.b, 0.92), 1, 0.0, team_surface)
+	_apply_team_style(health_rail, Color(team_color.r, team_color.g, team_color.b, 0.98), 4, 0.0, team_surface)
 	_apply_team_style(depth_light_rim, Color(team_color.r, team_color.g, team_color.b, 0.82), 2, 0.0)
+
+	# Nền đằng sau hình tướng: Rồng = xanh lá, Phượng = đỏ
+	if not is_instance_valid(background_rect):
+		background_rect = $Frame.get_node_or_null("Background")
+		if not is_instance_valid(background_rect) and is_instance_valid(frame_panel):
+			background_rect = TextureRect.new()
+			background_rect.name = "Background"
+			background_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+			background_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			background_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			background_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+			frame_panel.add_child(background_rect)
+			frame_panel.move_child(background_rect, 0)
+
+	if is_instance_valid(background_rect):
+		if p_role.contains("PHƯỢNG"):
+			background_rect.texture = BG_PHOENIX_TEX
+			background_rect.visible = true
+		else:
+			background_rect.texture = BG_DRAGON_TEX
+			background_rect.visible = true
 
 	if is_instance_valid(role_badge):
 		var badge_style := role_badge.get_theme_stylebox("normal") as StyleBoxFlat
@@ -204,7 +237,7 @@ func _apply_team_presentation(p_role: String) -> void:
 		if corner:
 			corner.add_theme_color_override("font_color", Color(team_color.r, team_color.g, team_color.b, 0.95))
 
-func _apply_team_style(panel: Control, border_color: Color, border_width: int, shadow_alpha: float) -> void:
+func _apply_team_style(panel: Control, border_color: Color, border_width: int, shadow_alpha: float, fill_color: Color = Color(0, 0, 0, 0)) -> void:
 	if not is_instance_valid(panel):
 		return
 	var style := panel.get_theme_stylebox("panel") as StyleBoxFlat
@@ -216,6 +249,8 @@ func _apply_team_style(panel: Control, border_color: Color, border_width: int, s
 	style.border_width_right = border_width
 	style.border_width_bottom = border_width
 	style.border_color = border_color
+	if fill_color.a > 0.0:
+		style.bg_color = fill_color
 	if shadow_alpha > 0.0:
 		style.shadow_color = Color(border_color.r, border_color.g, border_color.b, shadow_alpha)
 	panel.add_theme_stylebox_override("panel", style)
@@ -1362,9 +1397,12 @@ func setup_general(p_id: String, p_name: String, p_faction: String = "Trần", p
 
 	_apply_team_presentation(p_role)
 
-	# Tải ảnh chân dung tướng nếu có
+	# Tải ảnh chân dung tướng nếu có (ưu tiên bản tách nền trong suốt)
+	var trans_path = "res://assets/heroes_transparent/" + p_id + ".png"
 	var tex_path = "res://assets/ui/" + p_id + ".png"
-	if ResourceLoader.exists(tex_path) and is_instance_valid(portrait_rect):
+	if ResourceLoader.exists(trans_path) and is_instance_valid(portrait_rect):
+		portrait_rect.texture = load(trans_path)
+	elif ResourceLoader.exists(tex_path) and is_instance_valid(portrait_rect):
 		portrait_rect.texture = load(tex_path)
 
 	update_hp(current_hp, max_hp, true)

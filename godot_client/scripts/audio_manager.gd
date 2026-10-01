@@ -178,9 +178,11 @@ func _normalize_voice_key(raw_name: String) -> String:
 	elif "đại hồng thủy" in n or "dai hong thuy" in n: return "dai_hong_thuy"
 	# Only the actual fire slash card uses the Trảm Hỏa voice. Equipment such as
 	# Hỏa Mai Tây Sơn must not fall through to this generic substring match.
-	elif n == "trảm hỏa" or n == "tram hoa" or n == "hỏa" or n == "hoa": return "tram_hoa"
+	elif ("hỏa" in n or "hoa" in n) and ("trảm" in n or "tram" in n): return "tram_hoa"
+	elif ("lôi" in n or "loi" in n) and ("trảm" in n or "tram" in n): return "tram_loi"
+	elif "trầm ảo" in n or "tram ao" in n or "sa bẫy" in n or "sa bay" in n: return "tram_ao_sa_bay"
 	elif "trảm" in n or "tram" in n: return "tram"
-	elif "đỡ" in n or "do" in n: return "do"
+	elif n == "đỡ" or n == "do": return "do"
 	elif "bánh chưng" in n or "banh chung" in n: return "banh_chung"
 	elif "rượu" in n or "ruou" in n: return "hu_ruou"
 	elif "tiến thoái" in n or "tien thoai" in n: return "tien_thoai"
@@ -212,6 +214,5 @@ func _normalize_voice_key(raw_name: String) -> String:
 	elif "mở yến tiệc" in n or "mo yen tiec" in n: return "mo_yen_tiec"
 	elif "hịch tướng sĩ" in n or "hich tuong si" in n: return "hich_tuong_si"
 	elif "trống đồng" in n or "trong dong" in n: return "trong_dong_dong_son"
-	elif "trầm ảo" in n or "tram ao" in n or "sa bẫy" in n or "sa bay" in n: return "tram_ao_sa_bay"
 	elif "cắt lương" in n or "cat luong" in n or "cắt đường" in n or "cat duong" in n: return "cat_duong_luong"
 	return ""

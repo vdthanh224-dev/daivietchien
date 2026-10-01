@@ -2119,7 +2119,9 @@ function beginSlashAfterDodge(state, caster, targetSeat, defenseName = "Đỡ", 
     return;
   }
 
-  if (songCung && caster.hand.length >= 2) {
+  const songCungId = songCung?.id;
+  const songCungCostCount = caster.hand.length + (caster.equipments || []).filter((equipment) => equipment.id !== songCungId).length;
+  if (songCung && songCungCostCount >= 2) {
     state.phase = "AWAIT_SONG_CUNG_FOLLOW_UP";
     state.waitingTargetSeat = caster.seat;
     state.waitingTimer = 40;
@@ -2128,6 +2130,7 @@ function beginSlashAfterDodge(state, caster, targetSeat, defenseName = "Đỡ", 
     state.activeCard = {
       ...(state.activeCard || {}),
       cardName: "Song Cung Mường Nhạ",
+      songCungCardId: songCungId,
       casterSeat: caster.seat,
       targetSeat
     };
@@ -4497,11 +4500,25 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     if (accepted) {
       const distinctIds = [...new Set(requestedIds.filter(Boolean))];
       if (distinctIds.length !== 2) return { error: "Cần chọn đúng 2 lá để kích hoạt Song Cung" };
-      const indexes = distinctIds.map((id) => caster.hand.findIndex((card) => card.id === id));
-      if (indexes.some((index) => index < 0)) return { error: "Lá bỏ cho Song Cung không còn hợp lệ" };
-      const cards = indexes
-        .sort((left, right) => right - left)
-        .map((index) => caster.hand.splice(index, 1)[0]);
+      const selected = distinctIds.map((id) => {
+        const handIndex = caster.hand.findIndex((card) => card.id === id);
+        if (handIndex >= 0) return { source: "HAND", index: handIndex, card: caster.hand[handIndex] };
+        const equipmentIndex = (caster.equipments || []).findIndex((card) => card.id === id);
+        if (equipmentIndex >= 0 && caster.equipments[equipmentIndex].id === state.activeCard?.songCungCardId) return null;
+        if (equipmentIndex >= 0) return { source: "EQUIPMENT", index: equipmentIndex, card: caster.equipments[equipmentIndex] };
+        return null;
+      });
+      if (selected.some((entry) => !entry)) return { error: "Lá bỏ cho Song Cung không còn hợp lệ" };
+      // Hand and equipment each have their own index space. Removing by the
+      // shared numeric index can delete Song Cung itself when one cost comes
+      // from each zone, so resolve each selected card by id in its own zone.
+      const cards = [];
+      for (const entry of selected) {
+        const zone = entry.source === "HAND" ? caster.hand : caster.equipments;
+        const removeIndex = zone.findIndex((card) => card.id === entry.card.id);
+        if (removeIndex < 0) return { error: "Lá bỏ cho Song Cung không còn hợp lệ" };
+        cards.push(zone.splice(removeIndex, 1)[0]);
+      }
       for (const card of cards) discardCard(state, card);
       recordAction(state, {
         type: "SONG_CUNG_TRIGGERED",
@@ -5955,8 +5972,9 @@ export function handleAIReaction(state, aiSeat) {
   }
 
   if (state.phase === "AWAIT_SONG_CUNG_FOLLOW_UP" && state.waitingTargetSeat === aiSeat) {
-    if (ai.hand.length >= 2) {
-      return handleRespondAction(state, aiSeat, true, null, null, ai.hand.slice(0, 2).map((card) => card.id));
+    const costs = [...ai.hand, ...(ai.equipments || [])].filter((card) => card.id !== state.activeCard?.songCungCardId);
+    if (costs.length >= 2) {
+      return handleRespondAction(state, aiSeat, true, null, null, costs.slice(0, 2).map((card) => card.id));
     }
     return handleRespondAction(state, aiSeat, false, null);
   }

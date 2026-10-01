@@ -2496,6 +2496,10 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	if AppwriteMatchmaking:
 		AppwriteMatchmaking.my_session_user_id = my_user_id
 		AppwriteMatchmaking.my_session_user_name = my_user_name
+		# A previous cancelled search can leave this user's old room behind.
+		# Remove it before publishing the new room so a returning player cannot
+		# match against their own stale room.
+		await AppwriteMatchmaking.cleanup_user_waiting_rooms(my_user_id)
 
 	# Every client publishes its own one-player room first. This gives all
 	# clients a shared starting point, then the merge step below consolidates
@@ -2546,9 +2550,10 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		# on the same room instead of waiting for a second pass.
 		var should_merge = str(found_room.get("roomId", "")) != own_room_id
 		if not should_merge:
-			var rejected_room_id = str(found_room.get("roomId", ""))
-			found_room = {}
-			print("[Matchmaking] Giữ phòng %s; ứng viên %s chưa thắng tie-break." % [own_room_id, rejected_room_id])
+			# Our room won the deterministic election. Keep it as the host anchor;
+			# clearing it here made the later race retry treat the same room as a
+			# fresh join and could leave every client without a host.
+			print("[Matchmaking] Giữ phòng neo %s." % own_room_id)
 		else:
 			var old_room_id = mm_active_room_id
 			var joined = await AppwriteMatchmaking.join_room_slot(found_room, my_user_id, my_user_name, my_rank_points)
@@ -2570,7 +2575,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 					if mm_is_cancelled:
 						return
 					await get_tree().create_timer(0.5).timeout
-					var retry_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, 500, my_user_name)
+					var retry_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, 500, my_user_name, mm_active_room_id)
 					if retry_room.is_empty():
 						continue
 					var retry_joined = await AppwriteMatchmaking.join_room_slot(retry_room, my_user_id, my_user_name, my_rank_points)
@@ -2596,7 +2601,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 			await get_tree().create_timer(0.5).timeout
 			if mm_is_cancelled:
 				return
-			var race_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, 500, my_user_name)
+			var race_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, 500, my_user_name, mm_active_room_id)
 			if race_room.is_empty():
 				continue
 			var race_joined = await AppwriteMatchmaking.join_room_slot(race_room, my_user_id, my_user_name, my_rank_points)
@@ -2677,7 +2682,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 
 			# Keep consolidating rooms while they are waiting. Every client moves
 			# toward a room with more real players; ties use roomId for stability.
-			var merge_candidate = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, 500, my_user_name)
+			var merge_candidate = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, 500, my_user_name, mm_active_room_id)
 			if not merge_candidate.is_empty() and str(merge_candidate.get("roomId", "")) != mm_active_room_id:
 				var current_count = 0
 				for current_slot in mm_current_room.get("slots", []):
@@ -2687,6 +2692,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 				for candidate_slot in merge_candidate.get("slots", []):
 					if not candidate_slot.get("isEmpty", false) and not candidate_slot.get("isAI", false) and candidate_slot.get("userId", "") != "":
 						candidate_count += 1
+				print("[Matchmaking] Bầu phòng hiện tại=%s/%d ứng viên=%s/%d" % [mm_active_room_id, current_count, str(merge_candidate.get("roomId", "")), candidate_count])
 				var should_merge_live = candidate_count > current_count or (candidate_count == current_count and str(merge_candidate.get("roomId", "")) < mm_active_room_id)
 				if should_merge_live:
 					var previous_room_id = mm_active_room_id
@@ -2748,6 +2754,21 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 
 					if mm_current_room.get("status") == "STARTED":
 						break
+					if mm_current_room.get("status") != "WAITING":
+						# The room host may have merged this room into another one.
+						# Re-scan immediately so this client cannot wait forever on a
+						# retired room.
+						var replacement = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, 500, my_user_name, mm_active_room_id)
+						if not replacement.is_empty():
+							var replacement_joined = await AppwriteMatchmaking.join_room_slot(replacement, my_user_id, my_user_name, my_rank_points)
+							if not replacement_joined.is_empty():
+								mm_current_room = replacement_joined
+								mm_active_room_id = replacement_joined.get("roomId", "")
+								mm_is_host = false
+								AppwriteMatchmaking.is_host = false
+								guest_wait_timer = 0.0
+								_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
+								_update_matchmaking_status_count(status_lbl, mm_current_room)
 
 				if guest_wait_timer > 120.0:
 					if is_instance_valid(status_lbl):

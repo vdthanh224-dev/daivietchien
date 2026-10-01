@@ -128,10 +128,17 @@ func get_available_pick_heroes() -> Array[Dictionary]:
 	return available
 
 func get_avatar_texture(avatar_path: String) -> Texture2D:
-	if avatar_path != "" and ResourceLoader.exists(avatar_path):
-		var tex = load(avatar_path) as Texture2D
-		if tex:
-			return tex
+	if avatar_path != "":
+		var base_name = avatar_path.get_file()
+		var trans_path = "res://assets/heroes_transparent/" + base_name
+		if ResourceLoader.exists(trans_path):
+			var trans_tex = load(trans_path) as Texture2D
+			if trans_tex:
+				return trans_tex
+		if ResourceLoader.exists(avatar_path):
+			var tex = load(avatar_path) as Texture2D
+			if tex:
+				return tex
 	var def_path = "res://assets/ui/ly_thuong_kiet.png"
 	if ResourceLoader.exists(def_path):
 		var def_tex = load(def_path) as Texture2D
