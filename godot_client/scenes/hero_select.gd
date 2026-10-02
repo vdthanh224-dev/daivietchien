@@ -969,15 +969,15 @@ func _show_no_server_modal(message: String = "") -> void:
 
 var _server_state_received: bool = false
 
-# --- Luồng Chọn Tướng Theo Lượt (Đồng bộ qua Deno WebSocket hoặc Chạy Local) ---
+# --- Luồng Chọn Tướng Theo Lượt (chỉ qua Deno Cloud) ---
 func _start_draft_sequence() -> void:
 	current_picker_index = 0
-	if is_network_mode:
-		draft_status_lbl.text = "⚡ Đang đồng bộ tiến trình chọn tướng từ Máy chủ Deno..."
-		draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
-		_start_network_draft_watchdog()
-	else:
-		_run_local_draft_loop()
+	if not is_network_mode:
+		_show_no_server_modal("Chưa kết nối được Deno Cloud. Không thể bắt đầu chọn tướng khi thiếu máy chủ online.")
+		return
+	draft_status_lbl.text = "⚡ Đang đồng bộ tiến trình chọn tướng từ Deno Cloud..."
+	draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+	_start_network_draft_watchdog()
 
 func _start_network_draft_watchdog() -> void:
 	_server_state_received = false
@@ -991,11 +991,7 @@ func _start_network_draft_watchdog() -> void:
 
 	if not _server_state_received and is_draft_active and is_network_mode:
 		print("[HeroSelect] ⚠️ Máy chủ không phản hồi lượt chọn tướng.")
-		if _requires_network_draft():
-			_show_no_server_modal("Máy chủ chưa gửi trạng thái chọn tướng. Không chuyển sang chế độ cục bộ để tránh lệch trạng thái giữa các người chơi.")
-		else:
-			is_network_mode = false
-			_run_local_draft_loop()
+		_show_no_server_modal("Deno Cloud chưa gửi trạng thái chọn tướng. Vui lòng kết nối lại để mọi người dùng cùng một phòng online.")
 
 func _run_local_draft_loop() -> void:
 	print("[HeroSelect] ⚙️ Đang chạy chọn tướng chế độ Cục Bộ (Local Draft)...")

@@ -13,12 +13,13 @@ signal draft_joined(assigned_seat: int)
 signal ping_updated(ping_ms: int)
 
 const CANDIDATE_SERVERS: Array[Dictionary] = [
-	# Online matchmaking must use one shared authority. Local servers are still
-	# available through the explicit --server-url option for development.
+	# Draft and battle state must use one shared online authority. There is no
+	# localhost/LAN fallback because separate local processes do not share rooms.
 	{ "type": "DENO_CLOUD", "name": "Máy Chủ Đám Mây (Deno Cloud)", "url": "wss://dai-viet-chien-server.vdthanh.deno.net", "timeout": 3.5 }
 ]
 
-@export var server_url: String = "ws://127.0.0.1:8080"
+const CLOUD_SERVER_URL: String = "wss://dai-viet-chien-server.vdthanh.deno.net"
+@export var server_url: String = CLOUD_SERVER_URL
 @export var auto_reconnect: bool = true
 
 var socket: WebSocketPeer = WebSocketPeer.new()
@@ -35,43 +36,27 @@ var _ping_timer: float = 2.5
 var _last_ping_send_time: int = 0
 var _ping_awaiting_pong: bool = false
 
-var active_server_type: String = "NONE" # "DENO_CLOUD", "LOCAL", "APPWRITE_FALLBACK"
+var active_server_type: String = "NONE" # "DENO_CLOUD"
 var active_server_name: String = ""
 var active_server_url: String = ""
 var candidate_index: int = 0
 var is_scanning_candidates: bool = false
 var candidate_timer: float = 0.0
-var has_custom_cli_url: bool = false
-var has_custom_saved_config: bool = false
 var _reconnect_timer: float = 0.0
-var _custom_url_retry_count: int = 0
 
-const CONFIG_FILE: String = "user://server_config.json"
-
-var _instance_lock_server: TCPServer = null
 var auto_instance_index: int = 1
 
 func _detect_instance_index() -> int:
+	# Explicit test seats are still supported, but no local socket is opened to
+	# infer them. Production clients receive their seat from the cloud server.
 	var all_args = OS.get_cmdline_args() + OS.get_cmdline_user_args()
 	for arg in all_args:
-		if arg.begins_with("--seat="):
-			var s = arg.trim_prefix("--seat=").to_int()
-			if s >= 1 and s <= 4:
+		if arg.begins_with("--seat=") or arg.begins_with("--tester="):
+			var value = arg.substr(arg.find("=") + 1).to_int()
+			if value >= 1 and value <= 4:
 				seat_is_explicit = true
-				return s
-		if arg.begins_with("--tester="):
-			var t = arg.trim_prefix("--tester=").to_int()
-			if t >= 1 and t <= 4:
-				seat_is_explicit = true
-				return t
-
-	# Tự động nhận diện cửa sổ 1, 2, 3, 4 khi chạy nhiều instance (Godot Run Multiple Instances)
-	for s in range(1, 5):
-		var srv = TCPServer.new()
-		var err = srv.listen(6010 + s, "127.0.0.1")
-		if err == OK:
-			_instance_lock_server = srv
-			return s
+				return value
+	seat_is_explicit = false
 	return 1
 
 func _ready() -> void:
@@ -81,12 +66,7 @@ func _ready() -> void:
 	if OS.is_debug_build() or OS.has_feature("editor"):
 		DisplayServer.window_set_title("Đại Việt Chiến - [CỬA SỔ %d - GHẾ %d]" % [my_seat, my_seat])
 	_load_server_config()
-	if has_custom_cli_url:
-		connect_to_server(server_url)
-	elif has_custom_saved_config:
-		connect_to_server(server_url)
-	else:
-		_start_priority_connection()
+	_start_priority_connection()
 
 func is_connecting() -> bool:
 	if is_scanning_candidates:
@@ -112,8 +92,8 @@ func _try_candidate(index: int) -> void:
 		current_ping = -1
 		_ping_awaiting_pong = false
 		ping_updated.emit(-1)
-		print("[NetworkClient] ❌ Tất cả WebSocket Server (Deno Cloud & Local) đều không kết nối được! Không sử dụng Appwrite cho trận đấu.")
-		error_received.emit("Không thể kết nối đến Máy Chủ Trận Đấu (Deno Cloud hoặc Local 8080)!")
+		print("[NetworkClient] ❌ Không kết nối được Deno Cloud; local server đã bị tắt.")
+		error_received.emit("Không thể kết nối đến Máy Chủ Trận Đấu online.")
 		return
 
 	candidate_index = index
@@ -139,54 +119,21 @@ func _on_candidate_failed(reason: String) -> void:
 	_try_candidate(candidate_index + 1)
 
 func _load_server_config() -> void:
-	# 1. Đọc từ đối số dòng lệnh nếu có (ví dụ: --server-url=ws://127.0.0.1:8080)
-	var all_args = OS.get_cmdline_args() + OS.get_cmdline_user_args()
-	for arg in all_args:
-		if arg.begins_with("--server-url="):
-			server_url = arg.trim_prefix("--server-url=").strip_edges()
-			has_custom_cli_url = true
-			print("[NetworkClient] Đọc server_url từ CLI: ", server_url)
-			return
-
-	# 2. Chỉ dùng cấu hình đã lưu cho server từ xa. Cấu hình localhost cũ
-	#    không được phép ghi đè ưu tiên Deno Cloud, nếu không mỗi máy có thể
-	#    nối vào một backend khác nhau và draft sẽ không thể đồng bộ.
-	if FileAccess.file_exists(CONFIG_FILE):
-		var file = FileAccess.open(CONFIG_FILE, FileAccess.READ)
-		if file:
-			var text = file.get_as_text()
-			var json = JSON.parse_string(text)
-			if json is Dictionary and json.has("server_url"):
-				var saved_url = str(json["server_url"]).strip_edges()
-				var is_local_saved_url = saved_url.begins_with("ws://127.0.0.1") or saved_url.begins_with("ws://localhost")
-				if saved_url != "" and not is_local_saved_url:
-					server_url = saved_url
-					has_custom_saved_config = true
-					print("[NetworkClient] Đọc server_url từ cấu hình user: ", server_url)
+	# Ignore old user:// settings and --server-url overrides. They can point
+	# different clients at different authorities and split a draft room.
+	server_url = CLOUD_SERVER_URL
 
 func save_server_url(new_url: String) -> void:
-	server_url = new_url.strip_edges()
-	has_custom_saved_config = true
-	var file = FileAccess.open(CONFIG_FILE, FileAccess.WRITE)
-	if file:
-		file.store_string(JSON.stringify({"server_url": server_url}))
-		file.close()
-	connect_to_server(server_url)
+	# Kept for compatibility with older UI scripts. The client is cloud-only.
+	server_url = CLOUD_SERVER_URL
+	print("[NetworkClient] Bỏ qua địa chỉ server tùy chỉnh; chỉ dùng Deno Cloud.")
+	connect_to_server(CLOUD_SERVER_URL)
 
 func connect_to_server(url: String = "") -> void:
-	if url != "":
-		server_url = url
-	if not has_custom_cli_url and not has_custom_saved_config:
-		_start_priority_connection()
-		return
-
-	is_scanning_candidates = false
-	print("[NetworkClient] Đang kết nối trực tiếp tới: ", server_url)
-	socket.close()
-	socket = WebSocketPeer.new()
-	var err = socket.connect_to_url(server_url)
-	if err != OK:
-		print("[NetworkClient] Kết nối thất bại, mã lỗi: ", err)
+	# Always normalize callers (including old saved settings) to cloud.
+	server_url = CLOUD_SERVER_URL
+	_start_priority_connection()
+	return
 
 func _process(delta: float) -> void:
 	socket.poll()
@@ -198,15 +145,11 @@ func _process(delta: float) -> void:
 			is_scanning_candidates = false
 			_ping_timer = 0.0
 			candidate_timer = 0.0
-			if candidate_index < CANDIDATE_SERVERS.size() and not has_custom_cli_url:
+			if candidate_index < CANDIDATE_SERVERS.size():
 				var cand = CANDIDATE_SERVERS[candidate_index]
 				active_server_type = cand["type"]
 				active_server_name = cand["name"]
 				active_server_url = cand["url"]
-			else:
-				active_server_type = "CUSTOM"
-				active_server_name = "Custom Server"
-				active_server_url = server_url
 			print("[NetworkClient] ⚡ Đã kết nối thành công tới %s (%s)!" % [active_server_name, active_server_url])
 			print("[NetworkClient] DRAFT authority: server=%s" % active_server_url)
 			connection_established.emit()
@@ -231,15 +174,6 @@ func _process(delta: float) -> void:
 				max_to = float(CANDIDATE_SERVERS[candidate_index].get("timeout", 2.5))
 			if candidate_timer >= max_to:
 				_on_candidate_failed("Quá thời gian kết nối (Timeout %.1fs)" % max_to)
-		else:
-			if candidate_timer >= 2.5:
-				candidate_timer = 0.0
-				print("[NetworkClient] ⚠️ Kết nối tới %s quá 2.5s timeout. Đóng socket..." % server_url)
-				socket.close()
-				if has_custom_saved_config:
-					print("[NetworkClient] ⚠️ Cấu hình server đã lưu (%s) không phản hồi. Tự động chuyển sang dò tìm máy chủ tối ưu..." % server_url)
-					has_custom_saved_config = false
-					_start_priority_connection()
 
 	elif state == WebSocketPeer.STATE_CLOSED:
 		candidate_timer = 0.0
@@ -265,18 +199,7 @@ func _process(delta: float) -> void:
 				_reconnect_timer += delta
 				if _reconnect_timer >= 2.5:
 					_reconnect_timer = 0.0
-					if has_custom_saved_config:
-						_custom_url_retry_count += 1
-						if _custom_url_retry_count >= 1:
-							print("[NetworkClient] ⚠️ Server tùy chỉnh (%s) không thể kết nối. Tự động chuyển sang dò tìm máy chủ tối ưu..." % server_url)
-							has_custom_saved_config = false
-							_start_priority_connection()
-						else:
-							connect_to_server(server_url)
-					elif has_custom_cli_url:
-						connect_to_server(server_url)
-					else:
-						_start_priority_connection()
+					_start_priority_connection()
 
 func _send_ping() -> void:
 	if socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
