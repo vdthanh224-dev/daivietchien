@@ -15,7 +15,8 @@ signal ping_updated(ping_ms: int)
 const CANDIDATE_SERVERS: Array[Dictionary] = [
 	# Draft and battle state must use one shared online authority. There is no
 	# localhost/LAN fallback because separate local processes do not share rooms.
-	{ "type": "DENO_CLOUD", "name": "Máy Chủ Đám Mây (Deno Cloud)", "url": "wss://dai-viet-chien-server.vdthanh.deno.net", "timeout": 3.5 }
+	# Deno Deploy can need several seconds to wake an idle isolate and finish TLS.
+	{ "type": "DENO_CLOUD", "name": "Máy Chủ Đám Mây (Deno Cloud)", "url": "wss://dai-viet-chien-server.vdthanh.deno.net", "timeout": 12.0 }
 ]
 
 const CLOUD_SERVER_URL: String = "wss://dai-viet-chien-server.vdthanh.deno.net"
@@ -132,6 +133,11 @@ func save_server_url(new_url: String) -> void:
 func connect_to_server(url: String = "") -> void:
 	# Always normalize callers (including old saved settings) to cloud.
 	server_url = CLOUD_SERVER_URL
+	# Do not replace a healthy or in-flight socket when a scene asks for an
+	# explicit connection check. This keeps scene transitions from creating a
+	# short window where the socket is closed and the caller reports failure.
+	if is_connected_to_server or is_connecting():
+		return
 	_start_priority_connection()
 	return
 
@@ -169,7 +175,7 @@ func _process(delta: float) -> void:
 	elif state == WebSocketPeer.STATE_CONNECTING:
 		candidate_timer += delta
 		if is_scanning_candidates:
-			var max_to = 3.5
+			var max_to = 12.0
 			if candidate_index < CANDIDATE_SERVERS.size():
 				max_to = float(CANDIDATE_SERVERS[candidate_index].get("timeout", 2.5))
 			if candidate_timer >= max_to:
