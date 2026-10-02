@@ -91,15 +91,13 @@ func _ready() -> void:
 		# attempts. Start the cloud connection here instead of failing before
 		# NetworkClient's next heartbeat gets a chance to run.
 		if not NetworkClient.is_connected_to_server:
-			NetworkClient.connect_to_server()
+			if not NetworkClient.is_connecting():
+				NetworkClient.connect_to_server()
 			var wait_t := 0.0
-			var retry_t := 0.0
 			while wait_t < 15.0 and not NetworkClient.is_connected_to_server:
 				await get_tree().create_timer(0.1).timeout
 				wait_t += 0.1
-				retry_t += 0.1
-				if retry_t >= 2.0 and not NetworkClient.is_connected_to_server:
-					retry_t = 0.0
+				if not NetworkClient.is_connecting() and not NetworkClient.is_connected_to_server:
 					NetworkClient.connect_to_server()
 		is_network_mode = NetworkClient.is_connected_to_server
 	else:
@@ -190,7 +188,8 @@ func _setup_draft_slots() -> void:
 	var my_seat_num = my_seat_idx + 1
 	if NetworkClient:
 		NetworkClient.my_seat = my_seat_num
-		NetworkClient.seat_is_explicit = false
+		if not (OS.is_debug_build() or OS.has_feature("editor")):
+			NetworkClient.seat_is_explicit = false
 	print("[HeroSelect] Xác định ghế của bạn: Ghế %d (UID: %s, Tên: %s)" % [my_seat_num, my_uid, my_name])
 
 	var used_names: Array = []

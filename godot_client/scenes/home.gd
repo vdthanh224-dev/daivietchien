@@ -2377,9 +2377,9 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	var my_user_name = AuthManager.current_user_name if AuthManager and AuthManager.current_user_name != "" else ""
 	if (my_user_name == "" or my_user_name == "Đại Tướng Quân") and AuthManager and AuthManager.current_user_email != "":
 		my_user_name = AuthManager.current_user_email.split("@")[0].to_upper()
-	if my_user_name.is_empty() or my_user_name == "Đại Tướng Quân":
-		my_user_name = "Tướng Quân " + pid_suffix.right(3)
 	var my_rank_points = AuthManager.current_2v2_points if AuthManager else 1200
+	var is_debug_match = OS.is_debug_build() or OS.has_feature("editor")
+	var rank_diff = 999999 if is_debug_match else 500
 
 	if AppwriteMatchmaking:
 		AppwriteMatchmaking.my_session_user_id = my_user_id
@@ -2423,7 +2423,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	# Include our own room in this first election. If every client excludes its
 	# own host room, the smallest two rooms can make a cycle (A joins B while B
 	# joins A). A shared smallest-room tie-break gives all clients one anchor.
-	var found_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, 500, my_user_name, own_room_id)
+	var found_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, rank_diff, my_user_name, own_room_id)
 	if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
 		return
 
@@ -2463,7 +2463,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 					if mm_is_cancelled:
 						return
 					await get_tree().create_timer(0.5).timeout
-					var retry_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, 500, my_user_name, mm_active_room_id)
+					var retry_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, rank_diff, my_user_name, mm_active_room_id)
 					if retry_room.is_empty():
 						continue
 					var retry_joined = await AppwriteMatchmaking.join_room_slot(retry_room, my_user_id, my_user_name, my_rank_points)
@@ -2489,7 +2489,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 			await get_tree().create_timer(0.5).timeout
 			if mm_is_cancelled:
 				return
-			var race_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, 500, my_user_name, mm_active_room_id)
+			var race_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, rank_diff, my_user_name, mm_active_room_id)
 			if race_room.is_empty():
 				continue
 			var race_joined = await AppwriteMatchmaking.join_room_slot(race_room, my_user_id, my_user_name, my_rank_points)
@@ -2570,7 +2570,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 
 			# Keep consolidating rooms while they are waiting. Every client moves
 			# toward a room with more real players; ties use roomId for stability.
-			var merge_candidate = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, 500, my_user_name, mm_active_room_id)
+			var merge_candidate = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, rank_diff, my_user_name, mm_active_room_id)
 			if not merge_candidate.is_empty() and str(merge_candidate.get("roomId", "")) != mm_active_room_id:
 				var current_count = 0
 				for current_slot in mm_current_room.get("slots", []):
@@ -2646,7 +2646,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 						# The room host may have merged this room into another one.
 						# Re-scan immediately so this client cannot wait forever on a
 						# retired room.
-						var replacement = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, 500, my_user_name, mm_active_room_id)
+						var replacement = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, rank_diff, my_user_name, mm_active_room_id)
 						if not replacement.is_empty():
 							var replacement_joined = await AppwriteMatchmaking.join_room_slot(replacement, my_user_id, my_user_name, my_rank_points)
 							if not replacement_joined.is_empty():

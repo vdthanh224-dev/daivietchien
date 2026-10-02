@@ -52,6 +52,91 @@ interface RoomData {
 }
 
 const rooms = new Map<string, RoomData>();
+const instanceId = `node_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+const clusterChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("dvc_cluster_bus") : null;
+
+function clusterBroadcast(data: any) {
+  if (clusterChannel) {
+    try {
+      clusterChannel.postMessage({ ...data, sender: instanceId });
+    } catch (err) {
+      console.error("[ClusterBroadcast Error]:", err);
+    }
+  }
+}
+
+if (clusterChannel) {
+  clusterChannel.onmessage = (event) => {
+    const msg = event.data;
+    if (!msg || typeof msg !== "object" || msg.sender === instanceId) return;
+    const { type, roomId } = msg;
+    if (!roomId) return;
+
+    if (type === "DRAFT_SYNC" && msg.draft) {
+      let room = rooms.get(roomId);
+      if (!room) {
+        room = {
+          state: null,
+          draft: msg.draft,
+          sockets: new Map(),
+          lastActivity: Date.now(),
+        };
+        rooms.set(roomId, room);
+      } else if (room.draft) {
+        const incomingRev = msg.draft.revision || 0;
+        const currentRev = room.draft.revision || 0;
+        if (incomingRev >= currentRev || msg.draft.isCompleted) {
+          room.draft.slots = msg.draft.slots;
+          room.draft.currentPickerIndex = msg.draft.currentPickerIndex;
+          room.draft.timer = msg.draft.timer;
+          room.draft.timerStartAt = msg.draft.timerStartAt;
+          room.draft.revision = incomingRev;
+          room.draft.isCompleted = msg.draft.isCompleted;
+        }
+      }
+      room.lastActivity = Date.now();
+      if (room.draft && !room.draft.isCompleted) {
+        broadcastRoom(room, draftStateMessage(roomId, room.draft));
+      }
+    }
+
+    if (type === "DRAFT_COMPLETED_SYNC") {
+      let room = rooms.get(roomId);
+      if (room) {
+        if (room.draft) {
+          room.draft.isCompleted = true;
+          if (msg.slots) room.draft.slots = msg.slots;
+        }
+        if (!room.state && Array.isArray(msg.battlePlayers)) {
+          room.state = initGame(roomId, msg.battlePlayers);
+        }
+        room.lastActivity = Date.now();
+        broadcastRoom(room, {
+          type: "DRAFT_COMPLETED",
+          roomId,
+          slots: msg.slots || room.draft?.slots,
+          battlePlayers: msg.battlePlayers,
+          state: room.state,
+        });
+      }
+    }
+
+    if (type === "GAME_STATE_SYNC" && msg.state) {
+      let room = rooms.get(roomId);
+      if (room) {
+        room.state = msg.state;
+        room.lastActivity = Date.now();
+        broadcastRoom(room, {
+          type: "STATE_UPDATE",
+          state: room.state,
+          delta: null,
+          version: room.state.version,
+          action: msg.action || "STATE_UPDATE",
+        });
+      }
+    }
+  };
+}
 interface MatchmakingRoom {
   roomId: string;
   hostUserId: string;
@@ -234,6 +319,12 @@ function finishDraftAndStartBattle(roomId: string, room: RoomData) {
   room.state = initGame(roomId, battlePlayers);
   console.log(`[Deno Server] Chọn tướng hoàn tất phòng: ${roomId}! Bắt đầu trận đấu 2v2!`);
 
+  clusterBroadcast({
+    type: "DRAFT_COMPLETED_SYNC",
+    roomId,
+    slots: room.draft.slots,
+    battlePlayers,
+  });
   broadcastRoom(room, {
     type: "DRAFT_COMPLETED",
     roomId,
@@ -276,8 +367,8 @@ function ensureTickTimer() {
         const currentSlot = draft.slots[draft.currentPickerIndex];
         const hasHumanSocket = currentSlot && room.sockets.has(currentSlot.seat);
         const isBot = currentSlot && currentSlot.isAI && !hasHumanSocket;
-        // Bot suy nghĩ 3 giây (khi timer <= 37). Ghế có người thật (hoặc có socket kết nối) chờ đủ 40s (khi timer <= 0)
-        const shouldAutoPick = (draft.timer <= 0) || (isBot && draft.timer <= 37);
+        // Bot suy nghĩ 10 giây (khi timer <= 30). Ghế có người thật (hoặc có socket kết nối) chờ đủ 40s (khi timer <= 0)
+        const shouldAutoPick = (draft.timer <= 0) || (isBot && draft.timer <= 30);
 
         if (shouldAutoPick && currentSlot && !currentSlot.isLocked) {
           const lockedIds = draft.slots.filter(s => s.isLocked).map(s => s.heroId);
@@ -297,9 +388,11 @@ function ensureTickTimer() {
             continue;
           }
           broadcastRoom(room, draftStateMessage(roomId, draft));
+          clusterBroadcast({ type: "DRAFT_SYNC", roomId, draft });
         } else if (timerChanged) {
           draft.revision += 1;
           broadcastRoom(room, draftStateMessage(roomId, draft));
+          clusterBroadcast({ type: "DRAFT_SYNC", roomId, draft });
         }
         continue;
       }
@@ -393,8 +486,12 @@ function resolveDraftSeat(room: RoomData, requestedSeat: number, payload: any, s
   const normalize = (value: unknown) => String(value || "").trim().toLowerCase();
 
   // Godot debug windows can share one UID/name through user://; honor their explicit seat.
-  if (Number(payload.debugSeat) === requestedSeat && requestedSeat >= 1 && requestedSeat <= 4) {
-    return requestedSeat;
+  const debugSeat = Number(payload.debugSeat);
+  if (debugSeat >= 1 && debugSeat <= 4) {
+    const existingSocket = room.sockets.get(debugSeat);
+    if (!existingSocket || existingSocket === socket || existingSocket.readyState !== WebSocket.OPEN) {
+      return debugSeat;
+    }
   }
 
   const userId = normalize(payload.userId);
@@ -571,6 +668,7 @@ Deno.serve({ port, hostname }, async (req) => {
 
           if (room.draft && !room.draft.isCompleted) {
             broadcastRoom(room, draftStateMessage(roomId, room.draft));
+            clusterBroadcast({ type: "DRAFT_SYNC", roomId, draft: room.draft });
           } else if (room.state) {
             socket.send(JSON.stringify({
               type: "DRAFT_COMPLETED",
@@ -620,6 +718,7 @@ Deno.serve({ port, hostname }, async (req) => {
             finishDraftAndStartBattle(roomId, room);
           } else {
             broadcastRoom(room, draftStateMessage(roomId, draft));
+            clusterBroadcast({ type: "DRAFT_SYNC", roomId, draft });
           }
           return;
         }

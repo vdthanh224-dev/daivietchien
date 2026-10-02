@@ -243,9 +243,8 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 		var diff = abs(int(room.get("hostRankPoints", 0)) - my_rank_points)
 		var room_id = str(room.get("roomId", ""))
 		var best_room_id = str(best_room.get("roomId", "~"))
-		# Ưu tiên phòng có nhiều người thật nhất trước để gom đủ 4 người sớm nhất.
-		# Nếu số người bằng nhau thì dùng roomId làm tie-break ổn định.
-		if diff <= max_rank_diff:
+		var rank_ok = (OS.is_debug_build() or OS.has_feature("editor") or max_rank_diff >= 9999 or diff <= max_rank_diff)
+		if rank_ok:
 			if real_count > best_real_count or (real_count == best_real_count and (best_room.is_empty() or room_id < best_room_id)):
 				best_real_count = real_count
 				best_room = room

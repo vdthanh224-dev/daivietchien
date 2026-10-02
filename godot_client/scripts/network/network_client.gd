@@ -63,6 +63,7 @@ func _detect_instance_index() -> int:
 		var err = srv.listen(6010 + s, "127.0.0.1")
 		if err == OK:
 			_instance_lock_server = srv
+			seat_is_explicit = true
 			return s
 
 	seat_is_explicit = false
@@ -340,7 +341,7 @@ func send_join_draft(target_room: String, seat: int, user_id: String, user_name:
 	}
 	if not slots_data.is_empty():
 		payload["slots"] = slots_data
-	if seat_is_explicit:
+	if seat_is_explicit or OS.is_debug_build() or OS.has_feature("editor"):
 		# Debug windows may share one local auth session; keep their requested seats distinct.
 		payload["debugSeat"] = my_seat
 	send_json(payload)

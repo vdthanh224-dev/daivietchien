@@ -397,7 +397,14 @@ function resolveDraftSeat(room, requestedSeat, payload, socket) {
     return true;
   };
 
-  // Ưu tiên 1: Khớp chính xác theo userId từ phòng ghép
+  // Ưu tiên 1: Explicit debug seat (dành cho multi-instance debug cửa sổ 1, 2, 3, 4 trên cùng máy)
+  const debugSeat = Number(payload.debugSeat);
+  if (debugSeat >= 1 && debugSeat <= 4) {
+    const s = slots.find((e) => e.seat === debugSeat);
+    if (isAvailable(s)) return debugSeat;
+  }
+
+  // Ưu tiên 2: Khớp chính xác theo userId từ phòng ghép
   const byId = userId
     ? slots.filter((slot) => normalize(slot.userId) === userId)
     : [];
@@ -405,18 +412,12 @@ function resolveDraftSeat(room, requestedSeat, payload, socket) {
     return byId[0].seat;
   }
 
-  // Ưu tiên 2: Khớp theo userName
+  // Ưu tiên 3: Khớp theo userName
   const byName = userName
     ? slots.filter((slot) => normalize(slot.userName) === userName)
     : [];
   if (byName.length === 1 && isAvailable(byName[0])) {
     return byName[0].seat;
-  }
-
-  // Ưu tiên 3: Explicit debug seat (khi không tìm thấy UID trong phòng)
-  if (Number(payload.debugSeat) === requestedSeat && requestedSeat >= 1 && requestedSeat <= 4) {
-    const s = slots.find((e) => e.seat === requestedSeat);
-    if (isAvailable(s)) return requestedSeat;
   }
 
   const reqSlot = slots.find((slot) => slot.seat === requestedSeat);
@@ -540,7 +541,7 @@ async function tickDraftRoom(roomId, room) {
 
   const elapsed = Math.floor((Date.now() - draft.timerStartAt) / 1000);
   const isBot = currentSlot.isAI && (!room.sockets.has(currentSlot.seat) || room.sockets.get(currentSlot.seat)?.readyState !== WebSocket.OPEN);
-  if ((elapsed >= 40 || (isBot && elapsed >= 3)) && !currentSlot.isLocked) {
+  if ((elapsed >= 40 || (isBot && elapsed >= 10)) && !currentSlot.isLocked) {
     const used = new Set(draft.slots.filter((slot) => slot.isLocked).map((slot) => slot.heroId));
     const heroId = Array.from({ length: 28 }, (_, i) => i + 1).find((id) => !used.has(id)) || 1;
     currentSlot.heroId = heroId;
@@ -562,11 +563,11 @@ async function tickDraftRoom(roomId, room) {
     return;
   } else {
     draft.timer = Math.max(0, 40 - elapsed);
-    draft.revision = (draft.revision || 0) + 1;
   }
 
   if (draft.timer !== draft.lastBroadcastTimer) {
     draft.lastBroadcastTimer = draft.timer;
+    draft.revision = (draft.revision || 0) + 1;
     broadcastRoom(room, draftMessage(roomId, draft));
     clusterBroadcast({ type: "DRAFT_SYNC", roomId, draft });
   }
