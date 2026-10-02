@@ -28,6 +28,10 @@ var current_room_id: String = ""
 var is_host: bool = false
 var is_network_mode: bool = false
 var _draft_joined: bool = false
+var _pending_pick_hero_id: int = 0
+var _pending_pick_seat: int = 0
+# Drop delayed draft snapshots so a late packet cannot roll a client back.
+var _last_draft_revision: int = 0
 
 # UI References
 var draft_status_lbl: Label
@@ -65,6 +69,7 @@ func _ready() -> void:
 		else:
 			is_host = false
 	print("[HeroSelect] Vai trò phòng: %s (Room ID: %s)" % ["MÁY CHỦ (HOST)" if is_host else "MÁY KHÁCH (GUEST)", current_room_id])
+	print("[HeroSelect] Draft room status=%s slots=%d network_url=%s" % [str(current_room.get("status", "")), int(current_room.get("slots", []).size()), NetworkClient.active_server_url if NetworkClient else "NONE"])
 
 	# Khởi tạo dữ liệu tướng khả dụng từ HeroDatabase
 	if HeroDatabase:
@@ -84,7 +89,7 @@ func _ready() -> void:
 	if NetworkClient:
 		if not NetworkClient.is_connected_to_server and NetworkClient.is_connecting():
 			var wait_t = 0.0
-			while wait_t < 1.5 and NetworkClient.is_connecting() and not NetworkClient.is_connected_to_server:
+			while wait_t < 8.0 and NetworkClient.is_connecting() and not NetworkClient.is_connected_to_server:
 				await get_tree().create_timer(0.1).timeout
 				wait_t += 0.1
 		is_network_mode = NetworkClient.is_connected_to_server
@@ -95,7 +100,26 @@ func _ready() -> void:
 		_run_automated_screenshot()
 		return
 
+	if _requires_network_draft() and not is_network_mode:
+		_show_no_server_modal("Phòng có nhiều người chơi nhưng chưa kết nối được máy chủ chọn tướng. Vui lòng kiểm tra máy chủ rồi thử lại.")
+		return
 	_start_draft_sequence()
+
+func _requires_network_draft() -> bool:
+	var current_room = AppwriteMatchmaking.current_room if AppwriteMatchmaking else {}
+	var slots = current_room.get("slots", []) if current_room is Dictionary else []
+	# A matched room is authoritative even when it currently has bots. Letting
+	# one client switch to local draft makes its picker state diverge from peers.
+	if current_room is Dictionary and slots is Array and slots.size() == 4 and str(current_room.get("status", "")) == "STARTED":
+		return true
+	var human_count := 0
+	for slot in slots:
+		if not (slot is Dictionary) or bool(slot.get("isEmpty", false)):
+			continue
+		var uid := str(slot.get("userId", "")).to_lower()
+		if not bool(slot.get("isAI", false)) and not uid.begins_with("bot_"):
+			human_count += 1
+	return human_count >= 2
 
 func _setup_draft_slots() -> void:
 	draft_slots.clear()
@@ -849,6 +873,10 @@ func _update_lock_in_button_state() -> void:
 		lock_in_btn.disabled = true
 		_set_lock_in_text("⚔️ TRẬN ĐẤU SẴN SÀNG")
 		return
+	if _pending_pick_hero_id > 0:
+		lock_in_btn.disabled = true
+		_set_lock_in_text("⏳ ĐANG CHỜ MÁY CHỦ XÁC NHẬN...")
+		return
 
 	if _is_my_turn():
 		if is_player_locked:
@@ -962,11 +990,10 @@ func _start_network_draft_watchdog() -> void:
 			_on_network_connected_for_draft()
 
 	if not _server_state_received and is_draft_active and is_network_mode:
-		print("[HeroSelect] ⚠️ Máy chủ không phản hồi lượt chọn tướng. Tự động chuyển sang Chọn Tướng Tự Động...")
-		draft_status_lbl.text = "⚡ Đang chuyển sang Chọn Tướng Tự Động..."
-		draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
-		await get_tree().create_timer(1.0).timeout
-		if is_draft_active and not _server_state_received:
+		print("[HeroSelect] ⚠️ Máy chủ không phản hồi lượt chọn tướng.")
+		if _requires_network_draft():
+			_show_no_server_modal("Máy chủ chưa gửi trạng thái chọn tướng. Không chuyển sang chế độ cục bộ để tránh lệch trạng thái giữa các người chơi.")
+		else:
 			is_network_mode = false
 			_run_local_draft_loop()
 
@@ -1123,22 +1150,54 @@ func _get_locked_hero_id(idx: int) -> int:
 			return int(h.get("id", 0))
 	return 0
 
+func _find_draft_slot_index(seat_number: int) -> int:
+	if seat_number <= 0:
+		return -1
+	for i in range(draft_slots.size()):
+		if int(draft_slots[i].get("seatNumber", i + 1)) == seat_number:
+			return i
+	return -1
+
 func _on_confirm_pick_pressed() -> void:
 	if _is_my_turn() and not is_player_locked:
 		if not (inspecting_hero is Dictionary) or inspecting_hero.is_empty():
+			return
+		if current_picker_index < 0 or current_picker_index >= draft_slots.size():
 			return
 		var slot = draft_slots[current_picker_index]
 		var hid = int(inspecting_hero.get("id", 0))
 		var hname = inspecting_hero.get("name", "")
 
-		# Khóa tướng ngay lập tức trên máy cục bộ để UI phản hồi tức thì và không bị reset
-		is_player_locked = true
-		_lock_hero_for_slot(slot, inspecting_hero)
-		lock_in_btn.disabled = true
-		_set_lock_in_text("✅ BẠN ĐÃ KHÓA TƯỚNG")
-
 		if NetworkClient and NetworkClient.is_connected_to_server:
+			# Network draft is authoritative. Keep the pick pending until the next
+			# server snapshot, so an older broadcast cannot show a false lock.
+			_pending_pick_hero_id = hid
+			_pending_pick_seat = int(slot.get("seatNumber", current_picker_index + 1))
+			lock_in_btn.disabled = true
+			_set_lock_in_text("⏳ ĐANG GỬI LỰA CHỌN...")
 			NetworkClient.send_pick_hero(hid, hname)
+		else:
+			is_player_locked = true
+			_lock_hero_for_slot(slot, inspecting_hero)
+			lock_in_btn.disabled = true
+			_set_lock_in_text("✅ BẠN ĐÃ KHÓA TƯỚNG")
+
+func _rollback_pending_pick() -> void:
+	if _pending_pick_hero_id <= 0:
+		return
+	for slot in draft_slots:
+		if int(slot.get("seatNumber", 0)) == _pending_pick_seat:
+			var hero = slot.get("chosenHero", {})
+			if hero is Dictionary and int(hero.get("id", 0)) == _pending_pick_hero_id:
+				slot["chosenHero"] = null
+				slot["isLocked"] = false
+				break
+	selected_hero_ids.erase(_pending_pick_hero_id)
+	_pending_pick_hero_id = 0
+	_pending_pick_seat = 0
+	is_player_locked = false
+	_highlight_active_picker(current_picker_index)
+	_update_lock_in_button_state()
 
 # --- Kết Nối Đồng Bộ Deno Server (Authoritative Draft Phase) ---
 func _connect_network_draft() -> void:
@@ -1154,6 +1213,8 @@ func _connect_network_draft() -> void:
 		NetworkClient.connection_closed.connect(_on_network_draft_closed)
 	if not NetworkClient.connection_established.is_connected(_on_network_connected_for_draft):
 		NetworkClient.connection_established.connect(_on_network_connected_for_draft)
+	if not NetworkClient.error_received.is_connected(_on_network_draft_error):
+		NetworkClient.error_received.connect(_on_network_draft_error)
 
 	if NetworkClient.is_connected_to_server:
 		is_network_mode = true
@@ -1163,6 +1224,8 @@ func _on_network_connected_for_draft() -> void:
 	if _draft_joined or not NetworkClient:
 		return
 	is_network_mode = true
+	# A reconnect must accept the server's current revision as the new baseline.
+	_last_draft_revision = 0
 	var my_seat_num = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat in [1, 2, 3, 4] else 1
 	var my_uid = AuthManager.current_user_id if AuthManager else ""
 	var my_name = AuthManager.current_user_name if AuthManager else "Đại Tướng Quân"
@@ -1187,6 +1250,18 @@ func _on_network_draft_joined(assigned_seat: int) -> void:
 	_draft_joined = true
 	if assigned_seat >= 1 and assigned_seat <= 4 and NetworkClient:
 		NetworkClient.my_seat = assigned_seat
+		for slot in draft_slots:
+			slot["isPlayer"] = int(slot.get("seatNumber", 0)) == assigned_seat
+		_update_lock_in_button_state()
+
+func _on_network_draft_error(message: String) -> void:
+	if not is_draft_active or _pending_pick_hero_id <= 0:
+		return
+	print("[HeroSelect] Server từ chối chọn tướng: %s" % message)
+	_rollback_pending_pick()
+	if NetworkClient and NetworkClient.is_connected_to_server:
+		_draft_joined = false
+		_on_network_connected_for_draft()
 
 func _on_network_draft_closed() -> void:
 	if not is_draft_active:
@@ -1228,7 +1303,7 @@ func _apply_authoritative_draft_slots(server_slots: Array) -> void:
 			else:
 				local_s["chosenHero"] = null
 				local_s["isLocked"] = false
-				if local_s.get("isPlayer", false):
+				if local_s.get("isPlayer", false) and _pending_pick_hero_id <= 0:
 					is_player_locked = false
 			for node in left_slot_nodes:
 				if node.get("data") != local_s:
@@ -1249,11 +1324,27 @@ func _apply_authoritative_draft_slots(server_slots: Array) -> void:
 	for local_s in draft_slots:
 		if local_s.get("isLocked", false):
 			selected_hero_ids.append(int(local_s.get("chosenHero", {}).get("id", 0)))
+	if _pending_pick_hero_id > 0:
+		var pending_confirmed := false
+		for local_s in draft_slots:
+			if int(local_s.get("seatNumber", 0)) == _pending_pick_seat:
+				var pending_hero = local_s.get("chosenHero", {})
+				pending_confirmed = bool(local_s.get("isLocked", false)) and pending_hero is Dictionary and int(pending_hero.get("id", 0)) == _pending_pick_hero_id
+				break
+		if pending_confirmed:
+			_pending_pick_hero_id = 0
+			_pending_pick_seat = 0
+			is_player_locked = true
 
 func _on_server_draft_state_updated(data: Dictionary) -> void:
 	if not is_draft_active:
 		return
 	_server_state_received = true
+	var revision := int(data.get("revision", 0))
+	if revision > 0 and revision <= _last_draft_revision:
+		return
+	if revision > 0:
+		_last_draft_revision = revision
 
 	var phase = data.get("phase", "PICKING")
 	var t = int(data.get("timer", 0))
@@ -1265,7 +1356,14 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 		turn_timer_lbl.text = "⚔️ %ds" % t
 		return
 
-	current_picker_index = int(data.get("currentPickerIndex", 0))
+	# The server publishes a seat and a canonical index. Resolve by seat locally
+	# because matchmaking snapshots can arrive with slots in a different order.
+	var server_current_seat := int(data.get("currentSeat", 0))
+	var local_picker_index := _find_draft_slot_index(server_current_seat)
+	if local_picker_index >= 0:
+		current_picker_index = local_picker_index
+	else:
+		current_picker_index = int(data.get("currentPickerIndex", 0))
 	turn_timer_lbl.text = "⏳ %ds" % t
 	var server_seat = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat in [1, 2, 3, 4] else 1
 	for local_s in draft_slots:

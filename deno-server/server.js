@@ -314,14 +314,20 @@ function resolveDraftSeat(room, requestedSeat, payload, socket) {
 }
 
 function draftMessage(roomId, draft) {
+  const slots = [...draft.slots]
+    .sort((a, b) => a.seat - b.seat)
+    .map((slot) => ({ ...slot, seatNumber: slot.seat }));
+  const currentSeat = draft.slots[draft.currentPickerIndex]?.seat || 1;
+  const currentPickerIndex = slots.findIndex((slot) => slot.seat === currentSeat);
   return {
     type: "DRAFT_STATE_UPDATE",
     roomId,
-    currentPickerIndex: draft.currentPickerIndex,
-    currentSeat: draft.slots[draft.currentPickerIndex]?.seat || 1,
+    revision: draft.revision || 1,
+    currentPickerIndex: currentPickerIndex >= 0 ? currentPickerIndex : draft.currentPickerIndex,
+    currentSeat,
     timer: draft.timer,
-    slots: draft.slots,
-    selectedHeroIds: draft.slots.filter((slot) => slot.isLocked).map((slot) => slot.heroId),
+    slots,
+    selectedHeroIds: slots.filter((slot) => slot.isLocked).map((slot) => slot.heroId),
   };
 }
 
@@ -357,6 +363,7 @@ function createDraftRoom(roomId, payload, boundSeat) {
       timer: 40,
       timerStartAt: Date.now(),
       lastBroadcastTimer: 40,
+      revision: 1,
       isCompleted: false,
     },
     sockets: new Map(),
@@ -411,12 +418,14 @@ async function tickDraftRoom(roomId, room) {
     draft.timerStartAt = Date.now();
     draft.timer = 40;
     draft.lastBroadcastTimer = 40;
+    draft.revision = (draft.revision || 0) + 1;
     if (draft.currentPickerIndex >= draft.slots.length) {
       finishDraftAndStartBattle(roomId, room);
       return;
     }
   } else {
     draft.timer = Math.max(0, 40 - elapsed);
+    draft.revision = (draft.revision || 0) + 1;
   }
 
   if (draft.timer !== draft.lastBroadcastTimer) {
@@ -556,6 +565,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           if (payload.userId) slot.userId = String(payload.userId);
           if (payload.userName) slot.userName = String(payload.userName);
           slot.isAI = false;
+          room.draft.revision = (room.draft.revision || 0) + 1;
           currentRoomId = roomId;
           currentSeat = draftSeat;
           bindSocket(room, currentSeat, socket);
@@ -598,6 +608,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           room.draft.timer = 40;
           room.draft.timerStartAt = Date.now();
           room.draft.lastBroadcastTimer = 40;
+          room.draft.revision = (room.draft.revision || 0) + 1;
           room.lastActivity = Date.now();
           if (room.draft.currentPickerIndex >= room.draft.slots.length) {
             await finishDraftAndStartBattle(roomId, room);

@@ -208,7 +208,6 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 		return {}
 	var now = get_now_ms()
 	var best_room: Dictionary = {}
-	var min_diff = 999999
 	var best_real_count = -1
 	for doc in res["data"].get("documents", []):
 		if not (doc is Dictionary):
@@ -242,15 +241,12 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 		if (present and not is_requested_room) or not has_empty:
 			continue
 		var diff = abs(int(room.get("hostRankPoints", 0)) - my_rank_points)
+		var room_id = str(room.get("roomId", ""))
 		var best_room_id = str(best_room.get("roomId", "~"))
-		# Always choose the same room when player count/MMR are tied. This makes
-		# several one-player rooms converge instead of choosing each other.
-		# Rank difference only decides whether a room is eligible. Once eligible,
-		# all clients must choose the same deterministic anchor: fullest room,
-		# then smallest roomId. Choosing closest MMR here makes clients with
-		# different ratings select different one-player rooms and never merge.
-		if diff <= max_rank_diff and (real_count > best_real_count or (real_count == best_real_count and str(room.get("roomId", "")) < best_room_id)):
-			min_diff = diff
+		# Use one deterministic anchor for every client. Choosing the fullest
+		# room first can split two groups of players into different rooms; all
+		# eligible clients must converge on the same smallest roomId instead.
+		if diff <= max_rank_diff and (room_id < best_room_id or (room_id == best_room_id and real_count > best_real_count)):
 			best_real_count = real_count
 			best_room = room
 	return best_room

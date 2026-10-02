@@ -1,10 +1,11 @@
-[gd_scene load_steps=12 format=3 uid="uid://battle2v2scene123"]
+[gd_scene load_steps=13 format=3 uid="uid://battle2v2scene123"]
 
 [ext_resource type="Theme" uid="uid://d4af37royalgold" path="res://resources/themes/royal_gold_theme.tres" id="1_theme"]
 [ext_resource type="Script" path="res://scenes/battle_2v2.gd" id="2_script"]
 [ext_resource type="Texture2D" uid="uid://de3p08snhv5qn" path="res://assets/ui/home_background.png" id="3_bg"]
 [ext_resource type="PackedScene" uid="uid://cgeneralavatar123" path="res://scenes/components/general_avatar_ui.tscn" id="4_avatar"]
 [ext_resource type="Texture2D" uid="uid://b3cx3q63bytrs" path="res://assets/ui/card_back_bg.png" id="5_deck_card"]
+[ext_resource type="PackedScene" path="res://scenes/components/hero_info_modal.tscn" id="6_hero_info_modal"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_log_panel"]
 bg_color = Color(0.06, 0.08, 0.14, 0.88)
@@ -631,121 +632,10 @@ focus_mode = 0
 theme_override_font_sizes/font_size = 12
 text = "❌ BỎ QUA"
 
-[node name="GeneralInfoModal" type="Control" parent="."]
+[node name="GeneralInfoModal" parent="." instance=ExtResource("6_hero_info_modal")]
 visible = false
-z_as_relative = false
 z_index = 320
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="DarkMask" type="ColorRect" parent="GeneralInfoModal"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0.02, 0.03, 0.06, 0.7)
-
-[node name="Dim" type="CenterContainer" parent="GeneralInfoModal"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="Box" type="PanelContainer" parent="GeneralInfoModal/Dim"]
-custom_minimum_size = Vector2(620, 380)
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
-
-[node name="Margin" type="MarginContainer" parent="GeneralInfoModal/Dim/Box"]
-layout_mode = 2
-theme_override_constants/margin_left = 28
-theme_override_constants/margin_top = 22
-theme_override_constants/margin_right = 28
-theme_override_constants/margin_bottom = 22
-
-[node name="VBox" type="VBoxContainer" parent="GeneralInfoModal/Dim/Box/Margin"]
-layout_mode = 2
-theme_override_constants/separation = 12
-
-[node name="HeaderHBox" type="HBoxContainer" parent="GeneralInfoModal/Dim/Box/Margin/VBox"]
-layout_mode = 2
-
-[node name="ModalTitle" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/HeaderHBox"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.831373, 0.686275, 0.215686, 1)
-theme_override_font_sizes/font_size = 16
-text = "THÔNG TIN TƯỚNG"
-
-[node name="CloseXBtn" type="Button" parent="GeneralInfoModal/Dim/Box/Margin/VBox/HeaderHBox"]
-custom_minimum_size = Vector2(34, 34)
-layout_mode = 2
-text = "✕"
-
-[node name="ContentHBox" type="HBoxContainer" parent="GeneralInfoModal/Dim/Box/Margin/VBox"]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 16
-
-[node name="LeftCol" type="VBoxContainer" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox"]
-custom_minimum_size = Vector2(190, 0)
-layout_mode = 2
-
-[node name="HeroName" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/LeftCol"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.9, 0.45, 1)
-theme_override_font_sizes/font_size = 17
-text = "Tên Tướng"
-
-[node name="HeroStats" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/LeftCol"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-text = "Thế Lực: Trung\nMáu: 4/4\nBài trên tay: 4 lá"
-
-[node name="RightCol" type="VBoxContainer" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="SkillBox" type="PanelContainer" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="Margin" type="MarginContainer" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/SkillBox"]
-layout_mode = 2
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 8
-
-[node name="VBox" type="VBoxContainer" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/SkillBox/Margin"]
-layout_mode = 2
-
-[node name="SkillTitle" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/SkillBox/Margin/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.831373, 0.686275, 0.215686, 1)
-theme_override_font_sizes/font_size = 14
-text = "Kỹ Năng: DŨNG TƯỚNG"
-
-[node name="SkillDesc" type="Label" parent="GeneralInfoModal/Dim/Box/Margin/VBox/ContentHBox/RightCol/SkillBox/Margin/VBox"]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_font_sizes/font_size = 13
-text = "Mô tả kỹ năng tướng."
-autowrap_mode = 2
-
-[node name="CloseModalBtn" type="Button" parent="GeneralInfoModal/Dim/Box/Margin/VBox"]
-custom_minimum_size = Vector2(160, 42)
-layout_mode = 2
-size_flags_horizontal = 4
-text = "ĐÓNG"
+z_as_relative = false
 
 [node name="VictoryDefeatModal" type="Control" parent="."]
 visible = false
