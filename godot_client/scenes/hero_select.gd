@@ -873,8 +873,11 @@ func _inspect_hero(hero: Dictionary) -> void:
 	_update_lock_in_button_state()
 
 func _is_my_turn() -> bool:
+	var my_seat_num = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat in [1, 2, 3, 4] else 1
 	if current_picker_index >= 0 and current_picker_index < draft_slots.size():
-		return draft_slots[current_picker_index].get("isPlayer", false)
+		var slot = draft_slots[current_picker_index]
+		var s_num = int(slot.get("seatNumber", slot.get("seat", current_picker_index + 1)))
+		return bool(slot.get("isPlayer", false)) or s_num == my_seat_num
 	return false
 
 func _update_lock_in_button_state() -> void:
@@ -1345,16 +1348,23 @@ func _apply_authoritative_draft_slots(server_slots: Array) -> void:
 		if hero_card_nodes.has(hid):
 			hero_card_nodes[hid].modulate = Color(0.4, 0.4, 0.4, 0.8)
 	if _pending_pick_hero_id > 0:
-		var pending_confirmed := false
+		var my_slot: Dictionary = {}
 		for local_s in draft_slots:
 			if int(local_s.get("seatNumber", 0)) == _pending_pick_seat:
-				var pending_hero = local_s.get("chosenHero", {})
-				pending_confirmed = bool(local_s.get("isLocked", false)) and pending_hero is Dictionary and int(pending_hero.get("id", 0)) == _pending_pick_hero_id
+				my_slot = local_s
 				break
-		if pending_confirmed:
-			_pending_pick_hero_id = 0
-			_pending_pick_seat = 0
-			is_player_locked = true
+		if not my_slot.is_empty():
+			var pending_hero = my_slot.get("chosenHero", {})
+			var is_locked = bool(my_slot.get("isLocked", false))
+			var picked_hid = int(pending_hero.get("id", 0)) if pending_hero is Dictionary else 0
+			if is_locked and picked_hid == _pending_pick_hero_id:
+				_pending_pick_hero_id = 0
+				_pending_pick_seat = 0
+				is_player_locked = true
+			elif is_locked or current_picker_index != _find_draft_slot_index(_pending_pick_seat):
+				_pending_pick_hero_id = 0
+				_pending_pick_seat = 0
+				is_player_locked = is_locked
 
 func _on_server_draft_state_updated(data: Dictionary) -> void:
 	if not is_draft_active:
