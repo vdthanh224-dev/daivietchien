@@ -665,16 +665,28 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
 
         const isJoinAction = action === "JOIN_ROOM" || action === "INIT_GAME" || action === "JOIN_DRAFT";
 
-        // A connection receives its identity only after a successful join.
-        // Thereafter a client cannot switch rooms or impersonate another seat.
-        if (!isJoinAction && currentRoomId === null) {
-          return socket.send(JSON.stringify({ type: "ERROR", error: "Kết nối chưa tham gia phòng" }));
-        }
-        if (isJoinAction && requestSeat === 0) {
-          return socket.send(JSON.stringify({ type: "ERROR", error: "Ghế không hợp lệ" }));
-        }
-        if (currentRoomId !== null && (roomId !== currentRoomId || (requestSeat !== 0 && requestSeat !== currentSeat))) {
-          return socket.send(JSON.stringify({ type: "ERROR", error: "Kết nối đã được khóa vào phòng/ghế khác" }));
+        if (isJoinAction) {
+          if (requestSeat === 0) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Ghế không hợp lệ" }));
+          }
+          // Chuyển sang phòng mới: tháo gỡ socket khỏi phòng cũ một cách sạch sẽ
+          if (currentRoomId !== null && currentRoomId !== roomId) {
+            const oldRoom = rooms.get(currentRoomId);
+            if (oldRoom && oldRoom.sockets && oldRoom.sockets.get(currentSeat) === socket) {
+              oldRoom.sockets.delete(currentSeat);
+            }
+            currentRoomId = null;
+            currentSeat = 0;
+          }
+        } else {
+          // Các hành động trong trận (PICK_HERO, PLAY_CARD, ...):
+          // Kết nối phải đã tham gia phòng, và không được đổi phòng hoặc ghế khác.
+          if (currentRoomId === null) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Kết nối chưa tham gia phòng" }));
+          }
+          if (roomId !== currentRoomId || (requestSeat !== 0 && requestSeat !== currentSeat)) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Kết nối đã được khóa vào phòng/ghế khác" }));
+          }
         }
 
         // For bound connections, an omitted seat is resolved to the bound
@@ -691,9 +703,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           if (!room?.draft) {
             return socket.send(JSON.stringify({ type: "ERROR", error: "Không thể khởi tạo phòng chọn tướng" }));
           }
-          const draftSeat = currentRoomId === null
-            ? resolveDraftSeat(room, boundSeat, payload, socket)
-            : boundSeat;
+          const draftSeat = resolveDraftSeat(room, currentSeat || boundSeat || requestSeat, payload, socket);
           if (!draftSeat) {
             return socket.send(JSON.stringify({ type: "ERROR", error: "Phòng đã đủ 4 ghế" }));
           }

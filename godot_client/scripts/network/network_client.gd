@@ -354,6 +354,11 @@ func send_pick_hero(hero_id: int, hero_name: String = "") -> void:
 		"heroName": hero_name
 	})
 
+func leave_room() -> void:
+	room_id = ""
+	last_processed_action_seq = -1
+	last_state = {}
+
 func send_join_room(target_room: String, seat: int, players_data: Array = []) -> void:
 	room_id = target_room
 	my_seat = seat

@@ -981,6 +981,8 @@ func _show_no_server_modal(message: String = "") -> void:
 	btn_style.corner_radius_bottom_right = 8
 	btn.add_theme_stylebox_override("normal", btn_style)
 	btn.pressed.connect(func():
+		if NetworkClient:
+			NetworkClient.room_id = ""
 		get_tree().change_scene_to_file("res://scenes/home.tscn")
 	)
 	vbox.add_child(btn)
@@ -999,13 +1001,13 @@ func _start_draft_sequence() -> void:
 
 func _start_network_draft_watchdog() -> void:
 	_server_state_received = false
-	for retry in range(3):
-		await get_tree().create_timer(3.0).timeout
+	for retry in range(4):
+		await get_tree().create_timer(2.5).timeout
 		if _server_state_received or not is_draft_active or not is_network_mode:
 			return
-		if NetworkClient and NetworkClient.is_connected_to_server and not _draft_joined:
-			print("[HeroSelect] 🔁 Gửi lại JOIN_DRAFT lần %d." % (retry + 1))
-			_on_network_connected_for_draft()
+		if NetworkClient and NetworkClient.is_connected_to_server and not _server_state_received:
+			print("[HeroSelect] 🔁 Chưa nhận trạng thái chọn tướng từ Deno, gửi lại JOIN_DRAFT lần %d." % (retry + 1))
+			_on_network_connected_for_draft(true)
 
 	if not _server_state_received and is_draft_active and is_network_mode:
 		print("[HeroSelect] ⚠️ Máy chủ không phản hồi lượt chọn tướng.")
@@ -1234,8 +1236,8 @@ func _connect_network_draft() -> void:
 		is_network_mode = true
 		_on_network_connected_for_draft()
 
-func _on_network_connected_for_draft() -> void:
-	if _draft_joined or not NetworkClient:
+func _on_network_connected_for_draft(force: bool = false) -> void:
+	if (_draft_joined and not force) or not NetworkClient:
 		return
 	is_network_mode = true
 	# A reconnect must accept the server's current revision as the new baseline.
@@ -1279,13 +1281,17 @@ func _on_network_draft_joined(assigned_seat: int) -> void:
 		_update_lock_in_button_state()
 
 func _on_network_draft_error(message: String) -> void:
-	if not is_draft_active or _pending_pick_hero_id <= 0:
-		return
-	print("[HeroSelect] Server từ chối chọn tướng: %s" % message)
-	_rollback_pending_pick()
-	if NetworkClient and NetworkClient.is_connected_to_server:
+	print("[HeroSelect] ⚠️ Server phản hồi lỗi: %s" % message)
+	if _pending_pick_hero_id > 0:
+		_rollback_pending_pick()
+	if "đã được khóa vào phòng" in message or "chưa tham gia phòng" in message:
+		print("[HeroSelect] 🔄 Đặt lại kết nối socket do lệch trạng thái phòng. Đang kết nối lại...")
 		_draft_joined = false
-		_on_network_connected_for_draft()
+		if NetworkClient and NetworkClient.socket:
+			NetworkClient.socket.close()
+			NetworkClient.connect_to_server()
+	elif NetworkClient and NetworkClient.is_connected_to_server and not _server_state_received:
+		_on_network_connected_for_draft(true)
 
 func _on_network_draft_closed() -> void:
 	if not is_draft_active:
@@ -1535,6 +1541,8 @@ func _show_battle_launch_dialog() -> void:
 	home_btn.text = "🏠 VỀ ĐẠI SẢNH"
 	_style_cancel_small_btn(home_btn)
 	home_btn.pressed.connect(func():
+		if NetworkClient:
+			NetworkClient.room_id = ""
 		get_tree().change_scene_to_file("res://scenes/home.tscn")
 	)
 	btn_hbox.add_child(home_btn)
@@ -1542,6 +1550,8 @@ func _show_battle_launch_dialog() -> void:
 func _on_exit_pressed() -> void:
 	AudioManager.play_card_select()
 	is_draft_active = false
+	if NetworkClient:
+		NetworkClient.room_id = ""
 	get_tree().change_scene_to_file("res://scenes/home.tscn")
 
 # --- Button Styling Helpers ---

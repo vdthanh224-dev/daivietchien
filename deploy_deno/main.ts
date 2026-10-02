@@ -457,18 +457,24 @@ Deno.serve({ port, hostname }, async (req) => {
         }
 
         const isJoinAction = action === "JOIN_ROOM" || action === "INIT_GAME" || action === "JOIN_DRAFT";
-        if (!isJoinAction && currentRoomId === null) {
-          return socket.send(JSON.stringify({ type: "ERROR", error: "Kết nối chưa tham gia phòng" }));
-        }
-        if (isJoinAction && requestSeat === 0) {
-          return socket.send(JSON.stringify({ type: "ERROR", error: "Ghế không hợp lệ" }));
-        }
-        if (currentRoomId !== null) {
-          if (roomId !== currentRoomId) {
-            return socket.send(JSON.stringify({ type: "ERROR", error: "Kết nối đã được khóa vào phòng khác" }));
+        if (isJoinAction) {
+          if (requestSeat === 0) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Ghế không hợp lệ" }));
           }
-          if (requestSeat !== 0 && requestSeat !== currentSeat) {
-            console.log(`[Deno WS] Socket phòng ${roomId} gửi requestSeat=${requestSeat}, nhưng đã khóa vào ghế ${currentSeat}. Tiếp tục dùng ghế ${currentSeat}.`);
+          if (currentRoomId !== null && currentRoomId !== roomId) {
+            const oldRoom = rooms.get(currentRoomId);
+            if (oldRoom && oldRoom.sockets && oldRoom.sockets.get(currentSeat) === socket) {
+              oldRoom.sockets.delete(currentSeat);
+            }
+            currentRoomId = null;
+            currentSeat = 0;
+          }
+        } else {
+          if (currentRoomId === null) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Kết nối chưa tham gia phòng" }));
+          }
+          if (roomId !== currentRoomId || (requestSeat !== 0 && requestSeat !== currentSeat)) {
+            return socket.send(JSON.stringify({ type: "ERROR", error: "Kết nối đã được khóa vào phòng khác" }));
           }
         }
 

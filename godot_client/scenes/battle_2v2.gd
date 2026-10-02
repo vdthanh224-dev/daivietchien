@@ -370,6 +370,8 @@ func _show_no_server_modal(message: String = "") -> void:
 	btn_style.corner_radius_bottom_right = 8
 	btn.add_theme_stylebox_override("normal", btn_style)
 	btn.pressed.connect(func():
+		if NetworkClient:
+			NetworkClient.room_id = ""
 		get_tree().change_scene_to_file("res://scenes/home.tscn")
 	)
 	vbox.add_child(btn)
@@ -7874,6 +7876,8 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 		victory_desc.text = "Tất cả các tướng phe bạn đã ngã xuống. Hãy rèn luyện thêm binh pháp và trở lại phục thù!\n\n🎁 Phần thưởng: +40 EXP • +50 Vàng"
 
 func _on_return_home_clicked() -> void:
+	if NetworkClient:
+		NetworkClient.room_id = ""
 	get_tree().change_scene_to_file("res://scenes/home.tscn")
 
 func _is_ai_controller() -> bool:
