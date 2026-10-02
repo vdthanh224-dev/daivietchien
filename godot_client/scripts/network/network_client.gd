@@ -45,11 +45,10 @@ var is_scanning_candidates: bool = false
 var candidate_timer: float = 0.0
 var _reconnect_timer: float = 0.0
 
+var _instance_lock_server: TCPServer = null
 var auto_instance_index: int = 1
 
 func _detect_instance_index() -> int:
-	# Explicit test seats are still supported, but no local socket is opened to
-	# infer them. Production clients receive their seat from the cloud server.
 	var all_args = OS.get_cmdline_args() + OS.get_cmdline_user_args()
 	for arg in all_args:
 		if arg.begins_with("--seat=") or arg.begins_with("--tester="):
@@ -57,6 +56,17 @@ func _detect_instance_index() -> int:
 			if value >= 1 and value <= 4:
 				seat_is_explicit = true
 				return value
+
+	# Tự động nhận diện cửa sổ 1, 2, 3, 4 khi chạy nhiều instance (Godot Run Multiple Instances)
+	for s in range(1, 5):
+		var srv = TCPServer.new()
+		var err = srv.listen(6010 + s, "127.0.0.1")
+		if err == OK:
+			_instance_lock_server = srv
+			if s > 1:
+				seat_is_explicit = true
+			return s
+
 	seat_is_explicit = false
 	return 1
 

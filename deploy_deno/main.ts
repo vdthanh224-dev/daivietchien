@@ -396,13 +396,28 @@ function resolveDraftSeat(room: RoomData, requestedSeat: number, payload: any, s
   const userId = normalize(payload.userId);
   const userName = normalize(payload.userName);
   const byId = userId ? slots.filter((slot: any) => normalize(slot.userId) === userId) : [];
-  if (byId.length === 1) return byId[0].seat;
+  if (byId.length === 1) {
+    const existingSocket = room.sockets.get(byId[0].seat);
+    if (!existingSocket || existingSocket === socket || existingSocket.readyState !== WebSocket.OPEN) {
+      return byId[0].seat;
+    }
+  }
   const byName = userName ? slots.filter((slot: any) => normalize(slot.userName) === userName) : [];
-  if (byName.length === 1) return byName[0].seat;
+  if (byName.length === 1) {
+    const existingSocket = room.sockets.get(byName[0].seat);
+    if (!existingSocket || existingSocket === socket || existingSocket.readyState !== WebSocket.OPEN) {
+      return byName[0].seat;
+    }
+  }
 
-  // Duplicate debug identities use the requested per-window seat.
-  if (!room.sockets.has(requestedSeat) || room.sockets.get(requestedSeat) === socket) return requestedSeat;
-  return slots.find((slot: any) => !room.sockets.has(slot.seat))?.seat || 0;
+  // Duplicate debug identities or extra players use the requested per-window seat if available.
+  if (!room.sockets.has(requestedSeat) || room.sockets.get(requestedSeat) === socket || room.sockets.get(requestedSeat)?.readyState !== WebSocket.OPEN) {
+    return requestedSeat;
+  }
+  return slots.find((slot: any) => {
+    const s = room.sockets.get(slot.seat);
+    return !s || s.readyState !== WebSocket.OPEN;
+  })?.seat || 0;
 }
 
 const port = Number(Deno.env.get("PORT")) || 8080;

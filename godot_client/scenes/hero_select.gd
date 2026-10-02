@@ -1257,6 +1257,16 @@ func _on_network_draft_joined(assigned_seat: int) -> void:
 		NetworkClient.my_seat = assigned_seat
 		for slot in draft_slots:
 			slot["isPlayer"] = int(slot.get("seatNumber", 0)) == assigned_seat
+		for i in range(left_slot_nodes.size()):
+			var node = left_slot_nodes[i]
+			var s_data = node.get("data", {})
+			var s_num = int(s_data.get("seatNumber", i + 1))
+			var is_me = (s_num == assigned_seat)
+			var seat_lbl: Label = node.get("player")
+			if seat_lbl and is_instance_valid(seat_lbl):
+				seat_lbl.text = _get_anonymous_slot_name(i)
+				seat_lbl.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0, 1.0) if is_me else Color.WHITE)
+		_highlight_active_picker(current_picker_index)
 		_update_lock_in_button_state()
 
 func _on_network_draft_error(message: String) -> void:
@@ -1311,7 +1321,7 @@ func _apply_authoritative_draft_slots(server_slots: Array) -> void:
 				if local_s.get("isPlayer", false) and _pending_pick_hero_id <= 0:
 					is_player_locked = false
 			for node in left_slot_nodes:
-				if node.get("data") != local_s:
+				if int(node.get("data", {}).get("seatNumber", 0)) != s_num:
 					continue
 				var team_lbl = node.get("team")
 				if team_lbl and is_instance_valid(team_lbl):
@@ -1328,7 +1338,12 @@ func _apply_authoritative_draft_slots(server_slots: Array) -> void:
 	selected_hero_ids.clear()
 	for local_s in draft_slots:
 		if local_s.get("isLocked", false):
-			selected_hero_ids.append(int(local_s.get("chosenHero", {}).get("id", 0)))
+			var chosen = local_s.get("chosenHero", {})
+			if chosen is Dictionary and chosen.has("id"):
+				selected_hero_ids.append(int(chosen["id"]))
+	for hid in selected_hero_ids:
+		if hero_card_nodes.has(hid):
+			hero_card_nodes[hid].modulate = Color(0.4, 0.4, 0.4, 0.8)
 	if _pending_pick_hero_id > 0:
 		var pending_confirmed := false
 		for local_s in draft_slots:

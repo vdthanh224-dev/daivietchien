@@ -291,26 +291,41 @@ function randomTeamSeats() {
 }
 
 function resolveDraftSeat(room, requestedSeat, payload, socket) {
-    const slots = room.draft?.slots || [];
-    const normalize = (value) => String(value || "").trim().toLowerCase();
-    // Godot debug windows can share one UID/name through user://; honor their explicit seat.
-    if (Number(payload.debugSeat) === requestedSeat && requestedSeat >= 1 && requestedSeat <= 4) {
-        return requestedSeat;
-    }
-    const userId = normalize(payload.userId);
+  const slots = room.draft?.slots || [];
+  const normalize = (value) => String(value || "").trim().toLowerCase();
+  // Godot debug windows can share one UID/name through user://; honor their explicit seat.
+  if (Number(payload.debugSeat) === requestedSeat && requestedSeat >= 1 && requestedSeat <= 4) {
+    return requestedSeat;
+  }
+  const userId = normalize(payload.userId);
   const userName = normalize(payload.userName);
   const byId = userId
     ? slots.filter((slot) => normalize(slot.userId) === userId)
     : [];
-  if (byId.length === 1) return byId[0].seat;
+  if (byId.length === 1) {
+    const existingSocket = room.sockets.get(byId[0].seat);
+    if (!existingSocket || existingSocket === socket || existingSocket.readyState !== WebSocket.OPEN) {
+      return byId[0].seat;
+    }
+  }
   const byName = userName
     ? slots.filter((slot) => normalize(slot.userName) === userName)
     : [];
-  if (byName.length === 1) return byName[0].seat;
+  if (byName.length === 1) {
+    const existingSocket = room.sockets.get(byName[0].seat);
+    if (!existingSocket || existingSocket === socket || existingSocket.readyState !== WebSocket.OPEN) {
+      return byName[0].seat;
+    }
+  }
 
-  // Duplicate debug identities use the requested per-window seat.
-  if (!room.sockets.has(requestedSeat) || room.sockets.get(requestedSeat) === socket) return requestedSeat;
-  return slots.find((slot) => !room.sockets.has(slot.seat))?.seat || 0;
+  // If requested seat is available or occupied by the same/closed socket, use it.
+  if (!room.sockets.has(requestedSeat) || room.sockets.get(requestedSeat) === socket || room.sockets.get(requestedSeat)?.readyState !== WebSocket.OPEN) {
+    return requestedSeat;
+  }
+  return slots.find((slot) => {
+    const s = room.sockets.get(slot.seat);
+    return !s || s.readyState !== WebSocket.OPEN;
+  })?.seat || 0;
 }
 
 function draftMessage(roomId, draft) {

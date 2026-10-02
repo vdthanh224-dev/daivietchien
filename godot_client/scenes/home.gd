@@ -411,104 +411,12 @@ func _build_top_header() -> void:
 	header_hbox.add_child(settings_btn)
 
 func _build_four_game_modes() -> void:
-	# Trung tâm Sảnh Chính chuẩn AAA: Tôn vinh Danh Tướng và Chiến Lệnh Đài
-	_build_hero_stage()
+	# Sảnh Chính: Chiến Lệnh Đài và Thông Báo
 	_build_tactical_command_dock()
 	_build_event_notice_banner()
 
 func _build_hero_stage() -> void:
-	hero_stage_container = Control.new()
-	hero_stage_container.anchors_preset = PRESET_FULL_RECT
-	hero_stage_container.mouse_filter = MOUSE_FILTER_PASS
-	add_child(hero_stage_container)
-
-	# 1. Sprite Danh Tướng trung tâm (Có bóng đổ hoàng gia)
-	hero_sprite = TextureRect.new()
-	hero_sprite.custom_minimum_size = Vector2(480, 530)
-	hero_sprite.size = Vector2(480, 530)
-	hero_sprite.position = Vector2(390, 110)
-	hero_sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	hero_sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	hero_sprite.mouse_filter = MOUSE_FILTER_STOP
-
-	# Tải ảnh tướng trong suốt chất lượng cao (Trần Hưng Đạo hoặc Lý Thường Kiệt)
-	var hero_path = "res://assets/heroes_transparent/tran_hung_dao.png"
-	if not ResourceLoader.exists(hero_path):
-		hero_path = "res://assets/heroes_transparent/ly_thuong_kiet.png"
-	if not ResourceLoader.exists(hero_path):
-		hero_path = "res://assets/ui/tran_hung_dao.png"
-	hero_sprite.texture = load(hero_path)
-	hero_stage_container.add_child(hero_sprite)
-
-	# Hiệu ứng chuyển động thở tự nhiên (Idle Breathing Motion)
-	var base_y = hero_sprite.position.y
-	var hero_tw = create_tween().set_loops()
-	hero_tw.tween_property(hero_sprite, "position:y", base_y - 6.0, 2.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	hero_tw.tween_property(hero_sprite, "position:y", base_y, 2.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-
-	# 2. Bong bóng thoại Hào hùng của Danh Tướng (Dialogue Callout)
-	hero_dialogue_bubble = PanelContainer.new()
-	hero_dialogue_bubble.custom_minimum_size = Vector2(400, 68)
-	hero_dialogue_bubble.position = Vector2(430, 78)
-	var bubble_style = StyleBoxFlat.new()
-	bubble_style.bg_color = Color(0.06, 0.04, 0.08, 0.94)
-	bubble_style.border_width_left = 2
-	bubble_style.border_width_top = 2
-	bubble_style.border_width_right = 2
-	bubble_style.border_width_bottom = 2
-	bubble_style.border_color = COLOR_GOLD_PRIMARY
-	bubble_style.corner_radius_top_left = 12
-	bubble_style.corner_radius_top_right = 12
-	bubble_style.corner_radius_bottom_right = 12
-	bubble_style.corner_radius_bottom_left = 12
-	bubble_style.shadow_color = Color(0, 0, 0, 0.7)
-	bubble_style.shadow_size = 14
-	bubble_style.shadow_offset = Vector2(0, 4)
-	hero_dialogue_bubble.add_theme_stylebox_override("panel", bubble_style)
-
-	var b_vbox = VBoxContainer.new()
-	b_vbox.set_anchors_preset(PRESET_FULL_RECT)
-	b_vbox.offset_left = 14
-	b_vbox.offset_right = -14
-	b_vbox.offset_top = 8
-	b_vbox.offset_bottom = -8
-	b_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-
-	hero_dialogue_label = Label.new()
-	hero_dialogue_label.text = "\"Khoan thư sức dân làm kế sâu rễ bền gốc, đó là thượng sách giữ nước!\""
-	hero_dialogue_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hero_dialogue_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hero_dialogue_label.add_theme_font_size_override("font_size", 11)
-	hero_dialogue_label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.65, 1.0))
-	b_vbox.add_child(hero_dialogue_label)
-
-	var hero_sub_lbl = Label.new()
-	hero_sub_lbl.text = "⚔️ Tiết Chế Quốc Công Trần Hưng Đạo • Đại Việt"
-	hero_sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hero_sub_lbl.add_theme_font_size_override("font_size", 9)
-	hero_sub_lbl.add_theme_color_override("font_color", COLOR_GOLD_PRIMARY)
-	b_vbox.add_child(hero_sub_lbl)
-
-	hero_dialogue_bubble.add_child(b_vbox)
-	hero_stage_container.add_child(hero_dialogue_bubble)
-
-	# Bấm vào Tướng để phát voice line & kích hoạt thoại
-	hero_sprite.gui_input.connect(func(event: InputEvent):
-		if event is InputEventMouseButton and event.pressed:
-			_trigger_hero_interaction()
-	)
-
-	# 3. Bệ Danh Tướng & Nút đổi tướng nhanh
-	var hero_pedestal = Button.new()
-	hero_pedestal.custom_minimum_size = Vector2(280, 42)
-	hero_pedestal.position = Vector2(490, 595)
-	_style_white_gold_button(hero_pedestal, 20, 6, Vector2(0, 2))
-	hero_pedestal.text = "👑 TRẦN HƯNG ĐẠO  (Đổi Tướng ▾)"
-	hero_pedestal.add_theme_font_size_override("font_size", 12)
-	hero_pedestal.pressed.connect(func():
-		_show_modal("KHO DANH TƯỚNG ĐẠI VIỆT", _build_heroes_content())
-	)
-	hero_stage_container.add_child(hero_pedestal)
+	pass
 
 func _build_tactical_command_dock() -> void:
 	var cmd_container = Control.new()
