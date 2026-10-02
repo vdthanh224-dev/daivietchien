@@ -2071,41 +2071,20 @@ func _build_settings_content() -> Control:
 	div.color = COLOR_GOLD_PRIMARY
 	container.add_child(div)
 
-	# Server Connection Setting for LAN / Multi-device
+	# Realtime match and draft state always use the shared online server.
 	var srv_v = VBoxContainer.new()
 	srv_v.add_theme_constant_override("separation", 6)
 	var srv_lbl = Label.new()
-	srv_lbl.text = "🌐 Địa chỉ Máy Chủ Realtime (Cổng 8080):"
+	srv_lbl.text = "🌐 Máy Chủ Realtime: Deno Cloud"
 	srv_lbl.add_theme_font_size_override("font_size", 13)
 	srv_lbl.add_theme_color_override("font_color", COLOR_TEXT_DARK)
 	srv_v.add_child(srv_lbl)
 
-	var srv_input = LineEdit.new()
-	srv_input.custom_minimum_size = Vector2(0, 38)
-	srv_input.text = NetworkClient.server_url if NetworkClient else "ws://127.0.0.1:8080"
-	srv_v.add_child(srv_input)
-
-	var srv_preset_hbox = HBoxContainer.new()
-	srv_preset_hbox.add_theme_constant_override("separation", 8)
-
-	var local_btn = Button.new()
-	local_btn.text = "💻 Localhost"
-	local_btn.pressed.connect(func(): srv_input.text = "ws://127.0.0.1:8080")
-	srv_preset_hbox.add_child(local_btn)
-
-	var lan_btn = Button.new()
-	lan_btn.text = "🏠 Mạng LAN (192.168.1.102)"
-	lan_btn.pressed.connect(func(): srv_input.text = "ws://192.168.1.102:8080")
-	srv_preset_hbox.add_child(lan_btn)
-
-	var save_srv_btn = Button.new()
-	save_srv_btn.text = "💾 Lưu & Kết Nối Lại"
-	save_srv_btn.pressed.connect(func():
-		if NetworkClient:
-			NetworkClient.save_server_url(srv_input.text.strip_edges())
-	)
-	srv_preset_hbox.add_child(save_srv_btn)
-	srv_v.add_child(srv_preset_hbox)
+	var srv_value = Label.new()
+	srv_value.text = "dai-viet-chien-server.vdthanh.deno.net"
+	srv_value.add_theme_font_size_override("font_size", 12)
+	srv_value.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	srv_v.add_child(srv_value)
 	container.add_child(srv_v)
 
 	var div2 = ColorRect.new()
