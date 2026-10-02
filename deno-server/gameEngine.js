@@ -6009,12 +6009,13 @@ export function tickGameState(state, connectedSeats = null) {
       state.timerStartAt = Date.now();
       changed = true;
   }
-  const elapsed = Math.floor((Date.now() - state.timerStartAt) / 1000);
+  const elapsedMs = Date.now() - state.timerStartAt;
+  const elapsed = Math.floor(elapsedMs / 1000);
   const newTimer = Math.max(0, 40 - elapsed);
 
   // Giai đoạn chờ lật bài phán xét (AWAIT_JUDGEMENT)
   if (state.phase === "AWAIT_JUDGEMENT") {
-    if (elapsed >= 3) {
+    if (elapsedMs >= 1500) {
       applyPendingJudgement(state);
       important = true;
       state.timerStartAt = Date.now();
@@ -6106,7 +6107,7 @@ export function tickGameState(state, connectedSeats = null) {
     const canAIReact = !["AWAIT_UAT_KHI", "AWAIT_KHOI_BINH", "AWAIT_HUYNH_TRUONG", "AWAIT_THU_MUC"].includes(state.phase)
       && isAISlot
       && (waitingPlayer.hp > 0 || state.phase === "AWAIT_NEAR_DEATH");
-    if (canAIReact && elapsed >= 2 && elapsed < 40) {
+    if (canAIReact && elapsedMs >= 500 && elapsed < 40) {
         const res = handleAIReaction(state, waitingSeat);
         if (res && res.error) {
             console.log("[AI ERROR]", res.error, state.phase, waitingSeat);
@@ -6146,7 +6147,7 @@ export function tickGameState(state, connectedSeats = null) {
     }
 
     const isAITurn = turnPlayer && (turnPlayer.isAI || (Array.isArray(connectedSeats) && !connectedSeats.includes(state.turnSeat)));
-    if (isAITurn && turnPlayer.hp > 0 && elapsed >= 2 && elapsed < 40) {
+    if (isAITurn && turnPlayer.hp > 0 && elapsedMs >= 700 && elapsed < 40) {
       handleAIStep(state, state.turnSeat);
       important = true;
       state.timerStartAt = Date.now();

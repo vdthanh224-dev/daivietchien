@@ -603,14 +603,14 @@ setInterval(() => {
       if (!room.state || isFinished) continue;
 
       if (now >= (room.nextTickAt || 0)) {
-        room.nextTickAt = now + 1000;
+        room.nextTickAt = now + 250;
         tickSharedRoom(roomId, room);
       }
     } catch (err) {
       console.error(`[Room Loop Error room ${roomId}]:`, err);
     }
   }
-}, 500);
+}, 250);
 
 Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
   const upgrade = req.headers.get("upgrade") || "";

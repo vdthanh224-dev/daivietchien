@@ -267,8 +267,10 @@ function ensureTickTimer() {
       // 1. Tick giai đoạn DRAFT (Chọn Tướng)
       if (room.draft && !room.draft.isCompleted) {
         const draft = room.draft;
-        draft.timer = Math.max(0, draft.timer - 1);
-        draft.revision += 1;
+        const draftElapsed = Math.floor((now - (draft.timerStartAt || now)) / 1000);
+        const newDraftTimer = Math.max(0, 40 - draftElapsed);
+        const timerChanged = draft.timer !== newDraftTimer;
+        draft.timer = newDraftTimer;
         room.lastActivity = now;
 
         const currentSlot = draft.slots[draft.currentPickerIndex];
@@ -288,19 +290,21 @@ function ensureTickTimer() {
           draft.currentPickerIndex++;
           draft.timer = 40;
           draft.timerStartAt = now;
+          draft.revision += 1;
 
           if (draft.currentPickerIndex >= draft.slots.length || draft.slots.every(s => s.isLocked)) {
             finishDraftAndStartBattle(roomId, room);
             continue;
           }
+          broadcastRoom(room, draftStateMessage(roomId, draft));
+        } else if (timerChanged) {
+          draft.revision += 1;
+          broadcastRoom(room, draftStateMessage(roomId, draft));
         }
-
-        // Phát sóng tick đồng bộ mỗi giây cho cả 4 socket
-        broadcastRoom(room, draftStateMessage(roomId, draft));
         continue;
       }
 
-      // 2. Tick giai đoạn BATTLE (Trận Đấu) - Đồng bộ mỗi giây cho cả 4 người chơi
+      // 2. Tick giai đoạn BATTLE (Trận Đấu) - Đồng bộ phản ứng nhanh nhạy cho cả 4 người chơi
       if (room.state) {
         try {
           const connectedSeats = Array.from(room.sockets.keys());
@@ -327,7 +331,7 @@ function ensureTickTimer() {
         }
       }
     }
-  }, 1000);
+  }, 250);
 }
 
 function broadcastRoom(room: RoomData, messageObj: any) {

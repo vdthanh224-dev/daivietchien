@@ -3486,6 +3486,7 @@ func _on_card_play_btn_clicked() -> void:
 		_broadcast_player_battle_action("PLAY_CARD", c_id, tgt["seat"], my_seat, 0, lien_targets, false, lien_cost_id)
 		_animate_showcase_card(c_name, "Bạn dùng [%s] tấn công %s!" % [c_name, tgt["name"]], c_info)
 		_add_log("⚔️ Bạn dùng [%s]%s lên %s (Ghế %d)." % [c_name, " (kèm Hủ Rượu: +1 Sát Thương)" if is_wine else "", tgt["name"], tgt["seat"]])
+		desc_text.text = "⚔️ Đã xuất Trảm lên %s! Đang chờ đối phương phản hồi..." % tgt["name"]
 
 		if not is_network_mode:
 			var slash_suit = c_info.get("suit", "")
@@ -3505,12 +3506,13 @@ func _on_card_play_btn_clicked() -> void:
 		_reset_player_turn_timer()
 		AudioManager.play_voice(c_name)
 		AudioManager.play_skill()
+		p_gen["hp"] = min(p_gen["max_hp"], p_gen["hp"] + 1)
+		if p_gen.has("avatar_node") and is_instance_valid(p_gen["avatar_node"]):
+			p_gen["avatar_node"].update_hp(p_gen["hp"], p_gen["max_hp"])
 		_broadcast_player_battle_action("PLAY_CARD", c_id, my_seat)
 		_animate_showcase_card(c_name, "Bạn ăn Bánh Chưng hồi 1 Máu!", c_info)
 		_add_log("🍲 Bạn hồi phục 1 Máu bằng [Bánh Chưng] (%d/%d)." % [p_gen["hp"], p_gen["max_hp"]])
-		if not is_network_mode:
-			p_gen["hp"] = min(p_gen["max_hp"], p_gen["hp"] + 1)
-			p_gen["avatar_node"].update_hp(p_gen["hp"], p_gen["max_hp"])
+		desc_text.text = "🍲 Đã dùng [Bánh Chưng] hồi 1 Máu (%d/%d)!" % [p_gen["hp"], p_gen["max_hp"]]
 
 	elif c_name == "Hủ Rượu":
 		if wine_used_this_turn:
@@ -3608,6 +3610,7 @@ func _on_card_play_btn_clicked() -> void:
 			AudioManager.play_skill()
 			_animate_showcase_card(c_name, "Dùng Đột Kích Trộm Lương lên %s!" % tgt["name"], c_info)
 			_add_log("🗡️ Bạn dùng [%s] nhắm vào %s." % [c_name, tgt["name"]])
+			desc_text.text = "🗡️ Đã dùng [Đột Kích Trộm Lương] lên %s! Đang bốc bài..." % tgt["name"]
 			_broadcast_player_battle_action("PLAY_CARD", c_id, tgt["seat"])
 			return
 		else:
@@ -3633,6 +3636,7 @@ func _on_card_play_btn_clicked() -> void:
 			AudioManager.play_skill()
 			_animate_showcase_card(c_name, "Dùng Vườn Không Nhà Trống lên %s!" % tgt["name"], c_info)
 			_add_log("🌾 Bạn dùng [%s] nhắm vào %s." % [c_name, tgt["name"]])
+			desc_text.text = "🌾 Đã dùng [Vườn Không Nhà Trống] lên %s! Đang chọn bài..." % tgt["name"]
 			_broadcast_player_battle_action("PLAY_CARD", c_id, tgt["seat"])
 			return
 		else:
@@ -3654,6 +3658,7 @@ func _on_card_play_btn_clicked() -> void:
 		_broadcast_player_battle_action("PLAY_CARD", c_id, 0)
 		_animate_showcase_card(c_name, "Giặc Tới: Toàn bộ người chơi khác phải đánh 1 Trảm!", c_info)
 		_add_log("🪵 Bạn phát động [Giặc Tới]! Toàn bộ người chơi khác phải đánh 1 lá Trảm hoặc mất 1 Máu.")
+		desc_text.text = "🪵 Đã phát động [Giặc Tới]! Đang chờ người chơi khác phản hồi..."
 		if not is_network_mode:
 			_execute_aoe_attack(my_seat, "Giặc Tới", "Trảm")
 
@@ -3668,6 +3673,7 @@ func _on_card_play_btn_clicked() -> void:
 		_broadcast_player_battle_action("PLAY_CARD", c_id, 0)
 		_animate_showcase_card(c_name, "Mưa Tên Liên Châu: Toàn bộ người chơi khác phải đánh 1 Đỡ!", c_info)
 		_add_log("🏹 Bạn thi triển [Mưa Tên Liên Châu]! Toàn bộ người chơi khác phải đánh 1 lá Đỡ hoặc mất 1 Máu.")
+		desc_text.text = "🏹 Đã thi triển [Mưa Tên Liên Châu]! Đang chờ người chơi khác phản hồi..."
 		if not is_network_mode:
 			_execute_aoe_attack(my_seat, "Mưa Tên Liên Châu", "Đỡ")
 
@@ -3692,6 +3698,7 @@ func _on_card_play_btn_clicked() -> void:
 		_broadcast_player_battle_action("PLAY_CARD", c_id, tgt["seat"])
 		_animate_showcase_card(c_name, "Bạn huyết chiến %s!" % tgt["name"], c_info)
 		_add_log("⚔️ Bạn phát động [Huyết Chiến] lên %s (Ghế %d)!" % [tgt["name"], tgt["seat"]])
+		desc_text.text = "⚔️ Đã phát động [Huyết Chiến] lên %s! Đang chờ phản hồi..." % tgt["name"]
 		if not is_network_mode:
 			_execute_duel(my_seat, selected_target_seat)
 
@@ -4146,47 +4153,87 @@ func _sync_player_hand_from_server(server_hand: Array) -> void:
 		if is_instance_valid(node) and not node.has_meta("song_cung_equipped_preview"):
 			selected_song_cung_ids.append(str(_get_card_info_from_ui(node).get("id", "")))
 
+	# Thu thập các thẻ bài hiện có theo id để tái sử dụng, tránh hủy và tạo lại gây giật/nháy hình
+	var existing_nodes_by_id: Dictionary = {}
 	for child in hand_container.get_children():
-		if child.has_meta("song_cung_equipped_preview"):
+		if child.has_meta("hung_suc_equipped_preview") or child.has_meta("song_cung_equipped_preview"):
 			continue
-		selected_song_cung_card_nodes.erase(child)
-		hand_container.remove_child(child)
-		child.queue_free()
+		var cid = str(_get_card_info_from_ui(child).get("id", ""))
+		if not cid.is_empty() and not existing_nodes_by_id.has(cid):
+			existing_nodes_by_id[cid] = child
+		else:
+			hand_container.remove_child(child)
+			child.queue_free()
 
-	selected_card_ui = null
+	# Xóa những lá bài không còn trong server_hand
+	var server_ids_map: Dictionary = {}
+	for c in server_hand:
+		server_ids_map[str(c.get("id", ""))] = true
 
+	for cid in existing_nodes_by_id.keys():
+		if not server_ids_map.has(cid):
+			var node_to_remove = existing_nodes_by_id[cid]
+			if node_to_remove == selected_card_ui:
+				selected_card_ui = null
+			if node_to_remove == selected_dodge_card_ui:
+				selected_dodge_card_ui = null
+			selected_song_cung_card_nodes.erase(node_to_remove)
+			hand_container.remove_child(node_to_remove)
+			node_to_remove.queue_free()
+			existing_nodes_by_id.erase(cid)
+
+	# Giữ hoặc khởi tạo các lá bài theo thứ tự server_hand
+	var target_order_nodes: Array[Control] = []
 	for c in server_hand:
 		var c_id = str(c.get("id", ""))
-		var c_name = str(c.get("name", "Bài"))
-		if _is_dai_hong_thuy_name(c_name):
-			c_name = "Đại Hồng Thủy"
-		var c_rank = c.get("rank", 1)
-		var c_suit = str(c.get("suit", "Spade"))
-		var c_cat = int(c.get("category", 0))
-		var c_desc = str(c.get("desc", ""))
-		var c_sub_type = int(c.get("subType", -1))
-		if c_sub_type == 26 or c_name == "Hịch Tướng Sĩ":
-			c_desc = "Bạn và 1 người khác bạn chọn, bỏ 1 lá để nhận Sục Sôi: 1 vòng không giới hạn Trảm, tầm đánh +1. Có thể đổi lá để rút lá khác."
+		var card_ui: Control = null
+		if existing_nodes_by_id.has(c_id):
+			card_ui = existing_nodes_by_id[c_id]
+		else:
+			var c_name = str(c.get("name", "Bài"))
+			if _is_dai_hong_thuy_name(c_name):
+				c_name = "Đại Hồng Thủy"
+			var c_rank = c.get("rank", 1)
+			var c_suit = str(c.get("suit", "Spade"))
+			var c_cat = int(c.get("category", 0))
+			var c_desc = str(c.get("desc", ""))
+			var c_sub_type = int(c.get("subType", -1))
+			if c_sub_type == 26 or c_name == "Hịch Tướng Sĩ":
+				c_desc = "Bạn và 1 người khác bạn chọn, bỏ 1 lá để nhận Sục Sôi: 1 vòng không giới hạn Trảm, tầm đánh +1. Có thể đổi lá để rút lá khác."
 
-		var card_ui = CardUIScene.instantiate()
-		hand_container.add_child(card_ui)
-		card_ui.setup_card_data(c_id, c_name, c_rank, c_suit, c_cat, c_desc, c_sub_type)
-		var c_info = {
-			"id": c_id,
-			"name": c_name,
-			"rank": c_rank,
-			"suit": c_suit,
-			"cat": c_cat,
-			"desc": c_desc,
-			"subType": c_sub_type,
-			"card_node": card_ui
-		}
-		card_ui.card_clicked.connect(func(_c): _on_player_hand_card_clicked(card_ui, c_info))
+			card_ui = CardUIScene.instantiate()
+			hand_container.add_child(card_ui)
+			card_ui.setup_card_data(c_id, c_name, c_rank, c_suit, c_cat, c_desc, c_sub_type)
+			var c_info = {
+				"id": c_id,
+				"name": c_name,
+				"rank": c_rank,
+				"suit": c_suit,
+				"cat": c_cat,
+				"desc": c_desc,
+				"subType": c_sub_type,
+				"card_node": card_ui
+			}
+			card_ui.card_clicked.connect(func(_c): _on_player_hand_card_clicked(card_ui, c_info))
+		target_order_nodes.append(card_ui)
 		if is_waiting_song_cung and c_id in selected_song_cung_ids:
-			selected_song_cung_card_nodes.append(card_ui)
+			if not selected_song_cung_card_nodes.has(card_ui):
+				selected_song_cung_card_nodes.append(card_ui)
 			card_ui.set_selected(true)
+
+	for i in range(target_order_nodes.size()):
+		var node = target_order_nodes[i]
+		if node.get_parent() == hand_container and node.get_index() != i:
+			hand_container.move_child(node, i)
+
+	if generals_data.has(my_seat):
+		generals_data[my_seat]["hand_count"] = server_hand.size()
+		if generals_data[my_seat].has("avatar_node") and is_instance_valid(generals_data[my_seat]["avatar_node"]):
+			generals_data[my_seat]["avatar_node"].update_hand_count(server_hand.size())
+
 	_relayout_hand_cards()
-	if not selected_card_id.is_empty() and (current_server_phase == "AWAIT_DA_TRACH_DISCARD" or is_targeting_dan_cau or is_targeting_thuy_chien or is_targeting_nghich_y or is_targeting_thien_cam):
+
+	if selected_card_ui == null and not selected_card_id.is_empty():
 		for card_ui in hand_container.get_children():
 			if str(_get_card_info_from_ui(card_ui).get("id", "")) == selected_card_id:
 				selected_card_ui = card_ui
@@ -6511,7 +6558,18 @@ func _relayout_hand_cards() -> void:
 	var x: float = start_x
 	for index in range(count):
 		var card = hand_container.get_child(index)
-		card.position.x = x
+		var target_x: float = x
+		if not card.has_meta("is_animating_discard"):
+			if card.has_meta("layout_tween"):
+				var prev_tween = card.get_meta("layout_tween")
+				if prev_tween and (prev_tween is Tween) and prev_tween.is_valid():
+					prev_tween.kill()
+			if abs(card.position.x - target_x) > 1.5:
+				var t = card.create_tween()
+				t.tween_property(card, "position:x", target_x, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+				card.set_meta("layout_tween", t)
+			else:
+				card.position.x = target_x
 		if index < steps.size():
 			x += steps[index]
 
@@ -7253,6 +7311,7 @@ func _on_dodge_confirmed() -> void:
 			_broadcast_player_battle_action("RESPOND_ACTION", give_id)
 			_add_log("🌊 [THỦY TRIỀU RÚT] Bạn đưa 1 lá cho %s. Đang chờ Server đồng bộ..." % receiver_label)
 			_animate_showcase_card(str(give_info.get("name", "Lá bài")), "Bạn đưa 1 lá cho %s." % receiver_label, give_info)
+			_discard_player_card(give_card)
 		else:
 			hand_container.remove_child(give_card)
 			give_card.queue_free()
@@ -7290,8 +7349,7 @@ func _on_dodge_confirmed() -> void:
 
 	if chosen_card.has_method("set_selected"):
 		chosen_card.set_selected(false)
-	if not is_network_mode:
-		_discard_player_card(chosen_card)
+	_discard_player_card(chosen_card)
 	selected_dodge_card_ui = null
 
 	dodge_modal.visible = false
@@ -7804,9 +7862,8 @@ func _on_rescue_confirmed() -> void:
 	var info = _get_card_info_from_ui(chosen_card)
 	var c_name = info.get("name", "Bánh Chưng")
 	var c_id = info.get("id", c_name)
-	if not is_network_mode:
-		_discard_player_card(chosen_card)
-	else:
+	_discard_player_card(chosen_card)
+	if is_network_mode:
 		reaction_submission_pending = true
 		reaction_submission_version = last_server_version
 	_broadcast_player_battle_action("RESCUE_RESPONSE", c_id, victim_seat)
@@ -7814,10 +7871,11 @@ func _on_rescue_confirmed() -> void:
 	_add_log("💮 Bạn dùng [%s] cứu sống %s!" % [c_name, victim["name"]])
 	AudioManager.play_voice(c_name)
 	AudioManager.play_skill()
+	victim["hp"] = min(victim["max_hp"], victim["hp"] + 1)
+	if victim.has("avatar_node") and is_instance_valid(victim["avatar_node"]):
+		victim["avatar_node"].update_hp(victim["hp"], victim["max_hp"])
 	if is_network_mode:
 		return
-	victim["hp"] = min(victim["max_hp"], victim["hp"] + 1)
-	victim["avatar_node"].update_hp(victim["hp"], victim["max_hp"])
 	near_death_asker_queue.clear()
 	near_death_victim_seat = -1
 
