@@ -63,8 +63,6 @@ func _detect_instance_index() -> int:
 		var err = srv.listen(6010 + s, "127.0.0.1")
 		if err == OK:
 			_instance_lock_server = srv
-			if s > 1:
-				seat_is_explicit = true
 			return s
 
 	seat_is_explicit = false

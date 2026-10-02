@@ -243,12 +243,12 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 		var diff = abs(int(room.get("hostRankPoints", 0)) - my_rank_points)
 		var room_id = str(room.get("roomId", ""))
 		var best_room_id = str(best_room.get("roomId", "~"))
-		# Use one deterministic anchor for every client. Choosing the fullest
-		# room first can split two groups of players into different rooms; all
-		# eligible clients must converge on the same smallest roomId instead.
-		if diff <= max_rank_diff and (room_id < best_room_id or (room_id == best_room_id and real_count > best_real_count)):
-			best_real_count = real_count
-			best_room = room
+		# Ưu tiên phòng có nhiều người thật nhất trước để gom đủ 4 người sớm nhất.
+		# Nếu số người bằng nhau thì dùng roomId làm tie-break ổn định.
+		if diff <= max_rank_diff:
+			if real_count > best_real_count or (real_count == best_real_count and (best_room.is_empty() or room_id < best_room_id)):
+				best_real_count = real_count
+				best_room = room
 	return best_room
 
 func cleanup_user_waiting_rooms(my_user_id: String) -> void:
@@ -267,11 +267,7 @@ func cleanup_user_waiting_rooms(my_user_id: String) -> void:
 		if room.is_empty() or room.get("status") != "WAITING":
 			continue
 		var owns_room = str(room.get("hostUserId", "")) == my_user_id
-		if not owns_room:
-			for slot in room.get("slots", []):
-				if str(slot.get("userId", "")) == my_user_id:
-					owns_room = true
-					break
+		# Chỉ chủ phòng mới được phép xóa phòng. Khách không được xóa phòng của chủ!
 		if owns_room and str(doc.get("$id", "")) != "":
 			await _send_http_request("%s/databases/%s/collections/%s/documents/%s" % [ENDPOINT, DATABASE_ID, COLLECTION_ID, doc.get("$id", "")], HTTPClient.METHOD_DELETE)
 

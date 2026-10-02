@@ -397,23 +397,26 @@ function resolveDraftSeat(room, requestedSeat, payload, socket) {
     return true;
   };
 
-  // Godot debug windows can share one UID/name through user://; honor their explicit seat.
-  if (Number(payload.debugSeat) === requestedSeat && requestedSeat >= 1 && requestedSeat <= 4) {
-    const s = slots.find((e) => e.seat === requestedSeat);
-    if (isAvailable(s)) return requestedSeat;
-  }
-
+  // Ưu tiên 1: Khớp chính xác theo userId từ phòng ghép
   const byId = userId
     ? slots.filter((slot) => normalize(slot.userId) === userId)
     : [];
   if (byId.length === 1 && isAvailable(byId[0])) {
     return byId[0].seat;
   }
+
+  // Ưu tiên 2: Khớp theo userName
   const byName = userName
     ? slots.filter((slot) => normalize(slot.userName) === userName)
     : [];
   if (byName.length === 1 && isAvailable(byName[0])) {
     return byName[0].seat;
+  }
+
+  // Ưu tiên 3: Explicit debug seat (khi không tìm thấy UID trong phòng)
+  if (Number(payload.debugSeat) === requestedSeat && requestedSeat >= 1 && requestedSeat <= 4) {
+    const s = slots.find((e) => e.seat === requestedSeat);
+    if (isAvailable(s)) return requestedSeat;
   }
 
   const reqSlot = slots.find((slot) => slot.seat === requestedSeat);
@@ -454,7 +457,7 @@ function makeDraftSlots(rawSlots, boundSeat, payload) {
       userId: String(matched.userId || (isAI ? `bot_${seat}` : (seat === boundSeat ? (payload.userId || `user_${seat}`) : `user_${seat}`))),
       userName: String(matched.userName || (isAI ? `AI Ghế ${seat}` : (seat === boundSeat ? (payload.userName || `Ghế ${seat}`) : `Ghế ${seat}`))),
       isAI,
-      isDragon: dragonSeats.has(seat),
+      isDragon: matched.isDragon !== undefined ? Boolean(matched.isDragon) : dragonSeats.has(seat),
       heroId,
       heroName: String(matched.heroName || ""),
       maxHp: HERO_MAX_HP[heroId] || 4,

@@ -2344,19 +2344,20 @@ func _update_matchmaking_slots_visual(room: Dictionary, my_user_id: String, slot
 				sp_style.bg_color = Color(0.06, 0.09, 0.15, 0.95)
 				sp_style.border_color = Color(0.2, 0.28, 0.4, 0.7)
 			else:
-				# Bảo mật ẩn danh: Chỉ hiển thị BẠN hoặc Người chơi, không lộ tên thật và điểm RP
+				# Hiển thị tên người chơi rõ ràng
+				var uname = s.get("userName", "").strip_edges()
 				if is_me:
-					name_l.text = "BẠN"
+					name_l.text = "BẠN (%s)" % (uname if not uname.is_empty() else "Tôi")
 					name_l.add_theme_color_override("font_color", Color(1.0, 0.92, 0.55, 1.0))
 					sp_style.bg_color = Color(0.1, 0.22, 0.38, 0.95)
 					sp_style.border_color = COLOR_GOLD_PRIMARY
 				elif is_drag:
-					name_l.text = "Người chơi %d" % (i + 1)
+					name_l.text = uname if not uname.is_empty() else ("Người chơi %d" % (i + 1))
 					name_l.add_theme_color_override("font_color", Color(0.65, 0.9, 1.0, 1.0))
 					sp_style.bg_color = Color(0.07, 0.16, 0.26, 0.95)
 					sp_style.border_color = Color(0.25, 0.65, 0.95, 0.8)
 				else:
-					name_l.text = "Người chơi %d" % (i + 1)
+					name_l.text = uname if not uname.is_empty() else ("Người chơi %d" % (i + 1))
 					name_l.add_theme_color_override("font_color", Color(1.0, 0.75, 0.8, 1.0))
 					sp_style.bg_color = Color(0.22, 0.08, 0.12, 0.95)
 					sp_style.border_color = Color(0.9, 0.35, 0.45, 0.8)
@@ -2546,7 +2547,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	# Give real clients enough time to join before the optional bot fallback.
 	# A short timeout lets the host start the room while other clients are
 	# still completing their Appwrite join request.
-	var bot_fill_timeout: float = 1.0 if is_fast_test else 15.0
+	var bot_fill_timeout: float = 1.0 if is_fast_test else (60.0 if OS.is_debug_build() else 30.0)
 	var bot_fill_timer: float = 0.0
 	var heartbeat_timer: float = 0.0
 	var poll_timer: float = 0.0 # Thăm dò Appwrite mỗi 2.0 giây

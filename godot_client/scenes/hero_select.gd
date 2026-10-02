@@ -147,31 +147,41 @@ func _setup_draft_slots() -> void:
 	if my_name.is_empty():
 		my_name = "Đại Tướng Quân"
 
-	# Dùng UID/tên khi duy nhất; UID trùng trong debug phải giữ ghế riêng của cửa sổ.
+	# Ưu tiên xác định ghế dựa trên UID phiên làm việc thực tế trong phòng đã ghép.
 	var my_seat_idx = -1
 	if slots.size() == 4:
-		if NetworkClient and NetworkClient.seat_is_explicit and NetworkClient.my_seat in [1, 2, 3, 4]:
-			# Explicit debug seats must win over the shared local UID/name.
-			my_seat_idx = NetworkClient.my_seat - 1
-		else:
-			var identity_matches: Array[int] = []
+		# 1. Khớp chính xác theo UID trong danh sách slot phòng
+		if not my_uid.is_empty():
 			for i in range(4):
 				var s = slots[i]
 				if not bool(s.get("isEmpty", false)):
 					var slot_uid = str(s.get("userId", "")).strip_edges()
+					if slot_uid == my_uid:
+						my_seat_idx = i
+						break
+
+		# 2. Khớp theo tên tài khoản nếu UID chưa tìm thấy
+		if my_seat_idx == -1 and not my_name.is_empty():
+			for i in range(4):
+				var s = slots[i]
+				if not bool(s.get("isEmpty", false)):
 					var slot_name = str(s.get("userName", "")).strip_edges()
-					if (not my_uid.is_empty() and slot_uid == my_uid) or (not my_name.is_empty() and slot_name.to_lower() == my_name.to_lower()):
-						identity_matches.append(i)
-			if identity_matches.size() == 1:
-				my_seat_idx = identity_matches[0]
-		# Cuối cùng mới chọn ghế người thật đầu tiên.
+					if slot_name.to_lower() == my_name.to_lower():
+						my_seat_idx = i
+						break
+
+		# 3. Chạy trực tiếp qua tham số dòng lệnh (--seat=X) khi không khớp phòng
+		if my_seat_idx == -1 and NetworkClient and NetworkClient.seat_is_explicit and NetworkClient.my_seat in [1, 2, 3, 4]:
+			my_seat_idx = NetworkClient.my_seat - 1
+
+		# 4. Cuối cùng mới chọn ghế người thật đầu tiên
 		if my_seat_idx == -1:
 			for i in range(4):
 				var s = slots[i]
 				if not bool(s.get("isAI", false)) and not bool(s.get("isEmpty", false)):
 					my_seat_idx = i
 					break
-	if my_seat_idx == -1 and slots.size() != 4 and NetworkClient and NetworkClient.my_seat in [1, 2, 3, 4]:
+	elif NetworkClient and NetworkClient.my_seat in [1, 2, 3, 4]:
 		my_seat_idx = NetworkClient.my_seat - 1
 
 	if my_seat_idx == -1:
@@ -180,6 +190,7 @@ func _setup_draft_slots() -> void:
 	var my_seat_num = my_seat_idx + 1
 	if NetworkClient:
 		NetworkClient.my_seat = my_seat_num
+		NetworkClient.seat_is_explicit = false
 	print("[HeroSelect] Xác định ghế của bạn: Ghế %d (UID: %s, Tên: %s)" % [my_seat_num, my_uid, my_name])
 
 	var used_names: Array = []
@@ -248,8 +259,11 @@ func _get_anonymous_slot_name(slot_idx: int) -> String:
 	var my_seat_num = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat in [1, 2, 3, 4] else 1
 	var s_num = int(s.get("seatNumber", slot_idx + 1))
 	var is_me = bool(s.get("isPlayer", false)) or (s_num == my_seat_num)
+	var uname = str(s.get("userName", "")).strip_edges()
+	var display_name = uname if not uname.is_empty() else ("Người chơi %d" % s_num)
+
 	if is_me:
-		return "BẠN (Đồng minh 1)"
+		return "BẠN (%s)" % display_name
 
 	# Phe của người chơi
 	var my_is_dragon = true
@@ -260,16 +274,8 @@ func _get_anonymous_slot_name(slot_idx: int) -> String:
 
 	var is_ally = (bool(s.get("isDragon", true)) == my_is_dragon)
 	if is_ally:
-		return "Đồng minh 2"
-
-	var enemy_count = 1
-	for j in range(slot_idx):
-		var prev_s = draft_slots[j]
-		var prev_is_ally = (bool(prev_s.get("isDragon", true)) == my_is_dragon)
-		var prev_is_me = bool(prev_s.get("isPlayer", false)) or (int(prev_s.get("seatNumber", 0)) == my_seat_num)
-		if not prev_is_ally and not prev_is_me:
-			enemy_count += 1
-	return "Đối thủ %d" % enemy_count
+		return "%s (Đồng minh)" % display_name
+	return "%s (Đối thủ)" % display_name
 
 func _build_ui() -> void:
 	# 1. Nền màn hình chính
