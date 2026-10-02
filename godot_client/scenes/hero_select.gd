@@ -98,7 +98,7 @@ func _ready() -> void:
 				await get_tree().create_timer(0.1).timeout
 				wait_t += 0.1
 				retry_t += 0.1
-				if retry_t >= 1.0 and not NetworkClient.is_connecting():
+				if retry_t >= 2.0 and not NetworkClient.is_connected_to_server:
 					retry_t = 0.0
 					NetworkClient.connect_to_server()
 		is_network_mode = NetworkClient.is_connected_to_server

@@ -16,7 +16,7 @@ const CANDIDATE_SERVERS: Array[Dictionary] = [
 	# Draft and battle state must use one shared online authority. There is no
 	# localhost/LAN fallback because separate local processes do not share rooms.
 	# Deno Deploy can need several seconds to wake an idle isolate and finish TLS.
-	{ "type": "DENO_CLOUD", "name": "Máy Chủ Đám Mây (Deno Cloud)", "url": "wss://dai-viet-chien-server.vdthanh.deno.net", "timeout": 12.0 }
+	{ "type": "DENO_CLOUD", "name": "Máy Chủ Đám Mây (Deno Cloud)", "url": "wss://dai-viet-chien-server.vdthanh.deno.net", "timeout": 8.0 }
 ]
 
 const CLOUD_SERVER_URL: String = "wss://dai-viet-chien-server.vdthanh.deno.net"
@@ -101,6 +101,8 @@ func _try_candidate(index: int) -> void:
 		current_ping = -1
 		_ping_awaiting_pong = false
 		ping_updated.emit(-1)
+		if socket:
+			socket.close()
 		print("[NetworkClient] ❌ Không kết nối được Deno Cloud; local server đã bị tắt.")
 		error_received.emit("Không thể kết nối đến Máy Chủ Trận Đấu online.")
 		return
@@ -112,7 +114,8 @@ func _try_candidate(index: int) -> void:
 	server_url = cand["url"]
 	print("[NetworkClient] 🔍 [Ưu tiên %d/%d] Đang thử kết nối %s (%s)..." % [index + 1, CANDIDATE_SERVERS.size(), cand["name"], cand["url"]])
 
-	socket.close()
+	if socket:
+		socket.close()
 	socket = WebSocketPeer.new()
 	var err = socket.connect_to_url(server_url)
 	if err != OK:
@@ -123,6 +126,8 @@ func _on_candidate_failed(reason: String) -> void:
 	current_ping = -1
 	_ping_awaiting_pong = false
 	ping_updated.emit(-1)
+	if socket:
+		socket.close()
 	var cand = CANDIDATE_SERVERS[candidate_index] if candidate_index < CANDIDATE_SERVERS.size() else {}
 	print("[NetworkClient] ❌ Kết nối tới %s thất bại: %s. Chuyển sang ưu tiên tiếp theo..." % [cand.get("name", "Server"), reason])
 	_try_candidate(candidate_index + 1)
@@ -141,11 +146,16 @@ func save_server_url(new_url: String) -> void:
 func connect_to_server(url: String = "") -> void:
 	# Always normalize callers (including old saved settings) to cloud.
 	server_url = CLOUD_SERVER_URL
-	# Do not replace a healthy or in-flight socket when a scene asks for an
-	# explicit connection check. This keeps scene transitions from creating a
-	# short window where the socket is closed and the caller reports failure.
-	if is_connected_to_server or is_connecting():
+	if is_connected_to_server:
 		return
+	if is_connecting():
+		# Nếu đã kết nối đang diễn ra nhưng bị treo quá 5s, buộc reset và kết nối lại
+		if candidate_timer > 5.0:
+			if socket:
+				socket.close()
+			is_scanning_candidates = false
+		else:
+			return
 	_start_priority_connection()
 	return
 
