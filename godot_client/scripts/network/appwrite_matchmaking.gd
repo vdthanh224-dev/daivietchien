@@ -76,9 +76,11 @@ func get_realistic_gamer_name(seed_val: int, exclude_names: Array = []) -> Strin
 	return "Chiến Tướng %d" % rng.randi_range(100, 999)
 
 func is_same_user(uid1: String, name1: String, uid2: String, name2: String) -> bool:
-	if uid1.is_empty() or uid2.is_empty():
-		return false
-	return uid1 == uid2
+	if not uid1.is_empty() and not uid2.is_empty():
+		return uid1 == uid2
+	if not name1.is_empty() and not name2.is_empty():
+		return name1 == name2
+	return false
 
 # --- Encoding & Decoding Room State ---
 func encode_room_string(room: Dictionary) -> String:
