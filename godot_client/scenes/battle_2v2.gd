@@ -1,7 +1,7 @@
 extends Control
 
 const CardUIScene = preload("res://scenes/components/card_ui.tscn")
-const AI_CARD_PLAY_DELAY: float = 2.0
+const AI_CARD_PLAY_DELAY: float = 1.5
 const IRON_CHAIN_DESCRIPTION := "Chạm avatar để chọn tối đa 2 mục tiêu để đưa họ vào hoặc thoát trạng thái xích (cùng nhận sát thương nguyên tố), có thể đổi thành lá mới."
 const HERO_SKILL_ACTIONS := {
 	"LIEN_CHAU_TRIGGERED": {"name": "Liên Châu"},
@@ -5924,7 +5924,7 @@ func _run_reaction_card_selection_test() -> bool:
 	var bots_continue_after_all_players_die = _is_ai_controller()
 	for seat in human_alive_states:
 		generals_data[seat]["is_alive"] = human_alive_states[seat]
-	var ai_card_delay_is_two_seconds = AI_CARD_PLAY_DELAY == 2.0
+	var ai_card_delay_is_one_point_five_seconds = AI_CARD_PLAY_DELAY == 1.5
 	var han_lam_name_uses_state = str(_get_han_lam_revealed_card({"hanLamRevealedCard": {"name": "Trảm - Hỏa"}}, {}).get("name", "")) == "Trảm - Hỏa"
 	var tung_nghia_discard_limit_is_correct = _get_general_hand_limit({
 		"hp": 4,
@@ -5963,7 +5963,7 @@ func _run_reaction_card_selection_test() -> bool:
 	_handle_oai_nhuoc_card_selection(banh_chung)
 	var oai_nhuoc_rejects_pair_without_dodge = dodge_confirm_btn.disabled
 	_close_dodge_reaction_state()
-	return banh_chung_selected and rescue_second_click_keeps_selection and hu_ruou_selected and tram_selected and generic_starts_unselected and generic_accepts_second_dodge and reaction_second_click_keeps_selection and slash_starts_unselected and slash_accepts_second_dodge and slash_second_click_keeps_selection and tide_starts_unselected and tide_only_shows_give_button and tide_accepts_second_card and tide_second_click_keeps_selection and dan_cau_selected_before_sync and dan_cau_selection_survives_sync and wine_damage_label_is_accurate and wine_damage_from_active_card_is_accurate and remote_wine_delta_keeps_damage and static_popups_are_frontmost and reaction_hand_is_reachable and dynamic_popups_are_frontmost and village_destroy_duration_is_two_seconds and judgement_visible and judgement_is_frontmost and bai_coc_visual_is_deduplicated and bai_coc_history_is_deduplicated and rescued_avatar_stops_flashing and repeated_state_sync_keeps_hover_scale and bots_continue_after_all_players_die and ai_card_delay_is_two_seconds and han_lam_name_uses_state and tung_nghia_discard_limit_is_correct and khoan_gian_minimum_is_correct and khoan_gian_rounding_is_correct and nghia_tu_single_selection_stays_enabled and oai_nhuoc_valid_pair_enables_dodge and oai_nhuoc_uses_slash_damage and oai_nhuoc_rejects_pair_without_dodge
+	return banh_chung_selected and rescue_second_click_keeps_selection and hu_ruou_selected and tram_selected and generic_starts_unselected and generic_accepts_second_dodge and reaction_second_click_keeps_selection and slash_starts_unselected and slash_accepts_second_dodge and slash_second_click_keeps_selection and tide_starts_unselected and tide_only_shows_give_button and tide_accepts_second_card and tide_second_click_keeps_selection and dan_cau_selected_before_sync and dan_cau_selection_survives_sync and wine_damage_label_is_accurate and wine_damage_from_active_card_is_accurate and remote_wine_delta_keeps_damage and static_popups_are_frontmost and reaction_hand_is_reachable and dynamic_popups_are_frontmost and village_destroy_duration_is_two_seconds and judgement_visible and judgement_is_frontmost and bai_coc_visual_is_deduplicated and bai_coc_history_is_deduplicated and rescued_avatar_stops_flashing and repeated_state_sync_keeps_hover_scale and bots_continue_after_all_players_die and ai_card_delay_is_one_point_five_seconds and han_lam_name_uses_state and tung_nghia_discard_limit_is_correct and khoan_gian_minimum_is_correct and khoan_gian_rounding_is_correct and nghia_tu_single_selection_stays_enabled and oai_nhuoc_valid_pair_enables_dodge and oai_nhuoc_uses_slash_damage and oai_nhuoc_rejects_pair_without_dodge
 
 func _prompt_reaction_modal(title_text: String, desc_text_msg: String, required_type: String, pass_text: String, confirm_prefix: String, timeout_sec: float = 40.0, allow_khien_may: bool = false, _auto_select_first: bool = false, allow_dodge_as_slash: bool = true, is_slash_attack: bool = false) -> void:
 	var requires_card := required_type.strip_edges().to_upper() != "NONE"
@@ -6894,7 +6894,7 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 			_restore_truong_dao_slash_allowance(attacker_seat)
 			await _resolve_local_song_cung_if_applicable(attacker_seat, target_seat, damage_amount, damage_element)
 			_restore_turn_timer_to_attacker(attacker_seat, target_seat)
-			await get_tree().create_timer(1.2).timeout
+			await get_tree().create_timer(1.5).timeout
 			return
 		else:
 			_animate_showcase_card("Khiên Mây Bện", "%s lật [%s %s] (ĐEN) -> Phán xét thất bại!" % [tgt["name"], suit_sym, rank_str], judge_card)
@@ -6904,7 +6904,7 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 			_add_log("🛡️ [Khiên Mây Bện] của %s lật [%s %s] (ĐEN) -> Phán xét thất bại!" % [tgt["name"], suit_sym, rank_str])
 
 	# 4.2. AI tìm lá Đỡ trên tay
-	await get_tree().create_timer(1.2).timeout
+	await get_tree().create_timer(1.5).timeout
 	var dodge_idx = -1
 	for idx in range(tgt["hand_cards"].size()):
 		var c = tgt["hand_cards"][idx]
@@ -8384,7 +8384,7 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 func _execute_ai_turn(ai_seat: int) -> void:
 	if is_network_mode:
 		return
-	await get_tree().create_timer(1.0).timeout
+	await get_tree().create_timer(AI_CARD_PLAY_DELAY).timeout
 	if is_game_over:
 		return
 
@@ -8783,7 +8783,7 @@ func _execute_ai_turn(ai_seat: int) -> void:
 
 	# End AI turn
 	_broadcast_player_battle_action("END_TURN", "", 0, ai_seat)
-	await get_tree().create_timer(0.8).timeout
+	await get_tree().create_timer(AI_CARD_PLAY_DELAY).timeout
 	_next_turn()
 
 func _wait_for_ai_card_play() -> void:
