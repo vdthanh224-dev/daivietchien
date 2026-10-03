@@ -2286,7 +2286,7 @@ func _cancel_2v2_matchmaking() -> void:
 	_cancel_matchmaking_internal()
 	_hide_modal()
 
-func _update_matchmaking_status_count(status_lbl: Label, room: Dictionary, time_remaining: float = -1.0) -> void:
+func _update_matchmaking_status_count(status_lbl: Label, room: Dictionary, _time_remaining: float = -1.0) -> void:
 	if not is_instance_valid(status_lbl):
 		return
 	var count = 1
@@ -2298,14 +2298,10 @@ func _update_matchmaking_status_count(status_lbl: Label, room: Dictionary, time_
 				non_empty += 1
 		count = clampi(non_empty, 1, 4)
 	if count >= 4:
-		status_lbl.text = "⚔️ Đã tìm thấy người chơi (4/4)! Đang vào trận..."
+		status_lbl.text = "⚔️ Đã tìm thấy trận đấu! Đang vào trận..."
 		status_lbl.add_theme_color_override("font_color", Color(0.35, 0.95, 0.5, 1.0))
 	else:
-		if time_remaining >= 0.0:
-			var sec = maxi(1, int(ceil(time_remaining)))
-			status_lbl.text = "🔍 Đang tìm trận... (%d/4) • Tự thêm AI sau %ds" % [count, sec]
-		else:
-			status_lbl.text = "🔍 Đang tìm trận... (%d/4)" % count
+		status_lbl.text = "🔍 Đang tìm trận..."
 		status_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.65, 1.0))
 
 func _update_matchmaking_slots_visual(room: Dictionary, my_user_id: String, slot_nodes: Array) -> void:
@@ -2485,7 +2481,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	# A candidate can become full while this client is joining. Keep the
 	# client's own room alive and let the merge loop retry on the next poll.
 	if found_room.is_empty() and saw_waiting_room and is_instance_valid(status_lbl):
-		status_lbl.text = "🔍 Đang gộp phòng tìm trận..."
+		status_lbl.text = "🔍 Đang tìm trận..."
 
 	# Several clients can press the button at the same time. Give the first
 	# client time to publish its waiting room before creating another room.
