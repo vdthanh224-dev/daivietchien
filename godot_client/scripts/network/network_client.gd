@@ -17,7 +17,7 @@ const CANDIDATE_SERVERS: Array[Dictionary] = [
 	# Draft and battle state must use one shared online authority. There is no
 	# localhost/LAN fallback because separate local processes do not share rooms.
 	# Deno Deploy can need several seconds to wake an idle isolate and finish TLS.
-	{ "type": "DENO_CLOUD", "name": "Máy Chủ Đám Mây (Deno Cloud)", "url": "wss://dai-viet-chien-server.vdthanh.deno.net", "timeout": 8.0 }
+	{ "type": "DENO_CLOUD", "name": "Máy Chủ Đám Mây (Deno Cloud)", "url": "wss://dai-viet-chien-server.vdthanh.deno.net", "timeout": 25.0 }
 ]
 
 const CLOUD_SERVER_URL: String = "wss://dai-viet-chien-server.vdthanh.deno.net"
@@ -105,7 +105,8 @@ func _try_candidate(index: int) -> void:
 		ping_updated.emit(-1)
 		if socket:
 			socket.close()
-		print("[NetworkClient] ❌ Không kết nối được Deno Cloud; local server đã bị tắt.")
+		_reconnect_timer = 0.0
+		print("[NetworkClient] ❌ Chưa kết nối được Deno Cloud; sẽ tự động thử lại...")
 		error_received.emit("Không thể kết nối đến Máy Chủ Trận Đấu online.")
 		return
 

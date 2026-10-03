@@ -2366,6 +2366,17 @@ func _update_matchmaking_slots_visual(room: Dictionary, my_user_id: String, slot
 				status_l.add_theme_color_override("font_color", Color(0.35, 0.95, 0.5, 1.0))
 				rank_l.text = ""
 
+func _sync_my_seat_from_room(room_data: Dictionary, my_uid: String, my_name: String) -> void:
+	if not NetworkClient or room_data.is_empty():
+		return
+	var slots = room_data.get("slots", [])
+	for idx in range(slots.size()):
+		var sl = slots[idx]
+		if AppwriteMatchmaking and AppwriteMatchmaking.is_same_user(str(sl.get("userId", "")), str(sl.get("userName", "")), my_uid, my_name):
+			NetworkClient.my_seat = idx + 1
+			NetworkClient.update_debug_window_title(my_name)
+			return
+
 func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: Array) -> void:
 	var base_uid = AuthManager.current_user_id if AuthManager and AuthManager.current_user_id != "" else ""
 	var pid_suffix = str(OS.get_process_id())
@@ -2418,7 +2429,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	if AppwriteMatchmaking:
 		AppwriteMatchmaking.is_host = true
 	if NetworkClient:
-		NetworkClient.my_seat = 1
+		NetworkClient.my_seat = inst_idx
 		NetworkClient.update_debug_window_title(my_user_name)
 
 	# Include our own room in this first election. If every client excludes its
@@ -2452,6 +2463,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 				mm_current_room = joined
 				mm_active_room_id = joined.get("roomId", "")
 				mm_is_host = false
+				_sync_my_seat_from_room(mm_current_room, my_user_id, my_user_name)
 				if old_room_id != mm_active_room_id:
 					AppwriteMatchmaking.retire_merged_room(old_room_id)
 				if AppwriteMatchmaking:
@@ -2474,6 +2486,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 					mm_active_room_id = retry_joined.get("roomId", "")
 					mm_is_host = false
 					found_room = retry_joined
+					_sync_my_seat_from_room(mm_current_room, my_user_id, my_user_name)
 					if AppwriteMatchmaking:
 						AppwriteMatchmaking.is_host = false
 					break
@@ -2500,6 +2513,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 			mm_active_room_id = race_joined.get("roomId", "")
 			mm_is_host = false
 			found_room = race_joined
+			_sync_my_seat_from_room(mm_current_room, my_user_id, my_user_name)
 			if AppwriteMatchmaking:
 				AppwriteMatchmaking.is_host = false
 			break
@@ -2589,6 +2603,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 						mm_active_room_id = merged_room.get("roomId", "")
 						mm_is_host = false
 						AppwriteMatchmaking.is_host = false
+						_sync_my_seat_from_room(mm_current_room, my_user_id, my_user_name)
 						if previous_room_id != mm_active_room_id:
 							AppwriteMatchmaking.retire_merged_room(previous_room_id)
 							bot_fill_timer = 0.0
@@ -2669,6 +2684,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 								mm_is_host = false
 								AppwriteMatchmaking.is_host = false
 								guest_wait_timer = 0.0
+								_sync_my_seat_from_room(mm_current_room, my_user_id, my_user_name)
 								_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
 								_update_matchmaking_status_count(status_lbl, mm_current_room, bot_fill_timeout)
 
@@ -2739,13 +2755,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
 
 	# Cập nhật ghế chính xác và tiêu đề cửa sổ debug trước khi vào chọn tướng
-	for idx in range(mm_current_room.get("slots", []).size()):
-		var sl = mm_current_room["slots"][idx]
-		if AppwriteMatchmaking and AppwriteMatchmaking.is_same_user(str(sl.get("userId", "")), str(sl.get("userName", "")), my_user_id, my_user_name):
-			if NetworkClient:
-				NetworkClient.my_seat = idx + 1
-				NetworkClient.update_debug_window_title(my_user_name)
-			break
+	_sync_my_seat_from_room(mm_current_room, my_user_id, my_user_name)
 
 	# Lưu phòng vào AppwriteMatchmaking để hero_select.tscn có thể hiển thị chính xác tên 4 người
 	if AppwriteMatchmaking:

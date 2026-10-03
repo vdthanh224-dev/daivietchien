@@ -1401,19 +1401,22 @@ func _apply_authoritative_draft_slots(server_slots: Array) -> void:
 					is_player_locked = false
 				var hover_hid = int(s_info.get("hoverHeroId", 0))
 				var hover_hname = str(s_info.get("hoverHeroName", ""))
-				local_s["hoverHeroId"] = hover_hid
-				local_s["hoverHeroName"] = hover_hname
+				if hover_hid > 0:
+					local_s["hoverHeroId"] = hover_hid
+					local_s["hoverHeroName"] = hover_hname
+				var active_hid = hover_hid if hover_hid > 0 else int(local_s.get("hoverHeroId", 0))
+				var active_hname = hover_hname if not hover_hname.is_empty() else str(local_s.get("hoverHeroName", ""))
 				for node in left_slot_nodes:
 					if int(node.get("data", {}).get("seatNumber", 0)) == s_num:
 						var av: TextureRect = node["avatar"]
 						var hname_l: Label = node["hero_name"]
 						var status_l: Label = node["status"]
-						if hover_hid > 0:
-							var hero_h = HeroDatabase.get_hero(hover_hid) if HeroDatabase else {}
+						if active_hid > 0:
+							var hero_h = HeroDatabase.get_hero(active_hid) if HeroDatabase else {}
 							var tex = HeroDatabase.get_avatar_texture(hero_h.get("avatarPath", "")) if HeroDatabase else null
 							if tex: av.texture = tex
 							av.modulate = Color.WHITE
-							hname_l.text = hover_hname if not hover_hname.is_empty() else hero_h.get("name", "Tướng %d" % hover_hid)
+							hname_l.text = active_hname if not active_hname.is_empty() else hero_h.get("name", "Tướng %d" % active_hid)
 							hname_l.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 							status_l.text = "⏳ Đang chọn..."
 							status_l.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
@@ -1513,6 +1516,12 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 	# Cập nhật nhãn trạng thái theo lượt
 	var active_slot = draft_slots[current_picker_index] if current_picker_index < draft_slots.size() else {}
 	if _is_my_turn():
+		if not is_player_locked:
+			var cur_hid = int(inspecting_hero.get("id", 0)) if inspecting_hero is Dictionary else 0
+			if cur_hid == 0 or cur_hid in selected_hero_ids:
+				var candidate = _get_first_available_candidate()
+				if not candidate.is_empty():
+					_inspect_hero(candidate)
 		draft_status_lbl.text = "👑 ĐẾN LƯỢT BẠN CHỌN TƯỚNG! (Còn %d giây)" % t
 		draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 	else:
