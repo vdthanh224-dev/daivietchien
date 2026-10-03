@@ -71,6 +71,7 @@ func _ready() -> void:
 
 	# 4. Thiết lập Dev Tester
 	var is_dev = is_dev_machine()
+	print("[AuthLogin] Machine Unique ID: %s | Cho phép mục Tester: %s" % [OS.get_unique_id(), is_dev])
 	dev_tester_btn.visible = is_dev
 	if is_dev:
 		dev_tester_btn.pressed.connect(_toggle_dev_drawer)
@@ -447,15 +448,17 @@ func _update_ping_display(ping_ms: int) -> void:
 
 # --- DEV HELPERS ---
 
+# ID duy nhất của laptop nhà phát triển (OS.get_unique_id())
+const DEV_LAPTOP_MACHINE_IDS: Array[String] = [
+	"87b3fe32-b39f-11f0-abd7-806e6f6e6963",
+	"{87b3fe32-b39f-11f0-abd7-806e6f6e6963}"
+]
+
 func is_dev_machine() -> bool:
-	var u = OS.get_environment("USERNAME").strip_edges().to_lower()
-	if u == "ph laptop" or u == "phlaptop":
-		return true
-	if FileAccess.file_exists("res://.dev_machine"):
-		return true
-	if OS.is_debug_build() or OS.has_feature("editor"):
-		return true
-	return false
+	var raw_id = OS.get_unique_id().strip_edges().to_lower()
+	var clean_id = raw_id.replace("{", "").replace("}", "")
+	var is_dev = (raw_id in DEV_LAPTOP_MACHINE_IDS or clean_id in DEV_LAPTOP_MACHINE_IDS)
+	return is_dev
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not is_dev_machine():

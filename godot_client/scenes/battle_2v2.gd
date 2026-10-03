@@ -1019,6 +1019,48 @@ func _ready() -> void:
 		_save_viewport_screenshot("res://battle_2v2_screenshot.png")
 		get_tree().quit()
 
+	if "--screenshot-victory" in cmd_args:
+		is_network_mode = false
+		if NetworkClient and NetworkClient.game_state_updated.is_connected(_on_network_game_state_updated):
+			NetworkClient.game_state_updated.disconnect(_on_network_game_state_updated)
+		if AuthManager:
+			AuthManager.disable_session_save = true
+			AuthManager.current_2v2_rank_index = 0 # Dân Binh
+			AuthManager.current_2v2_stars = 2 # 2 sao -> lên 3 sao (+1 sao)
+			AuthManager.current_2v2_accumulation_points = 50 # 50 -> 75đ (+25đ)
+		_show_victory_defeat_modal(true)
+		await get_tree().create_timer(3.5).timeout
+		_save_viewport_screenshot("res://battle_2v2_victory_screenshot.png")
+		get_tree().quit()
+
+	if "--screenshot-promotion" in cmd_args:
+		is_network_mode = false
+		if NetworkClient and NetworkClient.game_state_updated.is_connected(_on_network_game_state_updated):
+			NetworkClient.game_state_updated.disconnect(_on_network_game_state_updated)
+		if AuthManager:
+			AuthManager.disable_session_save = true
+			AuthManager.current_2v2_rank_index = 0 # Dân Binh
+			AuthManager.current_2v2_stars = 4 # 4 sao
+			AuthManager.current_2v2_accumulation_points = 80 # 80 + 25 = 105 -> Đầy 100đ thưởng thêm 1 sao = 6 sao -> Thăng hạng Hương Dũng 0 sao, 5đ!
+		_show_victory_defeat_modal(true)
+		await get_tree().create_timer(4.5).timeout
+		_save_viewport_screenshot("res://battle_2v2_promotion_screenshot.png")
+		get_tree().quit()
+
+	if "--screenshot-defeat" in cmd_args:
+		is_network_mode = false
+		if NetworkClient and NetworkClient.game_state_updated.is_connected(_on_network_game_state_updated):
+			NetworkClient.game_state_updated.disconnect(_on_network_game_state_updated)
+		if AuthManager:
+			AuthManager.disable_session_save = true
+			AuthManager.current_2v2_rank_index = 1 # Hương Dũng
+			AuthManager.current_2v2_stars = 3 # 3 sao -> giảm xuống 2 sao (-1 sao)
+			AuthManager.current_2v2_accumulation_points = 20 # 20 -> 30đ (+10đ an ủi)
+		_show_victory_defeat_modal(false)
+		await get_tree().create_timer(3.5).timeout
+		_save_viewport_screenshot("res://battle_2v2_defeat_screenshot.png")
+		get_tree().quit()
+
 	if "--screenshot-history" in cmd_args:
 		_add_log("⚔️ Lý Thường Kiệt dùng [Trảm] lên Trần Hưng Đạo.")
 		_add_log("🛡️ Trần Hưng Đạo dùng [Đỡ] hóa giải đòn tấn công.")
@@ -4300,6 +4342,32 @@ func _begin_uat_khi_prompt() -> void:
 	if generals_data.has(my_seat) and generals_data[my_seat].has("avatar_node") and is_instance_valid(generals_data[my_seat]["avatar_node"]):
 		generals_data[my_seat]["avatar_node"].set_turn_active(true)
 		generals_data[my_seat]["avatar_node"].update_turn_timer(40)
+
+func _choose_ai_uat_khi_target(ai_seat: int) -> int:
+	var ai_gen = generals_data.get(ai_seat, {})
+	var ai_team = ai_gen.get("isDragon", (ai_seat == 1 or ai_seat == 3))
+	var other_allies: Array[int] = []
+	for s in generals_data.keys():
+		var s_num = int(s)
+		if s_num != ai_seat and generals_data.has(s_num):
+			var g = generals_data[s_num]
+			if g.get("is_alive", false):
+				var s_team = g.get("isDragon", (s_num == 1 or s_num == 3))
+				if s_team == ai_team:
+					other_allies.append(s_num)
+	if other_allies.is_empty():
+		return ai_seat # Không còn đồng đội -> tự buff lên chính mình
+	other_allies.sort_custom(func(a: int, b: int) -> bool:
+		var count_a = hand_container.get_child_count() if a == my_seat else int(generals_data[a].get("hand_count", 0))
+		var count_b = hand_container.get_child_count() if b == my_seat else int(generals_data[b].get("hand_count", 0))
+		return count_a < count_b
+	)
+	var lowest_ally = other_allies[0]
+	var ally_cards = hand_container.get_child_count() if lowest_ally == my_seat else int(generals_data[lowest_ally].get("hand_count", 0))
+	var ai_cards = hand_container.get_child_count() if ai_seat == my_seat else int(generals_data[ai_seat].get("hand_count", 0))
+	if ally_cards <= ai_cards:
+		return lowest_ally
+	return ai_seat
 
 func _clear_lien_chau_selection() -> void:
 	if lien_chau_cost_card and is_instance_valid(lien_chau_cost_card):
@@ -7765,9 +7833,29 @@ func _apply_damage_to_general(target_seat: int, amount: int, attacker_seat: int 
 			_add_log("✨ [HỊCH NGHĨA] %s rơi vào Cận Tử, rút 3 lá bài!" % tgt["name"])
 		_prompt_near_death_check(target_seat)
 	else:
-		if amount > 0 and target_seat == my_seat and _hero_has_skill(tgt, "uat_khi"):
-			_begin_uat_khi_prompt()
-			desc_text.text = "💢 [UẤT KHÍ] Chọn 1 người để cho người đó rút 1 lá."
+		if amount > 0 and _hero_has_skill(tgt, "uat_khi"):
+			if target_seat == my_seat:
+				_begin_uat_khi_prompt()
+				desc_text.text = "💢 [UẤT KHÍ] Chọn 1 người để cho người đó rút 1 lá."
+			else:
+				var chosen_seat = _choose_ai_uat_khi_target(target_seat)
+				if chosen_seat > 0 and generals_data.has(chosen_seat):
+					var c_gen = generals_data[chosen_seat]
+					var drawn_card = _draw_card_from_pile()
+					if chosen_seat == my_seat:
+						_add_card_to_player_hand(drawn_card)
+					else:
+						c_gen["hand_cards"].append(drawn_card)
+						c_gen["hand_count"] = c_gen["hand_cards"].size()
+						if c_gen.has("avatar_node") and is_instance_valid(c_gen["avatar_node"]):
+							c_gen["avatar_node"].update_hand_count(c_gen["hand_count"])
+					_animate_draw_to_seat(chosen_seat)
+					_add_log("💢 [UẤT KHÍ] %s phát động Uất Khí, cho %s rút 1 lá." % [tgt["name"], c_gen["name"]])
+					var tgt_avatar = tgt.get("avatar_node")
+					if is_instance_valid(tgt_avatar) and tgt_avatar.has_method("show_skill_banner"):
+						tgt_avatar.show_skill_banner("UẤT KHÍ", 2.0, true)
+					AudioManager.play_voice("Uất Khí")
+					AudioManager.play_skill()
 		_check_victory_condition()
 
 func _prompt_near_death_check(victim_seat: int) -> void:
@@ -7931,19 +8019,429 @@ func _check_victory_condition() -> void:
 		_show_victory_defeat_modal(player_won)
 
 func _show_victory_defeat_modal(is_win: bool) -> void:
+	if not victory_defeat_modal:
+		return
+
 	victory_defeat_modal.visible = true
+
+	# 1. Lấy dữ liệu Rank, Số Sao, Điểm Tích Lũy hiện tại của người chơi
+	var cur_rank_idx = 0
+	var cur_stars = 0
+	var cur_acc = 0
+	if AuthManager:
+		cur_rank_idx = AuthManager.current_2v2_rank_index
+		cur_stars = AuthManager.current_2v2_stars
+		cur_acc = AuthManager.current_2v2_accumulation_points
+
+	# 2. Xử lý tăng giảm sao và điểm tích lũy theo RankSystem
+	var res = RankSystem.process_match_result(is_win, cur_rank_idx, cur_stars, cur_acc)
+
+	# 3. Cập nhật và lưu ngay lập tức vào AuthManager
+	if AuthManager:
+		AuthManager.current_2v2_rank_index = res["rank_index"]
+		AuthManager.current_2v2_stars = res["stars"]
+		AuthManager.current_2v2_accumulation_points = res["accumulation_points"]
+		AuthManager.current_exp += 150 if is_win else 50
+		AuthManager.current_silver += 300 if is_win else 100
+		AuthManager.save_profile_to_appwrite()
+
+	# 4. Tái cấu trúc Box hiển thị Thông báo cuối trận
+	var box = victory_defeat_modal.get_node_or_null("Dim/Box") as PanelContainer
+	if not box:
+		return
+
+	box.custom_minimum_size = Vector2(580, 480)
+	var box_style = StyleBoxFlat.new()
+	box_style.bg_color = Color(0.06, 0.08, 0.14, 0.98)
+	box_style.border_width_left = 2
+	box_style.border_width_top = 2
+	box_style.border_width_right = 2
+	box_style.border_width_bottom = 2
+	box_style.border_color = Color(0.95, 0.78, 0.25, 1.0) if is_win else Color(0.75, 0.25, 0.25, 1.0)
+	box_style.corner_radius_top_left = 16
+	box_style.corner_radius_top_right = 16
+	box_style.corner_radius_bottom_right = 16
+	box_style.corner_radius_bottom_left = 16
+	box_style.shadow_color = Color(0, 0, 0, 0.7)
+	box_style.shadow_size = 12
+	box_style.shadow_offset = Vector2(0, 4)
+	box.add_theme_stylebox_override("panel", box_style)
+
+	var vbox = victory_defeat_modal.get_node_or_null("Dim/Box/Margin/VBox") as VBoxContainer
+	if not vbox:
+		return
+
+	# Xóa các con cũ để xây dựng giao diện động mới hoàn toàn
+	for ch in vbox.get_children():
+		ch.queue_free()
+
+	vbox.add_theme_constant_override("separation", 10)
+
+	# --- A. TIÊU ĐỀ KẾT QUẢ TRẬN ĐẤU ---
+	var header_vbox = VBoxContainer.new()
+	header_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	header_vbox.add_theme_constant_override("separation", 2)
+	vbox.add_child(header_vbox)
+
+	var title_lbl = Label.new()
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.text = "🎉 CHIẾN THẮNG HUY HOÀNG!" if is_win else "💀 CHIẾN BẠI SA TRƯỜNG!"
+	title_lbl.add_theme_font_size_override("font_size", 22)
+	title_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.25, 1.0) if is_win else Color(0.95, 0.35, 0.35, 1.0))
+	title_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	title_lbl.add_theme_constant_override("shadow_offset_y", 2)
+	header_vbox.add_child(title_lbl)
+
+	var sub_lbl = Label.new()
+	sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub_lbl.text = "Đại phá phòng tuyến đối phương • Khắc ghi chiến công!" if is_win else "Toàn quân lui binh • Tu dưỡng thao lược chờ ngày phục thù!"
+	sub_lbl.add_theme_font_size_override("font_size", 12)
+	sub_lbl.add_theme_color_override("font_color", Color(0.75, 0.80, 0.90, 0.9))
+	header_vbox.add_child(sub_lbl)
+
+	# --- B. KHUNG THÔNG TIN RANK & SAO & ĐIỂM TÍCH LŨY ---
+	var card_panel = PanelContainer.new()
+	var cp_style = StyleBoxFlat.new()
+	cp_style.bg_color = Color(0.04, 0.06, 0.10, 0.9)
+	cp_style.border_width_left = 1
+	cp_style.border_width_top = 1
+	cp_style.border_width_right = 1
+	cp_style.border_width_bottom = 1
+	cp_style.border_color = Color(0.4, 0.5, 0.7, 0.5)
+	cp_style.corner_radius_top_left = 12
+	cp_style.corner_radius_top_right = 12
+	cp_style.corner_radius_bottom_right = 12
+	cp_style.corner_radius_bottom_left = 12
+	card_panel.add_theme_stylebox_override("panel", cp_style)
+	vbox.add_child(card_panel)
+
+	var card_margin = MarginContainer.new()
+	card_margin.add_theme_constant_override("margin_left", 16)
+	card_margin.add_theme_constant_override("margin_right", 16)
+	card_margin.add_theme_constant_override("margin_top", 12)
+	card_margin.add_theme_constant_override("margin_bottom", 12)
+	card_panel.add_child(card_margin)
+
+	var card_hbox = HBoxContainer.new()
+	card_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	card_hbox.add_theme_constant_override("separation", 24)
+	card_margin.add_child(card_hbox)
+
+	# 1. Cột trái: Huy hiệu Rank
+	var badge_col = VBoxContainer.new()
+	badge_col.alignment = BoxContainer.ALIGNMENT_CENTER
+	badge_col.custom_minimum_size = Vector2(130, 0)
+	badge_col.add_theme_constant_override("separation", 4)
+	card_hbox.add_child(badge_col)
+
+	var badge_rect = TextureRect.new()
+	badge_rect.custom_minimum_size = Vector2(96, 96)
+	badge_rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	badge_rect.pivot_offset = Vector2(48, 48)
+	badge_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	badge_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var initial_icon_path = RankSystem.get_rank_icon_path(res["old_rank_idx"])
+	if ResourceLoader.exists(initial_icon_path):
+		badge_rect.texture = load(initial_icon_path)
+	badge_col.add_child(badge_rect)
+
+	var rank_name_lbl = Label.new()
+	rank_name_lbl.text = RankSystem.get_rank_name(res["old_rank_idx"]).to_upper()
+	rank_name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rank_name_lbl.add_theme_font_size_override("font_size", 15)
+	var rank_color = RankSystem.get_rank_info(res["old_rank_idx"]).get("color", Color(1.0, 0.85, 0.4))
+	rank_name_lbl.add_theme_color_override("font_color", rank_color)
+	badge_col.add_child(rank_name_lbl)
+
+	# Đường phân cách dọc
+	var card_sep = VSeparator.new()
+	var cs_style = StyleBoxLine.new()
+	cs_style.color = Color(0.3, 0.4, 0.55, 0.3)
+	cs_style.vertical = true
+	card_sep.add_theme_stylebox_override("separator", cs_style)
+	card_hbox.add_child(card_sep)
+
+	# 2. Cột phải: Dải Sao & Thanh Điểm Tích Lũy
+	var info_col = VBoxContainer.new()
+	info_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_col.alignment = BoxContainer.ALIGNMENT_CENTER
+	info_col.add_theme_constant_override("separation", 10)
+	card_hbox.add_child(info_col)
+
+	# --- Dải Sao ---
+	var star_section = VBoxContainer.new()
+	star_section.add_theme_constant_override("separation", 2)
+	info_col.add_child(star_section)
+
+	var star_header = HBoxContainer.new()
+	var star_title = Label.new()
+	star_title.text = "Số sao xếp hạng:"
+	star_title.add_theme_font_size_override("font_size", 13)
+	star_title.add_theme_color_override("font_color", Color(0.85, 0.88, 0.95))
+	star_header.add_child(star_title)
+
+	var star_tag = Label.new()
+	star_tag.text = " +1 ★" if is_win else " -1 ★"
+	star_tag.add_theme_font_size_override("font_size", 13)
+	star_tag.add_theme_color_override("font_color", Color(0.35, 0.95, 0.45) if is_win else Color(1.0, 0.35, 0.35))
+	star_header.add_child(star_tag)
+	star_section.add_child(star_header)
+
+	var stars_hbox = HBoxContainer.new()
+	stars_hbox.add_theme_constant_override("separation", 6)
+	star_section.add_child(stars_hbox)
+
+	var star_nodes: Array = []
+	for s in range(5):
+		var star_lbl = Label.new()
+		star_lbl.text = "★"
+		star_lbl.add_theme_font_size_override("font_size", 24)
+		star_lbl.pivot_offset = Vector2(12, 14)
+		if s < res["old_stars"]:
+			star_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.2, 1.0))
+			star_lbl.add_theme_color_override("font_shadow_color", Color(0.9, 0.6, 0.1, 0.7))
+		else:
+			star_lbl.add_theme_color_override("font_color", Color(0.25, 0.28, 0.38, 0.8))
+		stars_hbox.add_child(star_lbl)
+		star_nodes.append(star_lbl)
+
+	var star_count_lbl = Label.new()
+	star_count_lbl.text = " %d/5 Sao" % res["old_stars"]
+	star_count_lbl.add_theme_font_size_override("font_size", 12)
+	star_count_lbl.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85))
+	stars_hbox.add_child(star_count_lbl)
+
+	# --- Thanh Điểm Tích Lũy ---
+	var acc_section = VBoxContainer.new()
+	acc_section.add_theme_constant_override("separation", 4)
+	info_col.add_child(acc_section)
+
+	var acc_header = HBoxContainer.new()
+	var acc_title = Label.new()
+	acc_title.text = "Điểm tích lũy dũng cảm:"
+	acc_title.add_theme_font_size_override("font_size", 13)
+	acc_title.add_theme_color_override("font_color", Color(0.85, 0.88, 0.95))
+	acc_header.add_child(acc_title)
+
+	var acc_delta_lbl = Label.new()
+	acc_delta_lbl.text = " +25đ" if is_win else " +10đ"
+	acc_delta_lbl.add_theme_font_size_override("font_size", 13)
+	acc_delta_lbl.add_theme_color_override("font_color", Color(0.3, 0.85, 1.0) if is_win else Color(0.95, 0.75, 0.2))
+	acc_header.add_child(acc_delta_lbl)
+	acc_section.add_child(acc_header)
+
+	var acc_bar = ProgressBar.new()
+	acc_bar.custom_minimum_size = Vector2(0, 14)
+	acc_bar.max_value = 100
+	acc_bar.value = res["old_acc_points"]
+	acc_bar.show_percentage = false
+	var bar_bg = StyleBoxFlat.new()
+	bar_bg.bg_color = Color(0.1, 0.13, 0.2, 0.9)
+	bar_bg.corner_radius_top_left = 6
+	bar_bg.corner_radius_top_right = 6
+	bar_bg.corner_radius_bottom_right = 6
+	bar_bg.corner_radius_bottom_left = 6
+	var bar_fg = StyleBoxFlat.new()
+	bar_fg.bg_color = Color(0.2, 0.75, 0.95, 1.0)
+	bar_fg.corner_radius_top_left = 6
+	bar_fg.corner_radius_top_right = 6
+	bar_fg.corner_radius_bottom_right = 6
+	bar_fg.corner_radius_bottom_left = 6
+	acc_bar.add_theme_stylebox_override("background", bar_bg)
+	acc_bar.add_theme_stylebox_override("fill", bar_fg)
+	acc_section.add_child(acc_bar)
+
+	var acc_text_lbl = Label.new()
+	acc_text_lbl.text = "%d/100 Điểm (Đủ 100đ đổi +1★)" % res["old_acc_points"]
+	acc_text_lbl.add_theme_font_size_override("font_size", 11)
+	acc_text_lbl.add_theme_color_override("font_color", Color(0.65, 0.75, 0.85))
+	acc_section.add_child(acc_text_lbl)
+
+	# --- C. BANNER THĂNG HẠNG (PROMOTION) ---
+	var promo_panel = PanelContainer.new()
+	promo_panel.visible = false
+	promo_panel.pivot_offset = Vector2(250, 18)
+	var pp_style = StyleBoxFlat.new()
+	pp_style.bg_color = Color(0.35, 0.22, 0.05, 0.95)
+	pp_style.border_width_left = 2
+	pp_style.border_width_top = 2
+	pp_style.border_width_right = 2
+	pp_style.border_width_bottom = 2
+	pp_style.border_color = Color(1.0, 0.9, 0.35, 1.0)
+	pp_style.corner_radius_top_left = 10
+	pp_style.corner_radius_top_right = 10
+	pp_style.corner_radius_bottom_right = 10
+	pp_style.corner_radius_bottom_left = 10
+	promo_panel.add_theme_stylebox_override("panel", pp_style)
+	vbox.add_child(promo_panel)
+
+	var promo_margin = MarginContainer.new()
+	promo_margin.add_theme_constant_override("margin_top", 6)
+	promo_margin.add_theme_constant_override("margin_bottom", 6)
+	promo_panel.add_child(promo_margin)
+
+	var promo_lbl = Label.new()
+	promo_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	promo_lbl.text = "🌟 CHÚC MỪNG THĂNG HẠNG: %s! 🌟" % RankSystem.get_rank_name(res["rank_index"]).to_upper()
+	promo_lbl.add_theme_font_size_override("font_size", 14)
+	promo_lbl.add_theme_color_override("font_color", Color(1.0, 0.95, 0.4, 1.0))
+	promo_margin.add_child(promo_lbl)
+
+	# --- D. PHẦN THƯỞNG & NÚT VỀ SẢNH ---
+	var rewards_hbox = HBoxContainer.new()
+	rewards_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	rewards_hbox.add_theme_constant_override("separation", 24)
+	vbox.add_child(rewards_hbox)
+
+	var exp_lbl = Label.new()
+	exp_lbl.text = "🎁 +%d EXP" % (150 if is_win else 50)
+	exp_lbl.add_theme_font_size_override("font_size", 13)
+	exp_lbl.add_theme_color_override("font_color", Color(0.4, 0.9, 1.0))
+	rewards_hbox.add_child(exp_lbl)
+
+	var silver_lbl = Label.new()
+	silver_lbl.text = "🪙 +%d Bạc" % (300 if is_win else 100)
+	silver_lbl.add_theme_font_size_override("font_size", 13)
+	silver_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
+	rewards_hbox.add_child(silver_lbl)
+
+	var return_btn = Button.new()
+	return_btn.custom_minimum_size = Vector2(240, 42)
+	return_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	return_btn.text = "🏠 VỀ SẢNH CHÍNH"
+	var r_style = StyleBoxFlat.new()
+	r_style.bg_color = Color(0.85, 0.68, 0.22, 1.0)
+	r_style.corner_radius_top_left = 8
+	r_style.corner_radius_top_right = 8
+	r_style.corner_radius_bottom_right = 8
+	r_style.corner_radius_bottom_left = 8
+	r_style.shadow_color = Color(0, 0, 0, 0.4)
+	r_style.shadow_size = 4
+	return_btn.add_theme_stylebox_override("normal", r_style)
+	return_btn.add_theme_color_override("font_color", Color(0.08, 0.05, 0.01))
+	return_btn.add_theme_font_size_override("font_size", 14)
+	return_btn.pressed.connect(_on_return_home_clicked)
+	vbox.add_child(return_btn)
+
+	# --- E. HOẠT HỌA TUẦN TỰ (SEQUENTIAL TWEEN ANIMATIONS) ---
+	# 1. Xuất hiện Modal nảy nhẹ
+	box.pivot_offset = Vector2(290, 240)
+	box.scale = Vector2(0.85, 0.85)
+	box.modulate.a = 0.0
+	var tw = create_tween().set_parallel(true)
+	tw.tween_property(box, "scale", Vector2(1.0, 1.0), 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(box, "modulate:a", 1.0, 0.2)
 	if is_win:
 		AudioManager.play_victory()
 	else:
 		AudioManager.play_defeat()
+	await tw.finished
+
+	await get_tree().create_timer(0.3).timeout
+
+	# 2. Hoạt họa Tăng / Giảm Sao
 	if is_win:
-		victory_title.text = "🎉 CHIẾN THẮNG HUY HOÀNG!"
-		victory_title.add_theme_color_override("font_color", Color(1, 0.85, 0.25, 1))
-		victory_desc.text = "Chúc mừng! Phe của bạn đã đại phá toàn bộ chiến tuyến của đối phương!\n\n🎁 Phần thưởng: +150 EXP • +300 Vàng • +25 Điểm Xếp Hạng"
+		var target_star_idx = res["old_stars"]
+		if target_star_idx < star_nodes.size():
+			var s_node = star_nodes[target_star_idx] as Label
+			var s_tw = create_tween()
+			s_tw.tween_property(s_node, "scale", Vector2(1.8, 1.8), 0.18).set_trans(Tween.TRANS_BACK)
+			s_tw.parallel().tween_property(s_node, "theme_override_colors/font_color", Color(1.0, 0.88, 0.2, 1.0), 0.18)
+			s_tw.tween_property(s_node, "scale", Vector2(1.0, 1.0), 0.15)
+			AudioManager.play_card_draw()
+			await s_tw.finished
 	else:
-		victory_title.text = "💀 THẤT BẠI!"
-		victory_title.add_theme_color_override("font_color", Color(0.9, 0.3, 0.3, 1))
-		victory_desc.text = "Tất cả các tướng phe bạn đã ngã xuống. Hãy rèn luyện thêm binh pháp và trở lại phục thù!\n\n🎁 Phần thưởng: +40 EXP • +50 Vàng"
+		if res["old_stars"] > 0:
+			var target_star_idx = res["old_stars"] - 1
+			if target_star_idx < star_nodes.size():
+				var s_node = star_nodes[target_star_idx] as Label
+				var s_tw = create_tween()
+				s_tw.tween_property(s_node, "theme_override_colors/font_color", Color(1.0, 0.25, 0.25), 0.15)
+				s_tw.tween_property(s_node, "theme_override_colors/font_color", Color(0.25, 0.28, 0.38, 0.8), 0.25)
+				AudioManager.play_damage()
+				await s_tw.finished
+
+	# Cập nhật nhãn số sao sau khi sao đổi
+	var intermediate_stars = res["stars"]
+	if res["promoted"]:
+		intermediate_stars = 5 # Đầy 5 sao trước khi biến hình thăng hạng
+	star_count_lbl.text = " %d/5 Sao" % intermediate_stars
+
+	await get_tree().create_timer(0.3).timeout
+
+	# 3. Hoạt họa Thanh Điểm Tích Lũy
+	var bar_tw = create_tween()
+	if res["star_bonus_from_points"]:
+		# Chạy lên 100/100 -> bùng nổ thưởng 1 sao -> chạy về điểm dư
+		bar_tw.tween_property(acc_bar, "value", 100.0, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		await bar_tw.finished
+		
+		acc_text_lbl.text = "⚡ ĐẦY 100 ĐIỂM TÍCH LŨY ➔ THƯỞNG +1 SAO! ⚡"
+		acc_text_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.2))
+		AudioManager.play_skill()
+
+		# Thêm 1 sao nữa vào dải sao
+		var bonus_star_idx = intermediate_stars
+		if bonus_star_idx < star_nodes.size():
+			var b_node = star_nodes[bonus_star_idx] as Label
+			var b_tw = create_tween()
+			b_tw.tween_property(b_node, "scale", Vector2(1.8, 1.8), 0.2)
+			b_tw.parallel().tween_property(b_node, "theme_override_colors/font_color", Color(1.0, 0.88, 0.2), 0.2)
+			b_tw.tween_property(b_node, "scale", Vector2(1.0, 1.0), 0.15)
+			await b_tw.finished
+		
+		await get_tree().create_timer(0.3).timeout
+		var bar_reset_tw = create_tween()
+		bar_reset_tw.tween_property(acc_bar, "value", float(res["accumulation_points"]), 0.4)
+		await bar_reset_tw.finished
+		acc_text_lbl.text = "%d/100 Điểm (Đủ 100đ đổi +1★)" % res["accumulation_points"]
+		acc_text_lbl.add_theme_color_override("font_color", Color(0.65, 0.75, 0.85))
+	else:
+		bar_tw.tween_property(acc_bar, "value", float(res["accumulation_points"]), 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		await bar_tw.finished
+		acc_text_lbl.text = "%d/100 Điểm (Đủ 100đ đổi +1★)" % res["accumulation_points"]
+
+	# 4. Hoạt Họa Lên Rank (Promotion)
+	if res["promoted"]:
+		await get_tree().create_timer(0.4).timeout
+		
+		# Hiệu ứng huy hiệu phát sáng và rung lắc nhẹ
+		var r_tw = create_tween()
+		r_tw.tween_property(badge_rect, "scale", Vector2(1.4, 1.4), 0.25).set_trans(Tween.TRANS_BACK)
+		r_tw.parallel().tween_property(badge_rect, "modulate", Color(2.5, 2.3, 1.5), 0.25)
+		await r_tw.finished
+		
+		# Đổi sang icon rank mới
+		var new_icon_path = RankSystem.get_rank_icon_path(res["rank_index"])
+		if ResourceLoader.exists(new_icon_path):
+			badge_rect.texture = load(new_icon_path)
+		
+		rank_name_lbl.text = RankSystem.get_rank_name(res["rank_index"]).to_upper()
+		var new_color = RankSystem.get_rank_info(res["rank_index"]).get("color", Color(1.0, 0.9, 0.3))
+		rank_name_lbl.add_theme_color_override("font_color", new_color)
+		
+		var r_down = create_tween()
+		r_down.tween_property(badge_rect, "scale", Vector2(1.0, 1.0), 0.35).set_trans(Tween.TRANS_BOUNCE)
+		r_down.parallel().tween_property(badge_rect, "modulate", Color(1.0, 1.0, 1.0), 0.35)
+		
+		# Hiện Banner thăng hạng
+		promo_panel.visible = true
+		promo_panel.scale = Vector2(0.6, 0.6)
+		promo_panel.modulate.a = 0.0
+		var p_tw = create_tween().set_parallel(true)
+		p_tw.tween_property(promo_panel, "scale", Vector2(1.0, 1.0), 0.3).set_trans(Tween.TRANS_BACK)
+		p_tw.tween_property(promo_panel, "modulate:a", 1.0, 0.2)
+		
+		AudioManager.play_victory()
+
+		# Reset dải sao về số sao mới của rank mới (mặc định 0 sao)
+		for s in range(5):
+			var s_node = star_nodes[s] as Label
+			if s < res["stars"]:
+				s_node.add_theme_color_override("font_color", Color(1.0, 0.88, 0.2, 1.0))
+			else:
+				s_node.add_theme_color_override("font_color", Color(0.25, 0.28, 0.38, 0.8))
+		star_count_lbl.text = " %d/5 Sao" % res["stars"]
 
 func _on_return_home_clicked() -> void:
 	if NetworkClient:

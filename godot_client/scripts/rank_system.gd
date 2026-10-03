@@ -7,6 +7,7 @@ const STARS_PER_TIER := 5
 const WIN_STARS := 1
 const LOSE_STARS := -1
 const WIN_ACCUMULATION_POINTS := 25
+const LOSE_ACCUMULATION_POINTS := 10
 const MAX_ACCUMULATION_POINTS := 100
 
 const RANK_DATA := [
@@ -165,9 +166,13 @@ func process_match_result(
 	current_stars: int,
 	current_acc_points: int
 ) -> Dictionary:
-	var rank_idx: int = clampi(current_rank_idx, 0, 11)
-	var stars: int = maxi(0, current_stars)
-	var acc_points: int = clampi(current_acc_points, 0, MAX_ACCUMULATION_POINTS)
+	var old_rank_idx: int = clampi(current_rank_idx, 0, 11)
+	var old_stars: int = maxi(0, current_stars)
+	var old_acc: int = clampi(current_acc_points, 0, MAX_ACCUMULATION_POINTS)
+
+	var rank_idx: int = old_rank_idx
+	var stars: int = old_stars
+	var acc_points: int = old_acc
 	var promoted := false
 	var demoted := false
 	var star_bonus := false
@@ -175,32 +180,42 @@ func process_match_result(
 	if is_win:
 		stars += WIN_STARS
 		acc_points += WIN_ACCUMULATION_POINTS
-
-		if acc_points >= MAX_ACCUMULATION_POINTS:
-			acc_points = 0
-			stars += 1
-			star_bonus = true
-
-		# Kiểm tra thăng hạng (riêng Hoàng Đế tích sao vô hạn)
-		if rank_idx < 11:
-			while stars > STARS_PER_TIER and rank_idx < 11:
-				stars -= (STARS_PER_TIER + 1) # 5 sao + 1 = 0 sao ở rank kế
-				rank_idx += 1
-				promoted = true
 	else:
 		stars += LOSE_STARS
-		if stars < 0:
-			if rank_idx > 0:
-				rank_idx -= 1
-				stars = STARS_PER_TIER # Rớt về 5 sao của rank trước
-				demoted = true
-			else:
-				stars = 0 # Sàn Dân Binh 0 sao không trừ âm
+		acc_points += LOSE_ACCUMULATION_POINTS
+
+	# Đủ 100 điểm tích lũy: tiêu thụ 100 điểm và cộng thêm 1 sao
+	if acc_points >= MAX_ACCUMULATION_POINTS:
+		acc_points -= MAX_ACCUMULATION_POINTS
+		stars += 1
+		star_bonus = true
+
+	# Kiểm tra Thăng hạng (riêng Hoàng Đế tích sao vô hạn)
+	if rank_idx < 11:
+		while stars > STARS_PER_TIER and rank_idx < 11:
+			stars -= (STARS_PER_TIER + 1) # 5 sao + 1 sao = 0 sao ở rank kế
+			rank_idx += 1
+			promoted = true
+	
+	# Kiểm tra Rớt hạng nếu sao âm
+	if stars < 0:
+		if rank_idx > 0:
+			rank_idx -= 1
+			stars = STARS_PER_TIER # Rớt về 5 sao của rank trước
+			demoted = true
+		else:
+			stars = 0 # Sàn Dân Binh 0 sao không trừ âm
 
 	return {
+		"is_win": is_win,
+		"old_rank_idx": old_rank_idx,
+		"old_stars": old_stars,
+		"old_acc_points": old_acc,
 		"rank_index": rank_idx,
 		"stars": stars,
 		"accumulation_points": acc_points,
+		"stars_delta": (stars - old_stars) if not (promoted or demoted) else (1 if is_win else -1),
+		"acc_points_delta": (WIN_ACCUMULATION_POINTS if is_win else LOSE_ACCUMULATION_POINTS),
 		"tier_changed": promoted or demoted,
 		"promoted": promoted,
 		"demoted": demoted,

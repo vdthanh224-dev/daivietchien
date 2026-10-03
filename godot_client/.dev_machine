@@ -1,3 +1,3 @@
-# Developer machine marker file for Dai Viet Chien
-# Only machines with this file or USERNAME="PH Laptop" will show the Tester bar.
-dev_machine=true
+# Developer machine ID marker
+# Only machine with OS.get_unique_id() == "87b3fe32-b39f-11f0-abd7-806e6f6e6963" will show the Tester bar.
+machine_id=87b3fe32-b39f-11f0-abd7-806e6f6e6963

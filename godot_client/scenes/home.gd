@@ -2624,9 +2624,14 @@ func _build_profile_content() -> Control:
 	win.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
 	v.add_child(win)
 
+	var rank_name = RankSystem.get_rank_name(AuthManager.current_2v2_rank_index) if (RankSystem and AuthManager) else "Dân Binh"
+	var rank_stars = AuthManager.current_2v2_stars if AuthManager else 0
+	var rank_acc = AuthManager.current_2v2_accumulation_points if AuthManager else 0
 	var rp = Label.new()
-	rp.text = "Điểm 2v2 RP: %d | Bạc: %s | Vàng: %s" % [
-		AuthManager.current_2v2_points if AuthManager else 1200,
+	rp.text = "Hạng 2v2: %s (%d/5 ★, %d/100đ) | Bạc: %s | Vàng: %s" % [
+		rank_name,
+		rank_stars,
+		rank_acc,
 		_format_number(current_silver),
 		_format_number(current_gold)
 	]
@@ -2688,7 +2693,7 @@ func _start_2v2_matchmaking() -> void:
 
 	# Lấy thông tin Rank và Số Sao của người chơi
 	var rank_idx = 0
-	var rank_stars = 3
+	var rank_stars = 0
 	if AuthManager:
 		rank_idx = AuthManager.current_2v2_rank_index
 		rank_stars = AuthManager.current_2v2_stars
@@ -3027,9 +3032,9 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	var my_user_name = AuthManager.current_user_name if AuthManager and AuthManager.current_user_name != "" else ""
 	if (my_user_name == "" or my_user_name == "Đại Tướng Quân") and AuthManager and AuthManager.current_user_email != "":
 		my_user_name = AuthManager.current_user_email.split("@")[0].to_upper()
-	var my_rank_points = AuthManager.current_2v2_points if AuthManager else 1200
+	var my_rank_points = (AuthManager.current_2v2_rank_index * 5 + AuthManager.current_2v2_stars) if AuthManager else 0
 	var is_debug_match = OS.is_debug_build() or OS.has_feature("editor")
-	var rank_diff = 999999 if is_debug_match else 500
+	var rank_diff = 999999 if is_debug_match else 10
 
 	if AppwriteMatchmaking:
 		AppwriteMatchmaking.my_session_user_id = my_user_id

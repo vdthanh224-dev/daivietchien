@@ -5826,6 +5826,29 @@ export function handleAIReaction(state, aiSeat) {
   const ai = state.players.find(x => x.seat === aiSeat);
   if (!ai || (ai.hp <= 0 && state.phase !== "AWAIT_NEAR_DEATH")) return { error: "Người chơi không hợp lệ" };
 
+  if (state.phase === "AWAIT_UAT_KHI" && state.waitingTargetSeat === aiSeat) {
+    const otherLivingAllies = state.players.filter((player) =>
+      player.seat !== aiSeat && isLivingPlayer(player) && areTeammatesInState(state, aiSeat, player.seat)
+    );
+
+    let targetSeat = aiSeat;
+
+    if (otherLivingAllies.length > 0) {
+      otherLivingAllies.sort((a, b) => (a.hand || []).length - (b.hand || []).length);
+      const lowestAlly = otherLivingAllies[0];
+      const aiCards = (ai.hand || []).length;
+      const allyCards = (lowestAlly.hand || []).length;
+
+      if (allyCards <= aiCards) {
+        targetSeat = lowestAlly.seat;
+      } else {
+        targetSeat = aiSeat;
+      }
+    }
+
+    return handleUseSkill(state, aiSeat, "Uất Khí", targetSeat);
+  }
+
   if (state.phase === "AWAIT_CHINH_THONG_TARGET" && state.waitingTargetSeat === aiSeat) {
     const target = state.players.find((player) => player.seat !== aiSeat && isLivingPlayer(player));
     return target ? handleUseSkill(state, aiSeat, "Chính Thống", target.seat) : handleRespondAction(state, aiSeat, false, null);
@@ -6092,13 +6115,9 @@ export function tickGameState(state, connectedSeats = null) {
       recordAction(state, {
         type: "TIMEOUT_AI_REACTION",
         casterSeat: waitingSeat,
-        description: state.phase === "AWAIT_UAT_KHI"
-          ? `⏰ <b>${waitingPlayer ? waitingPlayer.generalName : 'Người chơi'}</b> hết 40s: tự từ chối [Uất Khí].`
-          : `⏰ <b>${waitingPlayer ? waitingPlayer.generalName : 'Người chơi'}</b> hết 40s: AI tự động phản ứng hỗ trợ!`
+        description: `⏰ <b>${waitingPlayer ? waitingPlayer.generalName : 'Người chơi'}</b> hết 40s: AI tự động phản ứng hỗ trợ!`
       });
-      const aiRes = state.phase === "AWAIT_UAT_KHI"
-        ? { error: "Uất Khí hết giờ sẽ tự từ chối" }
-        : handleAIReaction(state, waitingSeat);
+      const aiRes = handleAIReaction(state, waitingSeat);
       if (!aiRes || aiRes.error) {
         if (state.phase === "AWAIT_SLASH_DEFENSE") {
           handleRespondAction(state, waitingSeat, false, null);
@@ -6155,8 +6174,7 @@ export function tickGameState(state, connectedSeats = null) {
     }
 
     const isAISlot = waitingPlayer && waitingPlayer.isAI === true;
-    // Uất Khí is an exclusive 40s choice. AI must not resolve it early.
-    const canAIReact = !["AWAIT_UAT_KHI", "AWAIT_KHOI_BINH", "AWAIT_HUYNH_TRUONG", "AWAIT_THU_MUC"].includes(state.phase)
+    const canAIReact = !["AWAIT_KHOI_BINH", "AWAIT_HUYNH_TRUONG", "AWAIT_THU_MUC"].includes(state.phase)
       && isAISlot
       && (waitingPlayer.hp > 0 || state.phase === "AWAIT_NEAR_DEATH");
     if (canAIReact && elapsedMs >= 1500 && elapsed < 40) {

@@ -25,10 +25,11 @@ var current_gold: int = 0
 var current_generals: Array = ["ly_thuong_kiet"]
 var current_2v2_points: int = 1200
 var current_2v2_rank_index: int = 0
-var current_2v2_stars: int = 3
+var current_2v2_stars: int = 0
 var current_2v2_accumulation_points: int = 0
 var tutorial_reward_claimed: bool = false
 var pending_exp_gain: Dictionary = {}
+var disable_session_save: bool = false
 
 # 12 Tiers of Military Ranks
 const MILITARY_TIERS = [
@@ -234,6 +235,9 @@ func fetch_profile_from_appwrite(on_completed: Callable = Callable()) -> void:
 	http.request(url, headers, HTTPClient.METHOD_GET)
 
 func save_profile_to_appwrite(on_completed: Callable = Callable()) -> void:
+	if disable_session_save:
+		if on_completed.is_valid(): on_completed.call()
+		return
 	save_session()
 
 	if session_secret == "" and session_cookie == "":
@@ -515,6 +519,8 @@ func get_save_path() -> String:
 	return "user://auth_session.json"
 
 func save_session() -> void:
+	if disable_session_save:
+		return
 	var path = get_save_path()
 	var file = FileAccess.open(path, FileAccess.WRITE)
 	if file:
@@ -608,7 +614,7 @@ func load_saved_session() -> void:
 						current_generals = ["ly_thuong_kiet"]
 					current_2v2_points = int(data.get("rank2v2Points", 1200))
 					current_2v2_rank_index = int(data.get("rank2v2Index", 0))
-					current_2v2_stars = int(data.get("rank2v2Stars", 3))
+					current_2v2_stars = int(data.get("rank2v2Stars", 0))
 					current_2v2_accumulation_points = int(data.get("rank2v2AccPoints", 0))
 					tutorial_reward_claimed = bool(data.get("tutorialRewardClaimed", false))
 					if session_secret != "":
