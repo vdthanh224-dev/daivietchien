@@ -893,8 +893,8 @@ func _inspect_hero(hero: Dictionary) -> void:
 				var status_l: Label = node["status"]
 				var slot_data = node["data"]
 				if not bool(slot_data.get("isLocked", false)):
-					var tex = HeroDatabase.get_avatar_texture(hero.get("avatarPath", "")) if HeroDatabase else null
-					if tex: av.texture = tex
+					var preview_tex = HeroDatabase.get_avatar_texture(hero.get("avatarPath", "")) if HeroDatabase else null
+					if preview_tex: av.texture = preview_tex
 					av.modulate = Color.WHITE
 					hname_l.text = hname
 					hname_l.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
