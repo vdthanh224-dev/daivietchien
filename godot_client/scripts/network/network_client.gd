@@ -10,6 +10,7 @@ signal error_received(message: String)
 signal draft_state_updated(draft_data: Dictionary)
 signal draft_completed(battle_data: Dictionary)
 signal draft_joined(assigned_seat: int)
+signal draft_hover_updated(seat: int, hero_id: int, hero_name: String)
 signal ping_updated(ping_ms: int)
 
 const CANDIDATE_SERVERS: Array[Dictionary] = [
@@ -288,6 +289,9 @@ func _handle_server_message(raw_json: String) -> void:
 	if msg_type == "DRAFT_STATE_UPDATE":
 		draft_state_updated.emit(data)
 
+	if msg_type == "DRAFT_HOVER_UPDATE":
+		draft_hover_updated.emit(int(data.get("seat", 0)), int(data.get("heroId", 0)), str(data.get("heroName", "")))
+
 	if msg_type == "DRAFT_COMPLETED":
 		draft_completed.emit(data)
 
@@ -354,6 +358,23 @@ func send_pick_hero(hero_id: int, hero_name: String = "") -> void:
 		"heroId": hero_id,
 		"heroName": hero_name
 	})
+
+func send_hover_hero(hero_id: int, hero_name: String = "") -> void:
+	if not is_connected_to_server or room_id.is_empty():
+		return
+	send_json({
+		"action": "HOVER_HERO",
+		"roomId": room_id,
+		"seat": my_seat,
+		"heroId": hero_id,
+		"heroName": hero_name
+	})
+
+func update_debug_window_title(display_name: String = "") -> void:
+	if not (OS.is_debug_build() or OS.has_feature("editor")):
+		return
+	var name_part = (" | " + display_name) if not display_name.is_empty() else ""
+	DisplayServer.window_set_title("Đại Việt Chiến - [CỬA SỔ %d - GHẾ %d%s]" % [auto_instance_index, my_seat, name_part])
 
 func leave_room() -> void:
 	room_id = ""

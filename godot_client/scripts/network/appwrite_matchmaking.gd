@@ -310,7 +310,7 @@ func _release_room_lock(room_id: String) -> void:
 	await _send_http_request(docs_url + "/" + _match_lock_doc_id(room_id), HTTPClient.METHOD_DELETE)
 
 # --- 3. Join Room Slot ---
-func join_room_slot(room: Dictionary, my_user_id: String, my_user_name: String, my_rank_points: int) -> Dictionary:
+func join_room_slot(room: Dictionary, my_user_id: String, my_user_name: String, my_rank_points: int, desired_seat: int = 0) -> Dictionary:
 	if room.is_empty():
 		return {}
 
@@ -335,10 +335,14 @@ func join_room_slot(room: Dictionary, my_user_id: String, my_user_name: String, 
 				await _release_room_lock(room_id)
 				return latest_room
 		var target_index = -1
-		for idx in range(latest_room.get("slots", []).size()):
-			if latest_room["slots"][idx].get("isEmpty", false):
-				target_index = idx
-				break
+		if desired_seat >= 1 and desired_seat <= latest_room.get("slots", []).size():
+			if latest_room["slots"][desired_seat - 1].get("isEmpty", false):
+				target_index = desired_seat - 1
+		if target_index < 0:
+			for idx in range(latest_room.get("slots", []).size()):
+				if latest_room["slots"][idx].get("isEmpty", false):
+					target_index = idx
+					break
 		if target_index < 0:
 			await _release_room_lock(room_id)
 			return {}

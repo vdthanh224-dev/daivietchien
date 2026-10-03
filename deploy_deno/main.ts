@@ -100,6 +100,24 @@ if (clusterChannel) {
       }
     }
 
+    if (type === "DRAFT_HOVER_SYNC") {
+      let room = rooms.get(roomId);
+      if (room?.draft) {
+        const slot = room.draft.slots.find((s: any) => s.seat === msg.seat);
+        if (slot && !slot.isLocked) {
+          (slot as any).hoverHeroId = msg.heroId;
+          (slot as any).hoverHeroName = msg.heroName;
+          broadcastRoom(room, {
+            type: "DRAFT_HOVER_UPDATE",
+            roomId,
+            seat: msg.seat,
+            heroId: msg.heroId,
+            heroName: msg.heroName,
+          });
+        }
+      }
+    }
+
     if (type === "DRAFT_COMPLETED_SYNC") {
       let room = rooms.get(roomId);
       if (room) {
@@ -152,7 +170,7 @@ const startTime = Date.now();
 const MAX_WS_MESSAGE_BYTES = 64 * 1024;
 const MAX_ACTIONS_PER_SECOND = 30;
 const ALLOWED_WS_ACTIONS = new Set([
-  "JOIN_ROOM", "INIT_GAME", "JOIN_DRAFT", "PICK_HERO", "GET_STATE", "PING",
+  "JOIN_ROOM", "INIT_GAME", "JOIN_DRAFT", "PICK_HERO", "HOVER_HERO", "GET_STATE", "PING",
   "USE_SKILL", "TOGGLE_SKILL", "PLAY_CARD", "RESPOND_ACTION", "END_TURN",
   "DISCARD_CARDS", "AI_STEP", "AI_REACTION"
 ]);
@@ -287,7 +305,12 @@ function draftStateMessage(roomId: string, draft: DraftState) {
   // picker index even when their matchmaking snapshots arrived in a different order.
   const slots = [...draft.slots]
     .sort((a, b) => a.seat - b.seat)
-    .map((slot) => ({ ...slot, seatNumber: slot.seat }));
+    .map((slot) => ({
+      ...slot,
+      seatNumber: slot.seat,
+      hoverHeroId: (slot as any).hoverHeroId || 0,
+      hoverHeroName: (slot as any).hoverHeroName || "",
+    }));
   const currentSeat = draft.slots[draft.currentPickerIndex]?.seat || 1;
   const currentPickerIndex = slots.findIndex((slot) => slot.seat === currentSeat);
   return {
@@ -375,6 +398,8 @@ function ensureTickTimer() {
           const autoHeroId = getAutoPickHeroId(lockedIds);
           currentSlot.heroId = autoHeroId;
           currentSlot.heroName = getHeroName(autoHeroId);
+          (currentSlot as any).hoverHeroId = 0;
+          (currentSlot as any).hoverHeroName = "";
           currentSlot.isLocked = true;
           console.log(`[Deno Draft AutoPick] Ghế ${currentSlot.seat} (${isBot ? "Bot" : "Timeout"}) đã tự chọn tướng ${currentSlot.heroName} (#${autoHeroId})`);
 
@@ -591,7 +616,10 @@ Deno.serve({ port, hostname }, async (req) => {
             const dragonSeats = randomTeamSeats();
             const defaultSlots: DraftSlot[] = [1, 2, 3, 4].map((s) => {
               const matched = rawSlots.find((x: any) => Number(x.seatNumber || x.seat) === s) || rawSlots[s - 1] || {};
-              const isAI = Boolean(matched.isAI ?? (s !== boundSeat));
+              const matchedUid = String(matched.userId || "").trim();
+              const isBotUid = matchedUid.startsWith("bot_");
+              const isRealUid = matchedUid !== "" && matchedUid !== "empty" && !isBotUid;
+              const isAI = isRealUid ? false : (matched.isAI !== undefined ? Boolean(matched.isAI) : (isBotUid || (rawSlots.length > 0 && !matchedUid)));
               return {
                 seat: s,
                 userId: String(matched.userId || (isAI ? `bot_${s}` : (s === boundSeat ? (payload.userId || `user_${s}`) : `user_${s}`))),
@@ -704,6 +732,8 @@ Deno.serve({ port, hostname }, async (req) => {
 
           currentSlot.heroId = heroId;
           currentSlot.heroName = payload.heroName || getHeroName(heroId);
+          (currentSlot as any).hoverHeroId = 0;
+          (currentSlot as any).hoverHeroName = "";
           currentSlot.maxHp = HERO_MAX_HP[heroId] || 4;
           currentSlot.isLocked = true;
 
@@ -719,6 +749,34 @@ Deno.serve({ port, hostname }, async (req) => {
           } else {
             broadcastRoom(room, draftStateMessage(roomId, draft));
             clusterBroadcast({ type: "DRAFT_SYNC", roomId, draft });
+          }
+          return;
+        }
+
+        // A.0.2. XEM TRƯỚC / RÊ CHUỘT CHỌN TƯỚNG (HOVER_HERO)
+        if (action === "HOVER_HERO") {
+          if (!room || !room.draft || room.draft.isCompleted) return;
+          const heroId = Number(payload.heroId || payload.hero_id || 0);
+          const heroName = String(payload.heroName || getHeroName(heroId) || "");
+          const targetSeat = currentSeat || boundSeat || Number(payload.seat || 0);
+          const slot = room.draft.slots.find((s: any) => s.seat === targetSeat);
+          if (slot && !slot.isLocked) {
+            (slot as any).hoverHeroId = heroId;
+            (slot as any).hoverHeroName = heroName;
+            broadcastRoom(room, {
+              type: "DRAFT_HOVER_UPDATE",
+              roomId,
+              seat: targetSeat,
+              heroId,
+              heroName,
+            });
+            clusterBroadcast({
+              type: "DRAFT_HOVER_SYNC",
+              roomId,
+              seat: targetSeat,
+              heroId,
+              heroName,
+            });
           }
           return;
         }

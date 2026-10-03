@@ -190,6 +190,7 @@ func _setup_draft_slots() -> void:
 		NetworkClient.my_seat = my_seat_num
 		if not (OS.is_debug_build() or OS.has_feature("editor")):
 			NetworkClient.seat_is_explicit = false
+		NetworkClient.update_debug_window_title(my_name)
 	print("[HeroSelect] Xác định ghế của bạn: Ghế %d (UID: %s, Tên: %s)" % [my_seat_num, my_uid, my_name])
 
 	var used_names: Array = []
@@ -215,7 +216,11 @@ func _setup_draft_slots() -> void:
 
 			var is_drag = bool(s.get("isDragon", s_num == 1 or s_num == 3))
 			var role_tag = "[RỒNG]" if is_drag else "[PHƯỢNG]"
-			var is_ai = false if is_me else bool(s.get("isAI", true))
+			var uid_str = str(s.get("userId", "")).strip_edges()
+			var is_bot = bool(s.get("isAI", false)) or uid_str.begins_with("bot_")
+			if uid_str != "" and uid_str != "empty" and not uid_str.begins_with("bot_"):
+				is_bot = false
+			var is_ai = false if is_me else is_bot
 
 			draft_slots.append({
 				"seatNumber": s_num,
@@ -234,6 +239,7 @@ func _setup_draft_slots() -> void:
 		var random_team_seats = [1, 2, 3, 4]
 		random_team_seats.shuffle()
 		var dragon_seats = random_team_seats.slice(0, 2)
+		var is_debug = OS.is_debug_build() or OS.has_feature("editor")
 		draft_slots = []
 		for s_num in range(1, 5):
 			var is_me = (s_num == local_seat)
@@ -246,7 +252,7 @@ func _setup_draft_slots() -> void:
 				"roleTag": role_tag,
 				"isPlayer": is_me,
 				"isDragon": is_drag,
-				"isAI": not is_me,
+				"isAI": false if is_debug else (not is_me),
 				"chosenHero": null,
 				"isLocked": false
 			})
@@ -875,6 +881,27 @@ func _inspect_hero(hero: Dictionary) -> void:
 	inspect_skill_title_lbl.text = "⚡ TUYỆT KỸ: [%s]" % HeroDatabase.get_skill_summary(int(hero.get("id", 0))).to_upper()
 	inspect_skill_desc_lbl.text = HeroDatabase.get_skill_details(int(hero.get("id", 0)))
 
+	if NetworkClient and NetworkClient.is_connected_to_server:
+		NetworkClient.send_hover_hero(hid, hname)
+
+	var my_seat_num = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat in [1, 2, 3, 4] else 1
+	if _is_my_turn():
+		for node in left_slot_nodes:
+			if int(node.get("data", {}).get("seatNumber", 0)) == my_seat_num:
+				var av: TextureRect = node["avatar"]
+				var hname_l: Label = node["hero_name"]
+				var status_l: Label = node["status"]
+				var slot_data = node["data"]
+				if not bool(slot_data.get("isLocked", false)):
+					var tex = HeroDatabase.get_avatar_texture(hero.get("avatarPath", "")) if HeroDatabase else null
+					if tex: av.texture = tex
+					av.modulate = Color.WHITE
+					hname_l.text = hname
+					hname_l.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+					status_l.text = "⏳ Đang chọn..."
+					status_l.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+				break
+
 	_update_lock_in_button_state()
 
 func _is_my_turn() -> bool:
@@ -1220,6 +1247,8 @@ func _connect_network_draft() -> void:
 		return
 	if not NetworkClient.draft_state_updated.is_connected(_on_server_draft_state_updated):
 		NetworkClient.draft_state_updated.connect(_on_server_draft_state_updated)
+	if not NetworkClient.draft_hover_updated.is_connected(_on_server_draft_hover_updated):
+		NetworkClient.draft_hover_updated.connect(_on_server_draft_hover_updated)
 	if not NetworkClient.draft_completed.is_connected(_on_server_draft_completed):
 		NetworkClient.draft_completed.connect(_on_server_draft_completed)
 	if not NetworkClient.draft_joined.is_connected(_on_network_draft_joined):
@@ -1265,6 +1294,8 @@ func _on_network_draft_joined(assigned_seat: int) -> void:
 	_draft_joined = true
 	if assigned_seat >= 1 and assigned_seat <= 4 and NetworkClient:
 		NetworkClient.my_seat = assigned_seat
+		var my_name = AppwriteMatchmaking.my_session_user_name if AppwriteMatchmaking else ""
+		NetworkClient.update_debug_window_title(my_name)
 		for slot in draft_slots:
 			slot["isPlayer"] = int(slot.get("seatNumber", 0)) == assigned_seat
 		for i in range(left_slot_nodes.size()):
@@ -1278,6 +1309,40 @@ func _on_network_draft_joined(assigned_seat: int) -> void:
 				seat_lbl.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0, 1.0) if is_me else Color.WHITE)
 		_highlight_active_picker(current_picker_index)
 		_update_lock_in_button_state()
+
+func _on_server_draft_hover_updated(seat: int, hero_id: int, hero_name: String) -> void:
+	if not is_draft_active:
+		return
+	for local_s in draft_slots:
+		if int(local_s.get("seatNumber", local_s.get("seat", 0))) == seat:
+			if bool(local_s.get("isLocked", false)):
+				return
+			local_s["hoverHeroId"] = hero_id
+			local_s["hoverHeroName"] = hero_name
+			var hero = HeroDatabase.get_hero(hero_id) if (HeroDatabase and hero_id > 0) else {}
+			for node in left_slot_nodes:
+				if int(node.get("data", {}).get("seatNumber", 0)) == seat:
+					var av: TextureRect = node["avatar"]
+					var hname_l: Label = node["hero_name"]
+					var status_l: Label = node["status"]
+					if hero_id > 0:
+						var tex = HeroDatabase.get_avatar_texture(hero.get("avatarPath", "")) if (HeroDatabase and not hero.is_empty()) else null
+						if tex: av.texture = tex
+						av.modulate = Color.WHITE
+						hname_l.text = hero_name if not hero_name.is_empty() else hero.get("name", "Tướng %d" % hero_id)
+						hname_l.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+						status_l.text = "⏳ Đang chọn..."
+						status_l.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+					else:
+						var def_tex = HeroDatabase.get_avatar_texture("") if HeroDatabase else null
+						if def_tex: av.texture = def_tex
+						av.modulate = Color(1.0, 1.0, 1.0, 0.4)
+						hname_l.text = "Chưa chọn..."
+						hname_l.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+						status_l.text = "Chờ lượt..."
+						status_l.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+					break
+			break
 
 func _on_network_draft_error(message: String) -> void:
 	print("[HeroSelect] ⚠️ Server phản hồi lỗi: %s" % message)
@@ -1334,6 +1399,33 @@ func _apply_authoritative_draft_slots(server_slots: Array) -> void:
 				local_s["isLocked"] = false
 				if local_s.get("isPlayer", false) and _pending_pick_hero_id <= 0:
 					is_player_locked = false
+				var hover_hid = int(s_info.get("hoverHeroId", 0))
+				var hover_hname = str(s_info.get("hoverHeroName", ""))
+				local_s["hoverHeroId"] = hover_hid
+				local_s["hoverHeroName"] = hover_hname
+				for node in left_slot_nodes:
+					if int(node.get("data", {}).get("seatNumber", 0)) == s_num:
+						var av: TextureRect = node["avatar"]
+						var hname_l: Label = node["hero_name"]
+						var status_l: Label = node["status"]
+						if hover_hid > 0:
+							var hero_h = HeroDatabase.get_hero(hover_hid) if HeroDatabase else {}
+							var tex = HeroDatabase.get_avatar_texture(hero_h.get("avatarPath", "")) if HeroDatabase else null
+							if tex: av.texture = tex
+							av.modulate = Color.WHITE
+							hname_l.text = hover_hname if not hover_hname.is_empty() else hero_h.get("name", "Tướng %d" % hover_hid)
+							hname_l.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+							status_l.text = "⏳ Đang chọn..."
+							status_l.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+						elif not local_s.get("isPlayer", false) or not _is_my_turn():
+							var def_tex = HeroDatabase.get_avatar_texture("") if HeroDatabase else null
+							if def_tex: av.texture = def_tex
+							av.modulate = Color(1.0, 1.0, 1.0, 0.4)
+							hname_l.text = "Chưa chọn..."
+							hname_l.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+							status_l.text = "Chờ lượt..."
+							status_l.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+						break
 			for node in left_slot_nodes:
 				if int(node.get("data", {}).get("seatNumber", 0)) != s_num:
 					continue

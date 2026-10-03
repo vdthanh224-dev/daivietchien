@@ -74,6 +74,24 @@ if (clusterChannel) {
       }
     }
 
+    if (type === "DRAFT_HOVER_SYNC") {
+      let room = rooms.get(roomId);
+      if (room?.draft) {
+        const slot = room.draft.slots.find((s) => s.seat === msg.seat);
+        if (slot && !slot.isLocked) {
+          slot.hoverHeroId = msg.heroId;
+          slot.hoverHeroName = msg.heroName;
+          broadcastRoom(room, {
+            type: "DRAFT_HOVER_UPDATE",
+            roomId,
+            seat: msg.seat,
+            heroId: msg.heroId,
+            heroName: msg.heroName,
+          });
+        }
+      }
+    }
+
     if (type === "DRAFT_COMPLETED_SYNC") {
       let room = rooms.get(roomId);
       if (room) {
@@ -108,7 +126,7 @@ if (clusterChannel) {
 const MAX_WS_MESSAGE_BYTES = 64 * 1024;
 const MAX_ACTIONS_PER_SECOND = 30;
 const ALLOWED_WS_ACTIONS = new Set([
-  "JOIN_ROOM", "INIT_GAME", "JOIN_DRAFT", "PICK_HERO", "GET_STATE", "PING",
+  "JOIN_ROOM", "INIT_GAME", "JOIN_DRAFT", "PICK_HERO", "HOVER_HERO", "GET_STATE", "PING",
   "USE_SKILL", "TOGGLE_SKILL", "PLAY_CARD", "RESPOND_ACTION", "END_TURN",
   "DISCARD_CARDS", "AI_STEP", "AI_REACTION"
 ]);
@@ -431,7 +449,12 @@ function resolveDraftSeat(room, requestedSeat, payload, socket) {
 function draftMessage(roomId, draft) {
   const slots = [...draft.slots]
     .sort((a, b) => a.seat - b.seat)
-    .map((slot) => ({ ...slot, seatNumber: slot.seat }));
+    .map((slot) => ({
+      ...slot,
+      seatNumber: slot.seat,
+      hoverHeroId: slot.hoverHeroId || 0,
+      hoverHeroName: slot.hoverHeroName || "",
+    }));
   const currentSeat = draft.slots[draft.currentPickerIndex]?.seat || 1;
   const currentPickerIndex = slots.findIndex((slot) => slot.seat === currentSeat);
   return {
@@ -450,7 +473,10 @@ function makeDraftSlots(rawSlots, boundSeat, payload) {
   const dragonSeats = randomTeamSeats();
   return [1, 2, 3, 4].map((seat) => {
     const matched = rawSlots.find((slot) => Number(slot?.seatNumber || slot?.seat) === seat) || rawSlots[seat - 1] || {};
-    const isAI = matched.isAI !== undefined ? Boolean(matched.isAI) : seat !== boundSeat;
+    const matchedUid = String(matched.userId || "").trim();
+    const isBotUid = matchedUid.startsWith("bot_");
+    const isRealUid = matchedUid !== "" && matchedUid !== "empty" && !isBotUid;
+    const isAI = isRealUid ? false : (matched.isAI !== undefined ? Boolean(matched.isAI) : (isBotUid || (rawSlots.length > 0 && !matchedUid)));
     const heroId = Number(matched.heroId || matched.hero_id || 0);
     return {
       seat,
@@ -461,6 +487,8 @@ function makeDraftSlots(rawSlots, boundSeat, payload) {
       isDragon: matched.isDragon !== undefined ? Boolean(matched.isDragon) : dragonSeats.has(seat),
       heroId,
       heroName: String(matched.heroName || ""),
+      hoverHeroId: 0,
+      hoverHeroName: "",
       maxHp: HERO_MAX_HP[heroId] || 4,
       isLocked: Boolean(matched.isLocked && heroId > 0),
     };
@@ -540,12 +568,14 @@ async function tickDraftRoom(roomId, room) {
   }
 
   const elapsed = Math.floor((Date.now() - draft.timerStartAt) / 1000);
-  const isBot = currentSlot.isAI && (!room.sockets.has(currentSlot.seat) || room.sockets.get(currentSlot.seat)?.readyState !== WebSocket.OPEN);
+  const isBot = Boolean(currentSlot.isAI) && (!room.sockets.has(currentSlot.seat) || room.sockets.get(currentSlot.seat)?.readyState !== WebSocket.OPEN);
   if ((elapsed >= 40 || (isBot && elapsed >= 10)) && !currentSlot.isLocked) {
     const used = new Set(draft.slots.filter((slot) => slot.isLocked).map((slot) => slot.heroId));
     const heroId = Array.from({ length: 28 }, (_, i) => i + 1).find((id) => !used.has(id)) || 1;
     currentSlot.heroId = heroId;
     currentSlot.heroName = getHeroName(heroId);
+    currentSlot.hoverHeroId = 0;
+    currentSlot.hoverHeroName = "";
     currentSlot.maxHp = HERO_MAX_HP[heroId] || 4;
     currentSlot.isLocked = true;
     draft.currentPickerIndex += 1;
@@ -753,6 +783,8 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           }
           currentSlot.heroId = heroId;
           currentSlot.heroName = String(payload.heroName || getHeroName(heroId));
+          currentSlot.hoverHeroId = 0;
+          currentSlot.hoverHeroName = "";
           currentSlot.maxHp = HERO_MAX_HP[heroId] || 4;
           currentSlot.isLocked = true;
           room.draft.currentPickerIndex += 1;
@@ -766,6 +798,34 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           } else {
             broadcastRoom(room, draftMessage(roomId, room.draft));
             clusterBroadcast({ type: "DRAFT_SYNC", roomId, draft: room.draft });
+          }
+          return;
+        }
+
+        // B2. XEM TRƯỚC / RÊ CHUỘT CHỌN TƯỚNG (HOVER PREVIEW SYNC)
+        if (action === "HOVER_HERO") {
+          if (!room?.draft || room.draft.isCompleted) return;
+          const heroId = Number(payload.heroId || payload.hero_id || 0);
+          const heroName = String(payload.heroName || getHeroName(heroId) || "");
+          const targetSeat = currentSeat || boundSeat || Number(payload.seat || 0);
+          const slot = room.draft.slots.find((s) => s.seat === targetSeat);
+          if (slot && !slot.isLocked) {
+            slot.hoverHeroId = heroId;
+            slot.hoverHeroName = heroName;
+            broadcastRoom(room, {
+              type: "DRAFT_HOVER_UPDATE",
+              roomId,
+              seat: targetSeat,
+              heroId,
+              heroName,
+            });
+            clusterBroadcast({
+              type: "DRAFT_HOVER_SYNC",
+              roomId,
+              seat: targetSeat,
+              heroId,
+              heroName,
+            });
           }
           return;
         }

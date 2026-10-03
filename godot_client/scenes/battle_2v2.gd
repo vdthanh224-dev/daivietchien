@@ -1411,6 +1411,7 @@ func _init_generals_from_draft() -> void:
 		my_seat = matching_seats[0]
 	if NetworkClient:
 		NetworkClient.my_seat = my_seat
+		NetworkClient.update_debug_window_title(my_name)
 
 	print("[Battle 2v2] Xác định Ghế người chơi tại máy: Ghế %d (UID: %s, Tên: %s)" % [my_seat, session_uid, my_name])
 
@@ -1940,9 +1941,13 @@ func _add_card_to_player_hand(c_info: Dictionary) -> void:
 		c_info["desc"] = "Bạn và 1 người khác bạn chọn, bỏ 1 lá để nhận Sục Sôi: 1 vòng không giới hạn Trảm, tầm đánh +1. Có thể đổi lá để rút lá khác."
 
 	var card_ui = CardUIScene.instantiate()
+	card_ui.position.x = hand_container.size.x
+	card_ui.modulate.a = 0.0
 	hand_container.add_child(card_ui)
 	card_ui.setup_card_data(c_info["id"], c_info["name"], c_info["rank"], c_info["suit"], c_info["cat"], c_info["desc"], int(c_info.get("subType", -1)))
 	card_ui.card_clicked.connect(func(_c): _on_player_hand_card_clicked(card_ui, c_info))
+	var fade_in_tw = card_ui.create_tween()
+	fade_in_tw.tween_property(card_ui, "modulate:a", 1.0, 0.18)
 	_relayout_hand_cards()
 	_animate_draw_to_seat(my_seat)
 	AudioManager.play_card_draw()
@@ -4202,8 +4207,15 @@ func _sync_player_hand_from_server(server_hand: Array) -> void:
 				c_desc = "Bạn và 1 người khác bạn chọn, bỏ 1 lá để nhận Sục Sôi: 1 vòng không giới hạn Trảm, tầm đánh +1. Có thể đổi lá để rút lá khác."
 
 			card_ui = CardUIScene.instantiate()
+			var init_x = hand_container.size.x
+			if not target_order_nodes.is_empty() and is_instance_valid(target_order_nodes.back()):
+				init_x = target_order_nodes.back().position.x + 30.0
+			card_ui.position.x = init_x
+			card_ui.modulate.a = 0.0
 			hand_container.add_child(card_ui)
 			card_ui.setup_card_data(c_id, c_name, c_rank, c_suit, c_cat, c_desc, c_sub_type)
+			var fade_in_tw = card_ui.create_tween()
+			fade_in_tw.tween_property(card_ui, "modulate:a", 1.0, 0.18)
 			var c_info = {
 				"id": c_id,
 				"name": c_name,

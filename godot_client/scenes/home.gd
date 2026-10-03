@@ -2389,43 +2389,85 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		# match against their own stale room.
 		await AppwriteMatchmaking.cleanup_user_waiting_rooms(my_user_id)
 
-	# Every client publishes its own one-player room first. This gives all
-	# clients a shared starting point, then the merge step below consolidates
-	# rooms into the one with the most real players.
+	# In debug mode (Run Multiple Instances), align windows 1..4 to deterministic seats 1..4:
+	# Window 1 hosts room_debug_match_4p in Seat 1; Windows 2, 3, 4 join Seats 2, 3, 4.
 	var own_room_id = "room_" + str(randi()).md5_text().substr(0, 8)
 	var own_team_seats = [1, 2, 3, 4]
-	own_team_seats.shuffle()
-	var own_dragon_seats = own_team_seats.slice(0, 2)
-	var own_room = {
-		"roomId": own_room_id,
-		"hostUserId": my_user_id,
-		"status": "WAITING",
-		"version": 1,
-		"hostRankPoints": my_rank_points,
-		"slots": [
-			{ "seatNumber": 1, "isDragon": own_dragon_seats.has(1), "isAI": false, "userId": my_user_id, "userName": my_user_name, "rankPoints": my_rank_points, "isEmpty": false },
-			{ "seatNumber": 2, "isDragon": own_dragon_seats.has(2), "isAI": false, "userId": "", "userName": "", "rankPoints": 0, "isEmpty": true },
-			{ "seatNumber": 3, "isDragon": own_dragon_seats.has(3), "isAI": false, "userId": "", "userName": "", "rankPoints": 0, "isEmpty": true },
-			{ "seatNumber": 4, "isDragon": own_dragon_seats.has(4), "isAI": false, "userId": "", "userName": "", "rankPoints": 0, "isEmpty": true }
-		]
-	}
-	var own_created = await AppwriteMatchmaking.create_waiting_room(own_room)
-	if not own_created:
-		if is_instance_valid(status_lbl):
-			status_lbl.text = "❌ Không thể tham gia hàng chờ. Vui lòng thử lại."
-		return
-	mm_current_room = own_room
-	mm_active_room_id = own_room_id
-	mm_is_host = true
-	if AppwriteMatchmaking:
-		AppwriteMatchmaking.is_host = true
+	var own_dragon_seats = []
+	if is_debug_match:
+		own_room_id = "room_debug_match_4p"
+		own_dragon_seats = [1, 3] # Ghế 1 & 3 là [RỒNG], Ghế 2 & 4 là [PHƯỢNG] cố định
+	else:
+		own_team_seats.shuffle()
+		own_dragon_seats = own_team_seats.slice(0, 2)
 
-	# Include our own room in this first election. If every client excludes its
-	# own host room, the smallest two rooms can make a cycle (A joins B while B
-	# joins A). A shared smallest-room tie-break gives all clients one anchor.
-	var found_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, rank_diff, my_user_name, own_room_id)
-	if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
-		return
+	var own_created = false
+	var inst_idx = NetworkClient.auto_instance_index if NetworkClient else 1
+
+	if is_debug_match and inst_idx > 1:
+		if is_instance_valid(status_lbl):
+			status_lbl.text = "🔍 Cửa sổ %d: Đang kết nối vào phòng debug (Ghế %d)..." % [inst_idx, inst_idx]
+		for retry in range(15):
+			if mm_is_cancelled:
+				return
+			var d_room = await AppwriteMatchmaking.poll_room_state("room_debug_match_4p")
+			if not d_room.is_empty() and d_room.get("status") == "WAITING":
+				var joined_d = await AppwriteMatchmaking.join_room_slot(d_room, my_user_id, my_user_name, my_rank_points, inst_idx)
+				if not joined_d.is_empty():
+					mm_current_room = joined_d
+					mm_active_room_id = "room_debug_match_4p"
+					mm_is_host = false
+					if AppwriteMatchmaking:
+						AppwriteMatchmaking.is_host = false
+					if NetworkClient:
+						NetworkClient.my_seat = inst_idx
+						NetworkClient.update_debug_window_title(my_user_name)
+					own_created = true
+					break
+			await get_tree().create_timer(0.35).timeout
+
+	if not own_created:
+		var slot_idx_for_me = (inst_idx - 1) if (is_debug_match and inst_idx in [1, 2, 3, 4]) else 0
+		var slots_init = []
+		for s_i in range(1, 5):
+			var is_this_me = (s_i == (slot_idx_for_me + 1))
+			slots_init.append({
+				"seatNumber": s_i,
+				"isDragon": own_dragon_seats.has(s_i),
+				"isAI": false,
+				"userId": my_user_id if is_this_me else "",
+				"userName": my_user_name if is_this_me else "",
+				"rankPoints": my_rank_points if is_this_me else 0,
+				"isEmpty": not is_this_me
+			})
+		var own_room = {
+			"roomId": own_room_id,
+			"hostUserId": my_user_id,
+			"status": "WAITING",
+			"version": 1,
+			"hostRankPoints": my_rank_points,
+			"slots": slots_init
+		}
+		own_created = await AppwriteMatchmaking.create_waiting_room(own_room)
+		if not own_created and not is_debug_match:
+			if is_instance_valid(status_lbl):
+				status_lbl.text = "❌ Không thể tham gia hàng chờ. Vui lòng thử lại."
+			return
+		mm_current_room = own_room
+		mm_active_room_id = own_room_id
+		mm_is_host = (inst_idx == 1 or not is_debug_match)
+		if AppwriteMatchmaking:
+			AppwriteMatchmaking.is_host = mm_is_host
+		if NetworkClient:
+			NetworkClient.my_seat = inst_idx if is_debug_match else 1
+			NetworkClient.update_debug_window_title(my_user_name)
+
+	# Include our own room in this first election (bỏ qua khi debug vì đã có phòng cố định).
+	var found_room = {}
+	if not is_debug_match:
+		found_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, rank_diff, my_user_name, own_room_id)
+		if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
+			return
 
 	var saw_waiting_room = not found_room.is_empty()
 	if not found_room.is_empty():
@@ -2565,7 +2607,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		poll_timer -= 0.5
 		guest_wait_timer += 0.5
 
-		if poll_timer <= 0.0 or is_fast_test:
+		if (poll_timer <= 0.0 or is_fast_test) and not is_debug_match:
 			poll_timer = 2.0 # Đặt lại chu kỳ 2s
 
 			# Keep consolidating rooms while they are waiting. Every client moves
@@ -2595,6 +2637,8 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 							bot_fill_timer = 0.0
 							last_real_player_count = 1
 							print("[Matchmaking] Gộp phòng %s vào %s (%d -> %d người thật)." % [previous_room_id, mm_active_room_id, current_count, candidate_count + 1])
+		elif poll_timer <= 0.0:
+			poll_timer = 2.0
 
 			if mm_is_host:
 				if heartbeat_timer <= 0.0:
@@ -2716,6 +2760,15 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		timer_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
 	AudioManager.play_victory()
 	_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
+
+	# Cập nhật ghế chính xác và tiêu đề cửa sổ debug trước khi vào chọn tướng
+	for idx in range(mm_current_room.get("slots", []).size()):
+		var sl = mm_current_room["slots"][idx]
+		if AppwriteMatchmaking and AppwriteMatchmaking.is_same_user(str(sl.get("userId", "")), str(sl.get("userName", "")), my_user_id, my_user_name):
+			if NetworkClient:
+				NetworkClient.my_seat = idx + 1
+				NetworkClient.update_debug_window_title(my_user_name)
+			break
 
 	# Lưu phòng vào AppwriteMatchmaking để hero_select.tscn có thể hiển thị chính xác tên 4 người
 	if AppwriteMatchmaking:
