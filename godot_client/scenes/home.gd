@@ -34,6 +34,7 @@ var gold_label: Label
 var modal_overlay: ColorRect
 var modal_panel: PanelContainer
 var modal_title_label: Label
+var modal_scroll: ScrollContainer
 var modal_content_container: VBoxContainer
 
 # Player State
@@ -54,6 +55,7 @@ var mm_search_started_at_ms: int = 0
 # Embers particle pool
 var ember_particles: Array = []
 var levelup_overlay: Control = null
+var _fullscreen_heroes_panel: Control = null
 
 # Hero Stage & Tactical Command Controls
 var hero_stage_container: Control = null
@@ -764,7 +766,7 @@ func _build_bottom_nav_dock() -> void:
 	dock_panel.add_child(dock_hbox)
 
 	var nav_items = [
-		{"icon": "🎖️", "title": "DANH TƯỚNG", "action": func(): _show_modal("KHO DANH TƯỚNG ĐẠI VIỆT", _build_heroes_content())},
+		{"icon": "🎖️", "title": "DANH TƯỚNG", "action": func(): _show_fullscreen_heroes()},
 		{"icon": "🎒", "title": "BINH KHÍ", "action": func(): _show_modal("BINH KHÍ KHỐ", _build_equipment_content())},
 		{"icon": "🏆", "title": "BẢNG VÀNG", "action": func(): _show_modal("BẢNG PHONG THẦN", _build_leaderboard_content())},
 		{"icon": "📜", "title": "NHIỆM VỤ 🔴", "action": func(): _show_modal("QUÂN LỆNH TRIỀU ĐÌNH", _build_quests_content())},
@@ -853,15 +855,15 @@ func _build_modal_layer() -> void:
 	m_vbox.add_child(m_div)
 
 	# Modal Scroll Container for content
-	var scroll = ScrollContainer.new()
-	scroll.size_flags_vertical = SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	modal_scroll = ScrollContainer.new()
+	modal_scroll.size_flags_vertical = SIZE_EXPAND_FILL
+	modal_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 
 	modal_content_container = VBoxContainer.new()
 	modal_content_container.size_flags_horizontal = SIZE_EXPAND_FILL
 	modal_content_container.add_theme_constant_override("separation", 10)
-	scroll.add_child(modal_content_container)
-	m_vbox.add_child(scroll)
+	modal_scroll.add_child(modal_content_container)
+	m_vbox.add_child(modal_scroll)
 
 # --- Button Styling Helpers with Prominent Shadows ---
 func _style_white_gold_button(btn: Button, corner_radius: int = 8, shadow_size: int = 5, shadow_offset: Vector2 = Vector2(0, 3)) -> void:
@@ -1084,9 +1086,13 @@ func _show_modal(title_text: String, content_node: Node) -> void:
 		modal_overlay.visible = true
 	if is_instance_valid(modal_panel):
 		if title_text == "⚔️ TÌM TRẬN 2v2 XẾP HẠNG":
-			modal_panel.custom_minimum_size = Vector2(500, 270)
+			modal_panel.custom_minimum_size = Vector2(580, 310)
+			if is_instance_valid(modal_scroll):
+				modal_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		else:
 			modal_panel.custom_minimum_size = Vector2(840, 530)
+			if is_instance_valid(modal_scroll):
+				modal_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 		modal_panel.scale = Vector2(0.9, 0.9)
 		modal_panel.modulate.a = 0.0
 		var tw = create_tween().set_parallel(true)
@@ -1104,6 +1110,8 @@ func _hide_modal() -> void:
 		tw.tween_property(modal_panel, "modulate:a", 0.0, 0.15)
 		await tw.finished
 		modal_panel.custom_minimum_size = Vector2(840, 530)
+		if is_instance_valid(modal_scroll):
+			modal_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	if is_instance_valid(modal_overlay):
 		modal_overlay.visible = false
 	if is_instance_valid(modal_content_container):
@@ -1529,86 +1537,618 @@ func _show_level_up_modal(old_lvl: int, new_lvl: int, on_close: Callable = Calla
 	pop_tw.tween_property(box, "scale", Vector2(1.0, 1.0), 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	pop_tw.tween_property(box, "modulate:a", 1.0, 0.25)
 
-# --- Modal Content Builders ---
-func _build_heroes_content() -> Control:
-	var container = VBoxContainer.new()
-	container.add_theme_constant_override("separation", 12)
+# --- Fullscreen Danh Tướng Gallery ---
+func _show_fullscreen_heroes() -> void:
+	if is_instance_valid(_fullscreen_heroes_panel):
+		_fullscreen_heroes_panel.queue_free()
+		_fullscreen_heroes_panel = null
 
-	var intro = Label.new()
-	intro.text = "Danh sách danh tướng nước Đại Việt qua các triều đại hào hùng:"
-	intro.add_theme_font_size_override("font_size", 14)
-	intro.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
-	container.add_child(intro)
+	var fs = Control.new()
+	fs.name = "FullscreenHeroesPanel"
+	fs.set_anchors_preset(PRESET_FULL_RECT)
+	fs.z_index = 85
+	_fullscreen_heroes_panel = fs
+	add_child(fs)
+
+	# Fullscreen dark royal background
+	var bg = ColorRect.new()
+	bg.set_anchors_preset(PRESET_FULL_RECT)
+	bg.color = Color(0.045, 0.055, 0.08, 0.985)
+	fs.add_child(bg)
+
+	var main_vbox = VBoxContainer.new()
+	main_vbox.set_anchors_preset(PRESET_FULL_RECT)
+	main_vbox.add_theme_constant_override("separation", 0)
+	fs.add_child(main_vbox)
+
+	# 1. Top Header Bar
+	var header_panel = PanelContainer.new()
+	header_panel.custom_minimum_size = Vector2(0, 64)
+	var hp_style = StyleBoxFlat.new()
+	hp_style.bg_color = Color(0.08, 0.09, 0.14, 0.98)
+	hp_style.border_width_bottom = 2
+	hp_style.border_color = Color(0.85, 0.72, 0.32, 0.5)
+	hp_style.content_margin_left = 28
+	hp_style.content_margin_right = 28
+	hp_style.content_margin_top = 8
+	hp_style.content_margin_bottom = 8
+	header_panel.add_theme_stylebox_override("panel", hp_style)
+	main_vbox.add_child(header_panel)
+
+	var header_hbox = HBoxContainer.new()
+	header_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	header_panel.add_child(header_hbox)
+
+	# Title & Subtitle on left
+	var title_vbox = VBoxContainer.new()
+	title_vbox.add_theme_constant_override("separation", 2)
+	header_hbox.add_child(title_vbox)
+
+	var title_lbl = Label.new()
+	title_lbl.text = "📜 KHO DANH TƯỚNG ĐẠI VIỆT"
+	title_lbl.add_theme_font_size_override("font_size", 22)
+	title_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.42, 1.0))
+	title_vbox.add_child(title_lbl)
+
+	# Count owned heroes and sort strictly by ID
+	var all_heroes: Array[Dictionary] = HeroDatabase.get_all_heroes().duplicate()
+	all_heroes.sort_custom(func(a, b): return int(a.get("id", 0)) < int(b.get("id", 0)))
+	var owned_count := 0
+	for h in all_heroes:
+		if HeroDatabase.is_hero_owned(int(h.get("id", 0))):
+			owned_count += 1
+
+	var count_lbl = Label.new()
+	count_lbl.text = "Bách Tướng Đại Việt • Đã chiêu mộ: %d / %d danh tướng" % [owned_count, all_heroes.size()]
+	count_lbl.add_theme_font_size_override("font_size", 13)
+	count_lbl.add_theme_color_override("font_color", Color(0.55, 0.88, 0.7, 1.0))
+	title_vbox.add_child(count_lbl)
+
+	# Spacer pushing close button to the far right
+	var spacer = Control.new()
+	spacer.size_flags_horizontal = SIZE_EXPAND_FILL
+	header_hbox.add_child(spacer)
+
+	# Close Button on the far right
+	var close_btn = Button.new()
+	close_btn.text = "✕ ĐÓNG"
+	close_btn.custom_minimum_size = Vector2(110, 42)
+	close_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var cb_normal = StyleBoxFlat.new()
+	cb_normal.bg_color = Color(0.42, 0.11, 0.14, 0.95)
+	cb_normal.border_color = Color(0.95, 0.45, 0.48, 1.0)
+	cb_normal.border_width_left = 1
+	cb_normal.border_width_top = 1
+	cb_normal.border_width_right = 1
+	cb_normal.border_width_bottom = 1
+	cb_normal.corner_radius_top_left = 8
+	cb_normal.corner_radius_top_right = 8
+	cb_normal.corner_radius_bottom_right = 8
+	cb_normal.corner_radius_bottom_left = 8
+	var cb_hover = cb_normal.duplicate()
+	cb_hover.bg_color = Color(0.62, 0.16, 0.20, 1.0)
+	close_btn.add_theme_stylebox_override("normal", cb_normal)
+	close_btn.add_theme_stylebox_override("hover", cb_hover)
+	close_btn.add_theme_stylebox_override("pressed", cb_hover)
+	close_btn.add_theme_font_size_override("font_size", 14)
+	close_btn.add_theme_color_override("font_color", Color(1.0, 0.95, 0.95, 1.0))
+
+	var close_action = func():
+		AudioManager.play_card_select()
+		if is_instance_valid(fs):
+			var tw = fs.create_tween()
+			tw.tween_property(fs, "modulate:a", 0.0, 0.15)
+			tw.tween_callback(func():
+				if is_instance_valid(fs):
+					fs.queue_free()
+				_fullscreen_heroes_panel = null
+			)
+
+	close_btn.pressed.connect(close_action)
+	header_hbox.add_child(close_btn)
+
+	# 2. Body Scroll Container
+	var scroll = ScrollContainer.new()
+	scroll.size_flags_horizontal = SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	main_vbox.add_child(scroll)
+
+	var scroll_margin = MarginContainer.new()
+	scroll_margin.size_flags_horizontal = SIZE_EXPAND_FILL
+	scroll_margin.add_theme_constant_override("margin_left", 32)
+	scroll_margin.add_theme_constant_override("margin_right", 32)
+	scroll_margin.add_theme_constant_override("margin_top", 20)
+	scroll_margin.add_theme_constant_override("margin_bottom", 36)
+	scroll.add_child(scroll_margin)
 
 	var grid = GridContainer.new()
-	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 12)
-	grid.add_theme_constant_override("v_separation", 12)
+	grid.columns = 6
+	grid.size_flags_horizontal = SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 14)
+	grid.add_theme_constant_override("v_separation", 16)
+	scroll_margin.add_child(grid)
 
-	var heroes = [
-		{"name": "Lý Thường Kiệt", "role": "Tiên Phong / Công", "img": "res://assets/ui/ly_thuong_kiet.png"},
-		{"name": "Trần Hưng Đạo", "role": "Thống Soái / Phòng", "img": "res://assets/ui/tran_hung_dao.png"},
-		{"name": "Ngô Quyền", "role": "Hải Vương / Công", "img": "res://assets/ui/ngo_quyen.png"},
-		{"name": "Lê Lợi", "role": "Bình Định / Cứu Viện", "img": "res://assets/ui/le_loi.png"},
-		{"name": "Bà Triệu", "role": "Nộ Chiến / Trảm", "img": "res://assets/ui/ba_trieu.png"},
-		{"name": "Đinh Bộ Lĩnh", "role": "Vạn Thắng / Điều Khiển", "img": "res://assets/ui/dinh_bo_linh.png"},
-		{"name": "Trần Quốc Toản", "role": "Phá Lỗ / Tốc Chiến", "img": "res://assets/ui/tran_quoc_toan.png"},
-		{"name": "Yết Kiêu", "role": "Thần Thủy / Tàng Hình", "img": "res://assets/ui/yet_kieu.png"},
-	]
+	# Grayscale Shader Material for unowned heroes (Black & White)
+	var gray_shader = Shader.new()
+	gray_shader.code = """
+shader_type canvas_item;
+void fragment() {
+	vec4 col = texture(TEXTURE, UV);
+	float gray = dot(col.rgb, vec3(0.299, 0.587, 0.114));
+	COLOR = vec4(vec3(gray * 0.72), col.a);
+}
+"""
+	var gray_mat = ShaderMaterial.new()
+	gray_mat.shader = gray_shader
 
-	for h in heroes:
-		var hero_card = PanelContainer.new()
-		hero_card.custom_minimum_size = Vector2(180, 160)
-		var h_style = StyleBoxFlat.new()
-		h_style.bg_color = Color(0.95, 0.94, 0.90, 1.0)
-		h_style.border_width_left = 1
-		h_style.border_width_top = 1
-		h_style.border_width_right = 1
-		h_style.border_width_bottom = 1
-		h_style.border_color = COLOR_GOLD_PRIMARY
-		h_style.corner_radius_top_left = 8
-		h_style.corner_radius_top_right = 8
-		h_style.corner_radius_bottom_right = 8
-		h_style.corner_radius_bottom_left = 8
-		h_style.shadow_color = COLOR_SHADOW
-		h_style.shadow_size = 4
-		h_style.shadow_offset = Vector2(0, 2)
-		hero_card.add_theme_stylebox_override("panel", h_style)
+	for h in all_heroes:
+		var hid = int(h.get("id", 0))
+		var is_owned = HeroDatabase.is_hero_owned(hid)
+		var hname = str(h.get("name", "Vô Danh"))
+		var faction = str(h.get("faction", "Đại Việt"))
+		var max_hp = int(h.get("maxHp", 4))
+		var avatar_path = str(h.get("avatarPath", ""))
 
-		var hv = VBoxContainer.new()
-		hv.offset_left = 6
-		hv.offset_right = -6
-		hv.offset_top = 6
-		hv.offset_bottom = -6
-		hv.add_theme_constant_override("separation", 4)
+		# Card Container
+		var card = PanelContainer.new()
+		card.custom_minimum_size = Vector2(175, 235)
+		card.size_flags_horizontal = SIZE_EXPAND_FILL
 
-		var himg = TextureRect.new()
-		himg.custom_minimum_size = Vector2(0, 100)
-		himg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		himg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-		var ht = load(h["img"])
-		if ht: himg.texture = ht
-		hv.add_child(himg)
+		var card_style = StyleBoxFlat.new()
+		if is_owned:
+			card_style.bg_color = Color(0.10, 0.13, 0.19, 0.95)
+			card_style.border_color = Color(0.85, 0.72, 0.32, 0.8)
+			card_style.border_width_left = 1
+			card_style.border_width_top = 1
+			card_style.border_width_right = 1
+			card_style.border_width_bottom = 1
+			card_style.shadow_color = Color(0.85, 0.72, 0.32, 0.15)
+			card_style.shadow_size = 4
+		else:
+			card_style.bg_color = Color(0.06, 0.07, 0.09, 0.95)
+			card_style.border_color = Color(0.32, 0.34, 0.40, 0.45)
+			card_style.border_width_left = 1
+			card_style.border_width_top = 1
+			card_style.border_width_right = 1
+			card_style.border_width_bottom = 1
+			card_style.shadow_size = 0
+		card_style.corner_radius_top_left = 8
+		card_style.corner_radius_top_right = 8
+		card_style.corner_radius_bottom_right = 8
+		card_style.corner_radius_bottom_left = 8
+		card_style.content_margin_left = 8
+		card_style.content_margin_right = 8
+		card_style.content_margin_top = 8
+		card_style.content_margin_bottom = 8
+		card.add_theme_stylebox_override("panel", card_style)
 
-		var hname = Label.new()
-		hname.text = h["name"]
-		hname.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		hname.add_theme_font_size_override("font_size", 13)
-		hname.add_theme_color_override("font_color", COLOR_TEXT_DARK)
-		hv.add_child(hname)
+		var cv = VBoxContainer.new()
+		cv.add_theme_constant_override("separation", 4)
+		card.add_child(cv)
 
-		var hrole = Label.new()
-		hrole.text = h["role"]
-		hrole.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		hrole.add_theme_font_size_override("font_size", 11)
-		hrole.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
-		hv.add_child(hrole)
+		# Top row: ID and Faction
+		var top_row = HBoxContainer.new()
+		var id_lbl = Label.new()
+		id_lbl.text = "#%02d" % hid
+		id_lbl.add_theme_font_size_override("font_size", 11)
+		id_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4, 0.9) if is_owned else Color(0.55, 0.58, 0.65, 0.8))
+		top_row.add_child(id_lbl)
 
-		hero_card.add_child(hv)
-		grid.add_child(hero_card)
+		var top_spacer = Control.new()
+		top_spacer.size_flags_horizontal = SIZE_EXPAND_FILL
+		top_row.add_child(top_spacer)
 
-	container.add_child(grid)
-	return container
+		var fac_lbl = Label.new()
+		fac_lbl.text = faction
+		fac_lbl.add_theme_font_size_override("font_size", 10)
+		fac_lbl.add_theme_color_override("font_color", Color(0.8, 0.75, 0.55, 0.8) if is_owned else Color(0.45, 0.48, 0.52, 0.7))
+		top_row.add_child(fac_lbl)
+		cv.add_child(top_row)
+
+		# Portrait image
+		var img_box = PanelContainer.new()
+		img_box.custom_minimum_size = Vector2(0, 120)
+		var ib_style = StyleBoxFlat.new()
+		ib_style.bg_color = Color(0.04, 0.05, 0.07, 0.8)
+		ib_style.corner_radius_top_left = 6
+		ib_style.corner_radius_top_right = 6
+		ib_style.corner_radius_bottom_right = 6
+		ib_style.corner_radius_bottom_left = 6
+		img_box.add_theme_stylebox_override("panel", ib_style)
+
+		var img = TextureRect.new()
+		img.custom_minimum_size = Vector2(0, 120)
+		img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		var tex = HeroDatabase.get_avatar_texture(avatar_path)
+		if tex:
+			img.texture = tex
+		if not is_owned:
+			img.material = gray_mat
+		img_box.add_child(img)
+		cv.add_child(img_box)
+
+		# Name
+		var name_lbl = Label.new()
+		name_lbl.text = hname
+		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		name_lbl.add_theme_font_size_override("font_size", 13)
+		name_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.65, 1.0) if is_owned else Color(0.70, 0.72, 0.76, 0.9))
+		cv.add_child(name_lbl)
+
+		# HP Row
+		var hp_lbl = Label.new()
+		hp_lbl.text = "🪷 %d Máu" % max_hp
+		hp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hp_lbl.add_theme_font_size_override("font_size", 11)
+		hp_lbl.add_theme_color_override("font_color", Color(0.4, 0.9, 0.6, 0.9) if is_owned else Color(0.5, 0.55, 0.6, 0.7))
+		cv.add_child(hp_lbl)
+
+		# Status Badge Pill
+		var status_panel = PanelContainer.new()
+		var sp_style = StyleBoxFlat.new()
+		if is_owned:
+			sp_style.bg_color = Color(0.08, 0.28, 0.16, 0.85)
+			sp_style.border_color = Color(0.35, 0.85, 0.55, 0.7)
+		else:
+			sp_style.bg_color = Color(0.12, 0.14, 0.17, 0.8)
+			sp_style.border_color = Color(0.35, 0.38, 0.44, 0.5)
+		sp_style.border_width_left = 1
+		sp_style.border_width_top = 1
+		sp_style.border_width_right = 1
+		sp_style.border_width_bottom = 1
+		sp_style.corner_radius_top_left = 4
+		sp_style.corner_radius_top_right = 4
+		sp_style.corner_radius_bottom_right = 4
+		sp_style.corner_radius_bottom_left = 4
+		sp_style.content_margin_left = 4
+		sp_style.content_margin_right = 4
+		sp_style.content_margin_top = 2
+		sp_style.content_margin_bottom = 2
+		status_panel.add_theme_stylebox_override("panel", sp_style)
+
+		var status_lbl = Label.new()
+		status_lbl.text = "✅ ĐÃ SỞ HỮU" if is_owned else "🔒 CHƯA SỞ HỮU"
+		status_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		status_lbl.add_theme_font_size_override("font_size", 10)
+		status_lbl.add_theme_color_override("font_color", Color(0.6, 1.0, 0.75, 1.0) if is_owned else Color(0.65, 0.68, 0.72, 0.8))
+		status_panel.add_child(status_lbl)
+		cv.add_child(status_panel)
+
+		# Clickable Button overlay
+		var click_btn = Button.new()
+		click_btn.set_anchors_preset(PRESET_FULL_RECT)
+		click_btn.flat = true
+		click_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		var captured_hero = h
+		var captured_owned = is_owned
+		click_btn.pressed.connect(func():
+			AudioManager.play_card_select()
+			_show_hero_detail_popup(captured_hero, captured_owned, fs)
+		)
+		card.add_child(click_btn)
+
+		grid.add_child(card)
+
+	# Fade in animation
+	fs.modulate.a = 0.0
+	var tw = fs.create_tween()
+	tw.tween_property(fs, "modulate:a", 1.0, 0.18)
+
+# --- Hero Detail Popup (Opened from Fullscreen Gallery) ---
+func _show_hero_detail_popup(hero: Dictionary, is_owned: bool, parent_layer: Control) -> void:
+	if not is_instance_valid(parent_layer):
+		return
+
+	var existing = parent_layer.get_node_or_null("HeroDetailPopup")
+	if is_instance_valid(existing):
+		existing.queue_free()
+
+	var popup = Control.new()
+	popup.name = "HeroDetailPopup"
+	popup.set_anchors_preset(PRESET_FULL_RECT)
+	popup.z_index = 95
+	parent_layer.add_child(popup)
+
+	# Dim background
+	var mask = ColorRect.new()
+	mask.set_anchors_preset(PRESET_FULL_RECT)
+	mask.color = Color(0.02, 0.03, 0.05, 0.82)
+	popup.add_child(mask)
+
+	var close_popup = func():
+		AudioManager.play_card_select()
+		if is_instance_valid(popup):
+			var tw = popup.create_tween()
+			tw.tween_property(popup, "modulate:a", 0.0, 0.12)
+			tw.tween_callback(popup.queue_free)
+
+	mask.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			close_popup.call()
+	)
+
+	# Center Modal Box
+	var box = PanelContainer.new()
+	box.custom_minimum_size = Vector2(820, 580)
+	box.set_anchors_preset(PRESET_CENTER)
+	box.grow_horizontal = GROW_DIRECTION_BOTH
+	box.grow_vertical = GROW_DIRECTION_BOTH
+
+	var box_style = StyleBoxFlat.new()
+	box_style.bg_color = Color(0.08, 0.09, 0.14, 0.98)
+	box_style.border_color = Color(0.85, 0.72, 0.32, 0.9)
+	box_style.border_width_left = 2
+	box_style.border_width_top = 2
+	box_style.border_width_right = 2
+	box_style.border_width_bottom = 2
+	box_style.corner_radius_top_left = 12
+	box_style.corner_radius_top_right = 12
+	box_style.corner_radius_bottom_right = 12
+	box_style.corner_radius_bottom_left = 12
+	box_style.shadow_color = Color(0, 0, 0, 0.6)
+	box_style.shadow_size = 16
+	box_style.content_margin_left = 20
+	box_style.content_margin_right = 20
+	box_style.content_margin_top = 16
+	box_style.content_margin_bottom = 16
+	box.add_theme_stylebox_override("panel", box_style)
+	popup.add_child(box)
+
+	var bv = VBoxContainer.new()
+	bv.add_theme_constant_override("separation", 12)
+	box.add_child(bv)
+
+	# 1. Header
+	var hdr = HBoxContainer.new()
+	var h_title = Label.new()
+	h_title.text = "📜 CHI TIẾT DANH TƯỚNG #%d" % int(hero.get("id", 0))
+	h_title.add_theme_font_size_override("font_size", 20)
+	h_title.add_theme_color_override("font_color", Color(1.0, 0.88, 0.4, 1.0))
+	hdr.add_child(h_title)
+
+	var h_spacer = Control.new()
+	h_spacer.size_flags_horizontal = SIZE_EXPAND_FILL
+	hdr.add_child(h_spacer)
+
+	var h_close = Button.new()
+	h_close.text = "✕"
+	h_close.custom_minimum_size = Vector2(36, 36)
+	h_close.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	h_close.pressed.connect(close_popup)
+	hdr.add_child(h_close)
+	bv.add_child(hdr)
+
+	# 2. Main Content HBox (Left Column: Portrait & Stats, Right Column: Skills)
+	var content_hbox = HBoxContainer.new()
+	content_hbox.size_flags_horizontal = SIZE_EXPAND_FILL
+	content_hbox.size_flags_vertical = SIZE_EXPAND_FILL
+	content_hbox.add_theme_constant_override("separation", 18)
+	bv.add_child(content_hbox)
+
+	# --- LEFT COLUMN ---
+	var left_col = VBoxContainer.new()
+	left_col.custom_minimum_size = Vector2(250, 0)
+	left_col.add_theme_constant_override("separation", 8)
+	content_hbox.add_child(left_col)
+
+	var portrait_box = PanelContainer.new()
+	portrait_box.custom_minimum_size = Vector2(250, 260)
+	var pb_style = StyleBoxFlat.new()
+	pb_style.bg_color = Color(0.05, 0.06, 0.09, 0.9)
+	pb_style.border_color = Color(0.85, 0.72, 0.32, 0.6) if is_owned else Color(0.35, 0.38, 0.45, 0.5)
+	pb_style.border_width_left = 1
+	pb_style.border_width_top = 1
+	pb_style.border_width_right = 1
+	pb_style.border_width_bottom = 1
+	pb_style.corner_radius_top_left = 8
+	pb_style.corner_radius_top_right = 8
+	pb_style.corner_radius_bottom_right = 8
+	pb_style.corner_radius_bottom_left = 8
+	portrait_box.add_theme_stylebox_override("panel", pb_style)
+
+	var big_img = TextureRect.new()
+	big_img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	big_img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var tex = HeroDatabase.get_avatar_texture(str(hero.get("avatarPath", "")))
+	if tex:
+		big_img.texture = tex
+	if not is_owned:
+		var gray_shader = Shader.new()
+		gray_shader.code = """
+shader_type canvas_item;
+void fragment() {
+	vec4 col = texture(TEXTURE, UV);
+	float gray = dot(col.rgb, vec3(0.299, 0.587, 0.114));
+	COLOR = vec4(vec3(gray * 0.75), col.a);
+}
+"""
+		var gray_mat = ShaderMaterial.new()
+		gray_mat.shader = gray_shader
+		big_img.material = gray_mat
+	portrait_box.add_child(big_img)
+	left_col.add_child(portrait_box)
+
+	var name_lbl = Label.new()
+	name_lbl.text = str(hero.get("name", "Vô Danh"))
+	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_lbl.add_theme_font_size_override("font_size", 18)
+	name_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5, 1.0) if is_owned else Color(0.75, 0.78, 0.82, 1.0))
+	left_col.add_child(name_lbl)
+
+	var faction_lbl = Label.new()
+	faction_lbl.text = "Triều đại: %s" % str(hero.get("faction", "Đại Việt"))
+	faction_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	faction_lbl.add_theme_font_size_override("font_size", 13)
+	faction_lbl.add_theme_color_override("font_color", Color(0.75, 0.8, 0.85, 0.8))
+	left_col.add_child(faction_lbl)
+
+	# Lotus Blossoms
+	var max_hp = int(hero.get("maxHp", 4))
+	var lotus_str = ""
+	for i in range(max_hp):
+		lotus_str += "🪷 "
+	var hp_icons_lbl = Label.new()
+	hp_icons_lbl.text = lotus_str.strip_edges()
+	hp_icons_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hp_icons_lbl.add_theme_font_size_override("font_size", 16)
+	left_col.add_child(hp_icons_lbl)
+
+	var hp_text_lbl = Label.new()
+	hp_text_lbl.text = "%d Máu tối đa" % max_hp
+	hp_text_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hp_text_lbl.add_theme_font_size_override("font_size", 12)
+	hp_text_lbl.add_theme_color_override("font_color", Color(0.4, 0.95, 0.6, 0.9))
+	left_col.add_child(hp_text_lbl)
+
+	# Ownership Pill
+	var own_panel = PanelContainer.new()
+	var op_style = StyleBoxFlat.new()
+	if is_owned:
+		op_style.bg_color = Color(0.08, 0.28, 0.16, 0.95)
+		op_style.border_color = Color(0.35, 0.88, 0.58, 0.9)
+	else:
+		op_style.bg_color = Color(0.16, 0.18, 0.22, 0.95)
+		op_style.border_color = Color(0.45, 0.48, 0.55, 0.6)
+	op_style.border_width_left = 1
+	op_style.border_width_top = 1
+	op_style.border_width_right = 1
+	op_style.border_width_bottom = 1
+	op_style.corner_radius_top_left = 6
+	op_style.corner_radius_top_right = 6
+	op_style.corner_radius_bottom_right = 6
+	op_style.corner_radius_bottom_left = 6
+	op_style.content_margin_top = 4
+	op_style.content_margin_bottom = 4
+	own_panel.add_theme_stylebox_override("panel", op_style)
+
+	var own_lbl = Label.new()
+	own_lbl.text = "✅ ĐÃ SỞ HỮU" if is_owned else "🔒 CHƯA SỞ HỮU"
+	own_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	own_lbl.add_theme_font_size_override("font_size", 11)
+	own_lbl.add_theme_color_override("font_color", Color(0.65, 1.0, 0.8, 1.0) if is_owned else Color(0.72, 0.75, 0.8, 0.85))
+	own_panel.add_child(own_lbl)
+	left_col.add_child(own_panel)
+
+	# --- RIGHT COLUMN (Skills List) ---
+	var right_col = VBoxContainer.new()
+	right_col.size_flags_horizontal = SIZE_EXPAND_FILL
+	right_col.size_flags_vertical = SIZE_EXPAND_FILL
+	right_col.add_theme_constant_override("separation", 10)
+	content_hbox.add_child(right_col)
+
+	var skill_sec_title = Label.new()
+	skill_sec_title.text = "⚔️ KỸ NĂNG VÕ TƯỚNG"
+	skill_sec_title.add_theme_font_size_override("font_size", 16)
+	skill_sec_title.add_theme_color_override("font_color", Color(1.0, 0.88, 0.42, 1.0))
+	right_col.add_child(skill_sec_title)
+
+	var skill_scroll = ScrollContainer.new()
+	skill_scroll.size_flags_horizontal = SIZE_EXPAND_FILL
+	skill_scroll.size_flags_vertical = SIZE_EXPAND_FILL
+	skill_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	right_col.add_child(skill_scroll)
+
+	var skill_list = VBoxContainer.new()
+	skill_list.size_flags_horizontal = SIZE_EXPAND_FILL
+	skill_list.add_theme_constant_override("separation", 10)
+	skill_scroll.add_child(skill_list)
+
+	var skills = hero.get("skills", [])
+	if skills is Array and not skills.is_empty():
+		for sk in skills:
+			if not (sk is Dictionary):
+				continue
+			var sk_name = str(sk.get("name", "Kỹ năng"))
+			var sk_desc = str(sk.get("desc", ""))
+
+			var sk_card = PanelContainer.new()
+			sk_card.size_flags_horizontal = SIZE_EXPAND_FILL
+			var sc_style = StyleBoxFlat.new()
+			sc_style.bg_color = Color(0.06, 0.07, 0.11, 0.95)
+			sc_style.border_color = Color(0.85, 0.72, 0.32, 0.6)
+			sc_style.border_width_left = 2
+			sc_style.border_width_top = 1
+			sc_style.border_width_right = 1
+			sc_style.border_width_bottom = 1
+			sc_style.corner_radius_top_left = 8
+			sc_style.corner_radius_top_right = 8
+			sc_style.corner_radius_bottom_right = 8
+			sc_style.corner_radius_bottom_left = 8
+			sc_style.content_margin_left = 14
+			sc_style.content_margin_right = 14
+			sc_style.content_margin_top = 10
+			sc_style.content_margin_bottom = 10
+			sk_card.add_theme_stylebox_override("panel", sc_style)
+
+			var sk_vbox = VBoxContainer.new()
+			sk_vbox.add_theme_constant_override("separation", 6)
+			sk_card.add_child(sk_vbox)
+
+			var sk_hdr = HBoxContainer.new()
+			var name_tag = Label.new()
+			name_tag.text = "❖  " + sk_name
+			name_tag.add_theme_font_size_override("font_size", 15)
+			name_tag.add_theme_color_override("font_color", Color(1.0, 0.88, 0.42, 1.0))
+			sk_hdr.add_child(name_tag)
+
+			var sk_spacer = Control.new()
+			sk_spacer.size_flags_horizontal = SIZE_EXPAND_FILL
+			sk_hdr.add_child(sk_spacer)
+
+			# Skill type pill
+			var lower_desc = (sk_name + " " + sk_desc).to_lower()
+			var type_text = "BỊ ĐỘNG"
+			if "bật:" in lower_desc or "trong giai đoạn" in lower_desc or "một lần mỗi lượt" in lower_desc or "có thể dùng" in lower_desc or "bỏ 1 lá" in lower_desc or "đổi 2 lá" in lower_desc:
+				type_text = "CHỦ ĐỘNG"
+			elif "khi rơi vào" in lower_desc or "khi mất máu" in lower_desc or "khi bị" in lower_desc or "sau khi" in lower_desc or "khi đánh ra" in lower_desc or "khi bạn dùng" in lower_desc or "khi bạn gây" in lower_desc or "khi người khác" in lower_desc:
+				type_text = "KÍCH HOẠT"
+
+			var type_lbl = Label.new()
+			type_lbl.text = "〔 %s 〕" % type_text
+			type_lbl.add_theme_font_size_override("font_size", 11)
+			type_lbl.add_theme_color_override("font_color", Color(0.55, 0.85, 1.0, 0.9))
+			sk_hdr.add_child(type_lbl)
+			sk_vbox.add_child(sk_hdr)
+
+			var desc_lbl = Label.new()
+			desc_lbl.text = sk_desc
+			desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			desc_lbl.size_flags_horizontal = SIZE_EXPAND_FILL
+			desc_lbl.add_theme_font_size_override("font_size", 13)
+			desc_lbl.add_theme_color_override("font_color", Color(0.90, 0.92, 0.95, 0.95))
+			sk_vbox.add_child(desc_lbl)
+
+			skill_list.add_child(sk_card)
+
+	# 3. Footer
+	var ftr = HBoxContainer.new()
+	var ftr_spacer = Control.new()
+	ftr_spacer.size_flags_horizontal = SIZE_EXPAND_FILL
+	ftr.add_child(ftr_spacer)
+
+	var ftr_close = Button.new()
+	ftr_close.text = "ĐÓNG"
+	ftr_close.custom_minimum_size = Vector2(100, 36)
+	ftr_close.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	ftr_close.pressed.connect(close_popup)
+	ftr.add_child(ftr_close)
+	bv.add_child(ftr)
+
+	# Pop animation
+	box.scale = Vector2(0.92, 0.92)
+	box.pivot_offset = Vector2(410, 290)
+	popup.modulate.a = 0.0
+	var tw = popup.create_tween().set_parallel(true)
+	tw.tween_property(popup, "modulate:a", 1.0, 0.16)
+	tw.tween_property(box, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func _build_heroes_content() -> Control:
+	call_deferred("_show_fullscreen_heroes")
+	var dummy = Control.new()
+	dummy.custom_minimum_size = Vector2(1, 1)
+	return dummy
 
 func _build_equipment_content() -> Control:
 	var container = VBoxContainer.new()
@@ -2146,45 +2686,143 @@ func _start_2v2_matchmaking() -> void:
 	var container = VBoxContainer.new()
 	container.add_theme_constant_override("separation", 18)
 
-	# 1. Matchmaking Status Card
+	# Lấy thông tin Rank và Số Sao của người chơi
+	var rank_idx = 0
+	var rank_stars = 3
+	if AuthManager:
+		rank_idx = AuthManager.current_2v2_rank_index
+		rank_stars = AuthManager.current_2v2_stars
+
+	var rank_name = "Dân Binh"
+	var rank_icon_path = "res://assets/ui/ranks/dan_binh.png"
+	var rank_color = Color(1.0, 0.85, 0.4)
+	if RankSystem:
+		var rank_info = RankSystem.get_rank_info(rank_idx)
+		rank_name = RankSystem.get_rank_name(rank_idx)
+		rank_icon_path = RankSystem.get_rank_icon_path(rank_idx)
+		rank_color = rank_info.get("color", Color(1.0, 0.85, 0.4))
+
+	# 1. Matchmaking Status Card (Bên trái: Rank & Sao & Chức vị; Bên phải: Đang tìm trận & Số giây)
 	var search_card = PanelContainer.new()
-	search_card.custom_minimum_size = Vector2(440, 140)
+	search_card.custom_minimum_size = Vector2(500, 160)
 	var sc_style = StyleBoxFlat.new()
-	sc_style.bg_color = Color(0.07, 0.11, 0.18, 0.95)
+	sc_style.bg_color = Color(0.06, 0.09, 0.15, 0.95)
 	sc_style.border_width_left = 1
 	sc_style.border_width_top = 1
 	sc_style.border_width_right = 1
 	sc_style.border_width_bottom = 1
 	sc_style.border_color = COLOR_GOLD_PRIMARY
-	sc_style.corner_radius_top_left = 10
-	sc_style.corner_radius_top_right = 10
-	sc_style.corner_radius_bottom_right = 10
-	sc_style.corner_radius_bottom_left = 10
+	sc_style.corner_radius_top_left = 12
+	sc_style.corner_radius_top_right = 12
+	sc_style.corner_radius_bottom_right = 12
+	sc_style.corner_radius_bottom_left = 12
+	sc_style.shadow_color = Color(0, 0, 0, 0.5)
+	sc_style.shadow_size = 6
+	sc_style.shadow_offset = Vector2(0, 3)
 	search_card.add_theme_stylebox_override("panel", sc_style)
 
 	var sc_margin = MarginContainer.new()
 	sc_margin.add_theme_constant_override("margin_left", 24)
 	sc_margin.add_theme_constant_override("margin_right", 24)
-	sc_margin.add_theme_constant_override("margin_top", 22)
-	sc_margin.add_theme_constant_override("margin_bottom", 22)
+	sc_margin.add_theme_constant_override("margin_top", 16)
+	sc_margin.add_theme_constant_override("margin_bottom", 16)
 	search_card.add_child(sc_margin)
 
-	var sc_vbox = VBoxContainer.new()
-	sc_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	sc_vbox.add_theme_constant_override("separation", 14)
-	sc_margin.add_child(sc_vbox)
+	var main_hbox = HBoxContainer.new()
+	main_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	main_hbox.add_theme_constant_override("separation", 28)
+	sc_margin.add_child(main_hbox)
+
+	# --- CỘT TRÁI: HÌNH RANK -> SỐ SAO (SÁNG / TỐI) -> TÊN CHỨC RANK ---
+	var rank_col = VBoxContainer.new()
+	rank_col.alignment = BoxContainer.ALIGNMENT_CENTER
+	rank_col.custom_minimum_size = Vector2(160, 0)
+	rank_col.add_theme_constant_override("separation", 6)
+	main_hbox.add_child(rank_col)
+
+	# 1. Hình của rank tương ứng
+	var rank_icon_rect = TextureRect.new()
+	rank_icon_rect.custom_minimum_size = Vector2(88, 88)
+	rank_icon_rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	rank_icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rank_icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	if ResourceLoader.exists(rank_icon_path):
+		rank_icon_rect.texture = load(rank_icon_path)
+	rank_col.add_child(rank_icon_rect)
+
+	# 2. Số sao bên dưới hình (Ví dụ 3/5 sao thì 3 sao sáng, 2 sao tối)
+	var stars_hbox = HBoxContainer.new()
+	stars_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	stars_hbox.add_theme_constant_override("separation", 4)
+	if rank_idx >= 11:
+		# Bậc Hoàng Đế (vô hạn sao)
+		var star_lbl = Label.new()
+		star_lbl.text = "★"
+		star_lbl.add_theme_font_size_override("font_size", 20)
+		star_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.2, 1.0))
+		stars_hbox.add_child(star_lbl)
+		var count_lbl = Label.new()
+		count_lbl.text = "x %d" % rank_stars
+		count_lbl.add_theme_font_size_override("font_size", 16)
+		count_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5, 1.0))
+		stars_hbox.add_child(count_lbl)
+	else:
+		var max_stars = 5
+		for s in range(max_stars):
+			var star_lbl = Label.new()
+			star_lbl.text = "★"
+			star_lbl.add_theme_font_size_override("font_size", 20)
+			if s < rank_stars:
+				# Sao sáng (màu vàng kim rực rỡ)
+				star_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.2, 1.0))
+				star_lbl.add_theme_color_override("font_shadow_color", Color(0.9, 0.6, 0.1, 0.7))
+				star_lbl.add_theme_constant_override("shadow_offset_x", 0)
+				star_lbl.add_theme_constant_override("shadow_offset_y", 1)
+			else:
+				# Sao tối (màu xám tối)
+				star_lbl.add_theme_color_override("font_color", Color(0.25, 0.28, 0.38, 0.8))
+			stars_hbox.add_child(star_lbl)
+	rank_col.add_child(stars_hbox)
+
+	# 3. Ghi chức của rank bên dưới
+	var rank_name_lbl = Label.new()
+	rank_name_lbl.text = rank_name.to_upper()
+	rank_name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rank_name_lbl.add_theme_font_size_override("font_size", 16)
+	rank_name_lbl.add_theme_color_override("font_color", rank_color)
+	rank_name_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	rank_name_lbl.add_theme_constant_override("shadow_offset_x", 0)
+	rank_name_lbl.add_theme_constant_override("shadow_offset_y", 1)
+	rank_col.add_child(rank_name_lbl)
+
+	# --- ĐƯỜNG PHÂN CÁCH DỌC ---
+	var sep = VSeparator.new()
+	var sep_style = StyleBoxLine.new()
+	sep_style.color = Color(0.4, 0.48, 0.6, 0.3)
+	sep_style.vertical = true
+	sep_style.thickness = 1
+	sep.add_theme_stylebox_override("separator", sep_style)
+	sep.custom_minimum_size = Vector2(1, 110)
+	main_hbox.add_child(sep)
+
+	# --- CỘT PHẢI: HIỆN ĐANG TÌM TRẬN VÀ SỐ GIÂY ---
+	var status_col = VBoxContainer.new()
+	status_col.alignment = BoxContainer.ALIGNMENT_CENTER
+	status_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status_col.add_theme_constant_override("separation", 14)
+	main_hbox.add_child(status_col)
 
 	var status_lbl = Label.new()
 	status_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_lbl.text = "🔍 Đang tìm trận..."
-	status_lbl.add_theme_font_size_override("font_size", 16)
+	status_lbl.add_theme_font_size_override("font_size", 18)
 	status_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.65, 1.0))
-	sc_vbox.add_child(status_lbl)
+	status_col.add_child(status_lbl)
 
 	var timer_badge = PanelContainer.new()
 	timer_badge.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var tb_style = StyleBoxFlat.new()
-	tb_style.bg_color = Color(0.04, 0.07, 0.12, 0.9)
+	tb_style.bg_color = Color(0.04, 0.07, 0.12, 0.95)
 	tb_style.border_width_left = 1
 	tb_style.border_width_top = 1
 	tb_style.border_width_right = 1
@@ -2197,18 +2835,19 @@ func _start_2v2_matchmaking() -> void:
 	timer_badge.add_theme_stylebox_override("panel", tb_style)
 
 	var tb_margin = MarginContainer.new()
-	tb_margin.add_theme_constant_override("margin_left", 20)
-	tb_margin.add_theme_constant_override("margin_right", 20)
-	tb_margin.add_theme_constant_override("margin_top", 4)
-	tb_margin.add_theme_constant_override("margin_bottom", 4)
+	tb_margin.add_theme_constant_override("margin_left", 24)
+	tb_margin.add_theme_constant_override("margin_right", 24)
+	tb_margin.add_theme_constant_override("margin_top", 6)
+	tb_margin.add_theme_constant_override("margin_bottom", 6)
 	timer_badge.add_child(tb_margin)
 
 	var timer_lbl = Label.new()
 	timer_lbl.text = "⏳ 00:00"
-	timer_lbl.add_theme_font_size_override("font_size", 18)
+	timer_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	timer_lbl.add_theme_font_size_override("font_size", 22)
 	timer_lbl.add_theme_color_override("font_color", Color(0.4, 0.85, 1.0, 1.0))
 	tb_margin.add_child(timer_lbl)
-	sc_vbox.add_child(timer_badge)
+	status_col.add_child(timer_badge)
 
 	container.add_child(search_card)
 

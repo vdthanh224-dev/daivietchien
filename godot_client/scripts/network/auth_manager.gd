@@ -24,6 +24,9 @@ var current_silver: int = 5000
 var current_gold: int = 0
 var current_generals: Array = ["ly_thuong_kiet"]
 var current_2v2_points: int = 1200
+var current_2v2_rank_index: int = 0
+var current_2v2_stars: int = 3
+var current_2v2_accumulation_points: int = 0
 var tutorial_reward_claimed: bool = false
 var pending_exp_gain: Dictionary = {}
 
@@ -202,6 +205,12 @@ func fetch_profile_from_appwrite(on_completed: Callable = Callable()) -> void:
 						current_gold = int(data["gold"])
 					if data.has("rank2v2Points"):
 						current_2v2_points = int(data["rank2v2Points"])
+					if data.has("rank2v2Index"):
+						current_2v2_rank_index = int(data["rank2v2Index"])
+					if data.has("rank2v2Stars"):
+						current_2v2_stars = int(data["rank2v2Stars"])
+					if data.has("rank2v2AccPoints"):
+						current_2v2_accumulation_points = int(data["rank2v2AccPoints"])
 					if data.has("tutorialRewardClaimed"):
 						tutorial_reward_claimed = bool(data["tutorialRewardClaimed"])
 					if data.has("generals"):
@@ -215,8 +224,8 @@ func fetch_profile_from_appwrite(on_completed: Callable = Callable()) -> void:
 
 					save_session()
 					profile_updated.emit()
-					print("[AuthManager] Đồng bộ Appwrite thành công! Level: %d, Exp: %d, Tướng: %d (Quân hàm: %dđ)" % [
-						current_level, current_exp, current_generals.size(), get_military_points()
+					print("[AuthManager] Đồng bộ Appwrite thành công! Level: %d, Exp: %d, Tướng: %d (Quân hàm: %dđ, 2v2: Rank %d, %d sao)" % [
+						current_level, current_exp, current_generals.size(), get_military_points(), current_2v2_rank_index, current_2v2_stars
 					])
 		if on_completed.is_valid():
 			on_completed.call()
@@ -244,6 +253,9 @@ func save_profile_to_appwrite(on_completed: Callable = Callable()) -> void:
 			"gold": current_gold,
 			"militaryPoints": get_military_points(),
 			"rank2v2Points": current_2v2_points,
+			"rank2v2Index": current_2v2_rank_index,
+			"rank2v2Stars": current_2v2_stars,
+			"rank2v2AccPoints": current_2v2_accumulation_points,
 			"generals": ",".join(current_generals),
 			"tutorialRewardClaimed": tutorial_reward_claimed,
 			"onboardingComplete": true
@@ -518,6 +530,9 @@ func save_session() -> void:
 			"gold": current_gold,
 			"generals": current_generals,
 			"rank2v2Points": current_2v2_points,
+			"rank2v2Index": current_2v2_rank_index,
+			"rank2v2Stars": current_2v2_stars,
+			"rank2v2AccPoints": current_2v2_accumulation_points,
 			"tutorialRewardClaimed": tutorial_reward_claimed
 		}
 		file.store_string(JSON.stringify(data))
@@ -561,6 +576,9 @@ func set_onboarding_done() -> void:
 	data["silver"] = current_silver
 	data["gold"] = current_gold
 	data["generals"] = current_generals
+	data["rank2v2Index"] = current_2v2_rank_index
+	data["rank2v2Stars"] = current_2v2_stars
+	data["rank2v2AccPoints"] = current_2v2_accumulation_points
 	data["tutorialRewardClaimed"] = tutorial_reward_claimed
 
 	var wfile = FileAccess.open(path, FileAccess.WRITE)
@@ -589,6 +607,9 @@ func load_saved_session() -> void:
 					if current_generals.is_empty():
 						current_generals = ["ly_thuong_kiet"]
 					current_2v2_points = int(data.get("rank2v2Points", 1200))
+					current_2v2_rank_index = int(data.get("rank2v2Index", 0))
+					current_2v2_stars = int(data.get("rank2v2Stars", 3))
+					current_2v2_accumulation_points = int(data.get("rank2v2AccPoints", 0))
 					tutorial_reward_claimed = bool(data.get("tutorialRewardClaimed", false))
 					if session_secret != "":
 						is_logged_in = true
