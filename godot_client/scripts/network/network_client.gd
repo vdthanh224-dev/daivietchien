@@ -383,7 +383,7 @@ func leave_room() -> void:
 	last_processed_action_seq = -1
 	last_state = {}
 
-func send_join_room(target_room: String, seat: int, players_data: Array = []) -> void:
+func send_join_room(target_room: String, seat: int, players_data: Array = [], mode_id: String = "2v2") -> void:
 	room_id = target_room
 	my_seat = seat
 	last_processed_action_seq = -1
@@ -391,7 +391,8 @@ func send_join_room(target_room: String, seat: int, players_data: Array = []) ->
 		"action": "JOIN_ROOM",
 		"roomId": target_room,
 		"seat": seat,
-		"heroId": "1"
+		"heroId": "1",
+		"modeId": mode_id
 	}
 	if not players_data.is_empty():
 		payload["players"] = players_data

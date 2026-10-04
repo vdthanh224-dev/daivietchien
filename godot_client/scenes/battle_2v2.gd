@@ -4266,7 +4266,8 @@ func _build_initial_server_players() -> Array:
 			"maxHp": g.get("max_hp", 4),
 			"hp": g.get("hp", 4),
 			"isAlly": bool(g.get("isDragon", false)),
-			"isAI": is_ai
+			"isAI": is_ai,
+			"role": str(g.get("role", ""))
 		})
 	return players
 
@@ -4281,8 +4282,9 @@ func _on_network_connected() -> void:
 			r_id = appwrite_r_id
 	elif NetworkClient and NetworkClient.room_id != "":
 		r_id = NetworkClient.room_id
+	var mode_id := str(AppwriteMatchmaking.current_room.get("modeId", "2v2")) if AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary else "2v2"
 	var initial_players = _build_initial_server_players()
-	NetworkClient.send_join_room(r_id, my_seat, initial_players)
+	NetworkClient.send_join_room(r_id, my_seat, initial_players, mode_id)
 	var s_name = NetworkClient.active_server_name if ("active_server_name" in NetworkClient and not NetworkClient.active_server_name.is_empty()) else "Game Server"
 	var s_url = NetworkClient.active_server_url if ("active_server_url" in NetworkClient and not NetworkClient.active_server_url.is_empty()) else NetworkClient.server_url
 	_add_log("🌐 [ĐỒNG BỘ MẠNG] Ưu tiên: Đã kết nối %s (%s)! Phòng: %s, Ghế: %d" % [s_name, s_url, r_id, my_seat])

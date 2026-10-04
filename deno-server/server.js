@@ -58,13 +58,13 @@ if (clusterChannel) {
         const incomingRev = msg.draft.revision || 0;
         const currentRev = room.draft.revision || 0;
         if (incomingRev >= currentRev || msg.draft.isCompleted) {
-          room.draft.slots = msg.draft.slots;
-          room.draft.currentPickerIndex = msg.draft.currentPickerIndex;
-          room.draft.timer = msg.draft.timer;
-          room.draft.timerStartAt = msg.draft.timerStartAt;
-          room.draft.revision = incomingRev;
-          room.draft.isCompleted = msg.draft.isCompleted;
-          if (msg.draft.leader) room.draft.leader = msg.draft.leader;
+          // Keep every draft field authoritative across Deno isolates.
+          room.draft = {
+            ...room.draft,
+            ...msg.draft,
+            slots: Array.isArray(msg.draft.slots) ? msg.draft.slots : room.draft.slots,
+            revision: incomingRev,
+          };
         }
         room.lastLeaderHeartbeat = Date.now();
       }
@@ -100,7 +100,7 @@ if (clusterChannel) {
           if (msg.slots) room.draft.slots = msg.slots;
         }
         if (!room.state && Array.isArray(msg.battlePlayers)) {
-          room.state = initGame(roomId, msg.battlePlayers);
+          room.state = initGame(roomId, msg.battlePlayers, msg.modeId || room.draft?.modeId || "2v2");
         }
         room.lastActivity = Date.now();
         broadcastRoom(room, {
@@ -576,6 +576,7 @@ function finishDraftAndStartBattle(roomId, room) {
   clusterBroadcast({
     type: "DRAFT_COMPLETED_SYNC",
     roomId,
+    modeId: draft.modeId || "2v2",
     slots: draft.slots,
     battlePlayers,
   });
