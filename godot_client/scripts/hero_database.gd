@@ -67,12 +67,16 @@ func get_weekly_free_hero_ids() -> Array[int]:
 	var rng = RandomNumberGenerator.new()
 	rng.seed = week_seed
 
+	var is_admin = AuthManager and AuthManager.is_admin()
+	var max_candidate_id = 100 if is_admin else 28
+
 	var candidates: Array[int] = []
-	for i in range(1, 101):
+	for i in range(1, max_candidate_id + 1):
 		candidates.append(i)
 
 	var free_ids: Array[int] = []
-	while free_ids.size() < 10 and not candidates.is_empty():
+	var target_free_count = min(10, candidates.size())
+	while free_ids.size() < target_free_count and not candidates.is_empty():
 		var idx = rng.randi_range(0, candidates.size() - 1)
 		free_ids.append(candidates[idx])
 		candidates.remove_at(idx)
@@ -92,8 +96,8 @@ func _get_day_of_year(year: int, month: int, day: int) -> int:
 
 func is_hero_owned(hero_id: int) -> bool:
 	if AuthManager and AuthManager.is_admin():
-			return true
-	if hero_id == 47: # Lý Thường Kiệt khởi đầu mặc định
+		return true
+	if hero_id == 1 or hero_id == 47: # Tướng khởi đầu mặc định (Cao Lỗ #1, Lý Thường Kiệt #47)
 		return true
 	if not AuthManager:
 		return false
@@ -113,13 +117,17 @@ func is_hero_owned(hero_id: int) -> bool:
 	return false
 
 func get_available_pick_heroes() -> Array[Dictionary]:
-	if AuthManager and AuthManager.is_admin():
-			return all_heroes.duplicate()
+	var is_admin = AuthManager and AuthManager.is_admin()
+	if is_admin:
+		return all_heroes.duplicate()
 
 	var free_ids = get_weekly_free_hero_ids()
 	var available: Array[Dictionary] = []
 	for h in all_heroes:
-		var hid = h["id"]
+		var hid = int(h["id"])
+		# Chỉ xuất hiện các tướng từ 1->28 nếu không phải người có label appwrite Admin
+		if hid < 1 or hid > 28:
+			continue
 		if hid in free_ids or is_hero_owned(hid):
 			var copy = h.duplicate()
 			copy["is_weekly_free"] = (hid in free_ids)

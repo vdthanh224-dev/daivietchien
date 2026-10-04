@@ -494,6 +494,8 @@ horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="HealthSpotlightOverlay" type="Control" parent="."]
+z_index = 2000
+z_as_relative = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -558,7 +560,7 @@ size_flags_vertical = 3
 theme_override_colors/default_color = Color(0.92, 0.95, 1, 1)
 theme_override_font_sizes/normal_font_size = 13
 bbcode_enabled = true
-text = "• Mỗi tướng sở hữu các đóa sinh mệnh [color=#FFA0C0][b]Hoa Sen 🌸[/b][/color] nằm ở góc dưới avatar.
+text = "• Mỗi tướng sở hữu các đóa sinh mệnh [color=#FFA0C0][b]Hoa Sen 🌸[/b][/color] nằm ở thanh sinh mệnh dọc bên trái avatar.
 • Khi trúng đòn mất máu, hoa sen sẽ [color=#9E9E9E][b]chuyển sang tối màu ⚪[/b][/color].
 • ⚠️ [color=#FF5555][b]QUY TẮC SINH TỬ:[/b][/color] Nếu lượng máu tụt về [b]0[/b], tướng sẽ [color=#FF3333][b]TỬ TRẬN[/b][/color] và thua cuộc!
 • Hãy cùng học cách rút bài, dùng Trảm, Đỡ và tuyệt kỹ của tướng để chiến thắng!"
@@ -571,81 +573,67 @@ theme_override_font_sizes/font_size = 13
 text = "TIẾP TỤC (ĐẦU LƯỢT RÚT BÀI) ➜"
 
 [node name="BossSpotlightLotus" type="PanelContainer" parent="HealthSpotlightOverlay"]
-custom_minimum_size = Vector2(170, 42)
+custom_minimum_size = Vector2(28, 218)
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -85.0
-offset_top = 206.0
-offset_right = 85.0
-offset_bottom = 248.0
+offset_left = -87.0
+offset_top = 16.0
+offset_right = -59.0
+offset_bottom = 234.0
 grow_horizontal = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_lotus_halo")
 
-[node name="VBox" type="VBoxContainer" parent="HealthSpotlightOverlay/BossSpotlightLotus"]
+[node name="Margin" type="MarginContainer" parent="HealthSpotlightOverlay/BossSpotlightLotus"]
 layout_mode = 2
-theme_override_constants/separation = 1
-alignment = 1
+theme_override_constants/margin_left = 2
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 2
+theme_override_constants/margin_bottom = 6
 
-[node name="Tag" type="Label" parent="HealthSpotlightOverlay/BossSpotlightLotus/VBox"]
+[node name="VBox" type="VBoxContainer" parent="HealthSpotlightOverlay/BossSpotlightLotus/Margin"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.45, 0.45, 1)
-theme_override_font_sizes/font_size = 10
-text = "MÁU SƠN TẶC"
-horizontal_alignment = 1
-
-[node name="Lotus" type="Label" parent="HealthSpotlightOverlay/BossSpotlightLotus/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.65, 0.8, 1)
-theme_override_font_sizes/font_size = 13
-text = "🌸 🌸 🌸 (3/3)"
-horizontal_alignment = 1
+theme_override_constants/separation = 4
+alignment = 2
 
 [node name="PlayerSpotlightLotus" type="PanelContainer" parent="HealthSpotlightOverlay"]
-custom_minimum_size = Vector2(170, 42)
+custom_minimum_size = Vector2(28, 218)
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -200.0
-offset_top = -62.0
-offset_right = -30.0
-offset_bottom = -20.0
+offset_left = -202.0
+offset_top = -252.0
+offset_right = -174.0
+offset_bottom = -34.0
 grow_horizontal = 0
 grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_lotus_halo")
 
-[node name="VBox" type="VBoxContainer" parent="HealthSpotlightOverlay/PlayerSpotlightLotus"]
+[node name="Margin" type="MarginContainer" parent="HealthSpotlightOverlay/PlayerSpotlightLotus"]
 layout_mode = 2
-theme_override_constants/separation = 1
-alignment = 1
+theme_override_constants/margin_left = 2
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 2
+theme_override_constants/margin_bottom = 6
 
-[node name="Tag" type="Label" parent="HealthSpotlightOverlay/PlayerSpotlightLotus/VBox"]
+[node name="VBox" type="VBoxContainer" parent="HealthSpotlightOverlay/PlayerSpotlightLotus/Margin"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.45, 0.95, 0.55, 1)
-theme_override_font_sizes/font_size = 10
-text = "MÁU CỦA BẠN"
-horizontal_alignment = 1
-
-[node name="Lotus" type="Label" parent="HealthSpotlightOverlay/PlayerSpotlightLotus/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.65, 0.8, 1)
-theme_override_font_sizes/font_size = 13
-text = "🌸 🌸 🌸 🌸 (4/4)"
-horizontal_alignment = 1
+theme_override_constants/separation = 4
+alignment = 2
 
 [node name="ArrowBossHealth" type="Control" parent="HealthSpotlightOverlay"]
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -160.0
-offset_top = 212.0
-offset_right = -100.0
-offset_bottom = 252.0
+offset_left = -120.0
+offset_top = 184.0
+offset_right = -80.0
+offset_bottom = 224.0
 grow_horizontal = 2
 
 [node name="ArrowImg" type="TextureRect" parent="HealthSpotlightOverlay/ArrowBossHealth"]
@@ -660,13 +648,14 @@ stretch_mode = 5
 
 [node name="TagBoss" type="Label" parent="HealthSpotlightOverlay/ArrowBossHealth"]
 layout_mode = 0
-offset_left = -120.0
+offset_left = -160.0
 offset_top = -2.0
-offset_right = -12.0
+offset_right = -14.0
 offset_bottom = 18.0
 theme_override_colors/font_color = Color(1, 0.45, 0.45, 1)
 theme_override_font_sizes/font_size = 11
-text = "MÁU SƠN TẶC ➜"
+text = "MÁU SƠN TẶC (3/3) ➜"
+horizontal_alignment = 2
 
 [node name="ArrowPlayerHealth" type="Control" parent="HealthSpotlightOverlay"]
 layout_mode = 1
@@ -675,10 +664,10 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -280.0
-offset_top = -54.0
-offset_right = -220.0
-offset_bottom = -14.0
+offset_left = -235.0
+offset_top = -96.0
+offset_right = -195.0
+offset_bottom = -56.0
 grow_horizontal = 0
 grow_vertical = 0
 
@@ -694,13 +683,14 @@ stretch_mode = 5
 
 [node name="TagPlayer" type="Label" parent="HealthSpotlightOverlay/ArrowPlayerHealth"]
 layout_mode = 0
-offset_left = -110.0
+offset_left = -160.0
 offset_top = -2.0
-offset_right = -12.0
+offset_right = -14.0
 offset_bottom = 18.0
 theme_override_colors/font_color = Color(0.45, 0.95, 0.55, 1)
 theme_override_font_sizes/font_size = 11
-text = "MÁU CỦA BẠN ➜"
+text = "MÁU CỦA BẠN (4/4) ➜"
+horizontal_alignment = 2
 
 [node name="RewardModal" type="Control" parent="."]
 visible = false

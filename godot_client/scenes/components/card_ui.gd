@@ -50,8 +50,57 @@ func setup_card_data(id: String, p_name: String, rank_val: Variant, suit_str: St
 	res.category = cat
 	if sub_type_val >= 0:
 		res.sub_type = sub_type_val as CardResourceScript.CardSubType
+	else:
+		res.sub_type = _infer_sub_type_from_name(p_name)
+		if cat == 0:
+			res.category = _infer_category_from_name(p_name)
 	res.description = desc
 	update_card(res)
+
+static func _infer_sub_type_from_name(p_name: String) -> int:
+	var n = p_name.to_lower()
+	if "hỏa" in n and "trảm" in n: return CardResourceScript.CardSubType.TRAM_HOA
+	if ("thủy" in n or "thuy" in n) and ("trảm" in n or "tram" in n): return CardResourceScript.CardSubType.TRAM_THUY
+	if "trảm" in n: return CardResourceScript.CardSubType.TRAM
+	if "đỡ" in n: return CardResourceScript.CardSubType.DO
+	if "bánh chưng" in n: return CardResourceScript.CardSubType.BANH_CHUNG
+	if "rượu" in n: return CardResourceScript.CardSubType.HU_RUOU
+	if "khiên mây" in n or "áo bào" in n or "giáp đồng" in n: return CardResourceScript.CardSubType.AO_GIAP
+	if "thuận thiên" in n or "song cung" in n or "nỏ thần" in n or "trường đao" in n or "thương ngâu" in n or "súng thần công" in n: return CardResourceScript.CardSubType.VU_KHI
+	if "ngựa trắng" in n: return CardResourceScript.CardSubType.NGUA_CONG
+	if "voi chiến" in n: return CardResourceScript.CardSubType.NGUA_THU
+	if "trống đồng" in n or "bảo vật" in n: return CardResourceScript.CardSubType.BRONZE_DRUM
+	if "diệu kế" in n: return CardResourceScript.CardSubType.DIEU_KE
+	if "vườn không" in n: return CardResourceScript.CardSubType.VUON_KHONG
+	if "đột kích" in n: return CardResourceScript.CardSubType.DOT_KICH
+	if "dụng binh" in n: return CardResourceScript.CardSubType.DUNG_BINH
+	if "huyết chiến" in n or "quyết đấu" in n or "thách đấu" in n: return CardResourceScript.CardSubType.HUYET_CHIEN
+	if "xích" in n or "tỏa" in n: return CardResourceScript.CardSubType.XICH_TAM_TOA
+	if "mở kho" in n: return CardResourceScript.CardSubType.MO_KHO_CUU_TE
+	if "giặc tới" in n: return CardResourceScript.CardSubType.GIAC_TOI
+	if "mưa tên" in n or "vạn tiễn" in n: return CardResourceScript.CardSubType.MUA_TEN
+	if "đại hồng thủy" in n: return CardResourceScript.CardSubType.DAI_HONG_THUY
+	if "cắt lương" in n: return CardResourceScript.CardSubType.CAT_LUONG
+	if "trầm ảo" in n: return CardResourceScript.CardSubType.TRAM_AO
+	if "bãi cọc" in n: return CardResourceScript.CardSubType.BAI_COC_BACH_DANG
+	if "thủy triều" in n: return CardResourceScript.CardSubType.THUY_TRIEU_RUT
+	if "mượn gươm" in n: return CardResourceScript.CardSubType.MUON_GUOM_DIET_DICH
+	if "mở yến tiệc" in n: return CardResourceScript.CardSubType.MO_YEN_TIEC
+	if "hịch tướng sĩ" in n: return CardResourceScript.CardSubType.HICH_TUONG_SI
+	if "khổ nhục" in n: return CardResourceScript.CardSubType.KHO_NHUC_KE
+	if "tẩu vi" in n: return CardResourceScript.CardSubType.TAU_VI_THUONG_SACH
+	if "phủ để" in n: return CardResourceScript.CardSubType.PHU_DE_TRUU_TAN
+	return CardResourceScript.CardSubType.TRAM
+
+static func _infer_category_from_name(p_name: String) -> int:
+	var n = p_name.to_lower()
+	if "khiên mây" in n or "áo bào" in n or "giáp đồng" in n or "thuận thiên" in n or "song cung" in n or "nỏ thần" in n or "trường đao" in n or "thương ngâu" in n or "súng thần công" in n or "ngựa trắng" in n or "voi chiến" in n or "trống đồng" in n or "bảo vật" in n:
+		return CardResourceScript.CardCategory.TRANG_BI
+	if "đại hồng thủy" in n or "cắt lương" in n or "trầm ảo" in n or "bãi cọc" in n:
+		return CardResourceScript.CardCategory.TRI_HOAN
+	if "diệu kế" in n or "vườn không" in n or "đột kích" in n or "dụng binh" in n or "huyết chiến" in n or "quyết đấu" in n or "thách đấu" in n or "xích" in n or "mở kho" in n or "giặc tới" in n or "mưa tên" in n or "vạn tiễn" in n or "thủy triều" in n or "mượn gươm" in n or "mở yến tiệc" in n or "hịch tướng sĩ" in n or "khổ nhục" in n or "tẩu vi" in n or "phủ để" in n:
+		return CardResourceScript.CardCategory.CAM_NANG
+	return CardResourceScript.CardCategory.CO_BAN
 
 func update_card(data: Resource) -> void:
 	card_data = data

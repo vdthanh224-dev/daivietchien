@@ -1,6 +1,7 @@
 extends Control
 
 const CardUIScene = preload("res://scenes/components/card_ui.tscn")
+const GeneralAvatarScene = preload("res://scenes/components/general_avatar_ui.tscn")
 const AI_CARD_PLAY_DELAY: float = 1.5
 const IRON_CHAIN_DESCRIPTION := "Chạm avatar để chọn tối đa 2 mục tiêu để đưa họ vào hoặc thoát trạng thái xích (cùng nhận sát thương nguyên tố), có thể đổi thành lá mới."
 const HERO_SKILL_ACTIONS := {
@@ -128,6 +129,53 @@ var rescue_card_selector_scroll: ScrollContainer = null
 var my_seat: int = 1
 var my_team_is_dragon: bool = true
 var current_turn_seat: int = 1
+var battle_seat_count: int = 4
+var battle_seat_nodes: Dictionary = {}
+
+func _build_battle_seat_avatar_map(seat_count: int) -> Dictionary:
+	var map: Dictionary = {}
+	var base_nodes: Array = [seat_bottom_right, seat_top_right, seat_top_left, seat_mid_left]
+	var seats_root: Control = $TableTop/Seats
+	var center := Vector2(640.0, 355.0)
+	var radius := Vector2(470.0, 220.0)
+	var other_seat_order: Array[int] = []
+	for seat_number in range(1, seat_count + 1):
+		if seat_number != my_seat:
+			other_seat_order.append(seat_number)
+	for old_node in seats_root.get_children():
+		if old_node is Control and old_node.has_meta("dynamic_battle_seat"):
+			old_node.queue_free()
+	battle_seat_nodes.clear()
+	for offset in range(seat_count):
+		var avatar = base_nodes[offset] if offset < base_nodes.size() else null
+		var holder: Control = avatar.get_parent() if avatar and is_instance_valid(avatar) else null
+		if holder == null:
+			holder = Control.new()
+			holder.name = "DynastySeat%d" % (offset + 1)
+			holder.set_meta("dynamic_battle_seat", true)
+			holder.custom_minimum_size = Vector2(170, 230)
+			seats_root.add_child(holder)
+			avatar = GeneralAvatarScene.instantiate()
+			holder.add_child(avatar)
+		avatar.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		# The local player keeps the existing lower-right 2v2 position. Other seats
+		# use the open upper and side arc so the lower area remains exclusively ours.
+		if offset == 0:
+			var player_seat := ((my_seat - 1 + offset) % seat_count) + 1
+			map[player_seat] = avatar
+			battle_seat_nodes[player_seat] = avatar
+			continue
+		var other_index := offset - 1
+		var other_count := seat_count - 1
+		# Seat order grows from the player's left toward the right arc (1, 2, 3...).
+		var angle := -2.85 + 2.60 * float(other_index) / float(maxi(1, other_count - 1))
+		holder.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		holder.position = center + Vector2(cos(angle) * radius.x, sin(angle) * radius.y) - Vector2(85, 115)
+		holder.size = Vector2(170, 230)
+		var seat_number := other_seat_order[other_index]
+		map[seat_number] = avatar
+		battle_seat_nodes[seat_number] = avatar
+	return map
 var current_turn_timer: float = 40.0
 var current_server_phase: String = "PLAY"
 var is_player_turn: bool = false
@@ -166,6 +214,8 @@ var is_targeting_ho_phu_skill: bool = false
 var borrow_sword_owner_seat: int = -1
 var borrow_sword_target_seat: int = -1
 var is_game_over: bool = false
+var exit_battle_btn: Button = null
+var match_result_recorded: bool = false
 
 # Multi-target Chain State
 var selected_chain_seats: Array = []
@@ -301,6 +351,7 @@ var generals_data: Dictionary = {}
 
 # 52-card standard deck pile
 var card_deck_pile: Array = []
+var hand_layout_refresh_timer: float = 0.0
 
 func _show_no_server_modal(message: String = "") -> void:
 	print("[Battle 2v2] ❌ Không có kết nối WebSocket Deno Server! Dừng trận đấu.")
@@ -490,8 +541,8 @@ func _ready() -> void:
 				is_network_mode = true
 				_on_network_connected()
 
-	_add_log("⚔️ Đấu Trường Đại Việt 2v2: Phe Rồng ([1], [3]) vs Phe Phượng ([2], [4])!")
-	_add_log("📜 Thứ tự ra bài: Ghế 1 ➔ Ghế 2 ➔ Ghế 3 ➔ Ghế 4.")
+	_add_log("⚔️ Đấu Trường Đại Việt: vai trò Vương Triều được giữ bí mật.")
+	_add_log("📜 Thứ tự ra bài bắt đầu từ Quân Vương rồi lần lượt theo ghế.")
 
 	if not is_network_mode and not is_screenshot_test:
 		_add_log("⚔️ Chế độ Đấu Trường Cục Bộ (Local vs AI).")
@@ -733,6 +784,97 @@ func _ready() -> void:
 		else:
 			push_error("[TEST FAIL] Thời gian hiển thị Dạ Trạch không đúng")
 			get_tree().quit(1)
+
+	if "--test-ai-slash-da-trach" in cmd_args:
+		is_network_mode = false
+		if NetworkClient and NetworkClient.game_state_updated.is_connected(_on_network_game_state_updated):
+			NetworkClient.game_state_updated.disconnect(_on_network_game_state_updated)
+		if NetworkClient and NetworkClient.action_received.is_connected(_on_network_action_received):
+			NetworkClient.action_received.disconnect(_on_network_action_received)
+		await get_tree().process_frame
+
+		# Setup Seat 1 as Triệu Quang Phục (Hero 14)
+		generals_data[1]["hero_id"] = 14
+		generals_data[1]["name"] = "Triệu Quang Phục"
+		generals_data[1]["hero_data"] = {"id": 14, "name": "Triệu Quang Phục"}
+		generals_data[1]["hand_count"] = 0
+		generals_data[1]["hand_cards"] = []
+		generals_data[1]["is_alive"] = true
+		generals_data[1]["hp"] = 4
+		generals_data[1]["isDragon"] = true
+		if is_instance_valid(hand_container) and my_seat == 1:
+			for c in hand_container.get_children():
+				c.queue_free()
+
+		# Setup Seat 3 as another general (Cao Lỗ) with cards
+		generals_data[3]["hero_id"] = 1
+		generals_data[3]["name"] = "Cao Lỗ"
+		generals_data[3]["hero_data"] = {"id": 1, "name": "Cao Lỗ"}
+		generals_data[3]["hand_count"] = 2
+		generals_data[3]["hand_cards"] = [{"name": "Đỡ"}, {"name": "Trảm"}]
+		generals_data[3]["is_alive"] = true
+		generals_data[3]["hp"] = 3
+		generals_data[3]["isDragon"] = true
+
+		# Setup Seat 2 as AI (Team Tiger)
+		generals_data[2]["isDragon"] = false
+		generals_data[2]["is_alive"] = true
+		generals_data[2]["hp"] = 4
+		generals_data[2]["hand_cards"] = [{"name": "Trảm", "suit": "Spade", "rank": 7}]
+		generals_data[2]["hand_count"] = 1
+
+		# 1. Test immunity helper
+		var tqp_empty_blocked = _is_da_trach_slash_blocked(1)
+		var other_blocked = _is_da_trach_slash_blocked(3)
+		if not tqp_empty_blocked or other_blocked:
+			push_error("[TEST FAIL] _is_da_trach_slash_blocked: tqp_empty=%s (want true), other=%s (want false)" % [tqp_empty_blocked, other_blocked])
+			get_tree().quit(1)
+			return
+
+		# 2. When Triệu Quang Phục has cards, he is NOT blocked
+		generals_data[1]["hand_count"] = 1
+		generals_data[1]["hand_cards"] = [{"name": "Trảm"}]
+		if my_seat == 1 and is_instance_valid(hand_container):
+			generals_data[1]["isPlayer"] = false # test as general dict
+		var tqp_with_cards_blocked = _is_da_trach_slash_blocked(1)
+		if tqp_with_cards_blocked:
+			push_error("[TEST FAIL] Triệu Quang Phục có bài nhưng vẫn bị tính là Dạ Trạch chặn!")
+			get_tree().quit(1)
+			return
+
+		# Reset Triệu Quang Phục to 0 cards
+		generals_data[1]["hand_count"] = 0
+		generals_data[1]["hand_cards"] = []
+
+		# 3. Test AI filtering: enemies = [1, 3]
+		var enemies_test = [1, 3]
+		var valid_targets: Array = []
+		for e_seat in enemies_test:
+			if _is_da_trach_slash_blocked(e_seat):
+				continue
+			valid_targets.append(e_seat)
+
+		if valid_targets != [3]:
+			push_error("[TEST FAIL] valid_targets should be [3], got %s" % str(valid_targets))
+			get_tree().quit(1)
+			return
+
+		# 4. Test AI when ONLY Triệu Quang Phục with 0 cards is enemy
+		var solo_enemy = [1]
+		var solo_valid: Array = []
+		for e_seat in solo_enemy:
+			if _is_da_trach_slash_blocked(e_seat):
+				continue
+			solo_valid.append(e_seat)
+
+		if not solo_valid.is_empty():
+			push_error("[TEST FAIL] solo_valid should be empty, got %s" % str(solo_valid))
+			get_tree().quit(1)
+			return
+
+		print("[TEST PASS] AI Trảm skip Triệu Quang Phục khi không có bài hoàn toàn chính xác!")
+		get_tree().quit(0)
+
 
 	if "--test-all-skill-feedback" in cmd_args:
 		is_network_mode = false
@@ -1273,7 +1415,10 @@ func _process(delta: float) -> void:
 
 	_process_showcase_queue()
 	_update_distance_labels()
-	_relayout_hand_cards()
+	hand_layout_refresh_timer -= delta
+	if hand_layout_refresh_timer <= 0.0:
+		hand_layout_refresh_timer = 0.1
+		_relayout_hand_cards()
 
 	if is_game_over:
 		return
@@ -1424,10 +1569,12 @@ func _init_generals_from_draft() -> void:
 	if AppwriteMatchmaking and AppwriteMatchmaking.draft_slots is Array and not AppwriteMatchmaking.draft_slots.is_empty():
 		draft = AppwriteMatchmaking.draft_slots
 	elif AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary:
-		if AppwriteMatchmaking.current_room.get("draft_slots", []).size() == 4:
-			draft = AppwriteMatchmaking.current_room["draft_slots"]
-		elif AppwriteMatchmaking.current_room.get("slots", []).size() == 4:
-			draft = AppwriteMatchmaking.current_room["slots"]
+		var room_draft = AppwriteMatchmaking.current_room.get("draft_slots", [])
+		var room_slots = AppwriteMatchmaking.current_room.get("slots", [])
+		if room_draft is Array and not room_draft.is_empty():
+			draft = room_draft
+		elif room_slots is Array and not room_slots.is_empty():
+			draft = room_slots
 
 	# Xác định ghế của người chơi tại máy
 	var session_uid = AppwriteMatchmaking.my_session_user_id if AppwriteMatchmaking else ""
@@ -1436,7 +1583,11 @@ func _init_generals_from_draft() -> void:
 	if str(my_name).is_empty() and AuthManager:
 		my_name = AuthManager.current_user_name
 
-	my_seat = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 and NetworkClient.my_seat <= 4 else 1
+	my_seat = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 and NetworkClient.my_seat <= 8 else 1
+	var mode_id := str(AppwriteMatchmaking.current_room.get("modeId", "2v2")) if AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary else "2v2"
+	if mode_id.begins_with("dynasty_") and draft.size() > 4:
+		print("[Battle] Khởi tạo Vương Triều %d người với state %d ghế" % [draft.size(), draft.size()])
+	battle_seat_count = maxi(4, draft.size())
 	var matching_seats: Array[int] = []
 	for slot in draft:
 		if not (slot is Dictionary):
@@ -1463,28 +1614,17 @@ func _init_generals_from_draft() -> void:
 			my_team_is_dragon = bool(slot.get("isDragon", my_team_is_dragon))
 			break
 
-	var fallback_hero_ids = [53, 1, 3, 47]
+	var fallback_hero_ids = [53, 1, 3, 47, 2, 4, 5, 6]
 
 	# Ánh xạ layout bàn cờ theo chuẩn Unity:
 	# Bạn (Người chơi tại máy) luôn ngồi góc Dưới Phải (SeatBottomRight)
 	# Offset 1 (seat + 1): Top-Right
 	# Offset 2 (seat + 2): Top-Left (Đồng Đội)
 	# Offset 3 (seat + 3): Mid-Left
-	var seat_to_avatar = {}
-	var seat_to_offset = {}
-	for s_num in [1, 2, 3, 4]:
-		var offset = (s_num - my_seat + 4) % 4
-		seat_to_offset[s_num] = offset
-		if offset == 0:
-			seat_to_avatar[s_num] = seat_bottom_right
-		elif offset == 1:
-			seat_to_avatar[s_num] = seat_top_right
-		elif offset == 2:
-			seat_to_avatar[s_num] = seat_top_left
-		else:
-			seat_to_avatar[s_num] = seat_mid_left
+	var seat_to_avatar = _build_battle_seat_avatar_map(battle_seat_count)
+	var seat_count := battle_seat_count
 
-	for i in range(4):
+	for i in range(seat_count):
 		var s_num = i + 1
 		var slot_data = {}
 		for candidate in draft:
@@ -1525,11 +1665,11 @@ func _init_generals_from_draft() -> void:
 				if db_by_name is Dictionary and not db_by_name.is_empty():
 					hero_info = db_by_name
 		if hero_info == null or not (hero_info is Dictionary) or hero_info.is_empty():
-			hero_info = HeroDatabase.get_hero(fallback_hero_ids[i])
+			hero_info = HeroDatabase.get_hero(fallback_hero_ids[i % fallback_hero_ids.size()])
 
 		var h_name = hero_info.get("name", "Tướng %d" % s_num)
 		var h_faction = hero_info.get("faction", "Thăng Long")
-		var h_hp = int(hero_info.get("maxHp", hero_info.get("hp", 4)))
+		var h_hp = int(slot_data.get("maxHp", hero_info.get("maxHp", hero_info.get("hp", 4))))
 		
 		var slug = hero_info.get("slug", "")
 		if slug == "":
@@ -1542,7 +1682,9 @@ func _init_generals_from_draft() -> void:
 		if slug == "":
 			slug = str(hero_info.get("id", s_num))
 
-		var role_str = "RỒNG" if is_drag else "PHƯỢNG"
+		var is_dynasty := mode_id.begins_with("dynasty_")
+		var role_code := str(slot_data.get("role", ""))
+		var role_str = ("VƯƠNG" if role_code == "KING" else "?") if is_dynasty else ("RỒNG" if is_drag else "PHƯỢNG")
 
 		var avatar_node = seat_to_avatar[s_num]
 		avatar_node.setup_general(slug, h_name, h_faction, h_hp, h_hp, role_str, s_num)
@@ -1572,6 +1714,7 @@ func _init_generals_from_draft() -> void:
 			"isPlayer": is_p,
 			"isAI": is_ai,
 			"isDragon": is_drag,
+			"role": role_code,
 				"name": h_name,
 				"hero_id": int(hero_info.get("id", s_num)),
 				"faction": h_faction,
@@ -1607,6 +1750,23 @@ func _hero_has_skill(g: Dictionary, skill_id: String) -> bool:
 	var hero = g.get("hero_data", {})
 	var hero_id = int(hero.get("id", g.get("hero_id", 0)))
 	return hero_id > 0 and HeroDatabase.has_hero_skill(hero_id, skill_id)
+
+func _is_da_trach_slash_blocked(target_seat: int) -> bool:
+	if not generals_data.has(target_seat):
+		return false
+	var tgt = generals_data[target_seat]
+	if not tgt.get("is_alive", false):
+		return false
+	var is_da_trach: bool = _hero_has_skill(tgt, "da_trach") or int(tgt.get("hero_id", 0)) == 14 or "Triệu Quang Phục" in str(tgt.get("name", ""))
+	if not is_da_trach:
+		return false
+	var hand_cnt: int = int(tgt.get("hand_count", 0))
+	if tgt.has("hand_cards") and tgt["hand_cards"] is Array:
+		hand_cnt = max(hand_cnt, tgt["hand_cards"].size())
+	if (tgt.get("isPlayer", false) or target_seat == my_seat) and is_instance_valid(hand_container):
+		hand_cnt = max(hand_cnt, hand_container.get_child_count())
+	return hand_cnt == 0
+
 
 func _can_use_lien_chau(g: Dictionary) -> bool:
 	var hero = g.get("hero_data", {})
@@ -1962,9 +2122,9 @@ func _clear_treasure_targeting() -> void:
 	_set_treasure_skill_selected(false)
 
 func _deal_initial_hands() -> void:
-	for s_num in [1, 2, 3, 4]:
+	for s_num in range(1, battle_seat_count + 1):
 		var g = generals_data[s_num]
-		for k in range(4):
+		for k in range(battle_seat_count):
 			var card_info = _draw_card_from_pile()
 			if g["isPlayer"]:
 				_add_card_to_player_hand(card_info)
@@ -2638,6 +2798,9 @@ func _on_general_avatar_clicked(seat_num: int) -> void:
 				if forced_distance > weapon_range:
 					desc_text.text = "⚠️ %s cách %d, vượt tầm vũ khí %d của %s!" % [g["name"], forced_distance, weapon_range, sword_owner["name"]]
 					return
+				if _is_da_trach_slash_blocked(seat_num):
+					desc_text.text = "🌙 [DẠ TRẠCH] %s không có bài trên tay nên không thể bị Trảm!" % g["name"]
+					return
 				borrow_sword_target_seat = seat_num
 				_update_borrow_sword_target_highlights()
 				desc_text.text = "🗡️ %s sẽ bị buộc dùng Vũ khí đánh %s. Có thể bấm nút xác nhận." % [
@@ -2673,13 +2836,13 @@ func _on_general_avatar_clicked(seat_num: int) -> void:
 	_update_action_btn()
 
 func _update_chain_target_highlights() -> void:
-	for s in [1, 2, 3, 4]:
+	for s in range(1, battle_seat_count + 1):
 		if generals_data.has(s) and generals_data[s].has("avatar_node") and is_instance_valid(generals_data[s]["avatar_node"]):
 			var is_sel = (s in selected_chain_seats)
 			generals_data[s]["avatar_node"].set_target_highlight(is_sel)
 
 func _update_borrow_sword_target_highlights() -> void:
-	for s in [1, 2, 3, 4]:
+	for s in range(1, battle_seat_count + 1):
 		if generals_data.has(s) and generals_data[s].has("avatar_node") and is_instance_valid(generals_data[s]["avatar_node"]):
 			var is_selected = s == borrow_sword_owner_seat or s == borrow_sword_target_seat
 			generals_data[s]["avatar_node"].set_target_highlight(is_selected)
@@ -3455,7 +3618,7 @@ func _on_card_play_btn_clicked() -> void:
 		if dist > max_r and not water_bach_dang:
 			desc_text.text = "⚠️ Khoảng cách tới %s là %d (Tầm đánh của bạn là %d)!" % [tgt["name"], dist, max_r]
 			return
-		var da_trach_blocks = int(c_info.get("subType", -1)) == 0 and _hero_has_skill(tgt, "da_trach") and int(tgt.get("hand_count", 0)) == 0
+		var da_trach_blocks = _is_da_trach_slash_blocked(selected_target_seat)
 		if da_trach_blocks:
 			if is_network_mode:
 				card_play_btn.disabled = true
@@ -3466,7 +3629,7 @@ func _on_card_play_btn_clicked() -> void:
 				if is_instance_valid(target_avatar) and target_avatar.has_method("show_skill_banner"):
 					target_avatar.show_skill_banner("DẠ TRẠCH", 2.0)
 				AudioManager.play_skill()
-				desc_text.text = "🌙 [DẠ TRẠCH] %s không thể trở thành mục tiêu của Trảm thường khi không có bài trên tay." % tgt["name"]
+				desc_text.text = "🌙 [DẠ TRẠCH] %s không thể trở thành mục tiêu của Trảm khi không có bài trên tay." % tgt["name"]
 			return
 
 		var has_no_than = _has_no_than(p_gen)
@@ -3534,6 +3697,8 @@ func _on_card_play_btn_clicked() -> void:
 		_animate_showcase_card(c_name, "Bạn dùng [%s] tấn công %s!" % [c_name, tgt["name"]], c_info)
 		_add_log("⚔️ Bạn dùng [%s]%s lên %s (Ghế %d)." % [c_name, " (kèm Hủ Rượu: +1 Sát Thương)" if is_wine else "", tgt["name"], tgt["seat"]])
 		desc_text.text = "⚔️ Đã xuất Trảm lên %s! Đang chờ đối phương phản hồi..." % tgt["name"]
+		if DailyQuestSystem:
+			DailyQuestSystem.record_progress("slash", 1)
 
 		if not is_network_mode:
 			var slash_suit = c_info.get("suit", "")
@@ -3560,6 +3725,8 @@ func _on_card_play_btn_clicked() -> void:
 		_animate_showcase_card(c_name, "Bạn ăn Bánh Chưng hồi 1 Máu!", c_info)
 		_add_log("🍲 Bạn hồi phục 1 Máu bằng [Bánh Chưng] (%d/%d)." % [p_gen["hp"], p_gen["max_hp"]])
 		desc_text.text = "🍲 Đã dùng [Bánh Chưng] hồi 1 Máu (%d/%d)!" % [p_gen["hp"], p_gen["max_hp"]]
+		if DailyQuestSystem:
+			DailyQuestSystem.record_progress("heal", 1)
 
 	elif c_name == "Hủ Rượu":
 		if wine_used_this_turn:
@@ -3811,6 +3978,9 @@ func _on_card_play_btn_clicked() -> void:
 		if forced_distance > weapon_range:
 			desc_text.text = "⚠️ %s cách %d, vượt tầm vũ khí %d của %s!" % [forced_target["name"], forced_distance, weapon_range, sword_owner["name"]]
 			return
+		if _is_da_trach_slash_blocked(borrow_sword_target_seat):
+			desc_text.text = "🌙 [DẠ TRẠCH] %s không có bài trên tay nên không thể bị Trảm!" % forced_target["name"]
+			return
 		_play_smart_card_rays("Trảm", sword_owner["seat"], [forced_target["seat"]])
 		if not is_network_mode:
 			_discard_player_card(selected_card_ui)
@@ -4045,6 +4215,12 @@ func _on_card_play_btn_clicked() -> void:
 
 func _broadcast_player_battle_action(act_type: String, card_id: String, target_seat: int = 0, caster_seat: int = 0, target_seat2: int = 0, target_seats: Array = [], recast: bool = false, lien_chau_card_id: String = "") -> void:
 	var c_seat = caster_seat if caster_seat > 0 else my_seat
+	if act_type == "PLAY_CARD" and (caster_seat == 0 or caster_seat == my_seat):
+		var played_cat: int = int(last_played_card_info.get("cat", -1))
+		var is_trick = played_cat in [2, 3] or "_CN_" in card_id
+		if is_trick and DailyQuestSystem:
+			DailyQuestSystem.record_progress("trick", 1)
+
 	if NetworkClient and NetworkClient.is_connected_to_server:
 		if act_type == "PLAY_CARD":
 			NetworkClient.send_play_card_for_seat(c_seat, card_id, target_seat, target_seat2, target_seats, recast, lien_chau_card_id)
@@ -4066,7 +4242,7 @@ func _broadcast_player_battle_action(act_type: String, card_id: String, target_s
 
 func _build_initial_server_players() -> Array:
 	var players = []
-	for seat in [1, 2, 3, 4]:
+	for seat in range(1, battle_seat_count + 1):
 		if not generals_data.has(seat):
 			continue
 		var g = generals_data[seat]
@@ -4145,7 +4321,7 @@ func _sync_player_hand_from_server(server_hand: Array) -> void:
 	# khỏi UI và người chơi không thể chọn để bỏ tiếp.
 	if server_hand.is_empty():
 		for child in hand_container.get_children():
-			if child.has_meta("song_cung_equipped_preview"):
+			if child == exit_battle_btn or child.has_meta("song_cung_equipped_preview"):
 				continue
 			selected_song_cung_card_nodes.erase(child)
 			hand_container.remove_child(child)
@@ -4178,7 +4354,7 @@ func _sync_player_hand_from_server(server_hand: Array) -> void:
 
 	var current_cards: Array = []
 	for child in hand_container.get_children():
-		if child.has_meta("hung_suc_equipped_preview") or child.has_meta("song_cung_equipped_preview"):
+		if child == exit_battle_btn or child.has_meta("hung_suc_equipped_preview") or child.has_meta("song_cung_equipped_preview"):
 			continue
 		var info = _get_card_info_from_ui(child)
 		current_cards.append([str(info.get("id", "")), str(info.get("name", "")), int(info.get("subType", -1))])
@@ -4203,7 +4379,7 @@ func _sync_player_hand_from_server(server_hand: Array) -> void:
 	# Thu thập các thẻ bài hiện có theo id để tái sử dụng, tránh hủy và tạo lại gây giật/nháy hình
 	var existing_nodes_by_id: Dictionary = {}
 	for child in hand_container.get_children():
-		if child.has_meta("hung_suc_equipped_preview") or child.has_meta("song_cung_equipped_preview"):
+		if child == exit_battle_btn or child.has_meta("hung_suc_equipped_preview") or child.has_meta("song_cung_equipped_preview"):
 			continue
 		var cid = str(_get_card_info_from_ui(child).get("id", ""))
 		if not cid.is_empty() and not existing_nodes_by_id.has(cid):
@@ -4647,7 +4823,9 @@ func _apply_network_game_state(state: Dictionary) -> void:
 				my_team_is_dragon = g["isDragon"]
 		var server_hp = int(p.get("hp", g["hp"]))
 		var server_max_hp = int(p.get("maxHp", g["max_hp"]))
+		g["role"] = str(p.get("role", g.get("role", "")))
 		var server_is_alive = bool(p.get("isAlive", g.get("is_alive", true)))
+		var was_alive = bool(g.get("is_alive", true))
 		g["suc_soi_turns_remaining"] = max(0, int(p.get("sucSoiTurnsRemaining", g.get("suc_soi_turns_remaining", 0))))
 		g["is_wine_buff_active"] = bool(p.get("isWineBuffActive", g.get("is_wine_buff_active", false)))
 		g["wine_used_this_turn"] = bool(p.get("wineUsedThisTurn", g.get("wine_used_this_turn", false)))
@@ -4662,6 +4840,8 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			g["is_alive"] = false
 			if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
 				g["avatar_node"].set_defeated(true)
+			if seat == my_seat and was_alive:
+				_show_dead_player_exit()
 		var is_first_sync = not g.get("hp_synced", false)
 		g["hp_synced"] = true
 
@@ -4735,6 +4915,8 @@ func _apply_network_game_state(state: Dictionary) -> void:
 				# Keep every existing and newly drawn Spade visually transformed.
 				if g["che_no_active"]:
 					_set_local_che_no_hand(true)
+			if seat == my_seat and not server_is_alive:
+				_show_dead_player_exit()
 
 		# Đồng bộ trang bị
 		var equips = p.get("equipments", [])
@@ -4855,7 +5037,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 	# - Khi phản ứng kết thúc hoặc trong lượt đánh: Đồng hồ 40s trở về trên đầu NGƯỜI ĐÁNH (server_turn_seat).
 	var active_action_seat = server_waiting_seat if (server_waiting_seat > 0 and generals_data.has(server_waiting_seat) and generals_data[server_waiting_seat]["is_alive"]) else server_turn_seat
 
-	for s in [1, 2, 3, 4]:
+	for s in range(1, battle_seat_count + 1):
 		if generals_data.has(s) and generals_data[s].has("avatar_node") and is_instance_valid(generals_data[s]["avatar_node"]):
 			var is_active = (s == active_action_seat and generals_data[s]["is_alive"])
 			generals_data[s]["avatar_node"].set_turn_active(is_active)
@@ -5063,6 +5245,10 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		else:
 			card_play_btn.visible = false
 			end_turn_btn.visible = false
+			var wait_gen = generals_data.get(server_waiting_seat, {})
+			var wait_name = wait_gen.get("name", "Ghế %d" % server_waiting_seat) if wait_gen is Dictionary else "Ghế %d" % server_waiting_seat
+			turn_indicator.text = "🌉 ĐANG CHỜ %s PHẢN ỨNG DẪN CẦU (%ds)..." % [wait_name.to_upper(), server_waiting_timer]
+			desc_text.text = "🌉 %s đang chọn Trảm mục tiêu chỉ định hoặc chấp nhận để Kiều Công Tiễn cướp 2 lá..." % wait_name
 
 	elif server_phase == "AWAIT_OAI_NHUOC":
 		is_player_turn = false
@@ -6640,16 +6826,22 @@ func _relayout_hand_cards() -> void:
 		var card = hand_container.get_child(index)
 		var target_x: float = x
 		if not card.has_meta("is_animating_discard"):
-			if card.has_meta("layout_tween"):
-				var prev_tween = card.get_meta("layout_tween")
-				if prev_tween and (prev_tween is Tween) and prev_tween.is_valid():
-					prev_tween.kill()
-			if abs(card.position.x - target_x) > 1.5:
-				var t = card.create_tween()
-				t.tween_property(card, "position:x", target_x, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-				card.set_meta("layout_tween", t)
-			else:
-				card.position.x = target_x
+			# _process() recalculates the hand layout every frame. Reuse the
+			# existing tween while its destination is unchanged; recreating it
+			# every frame made mobile devices continuously allocate and kill tweens.
+			var previous_target := float(card.get_meta("layout_target_x", INF))
+			if abs(previous_target - target_x) > 0.5:
+				if card.has_meta("layout_tween"):
+					var prev_tween = card.get_meta("layout_tween")
+					if prev_tween and (prev_tween is Tween) and prev_tween.is_valid():
+						prev_tween.kill()
+				if abs(card.position.x - target_x) > 1.5:
+					var t = card.create_tween()
+					t.tween_property(card, "position:x", target_x, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+					card.set_meta("layout_tween", t)
+				else:
+					card.position.x = target_x
+				card.set_meta("layout_target_x", target_x)
 		if index < steps.size():
 			x += steps[index]
 
@@ -6780,7 +6972,7 @@ func _play_smart_card_rays(card_name: String, caster_seat: int, target_seats: Ar
 
 func _get_aoe_ray_targets(caster_seat: int) -> Array:
 	var targets: Array = []
-	for seat in [1, 2, 3, 4]:
+	for seat in range(1, battle_seat_count + 1):
 		if seat != caster_seat and generals_data.has(seat) and generals_data[seat].get("is_alive", false):
 			targets.append(seat)
 	return targets
@@ -6890,6 +7082,18 @@ func _restore_truong_dao_slash_allowance(attacker_seat: int) -> void:
 func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: int = 1, damage_element: String = "NORMAL", slash_card_suit: String = "") -> void:
 	var tgt = generals_data[target_seat]
 	var atk = generals_data.get(attacker_seat, {})
+
+	# Kiểm tra Dạ Trạch (Triệu Quang Phục không có bài trên tay miễn nhiễm với đòn Trảm)
+	if _is_da_trach_slash_blocked(target_seat):
+		var target_avatar = tgt.get("avatar_node")
+		if is_instance_valid(target_avatar) and target_avatar.has_method("show_skill_banner"):
+			target_avatar.show_skill_banner("DẠ TRẠCH", 2.0)
+		AudioManager.play_skill()
+		_add_log("🌙 [DẠ TRẠCH] %s không có bài trên tay nên miễn nhiễm với đòn Trảm!" % tgt["name"])
+		if not is_network_mode:
+			_restore_turn_timer_to_attacker(attacker_seat, target_seat)
+		return
+
 	atk["last_slash_suit"] = slash_card_suit
 	var has_thuan_thien = _has_equipped_weapon_name(atk, "Kiếm Thuận Thiên")
 	var tran_nam_bypass := _hero_has_skill(atk, "tran_nam") and damage_element == "NORMAL" and slash_card_suit in ["Spade", "Club"]
@@ -7320,6 +7524,8 @@ func _on_dodge_khien_may_clicked() -> void:
 		_add_log("🛡️ [Khiên Mây Bện] Bạn kích hoạt lật phán xét [%s %s] (ĐỎ) -> Hóa giải đòn đánh thành công!" % [suit_sym, rank_str])
 		AudioManager.play_voice("Đỡ")
 		AudioManager.play_parry()
+		if DailyQuestSystem:
+			DailyQuestSystem.record_progress("dodge", 1)
 
 		dodge_modal.visible = false
 		is_waiting_dodge = false
@@ -7443,6 +7649,13 @@ func _on_dodge_confirmed() -> void:
 		custom_reaction_callback = Callable()
 		last_custom_reaction_card_info = card_info
 		_animate_showcase_card(c_name, "Bạn dùng [%s %s %s]." % [suit_sym, rank_str, c_name], card_info)
+		if DailyQuestSystem:
+			if "trảm" in c_name.to_lower():
+				DailyQuestSystem.record_progress("slash", 1)
+			elif "đỡ" in c_name.to_lower():
+				DailyQuestSystem.record_progress("dodge", 1)
+			elif "diệu kế" in c_name.to_lower() or int(card_info.get("cat", -1)) in [2, 3]:
+				DailyQuestSystem.record_progress("trick", 1)
 		if AudioManager.has_voice(c_name):
 			AudioManager.play_voice(c_name)
 		elif not current_reaction_required_type.is_empty() and AudioManager.has_voice(current_reaction_required_type):
@@ -7474,15 +7687,21 @@ func _on_dodge_confirmed() -> void:
 	if is_dieu_ke:
 		_animate_showcase_card(c_name, "Bạn dùng [%s %s %s] hóa giải mưu kế!" % [suit_sym, rank_str, c_name], card_info)
 		_add_log("📜 Bạn đã dùng lá [%s %s %s] hóa giải mưu kế thành công!" % [suit_sym, rank_str, c_name])
+		if DailyQuestSystem:
+			DailyQuestSystem.record_progress("trick", 1)
 	elif is_tram_reaction:
 		_animate_showcase_card(c_name, "Bạn dùng [%s %s %s] đáp trả đòn đánh!" % [suit_sym, rank_str, c_name], card_info)
 		_add_log("⚔️ Bạn đã dùng lá [%s %s %s] đáp trả đòn đánh thành công!" % [suit_sym, rank_str, c_name])
+		if DailyQuestSystem:
+			DailyQuestSystem.record_progress("slash", 1)
 	elif is_discard_reaction:
 		_animate_showcase_card(c_name, "Bạn bỏ [%s %s %s] hưởng ứng Hịch Tướng Sĩ." % [suit_sym, rank_str, c_name], card_info)
 		_add_log("📣 Bạn đã bỏ lá [%s %s %s] hưởng ứng Hịch Tướng Sĩ!" % [suit_sym, rank_str, c_name])
 	else:
 		_animate_showcase_card(c_name, "Bạn dùng [%s %s %s] hóa giải đòn Trảm!" % [suit_sym, rank_str, c_name], card_info)
 		_add_log("🛡️ Bạn đã tự chọn dùng lá [%s %s %s] hóa giải đòn Trảm thành công!" % [suit_sym, rank_str, c_name])
+		if DailyQuestSystem:
+			DailyQuestSystem.record_progress("dodge", 1)
 
 	if AudioManager.has_voice(c_name):
 		AudioManager.play_voice(c_name)
@@ -7534,6 +7753,13 @@ func _on_dodge_passed() -> void:
 		custom_reaction_callback = Callable()
 		last_custom_reaction_card_info = {}
 		cb.call(false, {})
+		return
+
+	if is_network_mode and current_server_phase == "AWAIT_DAN_CAU":
+		NetworkClient.send_respond_action(false, "")
+		_add_log("🌉 Bạn từ chối Trảm theo Dẫn Cầu, để Kiều Công Tiễn cướp 2 lá.")
+		reaction_submission_pending = true
+		reaction_submission_version = last_server_version
 		return
 
 	if is_network_mode and current_server_phase == "AWAIT_DRUM_CHOICE":
@@ -7619,7 +7845,7 @@ func _calculate_distance(seat_a: int, seat_b: int) -> int:
 	if seat_a == seat_b:
 		return 0
 	var living_seats: Array[int] = []
-	for seat in [1, 2, 3, 4]:
+	for seat in range(1, battle_seat_count + 1):
 		if generals_data.has(seat) and generals_data[seat].get("is_alive", true) and generals_data[seat].get("hp", 0) > 0:
 			living_seats.append(seat)
 	var from_index = living_seats.find(seat_a)
@@ -7807,7 +8033,7 @@ func _apply_damage_to_general(target_seat: int, amount: int, attacker_seat: int 
 			tgt["avatar_node"].set_chained(false)
 		# Lan theo vòng chơi, bắt đầu từ người kế tiếp người nhận sát thương.
 		for step in range(1, 4):
-			var other_seat = ((target_seat - 1 + step) % 4) + 1
+			var other_seat = ((target_seat - 1 + step) % battle_seat_count) + 1
 			if not generals_data.has(other_seat):
 				continue
 			var other = generals_data[other_seat]
@@ -7868,8 +8094,8 @@ func _prompt_near_death_check(victim_seat: int) -> void:
 	near_death_victim_seat = victim_seat
 	near_death_asker_queue.clear()
 	var start_seat = current_turn_seat if current_turn_seat > 0 else my_seat
-	for offset in range(4):
-		var asker_seat = ((start_seat - 1 + offset) % 4) + 1
+	for offset in range(battle_seat_count):
+		var asker_seat = ((start_seat - 1 + offset) % battle_seat_count) + 1
 		if not generals_data.has(asker_seat):
 			continue
 		var asker = generals_data[asker_seat]
@@ -7910,6 +8136,9 @@ func _advance_near_death_rescue() -> void:
 		return
 	var asker = generals_data[asker_seat]
 	if not asker.get("is_alive", false) and asker_seat != victim_seat:
+		_advance_near_death_rescue()
+		return
+	if asker_seat != victim_seat and asker.get("isDragon", false) != victim.get("isDragon", false):
 		_advance_near_death_rescue()
 		return
 
@@ -7969,6 +8198,8 @@ func _on_rescue_confirmed() -> void:
 	_broadcast_player_battle_action("RESCUE_RESPONSE", c_id, victim_seat)
 	_animate_showcase_card(c_name, "Bạn cứu sống %s (+1 Máu)!" % victim["name"], info)
 	_add_log("💮 Bạn dùng [%s] cứu sống %s!" % [c_name, victim["name"]])
+	if c_name == "Bánh Chưng" and DailyQuestSystem:
+		DailyQuestSystem.record_progress("heal", 1)
 	AudioManager.play_voice(c_name)
 	AudioManager.play_skill()
 	victim["hp"] = min(victim["max_hp"], victim["hp"] + 1)
@@ -8000,12 +8231,42 @@ func _handle_general_death(seat_num: int) -> void:
 		g["avatar_node"].set_near_death(false)
 		g["avatar_node"].set_defeated(true)
 	_add_log("☠️ Tướng %s (Ghế %d) đã ngã xuống trên chiến trường!" % [g["name"], seat_num])
+	if seat_num == my_seat:
+		_show_dead_player_exit()
+
+func _show_dead_player_exit() -> void:
+	if exit_battle_btn and is_instance_valid(exit_battle_btn):
+		return
+	_clear_normal_hand_selection()
+	for child in hand_container.get_children():
+		child.queue_free()
+	card_play_btn.visible = false
+	end_turn_btn.visible = false
+	hich_recast_btn.visible = false
+	desc_text.text = "☠️ Bạn đã Tử trận. Trận đấu vẫn tiếp tục cho đến khi có kết quả."
+	exit_battle_btn = Button.new()
+	exit_battle_btn.text = "🚪 THOÁT TRẬN"
+	exit_battle_btn.custom_minimum_size = Vector2(230, 54)
+	exit_battle_btn.position = Vector2(285, 52)
+	exit_battle_btn.focus_mode = Control.FOCUS_NONE
+	exit_battle_btn.add_theme_font_size_override("font_size", 16)
+	exit_battle_btn.pressed.connect(_on_exit_battle_clicked)
+	hand_container.add_child(exit_battle_btn)
+
+func _on_exit_battle_clicked() -> void:
+	# Giữ kết nối để nhận trạng thái FINISHED và hiển thị kết quả tua nhanh.
+	if exit_battle_btn and is_instance_valid(exit_battle_btn):
+		exit_battle_btn.disabled = true
+		exit_battle_btn.text = "⏩ ĐANG TUA NHANH..."
+	desc_text.text = "⏩ Bạn đã thoát lượt điều khiển. Đang chờ các AI kết thúc trận đấu..."
+	if NetworkClient and NetworkClient.is_connected_to_server:
+		NetworkClient.send_fast_forward_match()
 
 func _check_victory_condition() -> void:
 	var dragon_alive = 0
 	var phoenix_alive = 0
 
-	for s_num in [1, 2, 3, 4]:
+	for s_num in range(1, battle_seat_count + 1):
 		var g = generals_data[s_num]
 		if g["is_alive"]:
 			if g["isDragon"]:
@@ -8021,6 +8282,10 @@ func _check_victory_condition() -> void:
 func _show_victory_defeat_modal(is_win: bool) -> void:
 	if not victory_defeat_modal:
 		return
+	if match_result_recorded:
+		victory_defeat_modal.visible = true
+		return
+	match_result_recorded = true
 
 	victory_defeat_modal.visible = true
 
@@ -8037,11 +8302,25 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 	var res = RankSystem.process_match_result(is_win, cur_rank_idx, cur_stars, cur_acc)
 
 	# 3. Cập nhật và lưu ngay lập tức vào AuthManager
+	if DailyQuestSystem:
+		DailyQuestSystem.record_progress("battle", 1)
+		if is_win:
+			DailyQuestSystem.record_progress("win", 1)
+
+	var exp_result: Dictionary = {}
 	if AuthManager:
 		AuthManager.current_2v2_rank_index = res["rank_index"]
 		AuthManager.current_2v2_stars = res["stars"]
 		AuthManager.current_2v2_accumulation_points = res["accumulation_points"]
-		AuthManager.current_exp += 150 if is_win else 50
+		if is_win:
+			AuthManager.current_wins += 1
+		else:
+			AuthManager.current_losses += 1
+		var exp_gain: int = 20 if is_win else 12
+		if AuthManager.has_method("add_exp"):
+			exp_result = AuthManager.add_exp(exp_gain)
+		else:
+			AuthManager.current_exp += exp_gain
 		AuthManager.current_silver += 300 if is_win else 100
 		AuthManager.save_profile_to_appwrite()
 
@@ -8294,10 +8573,16 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 	vbox.add_child(rewards_hbox)
 
 	var exp_lbl = Label.new()
-	exp_lbl.text = "🎁 +%d EXP" % (150 if is_win else 50)
+	exp_lbl.text = "🎁 +%d EXP" % (20 if is_win else 12)
 	exp_lbl.add_theme_font_size_override("font_size", 13)
 	exp_lbl.add_theme_color_override("font_color", Color(0.4, 0.9, 1.0))
 	rewards_hbox.add_child(exp_lbl)
+	if not exp_result.is_empty() and bool(exp_result.get("leveled_up", false)):
+		var level_lbl = Label.new()
+		level_lbl.text = "🎉 LÊN CẤP %d" % int(exp_result.get("new_level", 1))
+		level_lbl.add_theme_font_size_override("font_size", 13)
+		level_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.25))
+		rewards_hbox.add_child(level_lbl)
 
 	var silver_lbl = Label.new()
 	silver_lbl.text = "🪙 +%d Bạc" % (300 if is_win else 100)
@@ -8450,7 +8735,7 @@ func _on_return_home_clicked() -> void:
 
 func _is_ai_controller() -> bool:
 	var lowest_human_seat = 99
-	for s in [1, 2, 3, 4]:
+	for s in range(1, battle_seat_count + 1):
 		if generals_data.has(s):
 			var g = generals_data[s]
 			if g.get("is_alive", false) and not g.get("isAI", false) and s < lowest_human_seat:
@@ -8482,10 +8767,11 @@ func _start_turn(seat_num: int) -> void:
 		wine_used_this_turn = false
 	is_discard_phase = false
 	cards_to_discard_count = 0
-	_add_log("📜 [LƯỢT %d] Tướng %s (%s) bước vào lượt chiến đấu." % [seat_num, g["name"], "Phe Rồng" if g["isDragon"] else "Phe Phượng"])
+	var turn_role := "VƯƠNG" if str(g.get("role", "")) == "KING" else "?"
+	_add_log("📜 [LƯỢT %d] Tướng %s (%s) bước vào lượt chiến đấu." % [seat_num, g["name"], turn_role])
 
 	# Kích hoạt 3 dấu chấm viền chạy quanh và đồng hồ đếm ngược trên đầu avatar tướng
-	for s in [1, 2, 3, 4]:
+	for s in range(1, battle_seat_count + 1):
 		if generals_data.has(s) and generals_data[s].has("avatar_node"):
 			var is_active = (s == seat_num and generals_data[s]["is_alive"])
 			generals_data[s]["avatar_node"].set_turn_active(is_active)
@@ -8962,7 +9248,7 @@ func _execute_ai_turn(ai_seat: int) -> void:
 
 	# 3. AI dùng Cẩm Nang nếu có
 	var enemies = []
-	for s in [1, 2, 3, 4]:
+	for s in range(1, battle_seat_count + 1):
 		var other = generals_data[s]
 		if other["is_alive"] and other["isDragon"] != ai_gen["isDragon"]:
 			enemies.append(s)
@@ -9003,7 +9289,7 @@ func _execute_ai_turn(ai_seat: int) -> void:
 
 		if c_name == "Thủy Triều Rút":
 			var tide_targets: Array = []
-			for target_s in [1, 2, 3, 4]:
+			for target_s in range(1, battle_seat_count + 1):
 				if target_s != ai_seat and generals_data.has(target_s) and generals_data[target_s].get("is_alive", false) and int(generals_data[target_s].get("hand_count", 0)) > 0:
 					tide_targets.append(target_s)
 			if not tide_targets.is_empty():
@@ -9213,46 +9499,59 @@ func _execute_ai_turn(ai_seat: int) -> void:
 
 		if slash_idx >= 0:
 			var slash_card = ai_gen["hand_cards"][slash_idx]
-			ai_gen["hand_cards"].remove_at(slash_idx)
-			ai_gen["hand_count"] = ai_gen["hand_cards"].size()
-			ai_gen["avatar_node"].update_hand_count(ai_gen["hand_count"])
+			var card_name = slash_card.get("name", "Trảm")
+			var elem = "NORMAL"
+			if "Hỏa" in card_name: elem = "FIRE"
+			elif "Thủy" in card_name or "Lôi" in card_name: elem = "WATER" # Accept old card names.
 
-			if ai_gen.get("has_bai_coc", false):
-				if not await _resolve_local_bai_coc_action(ai_seat, ai_seat):
-					slash_idx = -1
+			# Lọc các mục tiêu hợp lệ: trong tầm đánh và không bị Dạ Trạch chặn khi Triệu Quang Phục không có bài
+			var valid_slash_targets: Array = []
+			for e_seat in enemies:
+				if _is_da_trach_slash_blocked(e_seat):
+					continue
+				var dist = _calculate_distance(ai_seat, e_seat)
+				var max_r = _get_attack_range(ai_seat)
+				var water_bach_dang = ("Thủy" in card_name and ai_gen.get("equipped_off_horse", "") == "Thuyền Bạch Đằng")
+				if dist <= max_r or water_bach_dang:
+					valid_slash_targets.append(e_seat)
 
-			if slash_idx >= 0 and ai_gen.get("is_alive", false) and not is_game_over:
-				var chosen_tgt_seat = enemies.pick_random()
-				for e_seat in enemies:
-					if e_seat == my_seat and randf() < 0.6:
-						chosen_tgt_seat = e_seat
-						break
+			if not valid_slash_targets.is_empty():
+				ai_gen["hand_cards"].remove_at(slash_idx)
+				ai_gen["hand_count"] = ai_gen["hand_cards"].size()
+				ai_gen["avatar_node"].update_hand_count(ai_gen["hand_count"])
 
-				var tgt_gen = generals_data[chosen_tgt_seat]
-				var card_name = slash_card.get("name", "Trảm")
-				var elem = "NORMAL"
-				if "Hỏa" in card_name: elem = "FIRE"
-				elif "Thủy" in card_name or "Lôi" in card_name: elem = "WATER" # Accept old card names.
+				if ai_gen.get("has_bai_coc", false):
+					if not await _resolve_local_bai_coc_action(ai_seat, ai_seat):
+						slash_idx = -1
 
-				AudioManager.play_voice(card_name)
-				AudioManager.play_slash()
-				_broadcast_player_battle_action("PLAY_CARD", card_name, chosen_tgt_seat, ai_seat)
-				_animate_showcase_card(card_name, "%s dùng [%s] tấn công %s!" % [ai_gen["name"], card_name, tgt_gen["name"]], slash_card)
-				_add_log("⚔️ %s (Ghế %d) dùng [%s] lên %s (Ghế %d)." % [ai_gen["name"], ai_seat, card_name, tgt_gen["name"], chosen_tgt_seat])
-				_play_smart_card_rays(card_name, ai_seat, [chosen_tgt_seat])
+				if slash_idx >= 0 and ai_gen.get("is_alive", false) and not is_game_over:
+					var chosen_tgt_seat = valid_slash_targets.pick_random()
+					for e_seat in valid_slash_targets:
+						if e_seat == my_seat and randf() < 0.6:
+							chosen_tgt_seat = e_seat
+							break
 
-				var ai_slash_suit = slash_card.get("suit", "Spade")
-				var ai_slash_damage = 1
-				if ai_gen.get("is_wine_buff_active", false):
-					ai_slash_damage += 1
-					ai_gen["is_wine_buff_active"] = false
-				await _handle_slash_attack(ai_seat, chosen_tgt_seat, ai_slash_damage, elem, ai_slash_suit)
+					var tgt_gen = generals_data[chosen_tgt_seat]
 
-				if chosen_tgt_seat == my_seat:
-					while is_waiting_dodge and not is_game_over:
-						await get_tree().create_timer(0.3).timeout
-				else:
-					await _wait_for_ai_card_play()
+					AudioManager.play_voice(card_name)
+					AudioManager.play_slash()
+					_broadcast_player_battle_action("PLAY_CARD", card_name, chosen_tgt_seat, ai_seat)
+					_animate_showcase_card(card_name, "%s dùng [%s] tấn công %s!" % [ai_gen["name"], card_name, tgt_gen["name"]], slash_card)
+					_add_log("⚔️ %s (Ghế %d) dùng [%s] lên %s (Ghế %d)." % [ai_gen["name"], ai_seat, card_name, tgt_gen["name"], chosen_tgt_seat])
+					_play_smart_card_rays(card_name, ai_seat, [chosen_tgt_seat])
+
+					var ai_slash_suit = slash_card.get("suit", "Spade")
+					var ai_slash_damage = 1
+					if ai_gen.get("is_wine_buff_active", false):
+						ai_slash_damage += 1
+						ai_gen["is_wine_buff_active"] = false
+					await _handle_slash_attack(ai_seat, chosen_tgt_seat, ai_slash_damage, elem, ai_slash_suit)
+
+					if chosen_tgt_seat == my_seat:
+						while is_waiting_dodge and not is_game_over:
+							await get_tree().create_timer(0.3).timeout
+					else:
+						await _wait_for_ai_card_play()
 
 	# 5. AI Discard Phase (Bỏ bài thừa)
 	var ai_hand_limit = _get_general_hand_limit(ai_gen)
@@ -9466,8 +9765,8 @@ func _finish_player_end_turn(send_network_end_turn: bool = true) -> void:
 		_next_turn()
 
 func _get_next_alive_seat(current_seat: int) -> int:
-	for step in range(1, 4):
-		var next_s = ((current_seat - 1 + step) % 4) + 1
+	for step in range(1, battle_seat_count + 1):
+		var next_s = ((current_seat - 1 + step) % battle_seat_count) + 1
 		if generals_data.has(next_s) and generals_data[next_s].get("is_alive", false):
 			return next_s
 	return -1
@@ -9755,7 +10054,7 @@ func _next_turn() -> void:
 		generals_data[current_turn_seat]["wine_used_this_turn"] = false
 	var next_seat = _get_next_alive_seat(current_turn_seat)
 	if next_seat <= 0:
-		next_seat = (current_turn_seat % 4) + 1
+		next_seat = (current_turn_seat % battle_seat_count) + 1
 	_start_turn(next_seat)
 
 func _ensure_showcase_layer() -> void:
@@ -10515,7 +10814,7 @@ func _execute_aoe_attack(caster_seat: int, aoe_name: String, required_card_name:
 
 	var victims_order: Array = []
 	for i in range(1, 4):
-		var s = ((caster_seat - 1 + i) % 4) + 1
+		var s = ((caster_seat - 1 + i) % battle_seat_count) + 1
 		if generals_data.has(s) and generals_data[s]["is_alive"]:
 			victims_order.append(s)
 
@@ -10728,7 +11027,7 @@ func _execute_harvest(caster_seat: int) -> void:
 	var pool: Array = []
 	var pickers: Array = []
 	for i in range(0, 4):
-		var s = ((caster_seat - 1 + i) % 4) + 1
+		var s = ((caster_seat - 1 + i) % battle_seat_count) + 1
 		if generals_data.has(s) and generals_data[s]["is_alive"]:
 			pickers.append(s)
 			pool.append(_draw_card_from_pile())
@@ -11000,7 +11299,7 @@ func _show_iron_chain_modal() -> void:
 	for child in iron_chain_grid.get_children():
 		child.queue_free()
 
-	for s in [1, 2, 3, 4]:
+	for s in range(1, battle_seat_count + 1):
 		if not generals_data.has(s):
 			continue
 		var g = generals_data[s]
@@ -11095,7 +11394,7 @@ func _update_iron_chain_ui() -> void:
 	iron_chain_confirm_btn.text = "⛓️ XÁC NHẬN XÍCH (%d TƯỚNG)" % count if count > 0 else "🔄 ĐỔI LÁ XÍCH (RÚT 1)"
 
 	var child_idx = 0
-	for s in [1, 2, 3, 4]:
+	for s in range(1, battle_seat_count + 1):
 		if not generals_data.has(s) or not generals_data[s]["is_alive"]:
 			continue
 		if child_idx < iron_chain_grid.get_child_count():

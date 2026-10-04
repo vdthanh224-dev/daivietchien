@@ -40,7 +40,9 @@ const MODE_RULES = Object.freeze({
     teamForSeat: (seat) => Number(seat) % 2 === 1 ? "dragon" : "phoenix",
     isAllyForSeat: (seat) => Number(seat) % 2 === 1,
     teamLabel: (teamId) => teamId === "dragon" ? "Phe Rồng (Đội 1)" : "Phe Phượng (Đội 2)"
-  })
+  }),
+  "dynasty_5": Object.freeze({ id: "dynasty_5", minPlayers: 5, maxPlayers: 5, deckSize: 100, victory: "DYNASTY_ROLES", roleDistribution: ["KING", "LOYALIST", "REBEL", "REBEL", "SPY"], teamForSeat: () => "dynasty", isAllyForSeat: (seat) => Number(seat) === 1, teamLabel: () => "Vương Triều" }),
+  "dynasty_8": Object.freeze({ id: "dynasty_8", minPlayers: 8, maxPlayers: 8, deckSize: 150, victory: "DYNASTY_ROLES", roleDistribution: ["KING", "LOYALIST", "REBEL", "REBEL", "SPY", "LOYALIST", "REBEL", "REBEL"], teamForSeat: () => "dynasty", isAllyForSeat: (seat) => Number(seat) === 1, teamLabel: () => "Vương Triều" })
 });
 
 export function getModeRules(modeId = "2v2") {

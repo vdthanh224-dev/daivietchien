@@ -277,7 +277,7 @@ func _handle_server_message(raw_json: String) -> void:
 
 	if msg_type == "DRAFT_JOINED":
 		var assigned_seat = int(data.get("assignedSeat", data.get("seat", 0)))
-		if assigned_seat >= 1 and assigned_seat <= 4:
+		if assigned_seat >= 1 and assigned_seat <= 8:
 			my_seat = assigned_seat
 			print("[NetworkClient] Server cấp ghế chọn tướng: Ghế %d" % my_seat)
 			draft_joined.emit(my_seat)
@@ -333,7 +333,7 @@ func send_json(dict: Dictionary) -> void:
 	else:
 		print("[NetworkClient] Cảnh báo: Socket chưa sẵn sàng để gửi!")
 
-func send_join_draft(target_room: String, seat: int, user_id: String, user_name: String, slots_data: Array = []) -> void:
+func send_join_draft(target_room: String, seat: int, user_id: String, user_name: String, slots_data: Array = [], mode_id: String = "2v2") -> void:
 	room_id = target_room
 	my_seat = seat
 	last_processed_action_seq = -1
@@ -342,7 +342,8 @@ func send_join_draft(target_room: String, seat: int, user_id: String, user_name:
 		"roomId": target_room,
 		"seat": seat,
 		"userId": user_id,
-		"userName": user_name
+		"userName": user_name,
+		"modeId": mode_id
 	}
 	if not slots_data.is_empty():
 		payload["slots"] = slots_data
@@ -476,4 +477,13 @@ func send_end_turn_for_seat(seat_num: int) -> void:
 		"action": "END_TURN",
 		"roomId": room_id,
 		"seat": seat_num
+	})
+
+func send_fast_forward_match() -> void:
+	if room_id.is_empty():
+		return
+	send_json({
+		"action": "FAST_FORWARD_MATCH",
+		"roomId": room_id,
+		"seat": my_seat
 	})

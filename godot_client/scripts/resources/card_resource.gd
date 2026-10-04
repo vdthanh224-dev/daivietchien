@@ -59,6 +59,51 @@ func get_artwork_path() -> String:
 	if icon_path != "" and ResourceLoader.exists(icon_path):
 		return icon_path
 
+	var n = card_name.to_lower()
+
+	# 1. Khớp ưu tiên theo tên lá bài (card_name) để đảm bảo hình ảnh luôn đúng chuẩn với tên hiển thị
+	if "hỏa" in n and "trảm" in n: return "res://assets/ui/cards/card_slash_fire.png"
+	elif ("thủy" in n or "thuy" in n) and ("trảm" in n or "tram" in n): return "res://assets/ui/cards/card_slash_water.png"
+	elif "sấm" in n and "trảm" in n: return "res://assets/ui/cards/card_slash_thunder.png"
+	elif "trảm" in n: return "res://assets/ui/cards/card_slash.png"
+	elif "đỡ" in n: return "res://assets/ui/cards/card_dodge.png"
+	elif "bánh chưng" in n: return "res://assets/ui/cards/card_banh_chung.png"
+	elif "rượu" in n: return "res://assets/ui/cards/card_wine.png"
+	elif "khiên mây" in n: return "res://assets/ui/cards/card_armor_khien_may.png"
+	elif "giáp đồng" in n: return "res://assets/ui/cards/card_armor_giap_dong.png"
+	elif "áo bào" in n: return "res://assets/ui/cards/card_armor_ao_bao.png"
+	elif "nỏ thần" in n: return "res://assets/ui/cards/card_weapon_no_than.png"
+	elif "song cung" in n: return "res://assets/ui/cards/card_weapon_song_cung.png"
+	elif "thuận thiên" in n: return "res://assets/ui/cards/card_weapon_thuan_thien.png"
+	elif "trường đao" in n: return "res://assets/ui/cards/card_weapon_truong_dao.png"
+	elif "thương ngâu" in n: return "res://assets/ui/cards/card_weapon_thuong_ngau.png"
+	elif "súng thần công" in n: return "res://assets/ui/cards/card_weapon_sung_than_cong.png"
+	elif "voi chiến" in n: return "res://assets/ui/cards/card_mount_voi_chien.png"
+	elif "ngựa trắng" in n: return "res://assets/ui/cards/card_mount_ngua_trang.png"
+	elif "trống đồng" in n or "trong dong" in n or "bảo vật" in n: return "res://assets/ui/cards/card_treasure_trong_dong.png"
+	elif "diệu kế" in n: return "res://assets/ui/cards/card_flawless.png"
+	elif "xích" in n or "tỏa" in n: return "res://assets/ui/cards/card_iron_chain.png"
+	elif "vạn tiễn" in n or "mưa tên" in n or "mua ten" in n: return "res://assets/ui/cards/card_arrow_rain.png"
+	elif "giặc tới" in n or "giac toi" in n: return "res://assets/ui/cards/card_giac_toi.png"
+	elif "bãi cọc bạch đằng" in n or "bai coc bach dang" in n: return "res://assets/ui/cards/card_bai_coc_bach_dang.png"
+	elif "bãi cọc" in n or "bai coc" in n: return "res://assets/ui/cards/card_bai_coc_bach_dang.png"
+	elif "quyết đấu" in n or "thách đấu" in n or "thach dau" in n or "huyết chiến" in n or "huyet chien" in n: return "res://assets/ui/cards/card_duel.png"
+	elif "mở kho" in n or "ngũ cốc" in n or "mo kho" in n: return "res://assets/ui/cards/card_harvest.png"
+	elif "thủy triều" in n or "thuy trieu" in n: return "res://assets/ui/cards/card_thuy_trieu_rut.png"
+	elif "mượn gươm" in n or "muon guom" in n: return "res://assets/ui/cards/card_muon_guom.png"
+	elif "mở yến tiệc" in n or "mo yen tiec" in n: return "res://assets/ui/cards/card_mo_yen_tiec.png"
+	elif "hịch tướng sĩ" in n or "hich tuong si" in n: return "res://assets/ui/cards/card_hich_tuong_si.png"
+	elif "khổ nhục" in n or "kho nhuc" in n: return "res://assets/ui/cards/card_ex_nihilo.png"
+	elif "tẩu vi" in n or "tau vi" in n: return "res://assets/ui/cards/card_dismantle.png"
+	elif "phủ để" in n or "phu de" in n: return "res://assets/ui/cards/card_dismantle.png"
+	elif "vườn không" in n: return "res://assets/ui/cards/card_dismantle.png"
+	elif "đột kích" in n: return "res://assets/ui/cards/card_snatch.png"
+	elif "đại hồng thủy" in n or "dai hong thuy" in n or "thần sấm" in n or "sấm sét" in n: return "res://assets/ui/cards/card_dai_hong_thuy.png"
+	elif "dụng binh" in n or "vô trung" in n or "sinh hữu" in n: return "res://assets/ui/cards/card_ex_nihilo.png"
+	elif "trầm ảo" in n or "lạc bất" in n: return "res://assets/ui/cards/card_acedia.png"
+	elif "cắt lương" in n or "cắt đường" in n or "cat luong" in n: return "res://assets/ui/cards/card_supply_shortage.png"
+
+	# 2. Khớp theo sub_type nếu tên lá bài chưa nhận diện được
 	match sub_type:
 		CardSubType.TRAM: return "res://assets/ui/cards/card_slash.png"
 		CardSubType.TRAM_HOA: return "res://assets/ui/cards/card_slash_fire.png"
@@ -67,12 +112,10 @@ func get_artwork_path() -> String:
 		CardSubType.BANH_CHUNG: return "res://assets/ui/cards/card_banh_chung.png"
 		CardSubType.HU_RUOU: return "res://assets/ui/cards/card_wine.png"
 		CardSubType.AO_GIAP:
-			var n = card_name.to_lower()
 			if "khiên mây" in n or "khien may" in n: return "res://assets/ui/cards/card_armor_khien_may.png"
 			elif "áo bào" in n or "ao bao" in n: return "res://assets/ui/cards/card_armor_ao_bao.png"
 			else: return "res://assets/ui/cards/card_armor_giap_dong.png"
 		CardSubType.VU_KHI:
-			var n = card_name.to_lower()
 			if "song cung" in n: return "res://assets/ui/cards/card_weapon_song_cung.png"
 			elif "nỏ thần" in n or "no than" in n: return "res://assets/ui/cards/card_weapon_no_than.png"
 			elif "trường đao" in n or "truong dao" in n: return "res://assets/ui/cards/card_weapon_truong_dao.png"
@@ -103,49 +146,7 @@ func get_artwork_path() -> String:
 		CardSubType.TAU_VI_THUONG_SACH: return "res://assets/ui/cards/card_dismantle.png"
 		CardSubType.PHU_DE_TRUU_TAN: return "res://assets/ui/cards/card_dismantle.png"
 
-	# Fallback theo tên nếu sub_type chưa khớp
-	var n = card_name.to_lower()
-	if "hỏa" in n and "trảm" in n: return "res://assets/ui/cards/card_slash_fire.png"
-	elif ("thủy" in n or "thuy" in n) and ("trảm" in n or "tram" in n): return "res://assets/ui/cards/card_slash_water.png"
-	elif "trảm" in n: return "res://assets/ui/cards/card_slash.png"
-	elif "đỡ" in n: return "res://assets/ui/cards/card_dodge.png"
-	elif "bánh chưng" in n: return "res://assets/ui/cards/card_banh_chung.png"
-	elif "rượu" in n: return "res://assets/ui/cards/card_wine.png"
-	elif "khiên mây" in n: return "res://assets/ui/cards/card_armor_khien_may.png"
-	elif "giáp đồng" in n: return "res://assets/ui/cards/card_armor_giap_dong.png"
-	elif "áo bào" in n: return "res://assets/ui/cards/card_armor_ao_bao.png"
-	elif "nỏ thần" in n: return "res://assets/ui/cards/card_weapon_no_than.png"
-	elif "song cung" in n: return "res://assets/ui/cards/card_weapon_song_cung.png"
-	elif "thuận thiên" in n: return "res://assets/ui/cards/card_weapon_thuan_thien.png"
-	elif "trường đao" in n: return "res://assets/ui/cards/card_weapon_truong_dao.png"
-	elif "thương ngâu" in n: return "res://assets/ui/cards/card_weapon_thuong_ngau.png"
-	elif "súng thần công" in n: return "res://assets/ui/cards/card_weapon_sung_than_cong.png"
-	elif "voi chiến" in n: return "res://assets/ui/cards/card_mount_voi_chien.png"
-	elif "ngựa trắng" in n: return "res://assets/ui/cards/card_mount_ngua_trang.png"
-	elif "trống đồng" in n or "trong dong" in n: return "res://assets/ui/cards/card_treasure_trong_dong.png"
-	elif "diệu kế" in n: return "res://assets/ui/cards/card_flawless.png"
-	elif "xích" in n or "tỏa" in n: return "res://assets/ui/cards/card_iron_chain.png"
-	elif "vạn tiễn" in n or "mưa tên" in n or "mua ten" in n: return "res://assets/ui/cards/card_arrow_rain.png"
-	elif "giặc tới" in n or "giac toi" in n: return "res://assets/ui/cards/card_giac_toi.png"
-	elif "bãi cọc bạch đằng" in n or "bai coc bach dang" in n: return "res://assets/ui/cards/card_bai_coc_bach_dang.png"
-	elif "bãi cọc" in n or "bai coc" in n: return "res://assets/ui/cards/card_bai_coc_bach_dang.png"
-	elif "quyết đấu" in n or "thách đấu" in n or "thach dau" in n or "huyết chiến" in n or "huyet chien" in n: return "res://assets/ui/cards/card_duel.png"
-	elif "mở kho" in n or "ngũ cốc" in n or "mo kho" in n: return "res://assets/ui/cards/card_harvest.png"
-	elif "thủy triều" in n or "thuy trieu" in n: return "res://assets/ui/cards/card_thuy_trieu_rut.png"
-	elif "mượn gươm" in n or "muon guom" in n: return "res://assets/ui/cards/card_muon_guom.png"
-	elif "mở yến tiệc" in n or "mo yen tiec" in n: return "res://assets/ui/cards/card_mo_yen_tiec.png"
-	elif "hịch tướng sĩ" in n or "hich tuong si" in n: return "res://assets/ui/cards/card_hich_tuong_si.png"
-	elif "khổ nhục" in n or "kho nhuc" in n: return "res://assets/ui/cards/card_ex_nihilo.png"
-	elif "tẩu vi" in n or "tau vi" in n: return "res://assets/ui/cards/card_dismantle.png"
-	elif "phủ để" in n or "phu de" in n: return "res://assets/ui/cards/card_dismantle.png"
-	elif "vườn không" in n: return "res://assets/ui/cards/card_dismantle.png"
-	elif "đột kích" in n: return "res://assets/ui/cards/card_snatch.png"
-	elif "đại hồng thủy" in n or "dai hong thuy" in n or "thần sấm" in n or "sấm sét" in n: return "res://assets/ui/cards/card_dai_hong_thuy.png"
-	elif "dụng binh" in n or "vô trung" in n or "sinh hữu" in n: return "res://assets/ui/cards/card_ex_nihilo.png"
-	elif "trầm ảo" in n or "lạc bất" in n: return "res://assets/ui/cards/card_acedia.png"
-	elif "cắt lương" in n or "cắt đường" in n or "cat luong" in n: return "res://assets/ui/cards/card_supply_shortage.png"
-
-	return ""
+	return "res://assets/ui/cards/card_slash.png"
 
 func get_suit_symbol() -> String:
 	match suit.to_lower():

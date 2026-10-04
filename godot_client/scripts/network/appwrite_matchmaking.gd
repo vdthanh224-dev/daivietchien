@@ -88,11 +88,12 @@ func encode_room_string(room: Dictionary) -> String:
 	var h_uid = sanitize(room.get("hostUserId", ""), 60)
 	var st = sanitize(room.get("status", "WAITING"), 10)
 	var ver = int(room.get("version", 1))
-
-	var parts: Array[String] = ["ROOM4", r_id, h_uid, st, str(ver)]
+	var mode_id = sanitize(room.get("modeId", "2v2"), 16)
 	var slots = room.get("slots", [])
+	var slot_count = maxi(4, slots.size())
+	var parts: Array[String] = ["ROOMV2", r_id, h_uid, st, str(ver), mode_id, str(slot_count)]
 
-	for i in range(4):
+	for i in range(slot_count):
 		if i < slots.size():
 			var s = slots[i]
 			var is_empty = bool(s.get("isEmpty", false)) or s.get("userId", "") == "" or s.get("userId", "") == "empty"
@@ -109,15 +110,22 @@ func encode_room_string(room: Dictionary) -> String:
 	return "|".join(parts)
 
 func decode_room_string(raw_str: String, doc_timestamp: int = 0, host_rp: int = 0) -> Dictionary:
-	if raw_str.is_empty() or not raw_str.begins_with("ROOM4|"):
+	if raw_str.is_empty():
 		return {}
 	var parts = raw_str.split("|")
-	if parts.size() < 8:
+	if parts.size() < 8 or (parts[0] != "ROOM4" and parts[0] != "ROOMV2"):
 		return {}
 
 	var ver = 0
+	var mode_id = "2v2"
 	var slot_start_idx = 5
-	if parts.size() >= 9 and parts[4].is_valid_int():
+	var slot_count = 4
+	if parts[0] == "ROOMV2":
+		ver = int(parts[4]) if parts[4].is_valid_int() else 0
+		mode_id = parts[5] if parts.size() > 5 else "2v2"
+		slot_count = maxi(4, int(parts[6]) if parts.size() > 6 and parts[6].is_valid_int() else 4)
+		slot_start_idx = 7
+	elif parts.size() >= 9 and parts[4].is_valid_int():
 		ver = int(parts[4])
 		slot_start_idx = 5
 	else:
@@ -128,13 +136,14 @@ func decode_room_string(raw_str: String, doc_timestamp: int = 0, host_rp: int = 
 		"hostUserId": parts[2],
 		"status": parts[3],
 		"version": ver,
+		"modeId": mode_id,
 		"hostTimestamp": doc_timestamp,
 		"updateTimestamp": doc_timestamp,
 		"hostRankPoints": host_rp,
 		"slots": []
 	}
 
-	for i in range(slot_start_idx, mini(parts.size(), slot_start_idx + 4)):
+	for i in range(slot_start_idx, mini(parts.size(), slot_start_idx + slot_count)):
 		var sub = parts[i].split(",")
 		var uid = sub[0] if sub.size() > 0 else "empty"
 		var uname = sub[1] if sub.size() > 1 else ""
@@ -200,7 +209,7 @@ func _send_http_request(url: String, method: int, body_json: String = "") -> Dic
 	}
 
 # --- 1. Find Best Waiting Room ---
-func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_diff: int = 500, my_user_name: String = "", include_room_id: String = "") -> Dictionary:
+func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_diff: int = 500, my_user_name: String = "", include_room_id: String = "", mode_id: String = "") -> Dictionary:
 	var q_equal = "{\"method\":\"equal\",\"attribute\":\"userId\",\"values\":[\"ROOM_WAITING\"]}".uri_encode()
 	var q_order = "{\"method\":\"orderDesc\",\"attribute\":\"$createdAt\"}".uri_encode()
 	var q_limit = "{\"method\":\"limit\",\"values\":[100]}".uri_encode()
@@ -221,6 +230,8 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 			continue
 		var room = decode_room_string(str(doc.get("userName", "")), doc_time, int(doc.get("rankPoints", 0)))
 		if room.is_empty() or room.get("status") != "WAITING":
+			continue
+		if not mode_id.is_empty() and str(room.get("modeId", "2v2")) != mode_id:
 			continue
 		var is_requested_room = str(room.get("roomId", "")) == include_room_id and not include_room_id.is_empty()
 		if not is_requested_room and is_same_user(str(room.get("hostUserId", "")), "", my_user_id, my_user_name):

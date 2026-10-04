@@ -242,7 +242,7 @@ func _toggle_dev_drawer() -> void:
 		AudioManager.play_sfx("sfx_card_select", -6.0)
 
 func _on_support_pressed() -> void:
-	_set_status("🎧 Tổng đài CSKH: hotro@daivietchien.vn | Hotline: 1900 8888", Color("#FFD700"))
+	_set_status("🎧 Tổng đài CSKH: vdthanh1998@gmail.com | Hotline: 0961 705 592", Color("#FFD700"))
 	if AudioManager:
 		AudioManager.play_sfx("sfx_card_select", -4.0)
 
@@ -369,13 +369,16 @@ func _on_quick_login(num: int) -> void:
 func _on_login_succeeded(user_data: Dictionary) -> void:
 	submit_btn.disabled = false
 	quick_guest_btn.disabled = false
+	# Đợi prefs Appwrite đồng bộ xong trước khi quyết định có hiện tập huấn hay không.
+	if AuthManager and AuthManager.has_signal("profile_loaded"):
+		await AuthManager.profile_loaded
 	if AudioManager:
 		AudioManager.play_sfx("sfx_levelup", 0.0)
 
 	user_account_btn.text = "👤 %s ▾" % AuthManager.current_user_name
 	_set_status("🎉 Xác thực thành công! Đang tiến vào sa trường...", Color("#10B981"))
 
-	if is_register_mode or AuthManager.should_show_onboarding():
+	if AuthManager.should_show_onboarding():
 		_show_onboarding_modal()
 	else:
 		await get_tree().create_timer(0.3).timeout
@@ -395,11 +398,13 @@ func _show_onboarding_modal() -> void:
 	var modal = OnboardingModalScene.instantiate()
 	add_child(modal)
 	modal.tutorial_chosen.connect(func():
+		is_register_mode = false
 		AuthManager.set_onboarding_done()
 		get_tree().change_scene_to_file("res://scenes/tutorial_battle.tscn")
 	)
 	modal.veteran_chosen.connect(func():
-		AuthManager.set_onboarding_done()
+		is_register_mode = false
+		AuthManager.mark_played_before()
 		_execute_entry_transition()
 	)
 
@@ -444,7 +449,6 @@ func _update_ping_display(ping_ms: int) -> void:
 	else:
 		ping_label.text = "📶 %dms" % ping_ms
 		ping_label.add_theme_color_override("font_color", Color("#EF4444"))
-	print("[AuthLogin] 📶 Ping cập nhật: %s (ms=%d)" % [ping_label.text, ping_ms])
 
 # --- DEV HELPERS ---
 

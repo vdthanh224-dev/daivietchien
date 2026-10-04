@@ -308,64 +308,64 @@ func _ready() -> void:
 		img.save_png("res://tutorial_khien_may_black_screenshot.png")
 		print("[Screenshot] Đã lưu tutorial_khien_may_black_screenshot.png!")
 		get_tree().quit()
+	elif "--screenshot-skill" in OS.get_cmdline_user_args():
+		_on_close_health_spotlight()
+		_start_step_3_slash()
+		_start_step_4_5_skill()
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var img = get_viewport().get_texture().get_image()
+		img.save_png("res://tutorial_skill_screenshot.png")
+		print("[Screenshot] Đã lưu tutorial_skill_screenshot.png!")
+		get_tree().quit()
 
 func _process(delta: float) -> void:
 	if arrow_node and arrow_node.visible:
 		arrow_time += delta * 6.0
 		var bob = sin(arrow_time) * 6.0
 		arrow_node.position = arrow_target_pos + Vector2(bob, 0)
+	if spotlight_overlay and spotlight_overlay.visible:
+		var health_bob = sin(Time.get_ticks_msec() * 0.006) * 4.0
+		var boss_arrow_img = get_node_or_null("HealthSpotlightOverlay/ArrowBossHealth/ArrowImg")
+		if boss_arrow_img:
+			boss_arrow_img.position.x = -10.0 + health_bob
+		var player_arrow_img = get_node_or_null("HealthSpotlightOverlay/ArrowPlayerHealth/ArrowImg")
+		if player_arrow_img:
+			player_arrow_img.position.x = -10.0 + health_bob
 
 func _add_log(msg: String) -> void:
 	log_text.text += "\n" + msg
 
 func _setup_spotlight_lotus_icons() -> void:
 	var lotus_full_tex = preload("res://assets/ui/lotus_full.png")
-	var boss_vbox = get_node_or_null("HealthSpotlightOverlay/BossSpotlightLotus/VBox")
-	var player_vbox = get_node_or_null("HealthSpotlightOverlay/PlayerSpotlightLotus/VBox")
+	var boss_vbox = get_node_or_null("HealthSpotlightOverlay/BossSpotlightLotus/Margin/VBox")
+	if not boss_vbox:
+		boss_vbox = get_node_or_null("HealthSpotlightOverlay/BossSpotlightLotus/VBox")
+	var player_vbox = get_node_or_null("HealthSpotlightOverlay/PlayerSpotlightLotus/Margin/VBox")
+	if not player_vbox:
+		player_vbox = get_node_or_null("HealthSpotlightOverlay/PlayerSpotlightLotus/VBox")
 
-	if boss_vbox and boss_vbox.has_node("Lotus"):
-		var old_lbl = boss_vbox.get_node("Lotus")
-		old_lbl.visible = false
-		if not boss_vbox.has_node("LotusRow"):
-			var row = HBoxContainer.new()
-			row.name = "LotusRow"
-			row.alignment = BoxContainer.ALIGNMENT_CENTER
-			row.add_theme_constant_override("separation", 4)
-			for i in range(3):
-				var tr = TextureRect.new()
-				tr.custom_minimum_size = Vector2(22, 22)
-				tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-				tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-				tr.texture = lotus_full_tex
-				row.add_child(tr)
-			var txt = Label.new()
-			txt.text = " (3/3)"
-			txt.add_theme_color_override("font_color", Color(1, 0.85, 0.5, 1))
-			txt.add_theme_font_size_override("font_size", 12)
-			row.add_child(txt)
-			boss_vbox.add_child(row)
+	if boss_vbox:
+		for c in boss_vbox.get_children():
+			c.queue_free()
+		for i in range(3):
+			var tr = TextureRect.new()
+			tr.custom_minimum_size = Vector2(20, 20)
+			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			tr.texture = lotus_full_tex
+			boss_vbox.add_child(tr)
 
-	if player_vbox and player_vbox.has_node("Lotus"):
-		var old_lbl = player_vbox.get_node("Lotus")
-		old_lbl.visible = false
-		if not player_vbox.has_node("LotusRow"):
-			var row = HBoxContainer.new()
-			row.name = "LotusRow"
-			row.alignment = BoxContainer.ALIGNMENT_CENTER
-			row.add_theme_constant_override("separation", 4)
-			for i in range(4):
-				var tr = TextureRect.new()
-				tr.custom_minimum_size = Vector2(22, 22)
-				tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-				tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-				tr.texture = lotus_full_tex
-				row.add_child(tr)
-			var txt = Label.new()
-			txt.text = " (4/4)"
-			txt.add_theme_color_override("font_color", Color(1, 0.85, 0.5, 1))
-			txt.add_theme_font_size_override("font_size", 12)
-			row.add_child(txt)
-			player_vbox.add_child(row)
+	if player_vbox:
+		for c in player_vbox.get_children():
+			c.queue_free()
+		for i in range(4):
+			var tr = TextureRect.new()
+			tr.custom_minimum_size = Vector2(20, 20)
+			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			tr.texture = lotus_full_tex
+			player_vbox.add_child(tr)
 
 func _on_close_health_spotlight() -> void:
 	spotlight_overlay.visible = false
@@ -393,20 +393,20 @@ func _spawn_initial_cards() -> void:
 		c.queue_free()
 
 	var cards_data = [
-		{"name": "Trảm", "rank": "A", "suit": "Spade", "cat": 0, "desc": "Tấn công gây 1 sát thương."},
-		{"name": "Trảm", "rank": "2", "suit": "Spade", "cat": 0, "desc": "Tấn công gây 1 sát thương."},
-		{"name": "Đỡ", "rank": "3", "suit": "Diamond", "cat": 0, "desc": "Hóa giải 1 đòn Trảm."},
-		{"name": "Bánh Chưng", "rank": "4", "suit": "Heart", "cat": 0, "desc": "Hồi phục 1 Máu."},
-		{"name": "Khiên Mây Bện", "rank": "K", "suit": "Diamond", "cat": 1, "desc": "Phán xét Đỏ tự động Đỡ."}
+		{"name": "Trảm", "rank": "A", "suit": "Spade", "cat": 0, "sub": 0, "desc": "Tấn công gây 1 sát thương."},
+		{"name": "Trảm", "rank": "2", "suit": "Spade", "cat": 0, "sub": 0, "desc": "Tấn công gây 1 sát thương."},
+		{"name": "Đỡ", "rank": "3", "suit": "Diamond", "cat": 0, "sub": 3, "desc": "Hóa giải 1 đòn Trảm."},
+		{"name": "Bánh Chưng", "rank": "4", "suit": "Heart", "cat": 0, "sub": 4, "desc": "Hồi phục 1 Máu."},
+		{"name": "Khiên Mây Bện", "rank": "K", "suit": "Diamond", "cat": 1, "sub": 7, "desc": "Phán xét Đỏ tự động Đỡ."}
 	]
 
 	for data in cards_data:
-		_create_card_in_hand(data["name"], data["rank"], data["suit"], data["cat"], data["desc"])
+		_create_card_in_hand(data["name"], data["rank"], data["suit"], data["cat"], data["desc"], data.get("sub", -1))
 
-func _create_card_in_hand(c_name: String, c_rank: String, c_suit: String, c_cat: int, c_desc: String) -> Control:
+func _create_card_in_hand(c_name: String, c_rank: String, c_suit: String, c_cat: int, c_desc: String, c_sub: int = -1) -> Control:
 	var card_node = CardUIScene.instantiate()
 	hand_container.add_child(card_node)
-	card_node.setup_card_data("card_" + c_name, c_name, c_rank, c_suit, c_cat, c_desc)
+	card_node.setup_card_data("card_" + c_name, c_name, c_rank, c_suit, c_cat, c_desc, c_sub)
 	card_node.card_selected_state_changed.connect(_on_card_selected_state_changed)
 	card_node.mouse_entered.connect(func(): _on_card_hovered(card_node))
 	return card_node
@@ -652,10 +652,14 @@ func _execute_slash() -> void:
 func _start_step_4_5_skill() -> void:
 	current_step = 40
 	banner_title.text = "⚡ KỸ NĂNG ĐẶC BIỆT: [TIẾN THOÁI]"
-	banner_desc.text = "Tướng Lý Thường Kiệt sở hữu tuyệt kỹ TIẾN THOÁI:\nHoán chuyển tất cả lá TRẢM trên tay thành ĐỠ, và tất cả ĐỠ thành TRẢM!\nHãy click nút [⚡ TIẾN THOÁI] ở góc dưới bên trái tướng để biến đổi bài."
+	banner_desc.text = "Tướng Lý Thường Kiệt sở hữu tuyệt kỹ TIẾN THOÁI:\nHoán chuyển tất cả lá TRẢM trên tay thành ĐỠ, và tất cả ĐỠ thành TRẢM!\nHãy click nút [⚡ TIẾN THOÁI] ở cạnh trái tướng để biến đổi bài."
 	action_btn.visible = false
 
-	_show_arrow(player_avatar.global_position + Vector2(-115, 215), "BẤM TIẾN THOÁI")
+	var target_pos = player_avatar.global_position + Vector2(-120, 107)
+	if player_avatar.skill_buttons.size() > 0 and is_instance_valid(player_avatar.skill_buttons[0]) and player_avatar.skill_buttons[0].visible:
+		var btn = player_avatar.skill_buttons[0]
+		target_pos = Vector2(btn.global_position.x - 16, btn.global_position.y + btn.size.y * 0.5)
+	_show_arrow(target_pos, "BẤM TIẾN THOÁI")
 
 func _on_player_skill_clicked() -> void:
 	# Âm thanh: Voice "Tiến Thoái" + SFX Skill ngân vang
@@ -666,10 +670,10 @@ func _on_player_skill_clicked() -> void:
 	var count_do = 0
 	for c in hand_container.get_children():
 		if "Trảm" in c.card_name:
-			c.setup_card_data(c.card_data.id, "Đỡ", c.card_data.get_rank_string(), c.card_data.suit, 0, "Hóa giải 1 đòn Trảm.")
+			c.setup_card_data(c.card_data.id, "Đỡ", c.card_data.get_rank_string(), c.card_data.suit, 0, "Hóa giải 1 đòn Trảm.", 3)
 			count_tram += 1
 		elif "Đỡ" in c.card_name:
-			c.setup_card_data(c.card_data.id, "Trảm", c.card_data.get_rank_string(), c.card_data.suit, 0, "Tấn công gây 1 sát thương.")
+			c.setup_card_data(c.card_data.id, "Trảm", c.card_data.get_rank_string(), c.card_data.suit, 0, "Tấn công gây 1 sát thương.", 0)
 			count_do += 1
 
 	_add_log("✨ LÝ THƯỜNG KIỆT [TIẾN THOÁI]! Đã hoán chuyển %d Trảm ➜ Đỡ và %d Đỡ ➜ Trảm trên tay!" % [count_tram, count_do])
@@ -828,11 +832,11 @@ func _player_turn_start_free_play() -> void:
 	AudioManager.play_card_draw()
 
 	var new_cards = [
-		{"name": "Trảm", "rank": "7", "suit": "Spade", "cat": 0, "desc": "Tấn công gây 1 sát thương."},
-		{"name": "Bánh Chưng", "rank": "8", "suit": "Heart", "cat": 0, "desc": "Hồi phục 1 Máu."}
+		{"name": "Trảm", "rank": "7", "suit": "Spade", "cat": 0, "sub": 0, "desc": "Tấn công gây 1 sát thương."},
+		{"name": "Bánh Chưng", "rank": "8", "suit": "Heart", "cat": 0, "sub": 4, "desc": "Hồi phục 1 Máu."}
 	]
 	for data in new_cards:
-		_create_card_in_hand(data["name"], data["rank"], data["suit"], data["cat"], data["desc"])
+		_create_card_in_hand(data["name"], data["rank"], data["suit"], data["cat"], data["desc"], data.get("sub", -1))
 
 	_add_log("🎴 Bạn đã rút 2 lá bài vào tay.")
 
@@ -1173,6 +1177,9 @@ func _on_boss_defeated() -> void:
 	_show_reward_modal()
 
 func _show_reward_modal() -> void:
+	if DailyQuestSystem:
+		DailyQuestSystem.record_progress("battle", 1)
+		DailyQuestSystem.record_progress("win", 1)
 	reward_modal.visible = true
 	banner.visible = false
 	var box = reward_modal.get_node("Dim/Box") as PanelContainer
@@ -1323,7 +1330,7 @@ func _show_reward_modal() -> void:
 	dv.add_child(d_speech)
 
 	var d_mil = Label.new()
-	d_mil.text = "🎖️ Exp Quân Hàm: Cứ 1 tướng sở hữu +50đ ➜ Tướng Lý Thường Kiệt: +50 Exp Quân Hàm (🔰 Tân Binh 50/100đ)!"
+	d_mil.text = "🎖️ Exp Quân Hàm: Cứ 1 tướng sở hữu +5đ ➜ Tướng Lý Thường Kiệt: +5 Exp Quân Hàm (🔰 Tân Binh 5/100đ)!"
 	d_mil.add_theme_font_size_override("font_size", 12)
 	d_mil.add_theme_color_override("font_color", Color(0.18, 0.50, 0.20, 1.0))
 	dv.add_child(d_mil)
@@ -1340,7 +1347,7 @@ func _show_reward_modal() -> void:
 		{
 			"tag": "🎖️ THẦN TƯỚNG",
 			"val": "LÝ THƯỜNG KIỆT",
-			"desc": "Tướng 4 Khí Huyết\nTuyệt kỹ: Tiến Thoái\n+50 Exp Quân Hàm",
+			"desc": "Tướng 4 Khí Huyết\nTuyệt kỹ: Tiến Thoái\n+5 Exp Quân Hàm",
 			"tag_color": Color(0.72, 0.52, 0.08, 1.0)
 		},
 		{
