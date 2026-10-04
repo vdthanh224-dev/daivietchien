@@ -6578,7 +6578,7 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
       maxHp: p.maxHp,
       hp: p.hp,
       isAlly: p.isAlly === true,
-      role: viewerSeat === p.seat ? (p.role || "") : "",
+      role: p.role === "KING" || viewerSeat === p.seat ? (p.role || "") : "",
       isAI: p.isAI,
       isAlive: p.isAlive !== false,
       sucSoiTurnsRemaining: Math.max(0, Number(p.sucSoiTurnsRemaining) || 0),

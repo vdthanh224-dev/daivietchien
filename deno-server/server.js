@@ -346,14 +346,14 @@ function broadcastRoom(room, messageObj) {
           };
           ws.send(JSON.stringify(personalized));
         } else if (messageObj.type === "DRAFT_STATE_UPDATE") {
-          const safe = { ...messageObj, slots: (messageObj.slots || []).map((slot) => { const { role, heroId, heroName, hoverHeroId, hoverHeroName, ...publicSlot } = slot; const own = slot.seat === seat; return { ...publicSlot, role: own ? (role || "") : undefined, heroId: own ? heroId : 0, heroName: own ? heroName : "", hoverHeroId: own ? (hoverHeroId || 0) : 0, hoverHeroName: own ? (hoverHeroName || "") : "" }; }) };
+          const safe = { ...messageObj, slots: (messageObj.slots || []).map((slot) => { const { role, heroId, heroName, hoverHeroId, hoverHeroName, ...publicSlot } = slot; const own = slot.seat === seat; return { ...publicSlot, role: own || role === "KING" ? (role || "") : undefined, heroId: own ? heroId : 0, heroName: own ? heroName : "", hoverHeroId: own ? (hoverHeroId || 0) : 0, hoverHeroName: own ? (hoverHeroName || "") : "" }; }) };
           if (String(room.draft?.modeId || "").startsWith("dynasty_")) {
             const own = safe.slots.find((slot) => slot.seat === seat);
             safe.selectedHeroIds = own && own.heroId > 0 ? [own.heroId] : [];
           }
           ws.send(JSON.stringify(safe));
         } else if (messageObj.type === "DRAFT_COMPLETED") {
-          const safe = { ...messageObj, slots: (messageObj.slots || []).map((slot) => { const { role, ...publicSlot } = slot; return { ...publicSlot, role: slot.seat === seat ? (role || "") : undefined }; }) };
+          const safe = { ...messageObj, slots: (messageObj.slots || []).map((slot) => { const { role, ...publicSlot } = slot; return { ...publicSlot, role: slot.seat === seat || role === "KING" ? (role || "") : undefined }; }) };
           ws.send(JSON.stringify(safe));
         } else {
           ws.send(JSON.stringify(messageObj));
@@ -557,13 +557,17 @@ function finishDraftAndStartBattle(roomId, room) {
   const draft = room?.draft;
   if (!draft || draft.isCompleted || !draft.slots.every((slot) => slot.isLocked && slot.heroId > 0)) return;
 
+  for (const slot of draft.slots) {
+    const baseHp = HERO_MAX_HP[slot.heroId] || 4;
+    slot.maxHp = baseHp + (slot.role === "KING" ? 1 : 0);
+  }
   const battlePlayers = draft.slots.map((slot) => ({
     seat: slot.seat,
     userId: slot.userId,
     heroId: `HERO_${slot.heroId}`,
     generalName: slot.heroName || getHeroName(slot.heroId),
-    maxHp: HERO_MAX_HP[slot.heroId] || 4,
-    hp: HERO_MAX_HP[slot.heroId] || 4,
+    maxHp: slot.maxHp,
+    hp: slot.maxHp,
     isAlly: slot.isDragon,
     isAI: slot.isAI,
     role: slot.role || "",
@@ -859,7 +863,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           pickedSlot.heroName = String(payload.heroName || getHeroName(heroId));
           pickedSlot.hoverHeroId = 0;
           pickedSlot.hoverHeroName = "";
-          pickedSlot.maxHp = HERO_MAX_HP[heroId] || 4;
+          pickedSlot.maxHp = (HERO_MAX_HP[heroId] || 4) + (pickedSlot.role === "KING" ? 1 : 0);
           pickedSlot.isLocked = true;
           if (!dynastyReady) room.draft.currentPickerIndex += 1;
           if (!dynastyReady) {

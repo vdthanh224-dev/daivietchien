@@ -138,10 +138,11 @@ func _build_battle_seat_avatar_map(seat_count: int) -> Dictionary:
 	var seats_root: Control = $TableTop/Seats
 	var center := Vector2(640.0, 355.0)
 	var radius := Vector2(470.0, 220.0)
+	# Place seats clockwise from the local player: the next seat is always on
+	# the right, then wrap back to seat 1 after the last seat.
 	var other_seat_order: Array[int] = []
-	for seat_number in range(1, seat_count + 1):
-		if seat_number != my_seat:
-			other_seat_order.append(seat_number)
+	for offset in range(1, seat_count):
+		other_seat_order.append(((my_seat - 1 + offset) % seat_count) + 1)
 	for old_node in seats_root.get_children():
 		if old_node is Control and old_node.has_meta("dynamic_battle_seat"):
 			old_node.queue_free()
