@@ -4825,7 +4825,11 @@ func _apply_network_game_state(state: Dictionary) -> void:
 				my_team_is_dragon = g["isDragon"]
 		var server_hp = int(p.get("hp", g["hp"]))
 		var server_max_hp = int(p.get("maxHp", g["max_hp"]))
-		g["role"] = str(p.get("role", g.get("role", "")))
+		# The server hides other players' roles. Do not erase a role already
+		# received from the private draft snapshot when the incoming value is empty.
+		var incoming_role := str(p.get("role", ""))
+		if not incoming_role.is_empty():
+			g["role"] = incoming_role
 		var server_is_alive = bool(p.get("isAlive", g.get("is_alive", true)))
 		var was_alive = bool(g.get("is_alive", true))
 		g["suc_soi_turns_remaining"] = max(0, int(p.get("sucSoiTurnsRemaining", g.get("suc_soi_turns_remaining", 0))))
