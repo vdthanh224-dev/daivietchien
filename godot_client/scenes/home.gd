@@ -6527,10 +6527,17 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	# Đúng 15s kể từ người cuối cùng ghép vào phòng, nếu chưa đủ 4 người thì bổ sung AI và vào trận luôn
 	var bot_fill_timeout: float = 1.0 if is_fast_test else 15.0
 	var bot_fill_timer: float = 0.0
+	var last_real_player_at_ms: int = Time.get_ticks_msec()
 	var heartbeat_timer: float = 0.0
 	var poll_timer: float = 0.0 # Thăm dò Appwrite mỗi 2.0 giây
-	var last_real_player_count: int = 1
+	var last_real_player_count: int = 0
 	var guest_wait_timer: float = 0.0
+	for initial_slot in mm_current_room.get("slots", []):
+		if initial_slot is Dictionary and not initial_slot.get("isEmpty", false) and not initial_slot.get("isAI", false) and initial_slot.get("userId", "") != "":
+			last_real_player_count += 1
+	# This timestamp is the authoritative start of the current room's wait.
+	# It is independent of how long the first Appwrite request takes.
+	last_real_player_at_ms = Time.get_ticks_msec()
 
 	_update_matchmaking_status_count(status_lbl, mm_current_room, bot_fill_timeout)
 
@@ -6538,10 +6545,26 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		if not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
 			return
 
-		bot_fill_timer += 0.5
+		bot_fill_timer = float(Time.get_ticks_msec() - last_real_player_at_ms) / 1000.0
 		heartbeat_timer -= 0.5
 		poll_timer -= 0.5
-		guest_wait_timer += 0.5
+		guest_wait_timer = bot_fill_timer
+
+		# Do not enter a slow Appwrite request after the deadline. The old
+		# half-second counter kept running only after each request returned,
+		# which made a 15s wait visibly become 22-23s on a slow network.
+		var wait_remaining := bot_fill_timeout - bot_fill_timer
+		if last_real_player_count < target_player_count and wait_remaining <= 0.0:
+			if not mm_is_host:
+				print("[Matchmaking] Hết đúng %.0fs kể từ người cuối cùng, chuyển quyền chủ phòng để bổ sung AI." % bot_fill_timeout)
+				mm_is_host = true
+				AppwriteMatchmaking.is_host = true
+			break
+		if last_real_player_count >= target_player_count:
+			break
+		if last_real_player_count < target_player_count and wait_remaining < 0.75 and not is_fast_test:
+			await get_tree().create_timer(0.1).timeout
+			continue
 
 		if poll_timer <= 0.0 or is_fast_test:
 			poll_timer = 2.0 # Đặt lại chu kỳ 2s
@@ -6571,9 +6594,9 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 						_sync_my_seat_from_room(mm_current_room, my_user_id, my_user_name)
 						if previous_room_id != mm_active_room_id:
 							AppwriteMatchmaking.retire_merged_room(previous_room_id)
-							bot_fill_timer = 0.0
+							last_real_player_at_ms = Time.get_ticks_msec()
 							guest_wait_timer = 0.0
-							last_real_player_count = 1
+							last_real_player_count = candidate_count + 1
 							print("[Matchmaking] Gộp phòng %s vào %s (%d -> %d người thật)." % [previous_room_id, mm_active_room_id, current_count, candidate_count + 1])
 
 			if mm_is_host:
@@ -6596,6 +6619,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 
 				# Cứ có người chơi mới vào phòng -> reset 15s đếm ngầm lại từ đầu
 				if current_real_count > last_real_player_count:
+					last_real_player_at_ms = Time.get_ticks_msec()
 					bot_fill_timer = 0.0
 					last_real_player_count = current_real_count
 					print("[Matchmaking] Có người mới tham gia (%d/%d)! Đặt lại 15s đếm ngầm từ đầu." % [current_real_count, target_player_count])
@@ -6603,6 +6627,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 					last_real_player_count = current_real_count
 
 				_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
+				bot_fill_timer = float(Time.get_ticks_msec() - last_real_player_at_ms) / 1000.0
 				var host_time_left = maxf(0.0, bot_fill_timeout - bot_fill_timer)
 				_update_matchmaking_status_count(status_lbl, mm_current_room, host_time_left)
 
@@ -6624,6 +6649,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 						if not s.get("isEmpty", false) and not s.get("isAI", false) and s.get("userId", "") != "":
 							current_real_count += 1
 					if current_real_count > last_real_player_count:
+						last_real_player_at_ms = Time.get_ticks_msec()
 						guest_wait_timer = 0.0
 						last_real_player_count = current_real_count
 						print("[Matchmaking] (Khách) Có người mới tham gia (%d/%d)! Đặt lại 15s từ đầu." % [current_real_count, target_player_count])
@@ -6653,8 +6679,8 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 								_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
 								_update_matchmaking_status_count(status_lbl, mm_current_room, bot_fill_timeout)
 
-					# Dự phòng: nếu chủ phòng mất kết nối quá 18s (15s + 3s trễ mạng), tự động thăng cấp thành chủ phòng để thêm AI và vào trận luôn
-					if guest_wait_timer >= (bot_fill_timeout + 3.0):
+					# Trường hợp chủ phòng mất kết nối cũng dùng chung mốc 15 giây.
+					if guest_wait_timer >= bot_fill_timeout:
 						print("[Matchmaking] Hết 15s và chủ phòng không phản hồi, tự động thăng cấp thành chủ phòng để bổ sung AI và vào chọn tướng.")
 						mm_is_host = true
 						AppwriteMatchmaking.is_host = true
@@ -6668,6 +6694,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 					_hide_modal()
 					return
 
+		bot_fill_timer = float(Time.get_ticks_msec() - last_real_player_at_ms) / 1000.0
 		if mm_is_host and (bot_fill_timer >= bot_fill_timeout):
 			break
 
