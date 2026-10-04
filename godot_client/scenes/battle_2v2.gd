@@ -138,8 +138,8 @@ func _build_battle_seat_avatar_map(seat_count: int) -> Dictionary:
 	var seats_root: Control = $TableTop/Seats
 	var center := Vector2(640.0, 355.0)
 	var radius := Vector2(470.0, 220.0)
-	# Place seats clockwise from the local player: the next seat is always on
-	# the right, then wrap back to seat 1 after the last seat.
+	# Place seats from the local player toward the right, then continue around
+	# the table counter-clockwise; after the last seat, wrap back to seat 1.
 	var other_seat_order: Array[int] = []
 	for offset in range(1, seat_count):
 		other_seat_order.append(((my_seat - 1 + offset) % seat_count) + 1)
@@ -168,8 +168,9 @@ func _build_battle_seat_avatar_map(seat_count: int) -> Dictionary:
 			continue
 		var other_index := offset - 1
 		var other_count := seat_count - 1
-		# Seat order grows from the player's left toward the right arc (1, 2, 3...).
-		var angle := -2.85 + 2.60 * float(other_index) / float(maxi(1, other_count - 1))
+		# The first other seat is on the right. Decreasing screen-space angles
+		# continue counter-clockwise toward the left side.
+		var angle := -0.35 - 2.50 * float(other_index) / float(maxi(1, other_count - 1))
 		holder.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		holder.position = center + Vector2(cos(angle) * radius.x, sin(angle) * radius.y) - Vector2(85, 115)
 		holder.size = Vector2(170, 230)
