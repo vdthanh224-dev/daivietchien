@@ -8239,6 +8239,25 @@ func _handle_general_death(seat_num: int) -> void:
 		g["avatar_node"].set_near_death(false)
 		g["avatar_node"].set_defeated(true)
 	_add_log("☠️ Tướng %s (Ghế %d) đã ngã xuống trên chiến trường!" % [g["name"], seat_num])
+	# In local 2v2 games, the surviving teammate draws one card after the death.
+	if not is_network_mode and battle_seat_count == 4:
+		for teammate_seat in range(1, battle_seat_count + 1):
+			if teammate_seat == seat_num or not generals_data.has(teammate_seat):
+				continue
+			var teammate = generals_data[teammate_seat]
+			if not teammate.get("is_alive", false) or teammate.get("isDragon", false) != g.get("isDragon", false):
+				continue
+			var death_draw = _draw_card_from_pile()
+			if teammate_seat == my_seat:
+				_add_card_to_player_hand(death_draw)
+			else:
+				teammate["hand_cards"].append(death_draw)
+				teammate["hand_count"] = teammate["hand_cards"].size()
+				if teammate.has("avatar_node") and is_instance_valid(teammate["avatar_node"]):
+					teammate["avatar_node"].update_hand_count(teammate["hand_count"])
+			_animate_draw_to_seat(teammate_seat)
+			_add_log("🃏 %s rút 1 lá vì đồng đội %s đã tử trận." % [teammate["name"], g["name"]])
+			break
 	if seat_num == my_seat:
 		_show_dead_player_exit()
 

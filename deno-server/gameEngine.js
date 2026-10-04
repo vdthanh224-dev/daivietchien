@@ -3546,7 +3546,7 @@ function resumeAfterUatKhi(state) {
 }
 
 function finalizePlayerDeath(state, victim) {
-  if (!victim) return "";
+  if (!victim || victim.isAlive === false) return "";
 
   const killer = state.players.find((player) => player.seat === Number(state.deathKillerSeat));
   const doatViOwner = state.players.find((player) => isLivingPlayer(player)
@@ -3570,12 +3570,33 @@ function finalizePlayerDeath(state, victim) {
   victim.wineUsedThisTurn = false;
   victim.aoBaoCharges = 0;
 
+  // In 2v2, the surviving teammate draws one card when their teammate dies.
+  let teammateDeathDraw = "";
+  if (state.modeId === "2v2") {
+    const teammate = state.players.find((player) => player.seat !== victim.seat
+      && isLivingPlayer(player)
+      && areTeammatesInState(state, victim.seat, player.seat));
+    if (teammate) {
+      const drawn = drawCards(state, teammate.seat, 1);
+      if (drawn.length > 0) {
+        teammateDeathDraw = ` Đồng đội ${teammate.generalName} rút 1 lá sau khi ${victim.generalName} tử trận.`;
+        recordAction(state, {
+          type: "TEAMMATE_DEATH_DRAW",
+          casterSeat: teammate.seat,
+          targetSeat: victim.seat,
+          description: `🃏 ${teammate.generalName} rút 1 lá vì đồng đội ${victim.generalName} đã tử trận.`
+        });
+      }
+    }
+  }
+
   state.deathKillerSeat = 0;
-  if (doatVi) return " [Đoạt Vị] thu toàn bộ bài tay và trang bị của nạn nhân.";
+  if (doatVi) return ` [Đoạt Vị] thu toàn bộ bài tay và trang bị của nạn nhân.${teammateDeathDraw}`;
   const discardedTotal = discardedCount + equipmentCount + judgementCount;
-  return discardedTotal > 0
+  const discardSummary = discardedTotal > 0
     ? ` Đã bỏ ${discardedCount} lá trên tay, ${equipmentCount} lá trang bị và ${judgementCount} lá trì hoãn của nạn nhân.`
     : "";
+  return `${discardSummary}${teammateDeathDraw}`;
 }
 
 function triggerTranTien(state, killerSeat, victimSeat) {
