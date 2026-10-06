@@ -44,7 +44,15 @@ const HERO_SKILL_ACTIONS := {
 	"CAT_CU_DRAW": {"name": "Cát Cứ"},
 	"HOI_HO_REDUCED": {"name": "Hồi Hồ"},
 	"TAY_PHU_TRIGGERED": {"name": "Tây Phu"},
-	"NGHIA_TU_TRIGGERED": {"name": "Nghĩa Tử"}
+	"NGHIA_TU_TRIGGERED": {"name": "Nghĩa Tử"},
+	"UU_THIEP_STEAL": {"name": "Ưu Thiếp"},
+	"CO_LAU_DRAW": {"name": "Cờ Lau"},
+	"CO_LAU_DESTROY": {"name": "Cờ Lau"},
+	"VAN_THANG_TRIGGERED": {"name": "Vạn Thắng"},
+	"TRU_QUAN_TRIGGERED": {"name": "Trữ Quân"},
+	"COT_KINH_TRIGGERED": {"name": "Cột Kinh"},
+	"TRUNG_TIET_TRIGGERED": {"name": "Trung Tiết"},
+	"CAN_VE_TRIGGERED": {"name": "Cận Vệ"}
 }
 const IMPLEMENTED_HERO_SKILL_NAMES := [
 	"Chế Nỏ", "Liên Châu", "Xạ Thuẫn", "Phù Trấn", "Hịch Nghĩa", "Uất Khí",
@@ -52,7 +60,8 @@ const IMPLEMENTED_HERO_SKILL_NAMES := [
 	"Tiên Phong", "Trận Tiền", "Khởi Binh", "Huynh Trưởng", "Chiến Tượng", "Oai Nhược",
 	"Dựng Nước", "Xưng Đế", "Tùng Nghĩa", "Trung Kiên", "Văn Sách", "Hán Lâm",
 	"Trấn Nam", "Hóa Dân", "Dạ Trạch", "Nỏ Đỉnh", "Phục Hổ", "An Dân", "Lực Địch", "Hùng Sức",
-	"Vạn An", "Đế Nghiệp", "Khoan Giản", "Chính Thống", "Khoan Hòa", "Cải Cách", "Thiên Cảm", "Nam Tấn", "Bình Sạn", "Cát Cứ", "Cố Thủ", "Hồi Hồ", "Phòng Duyện", "Liệt Chiến", "Tây Phu", "Nghĩa Tử", "Dưỡng Binh"
+	"Vạn An", "Đế Nghiệp", "Khoan Giản", "Chính Thống", "Khoan Hòa", "Cải Cách", "Thiên Cảm", "Nam Tấn", "Bình Sạn", "Cát Cứ", "Cố Thủ", "Hồi Hồ", "Phòng Duyện", "Liệt Chiến", "Tây Phu", "Nghĩa Tử", "Dưỡng Binh",
+	"Tế Giang", "Ưu Thiếp", "Cờ Lau", "Vạn Thắng", "Trữ Quân", "Cột Kinh", "Trung Tiết", "Cận Vệ"
 ]
 
 # UI Node References
@@ -6532,7 +6541,7 @@ func _on_network_action_received(delta: Dictionary) -> void:
 	var attached_bai_coc_judge = delta.get("baiCocJudgeCard", {})
 	var is_confirmed_slash_after_bai_coc = act_type in ["PLAY_SLASH", "SLASH_ATTACK"] \
 		and attached_bai_coc_judge is Dictionary and not attached_bai_coc_judge.is_empty()
-	var is_visible_target_card_action = act_type in ["PLAY_SNATCH", "PLAY_DISMANTLE", "TRIEU_DANG_DESTROY", "THUONG_NGAU_DESTROY", "PLAY_FLAWLESS_DEFENSE", "BINH_SAN_DESTROY"]
+	var is_visible_target_card_action = act_type in ["PLAY_SNATCH", "PLAY_DISMANTLE", "TRIEU_DANG_DESTROY", "THUONG_NGAU_DESTROY", "PLAY_FLAWLESS_DEFENSE", "BINH_SAN_DESTROY", "CO_LAU_DESTROY", "UU_THIEP_STEAL"]
 	# Giáp và Phán xét phải hiện cho tất cả người chơi (kể cả nạn nhân vừa ra bài / người đang phán xét).
 	if caster_seat == my_seat and caster_seat > 0 and not is_an_tich_defense and not is_armor_event and not is_judgement_event and not is_visible_target_card_action and not is_confirmed_slash_after_bai_coc and not is_uat_khi_prompt and not is_visible_hero_skill_event:
 		return
@@ -6596,12 +6605,16 @@ func _on_network_action_received(delta: Dictionary) -> void:
 			var target_name = _get_card_display_name(target_card)
 			var actor_name = generals_data[caster_seat].get("name", "Ghế %d" % caster_seat) if generals_data.has(caster_seat) else "Ghế %d" % caster_seat
 			var target_owner_name = generals_data[target_seat].get("name", "Ghế %d" % target_seat) if generals_data.has(target_seat) else "Ghế %d" % target_seat
-			var action_verb = "cướp" if act_type == "PLAY_SNATCH" else "phá hủy"
+			var action_verb = "cướp" if act_type in ["PLAY_SNATCH", "UU_THIEP_STEAL"] else "phá hủy"
 			if act_type == "BINH_SAN_DESTROY":
 				action_verb = "dùng Bình Sạn phá hủy"
+			elif act_type == "CO_LAU_DESTROY":
+				action_verb = "dùng Cờ Lau phá hủy"
+			elif act_type == "UU_THIEP_STEAL":
+				action_verb = "dùng Ưu Thiếp cướp"
 			var display_duration = 2.0 if card_name == "Vườn Không Nhà Trống" and action_verb == "phá hủy" else -1.0
 			_animate_showcase_card(target_name, "%s %s [%s] của %s!" % [actor_name, action_verb, target_name, target_owner_name], target_card, display_duration)
-		if act_type == "BINH_SAN_DESTROY":
+		if act_type in ["BINH_SAN_DESTROY", "CO_LAU_DESTROY", "UU_THIEP_STEAL"]:
 			AudioManager.play_skill()
 	elif act_type == "RECAST_IRON_CHAIN":
 		# Recast discards and redraws without targeting anyone, so it must not use
@@ -11686,13 +11699,22 @@ func _show_card_pick_modal(is_steal: bool, target_seat: int, selection_data: Dic
 		card_pick_title.text = "🌫️ ẨN TÍCH: CHỌN LÁ ĐỠ"
 		card_pick_confirm_btn.text = "🌫️ DÙNG LÁ NÀY ĐỠ"
 		card_pick_desc.text = "💡 Chọn 1 lá Ẩn để dùng như Đỡ cho đòn Trảm."
+	elif effect_type == "UU_THIEP":
+		card_pick_title.text = "🐎 ƯU THIẾP: CƯỚP 1 LÁ TRANG BỊ"
+		card_pick_confirm_btn.text = "🐎 XÁC NHẬN CƯỚP"
+		card_pick_cancel_btn.text = "BỎ QUA"
+		card_pick_desc.text = "💡 Chọn 1 lá Trang bị của một mục tiêu để cướp về tay bạn (hoặc Bỏ qua):"
+	elif effect_type == "CO_LAU":
+		card_pick_title.text = "🎋 CỜ LAU: PHÁ HỦY TRANG BỊ CỦA %s" % tgt["name"].to_upper()
+		card_pick_confirm_btn.text = "🎋 XÁC NHẬN PHÁ HỦY"
+		card_pick_desc.text = "💡 Chọn 1 lá trang bị của %s để phá hủy:" % tgt["name"]
 	elif is_steal:
 		card_pick_title.text = "🗡️ ĐỘT KÍCH TRỘM LƯƠNG: CƯỚP BÀI TỪ %s" % tgt["name"].to_upper()
 		card_pick_confirm_btn.text = "🗡️ XÁC NHẬN CƯỚP"
 	else:
 		card_pick_title.text = "🌾 VƯỜN KHÔNG NHÀ TRỐNG: PHÁ HỦY BÀI CỦA %s" % tgt["name"].to_upper()
 		card_pick_confirm_btn.text = "🌾 XÁC NHẬN PHÁ HỦY"
-	if effect_type not in ["THUONG_NGAU", "DOAN_DAO", "TAU_VI", "PHU_DE", "TRIEU_DANG", "HOA_DAN", "AN_DAN", "DAN_CAU_STEAL", "XUNG_VUONG_DISCARD", "AN_TICH_DEFENSE"]:
+	if effect_type not in ["THUONG_NGAU", "DOAN_DAO", "TAU_VI", "PHU_DE", "TRIEU_DANG", "HOA_DAN", "AN_DAN", "DAN_CAU_STEAL", "XUNG_VUONG_DISCARD", "AN_TICH_DEFENSE", "UU_THIEP", "CO_LAU"]:
 		card_pick_desc.text = "💡 Hãy chọn 1 lá bài úp trên tay hoặc 1 trang bị đang mặc của %s:" % tgt["name"]
 
 	var has_options = false
@@ -11740,6 +11762,10 @@ func _show_card_pick_modal(is_steal: bool, target_seat: int, selection_data: Dic
 				has_options = true
 				var item_name = c_dict.get("name", "Trang bị") if c_dict is Dictionary else "Trang bị"
 				var slot_title = _get_equipment_slot_title(c_dict, item_name)
+				var owner_seat = int(s_opt.get("ownerSeat", s_opt.get("targetSeat", 0)))
+				if (effect_type == "UU_THIEP" or (owner_seat > 0 and owner_seat != target_seat)) and generals_data.has(owner_seat):
+					var owner_name = generals_data[owner_seat].get("name", "Ghế %d" % owner_seat)
+					slot_title = "%s (%s)" % [slot_title, owner_name]
 				_add_visible_card_pick_option(slot_title, item_name, "equipment", token, c_dict)
 			elif zone == "AN_TICH":
 				has_options = true
@@ -12015,6 +12041,11 @@ func _on_card_pick_confirmed() -> void:
 				_animate_showcase_card("Triều Dâng", "🌊 Hủy [%s] của %s!" % [item_name, tgt["name"]], target_card)
 				_add_log("🌊 [TRIỀU DÂNG] Bạn hủy [%s] của %s." % [item_name, tgt["name"]])
 				AudioManager.play_skill()
+			elif card_pick_effect_type == "UU_THIEP":
+				_add_card_to_player_hand(target_card)
+				AudioManager.play_skill()
+				_animate_showcase_card(item_name, "Ưu Thiếp cướp [%s] từ %s!" % [item_name, tgt["name"]], target_card)
+				_add_log("🐎 [ƯU THIẾP] Bạn cướp [%s] của %s!" % [item_name, tgt["name"]])
 			elif card_pick_is_steal:
 				_add_card_to_player_hand(target_card)
 				AudioManager.play_voice("Đột Kích Trộm Lương")
@@ -12041,6 +12072,8 @@ func _on_card_pick_confirmed() -> void:
 	_reset_player_turn_timer()
 
 func _hide_card_pick_modal() -> void:
+	if is_network_mode and current_server_phase == "AWAIT_TARGET_CARD" and card_pick_effect_type == "UU_THIEP":
+		NetworkClient.send_respond_action(false)
 	card_pick_modal.visible = false
 	card_pick_confirm_btn.visible = true
 	card_pick_cancel_btn.text = "HỦY"

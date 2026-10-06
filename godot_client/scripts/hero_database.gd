@@ -409,7 +409,7 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 	elif id == 29:
 		skills = [
 			{"id": "te_giang", "name": "Tế Giang", "desc": "Khi dùng Trảm nhắm vào mục tiêu không trang bị lá Chiến Mã, Tầm đánh của bạn tính là không giới hạn khoảng cách."},
-			{"id": "uu_thiep", "name": "Ưu Thiếp", "desc": "Khi bạn Trảm gây sát thương, bạn có thể cướp 1 lá Chiến Mã của nạn nhân."}
+			{"id": "uu_thiep", "name": "Ưu Thiếp", "desc": "Khi bạn Trảm gây sát thương, bạn có thể cướp 1 lá Trang bị của một mục tiêu."}
 		]
 	elif id == 30:
 		skills = [

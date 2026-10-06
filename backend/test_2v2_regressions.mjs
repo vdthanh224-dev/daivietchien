@@ -1664,14 +1664,47 @@ for (const [subType, name] of [
   const resBlocked = handlePlayCard(state, 1, "SLASH_TG_2", 3);
   assert.match(resBlocked.error, /Mục tiêu ngoài tầm đánh/);
 
-  // Seat 2 (trong tầm 1) có ngựa, Lã Đường Trảm trúng -> Ưu Thiếp cướp ngựa
+  // Seat 2 (trong tầm 1) có ngựa, seat 3 có ngựa. Lã Đường Trảm trúng seat 2 -> Ưu Thiếp mở chọn cướp trang bị của mục tiêu bất kỳ
   const horseOff = card("HORSE_OFF", "Ngựa Công", CARD_SUBTYPES.OFFENSIVE_HORSE, CARD_CATEGORIES.EQUIPMENT);
   state.players[1].equipments.push(horseOff);
   put(state, 1, card("SLASH_UT", "Trảm", CARD_SUBTYPES.ATTACK_NORMAL));
   assert.equal(handlePlayCard(state, 1, "SLASH_UT", 2).success, true);
   handleRespondAction(state, 2, false, null); // chịu đòn
-  assert.equal(state.players[1].equipments.some((e) => e.id === "HORSE_OFF"), false);
-  assert.equal(state.players[0].hand.some((c) => c.id === "HORSE_OFF"), true);
+  assert.equal(state.phase, "AWAIT_TARGET_CARD");
+  assert.equal(state.targetCardSelection.effectType, "UU_THIEP");
+  assert.equal(state.targetCardSelection.options.length, 2); // HORSE_OFF (seat 2) và HORSE_DEF (seat 3)
+
+  // Lã Đường chọn cướp HORSE_DEF của seat 3 (mục tiêu khác không phải nạn nhân bị trảm)
+  const resStealSeat3 = handleRespondAction(state, 1, true, null, "EQUIPMENT:HORSE_DEF:3");
+  assert.equal(resStealSeat3.success, true);
+  assert.equal(state.players[2].equipments.some((e) => e.id === "HORSE_DEF"), false);
+  assert.equal(state.players[0].hand.some((c) => c.id === "HORSE_DEF"), true);
+
+  // Thử cướp trang bị vũ khí của nạn nhân (seat 2)
+  const weaponEq = card("WEAPON_TEST", "Thanh Kiếm", CARD_SUBTYPES.WEAPON, CARD_CATEGORIES.EQUIPMENT);
+  state.players[1].equipments.push(weaponEq);
+  state.phase = "PLAY";
+  state.slashesUsedThisTurn = 0;
+  put(state, 1, card("SLASH_UT_2", "Trảm", CARD_SUBTYPES.ATTACK_NORMAL));
+  assert.equal(handlePlayCard(state, 1, "SLASH_UT_2", 2).success, true);
+  handleRespondAction(state, 2, false, null); // chịu đòn
+  assert.equal(state.phase, "AWAIT_TARGET_CARD");
+  // Cướp vũ khí của seat 2
+  handleRespondAction(state, 1, true, null, "EQUIPMENT:WEAPON_TEST:2");
+  assert.equal(state.players[1].equipments.some((e) => e.id === "WEAPON_TEST"), false);
+  assert.equal(state.players[0].hand.some((c) => c.id === "WEAPON_TEST"), true);
+
+  // Thử bỏ qua không cướp (skip)
+  state.phase = "PLAY";
+  state.slashesUsedThisTurn = 0;
+  put(state, 1, card("SLASH_UT_3", "Trảm", CARD_SUBTYPES.ATTACK_NORMAL));
+  assert.equal(handlePlayCard(state, 1, "SLASH_UT_3", 2).success, true);
+  handleRespondAction(state, 2, false, null); // chịu đòn
+  assert.equal(state.phase, "AWAIT_TARGET_CARD");
+  const resSkip = handleRespondAction(state, 1, false, null); // từ chối cướp
+  assert.equal(resSkip.success, true);
+  assert.equal(state.players[1].equipments.some((e) => e.id === "HORSE_OFF"), true); // ngựa của seat 2 vẫn còn
+  assert.equal(state.phase, "PLAY");
 }
 
 {

@@ -217,7 +217,7 @@ export const SKILLS = {
     id: 'UU_THIEP',
     name: 'Ưu Thiếp',
     type: 'TRIGGERED',
-    description: 'Khi bạn Trảm gây sát thương, bạn có thể cướp 1 lá Chiến Mã của nạn nhân.'
+    description: 'Khi bạn Trảm gây sát thương, bạn có thể cướp 1 lá Trang bị của một mục tiêu.'
   },
   CO_LAU: {
     id: 'CO_LAU',

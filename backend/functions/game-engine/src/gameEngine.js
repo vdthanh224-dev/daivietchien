@@ -2535,9 +2535,17 @@ function startTargetCardSelection(state, card, casterSeat, targetSeat, selection
 
 function resolveTargetCardToken(state, selection, targetCardId) {
   if (!selection || !targetCardId) return null;
-  const option = selection.options?.find((candidate) => candidate.token === targetCardId);
+  let option = selection.options?.find((candidate) => candidate.token === targetCardId);
+  if (!option && targetCardId) {
+    option = selection.options?.find((candidate) =>
+      candidate.card?.id === targetCardId ||
+      candidate.token === `EQUIPMENT:${targetCardId}` ||
+      candidate.token?.startsWith(`EQUIPMENT:${targetCardId}:`)
+    );
+  }
   if (!option) return null;
-  const target = state.players.find((player) => player.seat === selection.targetSeat);
+  const targetSeat = option.ownerSeat || option.targetSeat || selection.targetSeat;
+  const target = state.players.find((player) => player.seat === targetSeat);
   if (!target) return null;
 
   if (option.zone === "HAND") {
@@ -2547,8 +2555,8 @@ function resolveTargetCardToken(state, selection, targetCardId) {
   }
 
   const prefix = option.zone === "EQUIPMENT" ? "EQUIPMENT:" : "JUDGEMENT:";
-  if (!targetCardId.startsWith(prefix)) return null;
-  const cardId = targetCardId.slice(prefix.length);
+  if (!targetCardId.startsWith(prefix) && !option.card) return null;
+  const cardId = option.card?.id || targetCardId.slice(prefix.length).split(":")[0];
   const cards = option.zone === "EQUIPMENT" ? target.equipments : target.judgements;
   const index = cards.findIndex((card) => card.id === cardId);
   if (index < 0) return null;
@@ -2905,7 +2913,7 @@ function completeTargetCardSelection(state, chooserSeat, targetCardId) {
     desc = `🎋 <b>${caster ? caster.generalName : 'Đinh Bộ Lĩnh'}</b> kích hoạt [Cờ Lau], phá hủy trang bị [${publicTargetName}] của <b>${target.generalName}</b>!`;
   }
   if (selection.effectType === "UU_THIEP") {
-    desc = `🐎 <b>${caster ? caster.generalName : 'Lã Đường'}</b> kích hoạt [Ưu Thiếp], cướp lá Chiến Mã [${publicTargetName}] của <b>${target.generalName}</b>!`;
+    desc = `🐎 <b>${caster ? caster.generalName : 'Lã Đường'}</b> kích hoạt [Ưu Thiếp], cướp lá Trang bị [${publicTargetName}] của <b>${target.generalName}</b>!`;
   }
   const skillActs = selection.effectType === "BINH_SAN" ? [{ name: "Bình Sạn", seat: chooserSeat }]
     : selection.effectType === "CO_LAU" ? [{ name: "Cờ Lau", seat: chooserSeat }]
@@ -3494,62 +3502,52 @@ function resolveSlashDamageAfterDefense(state, targetSeat) {
 
 function triggerUuThiep(state, casterSeat, targetSeat) {
   const caster = state.players.find((p) => p.seat === Number(casterSeat));
-  const target = state.players.find((p) => p.seat === Number(targetSeat));
-  if (!isLivingPlayer(caster) || !isLivingPlayer(target) || caster.seat === target.seat) return null;
-  const victimHorses = (target.equipments || []).filter(
-    (eq) => eq.subType === CARD_SUBTYPES.OFFENSIVE_HORSE || eq.subType === CARD_SUBTYPES.DEFENSIVE_HORSE
+  if (!isLivingPlayer(caster)) return null;
+
+  const candidateTargets = state.players.filter(
+    (p) => isLivingPlayer(p) && p.seat !== caster.seat && (p.equipments || []).length > 0
   );
-  if (victimHorses.length === 1) {
-    const horse = victimHorses[0];
-    const idx = target.equipments.findIndex((eq) => eq.id === horse.id);
-    if (idx >= 0) {
-      target.equipments.splice(idx, 1);
-      caster.hand.push(horse);
-      recordAction(state, {
-        type: "UU_THIEP_STEAL",
-        casterSeat: caster.seat,
-        targetSeat: target.seat,
-        cardId: horse.id,
-        cardName: horse.name,
-        skillActivations: [{ name: "Ưu Thiếp", seat: caster.seat }],
-        description: `🐎 <b>${caster.generalName}</b> kích hoạt [Ưu Thiếp], cướp lá Chiến Mã [${horse.name}] của <b>${target.generalName}</b>.`
+  if (candidateTargets.length === 0) return null;
+
+  const options = [];
+  for (const cand of candidateTargets) {
+    for (const eq of (cand.equipments || [])) {
+      options.push({
+        token: `EQUIPMENT:${eq.id}:${cand.seat}`,
+        zone: "EQUIPMENT",
+        label: `TRANG BỊ (${cand.generalName})`,
+        card: eq,
+        ownerSeat: cand.seat,
+        targetSeat: cand.seat
       });
     }
-    return null;
   }
-  if (victimHorses.length > 1) {
-    const horseOptions = victimHorses.map((eq) => ({
-      token: `EQUIPMENT:${eq.id}`,
-      zone: "EQUIPMENT",
-      label: "CHIẾN MÃ",
-      card: eq
-    }));
-    state.targetCardSelection = {
-      chooserSeat: caster.seat,
-      targetSeat: target.seat,
-      operation: "STEAL",
-      cardId: "UU_THIEP",
-      cardName: "Ưu Thiếp",
-      options: horseOptions,
-      effectType: "UU_THIEP",
-      remainingCount: 1
-    };
-    state.phase = "AWAIT_TARGET_CARD";
-    state.waitingTargetSeat = caster.seat;
-    state.waitingReactionType = "TARGET_CARD";
-    state.waitingTimer = 40;
-    state.timerStartAt = Date.now();
-    recordAction(state, {
-      type: "TARGET_CARD_PROMPT",
-      casterSeat: caster.seat,
-      targetSeat: target.seat,
-      cardId: "UU_THIEP",
-      cardName: "Ưu Thiếp",
-      description: `🐎 ${caster.generalName} kích hoạt [Ưu Thiếp], chọn cướp 1 Chiến Mã của ${target.generalName}.`
-    });
-    return { success: true, state };
-  }
-  return null;
+
+  const defaultTarget = candidateTargets.find((p) => p.seat === Number(targetSeat)) || candidateTargets[0];
+  state.targetCardSelection = {
+    chooserSeat: caster.seat,
+    targetSeat: defaultTarget.seat,
+    operation: "STEAL",
+    cardId: "UU_THIEP",
+    cardName: "Ưu Thiếp",
+    options: options,
+    effectType: "UU_THIEP",
+    remainingCount: 1
+  };
+  state.phase = "AWAIT_TARGET_CARD";
+  state.waitingTargetSeat = caster.seat;
+  state.waitingReactionType = "TARGET_CARD";
+  state.waitingTimer = 40;
+  state.timerStartAt = Date.now();
+  recordAction(state, {
+    type: "TARGET_CARD_PROMPT",
+    casterSeat: caster.seat,
+    targetSeat: defaultTarget.seat,
+    cardId: "UU_THIEP",
+    cardName: "Ưu Thiếp",
+    description: `🐎 ${caster.generalName} kích hoạt [Ưu Thiếp], chọn cướp 1 lá Trang bị.`
+  });
+  return { success: true, state };
 }
 
 function triggerCoLau(state, casterSeat, targetSeat) {
@@ -3724,7 +3722,7 @@ function resolveNearDeathResume(state) {
               effectType: "THUONG_NGAU"
             });
         }
-        if (pending.type === "UU_THIEP" && target && target.hp > 0) {
+        if (pending.type === "UU_THIEP") {
           const res = triggerUuThiep(state, pending.casterSeat, pending.targetSeat);
           if (res) return res;
         }
@@ -4923,7 +4921,20 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
   }
 
   if (state.phase === "AWAIT_TARGET_CARD") {
-    if (!accepted) return { error: "Cần chọn một lá bài mục tiêu" };
+    if (!accepted) {
+      if (state.targetCardSelection?.effectType === "UU_THIEP") {
+        const chooser = state.players.find((p) => p.seat === respondentSeat);
+        recordAction(state, {
+          type: "UU_THIEP_SKIPPED",
+          casterSeat: respondentSeat,
+          skillActivations: [{ name: "Ưu Thiếp", seat: respondentSeat }],
+          description: `🐎 <b>${chooser ? chooser.generalName : "Lã Đường"}</b> không kích hoạt [Ưu Thiếp].`
+        });
+        resetTargetCardSelection(state);
+        return { success: true, state };
+      }
+      return { error: "Cần chọn một lá bài mục tiêu" };
+    }
     return completeTargetCardSelection(state, respondentSeat, targetCardId || cardId);
   }
 
