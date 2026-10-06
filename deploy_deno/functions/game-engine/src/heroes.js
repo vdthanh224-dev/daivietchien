@@ -34,6 +34,10 @@ export const HEROES = {
   HERO_26: { id: 'HERO_26', name: 'Đỗ Cảnh Thạc', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['CAT_CU', 'CO_THU'] },
   HERO_27: { id: 'HERO_27', name: 'Kiều Thuận', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['HOI_HO', 'PHONG_DUYEN'] },
   HERO_28: { id: 'HERO_28', name: 'Nguyễn Siêu', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['LIET_CHIEN', 'TAY_PHU'] },
+  HERO_29: { id: 'HERO_29', name: 'Lã Đường', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['TE_GIANG', 'UU_THIEP'] },
+  HERO_30: { id: 'HERO_30', name: 'Đinh Bộ Lĩnh', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['CO_LAU', 'VAN_THANG'] },
+  HERO_31: { id: 'HERO_31', name: 'Đinh Liễn', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['TRU_QUAN', 'COT_KINH'] },
+  HERO_32: { id: 'HERO_32', name: 'Đinh Điền', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['TRUNG_TIET', 'CAN_VE'] },
   TRAN_HUNG_DAO: {
     id: 'TRAN_HUNG_DAO',
     name: 'Trần Hưng Đạo',
@@ -202,6 +206,54 @@ export const SKILLS = {
     name: 'Thần Cơ',
     type: 'TRIGGERED',
     description: 'Khi bạn đánh ra lá bài Cẩm nang tức thời, bạn có thể rút 1 lá bài.'
+  },
+  TE_GIANG: {
+    id: 'TE_GIANG',
+    name: 'Tế Giang',
+    type: 'PASSIVE',
+    description: 'Khi dùng Trảm nhắm vào mục tiêu không trang bị lá Chiến Mã, Tầm đánh của bạn tính là không giới hạn khoảng cách.'
+  },
+  UU_THIEP: {
+    id: 'UU_THIEP',
+    name: 'Ưu Thiếp',
+    type: 'TRIGGERED',
+    description: 'Khi bạn Trảm gây sát thương, bạn có thể cướp 1 lá Chiến Mã của nạn nhân.'
+  },
+  CO_LAU: {
+    id: 'CO_LAU',
+    name: 'Cờ Lau',
+    type: 'OPTIONAL',
+    description: 'Mỗi khi bạn Trảm gây sát thương, bạn được chọn: Rút 1 lá bài từ xấp rút HOẶC phá hủy 1 lá trang bị của nạn nhân.'
+  },
+  VAN_THANG: {
+    id: 'VAN_THANG',
+    name: 'Vạn Thắng',
+    type: 'TRIGGERED',
+    description: 'Khi bạn tiêu diệt thành công 1 người, bạn rút 2 lá. Nếu đó là một trong 12 Sứ Quân, bạn hồi 1 máu.'
+  },
+  TRU_QUAN: {
+    id: 'TRU_QUAN',
+    name: 'Trữ Quân',
+    type: 'OPTIONAL',
+    description: 'Đầu Giai đoạn Rút bài, bạn có thể tự giảm 1 Máu để được rút thêm 2 lá bài.'
+  },
+  COT_KINH: {
+    id: 'COT_KINH',
+    name: 'Cột Kinh',
+    type: 'OPTIONAL',
+    description: 'Mỗi khi máu của bạn giảm vì bất cứ lý do gì, bạn có thể chọn 1 người chơi khác; người đó phải bỏ 1 lá bài trên tay.'
+  },
+  TRUNG_TIET: {
+    id: 'TRUNG_TIET',
+    name: 'Trung Tiết',
+    type: 'OPTIONAL',
+    description: 'Khi có người vào trạng thái Cận Tử mà không phải bạn, bạn có thể tự mất 1 Máu để rút 3 lá, nếu người Cận Tử sống sót, bạn rút thêm 1 lá.'
+  },
+  CAN_VE: {
+    id: 'CAN_VE',
+    name: 'Cận Vệ',
+    type: 'OPTIONAL',
+    description: 'Khi người chơi trong Tầm đánh 1 của bạn bị tấn công bởi Trảm, bạn có thể thay đổi mục tiêu bị Trảm thành bản thân.'
   }
 };
 
@@ -226,6 +278,10 @@ export function normalizeHeroId(heroId, generalName = "") {
     "87": "NGUYEN_TRAI",
     TRAN_QUOC_TUAN: "TRAN_HUNG_DAO",
     QUANG_TRUNG: "NGUYEN_HUE",
+    LA_DUONG: "HERO_29",
+    DINH_BO_LINH: "HERO_30",
+    DINH_LIEN: "HERO_31",
+    DINH_DIEN: "HERO_32",
   };
   const rawUpper = rawId.toUpperCase();
   const numericWireId = rawUpper.match(/^HERO_(\d+)$/)?.[1] || "";
@@ -268,6 +324,10 @@ export function normalizeHeroId(heroId, generalName = "") {
   if (key.includes("DO CANH THAC")) return "HERO_26";
   if (key.includes("KIEU THUAN")) return "HERO_27";
   if (key.includes("NGUYEN SIEU")) return "HERO_28";
+  if (key.includes("LA DUONG")) return "HERO_29";
+  if (key.includes("DINH BO LINH")) return "HERO_30";
+  if (key.includes("DINH LIEN")) return "HERO_31";
+  if (key.includes("DINH DIEN")) return "HERO_32";
   if (key.includes("TRAN HUNG DAO") || key.includes("TRAN QUOC TUAN")) return "TRAN_HUNG_DAO";
   if (key.includes("LY THUONG KIET")) return "LY_THUONG_KIET";
   if (key.includes("TRAN QUOC TOAN")) return "TRAN_QUOC_TOAN";
@@ -282,4 +342,25 @@ export function getSkillById(skillId) {
 
 export function heroHasSkill(player, skillId) {
   return !!getHeroById(normalizeHeroId(player?.heroId, player?.generalName))?.skills?.includes(skillId);
+}
+
+export const TWELVE_WARLORDS_HERO_IDS = new Set([
+  "HERO_26", // Đỗ Cảnh Thạc
+  "HERO_27", // Kiều Thuận
+  "HERO_28", // Nguyễn Siêu
+  "HERO_29", // Lã Đường
+]);
+
+export function isTwelveWarlords(player) {
+  if (!player) return false;
+  const heroId = normalizeHeroId(player.heroId, player.generalName);
+  if (TWELVE_WARLORDS_HERO_IDS.has(heroId)) return true;
+  const nameNorm = String(player.generalName || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/Đ/g, "D").replace(/đ/g, "d").toUpperCase();
+  const warlordNames = [
+    "DO CANH THAC", "KIEU THUAN", "NGUYEN SIEU", "LA DUONG",
+    "NGO XUONG XI", "NGO XUANG XI", "KIEU CONG HAN", "NGUYEN KHOAN",
+    "NGUYEN THU TIEP", "LY KHUE", "PHAM BACH HO", "NGO NHAT KHANH", "TRAN LAM"
+  ];
+  return warlordNames.some(w => nameNorm.includes(w));
 }

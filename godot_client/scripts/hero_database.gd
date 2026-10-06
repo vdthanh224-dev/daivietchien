@@ -191,10 +191,10 @@ func _init_all_heroes() -> void:
 	_add_hero(26, "Đỗ Cảnh Thạc", "Thăng Long", 4, "Cát Cứ", "Mỗi khi bị chọn làm mục tiêu của Vườn Không Nhà Trống hoặc Đột Kích Trộm Lương, bạn lập tức được rút 1 lá bài.", "res://assets/ui/do_canh_thac.png", "do_canh_thac")
 	_add_hero(27, "Kiều Thuận", "Thăng Long", 4, "Hồi Hồ", "Nếu trong lượt của mình bạn không sử dụng lá Trảm nào, sát thương đầu tiên bạn nhận cho tới lượt kế tiếp của bạn được giảm đi 1 điểm.", "res://assets/ui/kieu_thuan.png", "kieu_thuan")
 	_add_hero(28, "Nguyễn Siêu", "Thăng Long", 4, "Liệt Chiến", "Khi tham gia vào lá Huyết Chiến, nếu bạn là người chiến thắng, hồi 1 Máu.", "res://assets/ui/nguyen_sieu.png", "nguyen_sieu")
-	_add_hero(29, "Lã Đường", "Thăng Long", 4, "Tế Giang", "Khi dùng Trảm nhắm vào mục tiêu không trang bị lá Chiến Mã (+1 Khoảng cách), Tầm đánh của bạn tính là không giới hạn khoảng cách.", "res://assets/ui/la_duong.png", "la_duong")
-	_add_hero(30, "Đinh Bộ Lĩnh", "Thăng Long", 4, "Cờ Lau", "Mỗi khi đòn Trảm của bạn gây sát thương lên mục tiêu, bạn được chọn: Rút 1 lá bài từ xấp rút HOẶC phá hủy 1 lá trang bị của nạn nhân.", "res://assets/ui/dinh_bo_linh.png", "dinh_bo_linh")
+	_add_hero(29, "Lã Đường", "Thăng Long", 4, "Tế Giang", "Khi dùng Trảm nhắm vào mục tiêu không trang bị lá Chiến Mã, Tầm đánh của bạn tính là không giới hạn khoảng cách.", "res://assets/ui/la_duong.png", "la_duong")
+	_add_hero(30, "Đinh Bộ Lĩnh", "Thăng Long", 4, "Cờ Lau", "Mỗi khi bạn Trảm gây sát thương, bạn được chọn: Rút 1 lá bài từ xấp rút HOẶC phá hủy 1 lá trang bị của nạn nhân.", "res://assets/ui/dinh_bo_linh.png", "dinh_bo_linh")
 	_add_hero(31, "Đinh Liễn", "Thăng Long", 4, "Trữ Quân", "Đầu Giai đoạn Rút bài, bạn có thể tự giảm 1 Máu để được rút thêm 2 lá bài.", "res://assets/ui/dinh_lien.png", "dinh_lien")
-	_add_hero(32, "Đinh Điền", "Thăng Long", 4, "Trung Tiết", "Khi chúa công hoặc người chơi cùng phe nhận sát thương chí tử, bạn có thể tự mất 1 Máu để họ hồi lại 1 Máu ngay lập tức.", "res://assets/ui/dinh_dien.png", "dinh_dien")
+	_add_hero(32, "Đinh Điền", "Thăng Long", 4, "Trung Tiết", "Khi có người vào trạng thái Cận Tử mà không phải bạn, bạn có thể tự mất 1 Máu để rút 3 lá, nếu người Cận Tử sống sót, bạn rút thêm 1 lá.", "res://assets/ui/dinh_dien.png", "dinh_dien")
 	_add_hero(33, "Nguyễn Bặc", "Thăng Long", 4, "Định Quốc", "Bạn có thể dùng bất kỳ lá bài Đen như lá Huyết Chiến.", "res://assets/ui/nguyen_bac.png", "nguyen_bac")
 	_add_hero(34, "Phạm Hạp", "Thăng Long", 4, "Tận Trung", "Mỗi khi có người chơi khác sử dụng Bánh Chưng để hồi máu, bạn được rút 1 lá bài từ xấp bài rút.", "res://assets/ui/pham_hap.png", "pham_hap")
 	_add_hero(35, "Lê Hoàn", "Thăng Long", 4, "Phá Tống", "Khi đánh ra lá Trảm, bạn có thể bỏ thêm 1 lá bài trên tay để đòn Trảm đó không thể bị đối phương dùng Đỡ triệt tiêu.", "res://assets/ui/le_hoan.png", "le_hoan")
@@ -405,6 +405,26 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 		skills = [
 			{"id": "liet_chien", "name": "Liệt Chiến", "desc": "Khi tham gia vào lá Huyết Chiến, nếu bạn là người chiến thắng, hồi 1 Máu."},
 			{"id": "tay_phu", "name": "Tây Phu", "desc": "Bạn có thể dùng 2 lá trên tay để xem như sử dụng 1 lá Cẩm Nang Huyết Chiến nhắm vào mục tiêu bất kỳ."}
+		]
+	elif id == 29:
+		skills = [
+			{"id": "te_giang", "name": "Tế Giang", "desc": "Khi dùng Trảm nhắm vào mục tiêu không trang bị lá Chiến Mã, Tầm đánh của bạn tính là không giới hạn khoảng cách."},
+			{"id": "uu_thiep", "name": "Ưu Thiếp", "desc": "Khi bạn Trảm gây sát thương, bạn có thể cướp 1 lá Chiến Mã của nạn nhân."}
+		]
+	elif id == 30:
+		skills = [
+			{"id": "co_lau", "name": "Cờ Lau", "desc": "Mỗi khi bạn Trảm gây sát thương, bạn được chọn: Rút 1 lá bài từ xấp rút HOẶC phá hủy 1 lá trang bị của nạn nhân."},
+			{"id": "van_thang", "name": "Vạn Thắng", "desc": "Khi bạn tiêu diệt thành công 1 người, bạn rút 2 lá. Nếu đó là một trong 12 Sứ Quân, bạn hồi 1 máu."}
+		]
+	elif id == 31:
+		skills = [
+			{"id": "tru_quan", "name": "Trữ Quân", "desc": "Đầu Giai đoạn Rút bài, bạn có thể tự giảm 1 Máu để được rút thêm 2 lá bài."},
+			{"id": "cot_kinh", "name": "Cột Kinh", "desc": "Mỗi khi máu của bạn giảm vì bất cứ lý do gì, bạn có thể chọn 1 người chơi khác; người đó phải bỏ 1 lá bài trên tay."}
+		]
+	elif id == 32:
+		skills = [
+			{"id": "trung_tiet", "name": "Trung Tiết", "desc": "Khi có người vào trạng thái Cận Tử mà không phải bạn, bạn có thể tự mất 1 Máu để rút 3 lá, nếu người Cận Tử sống sót, bạn rút thêm 1 lá."},
+			{"id": "can_ve", "name": "Cận Vệ", "desc": "Khi người chơi trong Tầm đánh 1 của bạn bị tấn công bởi Trảm, bạn có thể thay đổi mục tiêu bị Trảm thành bản thân."}
 		]
 	var h = {
 		"id": id,

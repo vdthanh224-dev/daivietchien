@@ -1786,6 +1786,16 @@ func _has_no_than(g: Dictionary) -> bool:
 	var weapon = str(g.get("equipped_weapon", ""))
 	return "Nỏ Thần" in weapon or "No Than" in weapon
 
+func _has_equipped_horse(g: Dictionary) -> bool:
+	if not str(g.get("equipped_off_horse", "")).is_empty() or not str(g.get("equipped_def_horse", "")).is_empty():
+		return true
+	for eq in g.get("equipments", []):
+		if typeof(eq) == TYPE_DICTIONARY:
+			var sub_type = eq.get("subType", "")
+			if sub_type == 7 or sub_type == 8 or "HORSE" in str(sub_type).to_upper():
+				return true
+	return false
+
 func _is_server_skill_active(player: Dictionary, skill_name: String) -> bool:
 	var keys = player.get("activeSkillsKeys", [])
 	var values = player.get("activeSkillsValues", [])
@@ -3475,8 +3485,15 @@ func _on_card_play_btn_clicked() -> void:
 		NetworkClient.send_respond_action(true, str(_get_card_info_from_ui(selected_card_ui).get("id", "")))
 		card_play_btn.disabled = true
 		return
-	if current_server_phase in ["AWAIT_AN_DAN", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_TRUNG_KIEN"] and current_waiting_seat == my_seat:
+	if current_server_phase in ["AWAIT_AN_DAN", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_TRUNG_KIEN", "AWAIT_TRU_QUAN", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE"] and current_waiting_seat == my_seat:
 		NetworkClient.send_respond_action(true, "")
+		card_play_btn.disabled = true
+		return
+	if current_server_phase == "AWAIT_COT_KINH_TARGET" and current_waiting_seat == my_seat:
+		if selected_target_seat <= 0 or selected_target_seat == my_seat:
+			desc_text.text = "⚠️ [CỘT KINH] hãy chọn 1 người chơi khác."
+			return
+		NetworkClient.send_respond_action(true, str(selected_target_seat))
 		card_play_btn.disabled = true
 		return
 	if current_server_phase == "AWAIT_KHOI_BINH" and current_waiting_seat == my_seat:
@@ -3665,7 +3682,8 @@ func _on_card_play_btn_clicked() -> void:
 		var dist = _calculate_distance(my_seat, selected_target_seat)
 		var max_r = _get_attack_range(my_seat)
 		var water_bach_dang = ("Thủy" in c_name and p_gen.get("equipped_off_horse", "") == "Thuyền Bạch Đằng")
-		if dist > max_r and not water_bach_dang:
+		var te_giang_ignore = (_hero_has_skill(p_gen, "te_giang") and not _has_equipped_horse(tgt))
+		if dist > max_r and not water_bach_dang and not te_giang_ignore:
 			desc_text.text = "⚠️ Khoảng cách tới %s là %d (Tầm đánh của bạn là %d)!" % [tgt["name"], dist, max_r]
 			return
 		var da_trach_blocks = _is_da_trach_slash_blocked(selected_target_seat)
@@ -5337,7 +5355,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		elif server_waiting_seat != my_seat:
 			turn_indicator.text = "🐘 ĐANG CHỜ MỤC TIÊU CHỌN OAI NHƯỢC (%ds)..." % server_waiting_timer
 
-	elif server_phase in ["AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_TRUNG_KIEN"]:
+	elif server_phase in ["AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_TRUNG_KIEN", "AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE"]:
 		is_player_turn = false
 		if server_waiting_seat == my_seat:
 			card_play_btn.visible = true
@@ -5379,6 +5397,22 @@ func _apply_network_game_state(state: Dictionary) -> void:
 				end_turn_btn.text = "BỎ QUA"
 				turn_indicator.text = "📚 VĂN SÁCH: BỎ 1 LÁ ĐỂ RÚT 1 LÁ? (%ds)" % server_waiting_timer
 				desc_text.text = "Sau khi dùng Cẩm Nang thứ hai trong lượt, chọn 1 lá trên tay để bỏ và rút 1 lá, hoặc bỏ qua."
+			elif server_phase == "AWAIT_TRU_QUAN":
+				card_play_btn.text = "👑 GIẢM 1 MÁU RÚT 2 LÁ"
+				turn_indicator.text = "👑 TRỮ QUÂN: RÚT THÊM 2 LÁ? (%ds)" % server_waiting_timer
+				desc_text.text = "Tự giảm 1 Máu để được rút thêm 2 lá bài ở đầu giai đoạn rút bài."
+			elif server_phase == "AWAIT_COT_KINH_TARGET":
+				card_play_btn.text = "🏛️ CHỌN MỤC TIÊU BỎ BÀI"
+				turn_indicator.text = "🏛️ CỘT KINH: CHỌN NGƯỜI CHƠI BỎ BÀI (%ds)" % server_waiting_timer
+				desc_text.text = "Chọn 1 người chơi khác; người đó phải bỏ 1 lá bài trên tay."
+			elif server_phase == "AWAIT_TRUNG_TIET":
+				card_play_btn.text = "🛡️ MẤT 1 MÁU RÚT 3 LÁ"
+				turn_indicator.text = "🛡️ TRUNG TIẾT: CỨU NẠN NHÂN (%ds)" % server_waiting_timer
+				desc_text.text = "Tự mất 1 Máu để rút 3 lá (nếu nạn nhân sống sót, bạn rút thêm 1 lá)."
+			elif server_phase == "AWAIT_CAN_VE":
+				card_play_btn.text = "🛡️ ĐỠ TRẢM THAY ĐỒNG ĐỘI"
+				turn_indicator.text = "🛡️ CẬN VỆ: CHUYỂN TRẢM SANG BẢN THÂN (%ds)" % server_waiting_timer
+				desc_text.text = "Thay đổi mục tiêu bị Trảm của người trong Tầm 1 thành bản thân."
 			else:
 				card_play_btn.text = "🛡️ PHÁT ĐỘNG TRUNG KIÊN"
 				turn_indicator.text = "🛡️ TRUNG KIÊN: CỨU NGƯỜI SẮP TỬ TRẬN (%ds)" % server_waiting_timer
@@ -9631,7 +9665,8 @@ func _execute_ai_turn(ai_seat: int) -> void:
 				var dist = _calculate_distance(ai_seat, e_seat)
 				var max_r = _get_attack_range(ai_seat)
 				var water_bach_dang = ("Thủy" in card_name and ai_gen.get("equipped_off_horse", "") == "Thuyền Bạch Đằng")
-				if dist <= max_r or water_bach_dang:
+				var te_giang_ignore = (_hero_has_skill(ai_gen, "te_giang") and not _has_equipped_horse(generals_data[e_seat]))
+				if dist <= max_r or water_bach_dang or te_giang_ignore:
 					valid_slash_targets.append(e_seat)
 
 			if not valid_slash_targets.is_empty():
@@ -9757,7 +9792,7 @@ func _on_end_turn_btn_clicked() -> void:
 		NetworkClient.send_respond_action(true, str(_get_card_info_from_ui(selected_card_ui).get("id", "")))
 		card_play_btn.disabled = true
 		return
-	if current_server_phase in ["AWAIT_AN_DAN", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_TRUNG_KIEN", "AWAIT_VAN_SACH"] and current_waiting_seat == my_seat:
+	if current_server_phase in ["AWAIT_AN_DAN", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_TRUNG_KIEN", "AWAIT_VAN_SACH", "AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE"] and current_waiting_seat == my_seat:
 		NetworkClient.send_respond_action(false, "")
 		end_turn_btn.disabled = true
 		return

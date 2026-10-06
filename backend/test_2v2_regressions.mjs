@@ -1641,4 +1641,170 @@ for (const [subType, name] of [
   assert.equal(stateAnDan.phase, "AWAIT_AN_DAN_DUEL");
 }
 
+{
+  // Hero 29: Lã Đường - Tế Giang & Ưu Thiếp
+  const state = freshState();
+  state.players[0].heroId = "HERO_29"; // Lã Đường (seat 1)
+  state.players[1].heroId = "HERO_1";  // seat 2
+  state.players[2].heroId = "HERO_2";  // seat 3 (cách 2)
+
+  // Mục tiêu seat 3 không có ngựa -> Tế Giang không giới hạn tầm đánh
+  put(state, 1, card("SLASH_TG_1", "Trảm", CARD_SUBTYPES.ATTACK_NORMAL));
+  const resSlash = handlePlayCard(state, 1, "SLASH_TG_1", 3);
+  assert.equal(resSlash.success, true);
+  assert.equal(state.phase, "AWAIT_SLASH_DEFENSE");
+  handleRespondAction(state, 3, false, null); // chịu đòn
+
+  // Trang bị ngựa cho seat 3 -> Tế Giang không áp dụng, ngoài tầm đánh
+  const horseDef = card("HORSE_DEF", "Ngựa Thủ", CARD_SUBTYPES.DEFENSIVE_HORSE, CARD_CATEGORIES.EQUIPMENT);
+  state.players[2].equipments.push(horseDef);
+  state.phase = "PLAY";
+  state.slashesUsedThisTurn = 0;
+  put(state, 1, card("SLASH_TG_2", "Trảm", CARD_SUBTYPES.ATTACK_NORMAL));
+  const resBlocked = handlePlayCard(state, 1, "SLASH_TG_2", 3);
+  assert.match(resBlocked.error, /Mục tiêu ngoài tầm đánh/);
+
+  // Seat 2 (trong tầm 1) có ngựa, Lã Đường Trảm trúng -> Ưu Thiếp cướp ngựa
+  const horseOff = card("HORSE_OFF", "Ngựa Công", CARD_SUBTYPES.OFFENSIVE_HORSE, CARD_CATEGORIES.EQUIPMENT);
+  state.players[1].equipments.push(horseOff);
+  put(state, 1, card("SLASH_UT", "Trảm", CARD_SUBTYPES.ATTACK_NORMAL));
+  assert.equal(handlePlayCard(state, 1, "SLASH_UT", 2).success, true);
+  handleRespondAction(state, 2, false, null); // chịu đòn
+  assert.equal(state.players[1].equipments.some((e) => e.id === "HORSE_OFF"), false);
+  assert.equal(state.players[0].hand.some((c) => c.id === "HORSE_OFF"), true);
+}
+
+{
+  // Hero 30: Đinh Bộ Lĩnh - Cờ Lau & Vạn Thắng
+  const state = freshState();
+  state.players[0].heroId = "HERO_30"; // Đinh Bộ Lĩnh (seat 1)
+  state.players[1].heroId = "HERO_1";  // seat 2
+  state.players[1].hp = 3;
+  const eq = card("EQ_WEAPON", "Vũ Khí Test", CARD_SUBTYPES.WEAPON, CARD_CATEGORIES.EQUIPMENT);
+  state.players[1].equipments.push(eq);
+
+  // Cờ Lau: Chọn phá trang bị của nạn nhân
+  put(state, 1, card("SLASH_CL_1", "Trảm", CARD_SUBTYPES.ATTACK_NORMAL));
+  handlePlayCard(state, 1, "SLASH_CL_1", 2);
+  handleRespondAction(state, 2, false, null);
+  assert.equal(state.phase, "AWAIT_TARGET_CARD");
+  assert.equal(state.targetCardSelection.effectType, "CO_LAU");
+  handleRespondAction(state, 1, true, null, "EQUIPMENT:EQ_WEAPON");
+  assert.equal(state.players[1].equipments.length, 0);
+
+  // Cờ Lau: Chọn rút 1 lá khi đối thủ có trang bị
+  state.phase = "PLAY";
+  state.slashesUsedThisTurn = 0;
+  const eq2 = card("EQ_ARMOR", "Giáp Test", CARD_SUBTYPES.ARMOR, CARD_CATEGORIES.EQUIPMENT);
+  state.players[1].equipments.push(eq2);
+  put(state, 1, card("SLASH_CL_2", "Trảm", CARD_SUBTYPES.ATTACK_NORMAL));
+  handlePlayCard(state, 1, "SLASH_CL_2", 2);
+  handleRespondAction(state, 2, false, null);
+  assert.equal(state.phase, "AWAIT_TARGET_CARD");
+  const handBeforeCL = state.players[0].hand.length;
+  handleRespondAction(state, 1, true, null, "CO_LAU_DRAW");
+  assert.equal(state.players[0].hand.length, handBeforeCL + 1);
+  assert.equal(state.players[1].equipments.length, 1);
+
+  // Vạn Thắng: Tiêu diệt Đỗ Cảnh Thạc (1 trong 12 Sứ Quân) -> rút 2 lá + hồi 1 máu
+  state.phase = "PLAY";
+  state.slashesUsedThisTurn = 0;
+  state.players[0].hp = 2; // Đinh Bộ Lĩnh mất máu
+  const bow = card("BOW_RANGE", "Cung", CARD_SUBTYPES.WEAPON, CARD_CATEGORIES.EQUIPMENT);
+  bow.range = 2;
+  state.players[0].equipments.push(bow);
+  state.players[1].heroId = "HERO_26"; // Đỗ Cảnh Thạc (seat 2)
+  state.players[1].hp = 1;
+  const handBeforeVT = state.players[0].hand.length;
+  put(state, 1, card("SLASH_VT", "Trảm", CARD_SUBTYPES.ATTACK_NORMAL));
+  assert.equal(handlePlayCard(state, 1, "SLASH_VT", 2).success, true);
+  handleRespondAction(state, 2, false, null); // không đỡ
+  while (state.phase === "AWAIT_NEAR_DEATH") {
+    handleRespondAction(state, state.waitingTargetSeat, false, null);
+  }
+  assert.equal(state.players[1].isAlive, false);
+  assert.equal(state.players[0].hp, 3); // hồi 1 máu
+  assert.equal(state.players[0].hand.length, handBeforeVT + 3); // rút 2 lá (Vạn Thắng) + 1 lá (Cờ Lau)
+}
+
+{
+  // Hero 31: Đinh Liễn - Trữ Quân & Cột Kinh
+  const state = freshState();
+  state.players[0].heroId = "HERO_31"; // Đinh Liễn (seat 1)
+  state.players[1].heroId = "HERO_2";  // seat 2
+  put(state, 2, card("HAND_S2", "Lá trên tay", CARD_SUBTYPES.ATTACK_NORMAL));
+
+  state.turnStart = { seat: 1, skipDraw: false, skipPlay: false };
+  state.phase = "AWAIT_TRU_QUAN";
+  state.waitingTargetSeat = 1;
+
+  // Đinh Liễn kích hoạt Trữ Quân (tự giảm 1 Máu -> kích hoạt Cột Kinh)
+  handleRespondAction(state, 1, true, null);
+  assert.equal(state.players[0].hp, 3);
+  assert.equal(state.phase, "AWAIT_COT_KINH_TARGET");
+  assert.equal(state.waitingTargetSeat, 1);
+
+  // Chọn seat 2 phải bỏ 1 lá trên tay
+  handleRespondAction(state, 1, true, "2");
+  assert.equal(state.phase, "AWAIT_TARGET_CARD");
+  assert.equal(state.targetCardSelection.effectType, "COT_KINH_DISCARD");
+  assert.equal(state.waitingTargetSeat, 2);
+
+  handleRespondAction(state, 2, true, null, "HAND:0");
+  assert.equal(state.players[1].hand.length, 0);
+
+  // Hoàn tất Cột Kinh -> tiếp tục rút bài Trữ Quân (2 cơ bản + 2 thêm = 4 lá)
+  assert.equal(state.phase, "PLAY");
+  assert.equal(state.players[0].hand.length, 4);
+}
+
+{
+  // Hero 32: Đinh Điền - Trung Tiết & Cận Vệ
+  const state = freshState();
+  state.players[0].heroId = "HERO_1";  // seat 1
+  state.players[1].heroId = "HERO_32"; // Đinh Điền (seat 2)
+  state.players[2].heroId = "HERO_2";  // seat 3
+  state.players[3].heroId = "HERO_3";  // seat 4
+
+  // Cận Vệ: Seat 1 Trảm seat 3 (Đinh Điền seat 2 cách seat 3 tầm 1)
+  const bow = card("BOW_CV", "Cung", CARD_SUBTYPES.WEAPON, CARD_CATEGORIES.EQUIPMENT);
+  bow.range = 3;
+  state.players[0].equipments.push(bow);
+  put(state, 1, card("SLASH_CAN_VE", "Trảm", CARD_SUBTYPES.ATTACK_NORMAL));
+  assert.equal(handlePlayCard(state, 1, "SLASH_CAN_VE", 3).success, true);
+  assert.equal(state.phase, "AWAIT_CAN_VE");
+  assert.equal(state.waitingTargetSeat, 2);
+
+  // Đinh Điền đỡ đòn thay
+  handleRespondAction(state, 2, true, null);
+  assert.equal(state.phase, "AWAIT_SLASH_DEFENSE");
+  assert.equal(state.waitingTargetSeat, 2);
+  handleRespondAction(state, 2, false, null); // Đinh Điền nhận sát thương
+
+  // Trung Tiết: Seat 3 bị cận tử
+  state.players[2].hp = 1;
+  put(state, 3, card("PEACH_S3", "Bánh Chưng", CARD_SUBTYPES.PEACH));
+  const handBeforeTT = state.players[1].hand.length;
+  applyDamageToPlayer(state, 3, 1, "Sát thương");
+
+  assert.equal(state.phase, "AWAIT_TRUNG_TIET");
+  assert.equal(state.waitingTargetSeat, 2);
+
+  // Đinh Điền kích hoạt Trung Tiết: mất 1 máu, rút 3 lá
+  const ddHp = state.players[1].hp;
+  handleRespondAction(state, 2, true, null);
+  assert.equal(state.players[1].hp, ddHp - 1);
+  assert.equal(state.players[1].hand.length, handBeforeTT + 3);
+
+  // Seat 3 được cứu sống
+  assert.equal(state.phase, "AWAIT_NEAR_DEATH");
+  while (state.waitingTargetSeat !== 3 && state.phase === "AWAIT_NEAR_DEATH") {
+    handleRespondAction(state, state.waitingTargetSeat, false, null);
+  }
+  handleRespondAction(state, 3, true, "PEACH_S3");
+  assert.equal(state.players[2].hp, 1);
+  // Nạn nhân sống sót -> Đinh Điền rút thêm 1 lá (tổng cộng +4 lá)
+  assert.equal(state.players[1].hand.length, handBeforeTT + 4);
+}
+
 console.log("2v2 regression tests: PASS");
