@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: dai-viet-chien-server
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /

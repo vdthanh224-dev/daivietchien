@@ -1,16 +1,17 @@
-FROM denoland/deno:2.9.5
+FROM denoland/deno:latest
 
 WORKDIR /app
 
-# Copy toan bo deploy_deno folder
-COPY deploy_deno/ ./
+# Copy server code
+COPY deploy_deno/ .
 
-# Cache dependencies
+# Cache entry point
 RUN deno cache main.ts
 
-# Railway se set PORT tu dong
-ENV PORT=8080
+USER deno
 
-EXPOSE 8080
+# Render will provide the PORT env var; default to 10000
+ENV PORT=10000
+EXPOSE 10000
 
-CMD ["deno", "run", "--allow-net", "--allow-env", "--allow-read", "main.ts"]
+CMD ["run", "--allow-net", "--allow-env", "--allow-read", "main.ts"]

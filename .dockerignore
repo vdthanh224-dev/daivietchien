@@ -1,0 +1,15 @@
+.git
+godot_client/
+backend/
+buildweb/
+Hero_Avatars_Transparent/
+export_templates/
+feature_profiles/
+script_templates/
+text_editor_themes/
+scratch/
+*.exe
+*.zip
+*.bat
+*.log
+*.py
