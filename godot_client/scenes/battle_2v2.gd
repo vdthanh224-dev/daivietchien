@@ -8,6 +8,7 @@ const HERO_SKILL_ACTIONS := {
 	"LIEN_CHAU_TRIGGERED": {"name": "Liên Châu"},
 	"PHU_TRAN_DRAW": {"name": "Phù Trấn"},
 	"UAT_KHI_DRAW": {"name": "Uất Khí"},
+	"UAT_KHI_TRIGGERED": {"name": "Uất Khí"},
 	"TRIEU_DANG_DESTROY": {"name": "Triều Dâng"},
 	"LAP_LANG_DRAW": {"name": "Lập Làng"},
 	"THU_MUC_REDUCED": {"name": "Thủ Mục"},
@@ -2741,13 +2742,16 @@ func _on_general_avatar_clicked(seat_num: int) -> void:
 		return
 
 	if uat_khi_pending:
+		if seat_num == my_seat or int(g.get("hp", 0)) <= 0 or not g.get("is_alive", false):
+			_show_toast("Chỉ có thể chọn người chơi khác còn sống!")
+			return
 		_clear_uat_khi_selection()
 		uat_khi_target_seat = seat_num
 		g["avatar_node"].set_target_highlight(true)
-		card_play_btn.text = "💢 CHO %s RÚT 1 LÁ" % g["name"].to_upper()
+		card_play_btn.text = "💢 CHO %s HỒI 1 MÁU & RÚT 2 LÁ" % g["name"].to_upper()
 		card_play_btn.disabled = false
 		card_play_btn.visible = true
-		desc_text.text = "💢 [UẤT KHÍ] Chọn %s rút 1 lá bài." % g["name"]
+		desc_text.text = "💢 [UẤT KHÍ] Chọn %s hồi 1 máu và rút 2 lá bài." % g["name"]
 		AudioManager.play_card_select()
 		return
 
@@ -3569,29 +3573,36 @@ func _on_card_play_btn_clicked() -> void:
 			desc_text.text = "⚠️ [UẤT KHÍ] hãy chọn một người còn sống."
 			return
 		var uat_target = generals_data[uat_khi_target_seat]
-		if not uat_target.get("is_alive", false):
+		if not uat_target.get("is_alive", false) or int(uat_target.get("hp", 0)) <= 0:
 			desc_text.text = "⚠️ Mục tiêu [UẤT KHÍ] không hợp lệ."
 			_clear_uat_khi_selection()
 			return
 		if is_network_mode:
 			uat_khi_submission_pending = true
 			card_play_btn.disabled = true
-			NetworkClient.send_use_skill("Uất Khí", uat_khi_target_seat)
+			NetworkClient.send_respond_action(true, str(uat_khi_target_seat))
 		else:
-			var drawn_card = _draw_card_from_pile()
-			if uat_khi_target_seat == my_seat:
-				_add_card_to_player_hand(drawn_card)
-			else:
-				uat_target["hand_cards"].append(drawn_card)
-				uat_target["hand_count"] = uat_target["hand_cards"].size()
-				uat_target["avatar_node"].update_hand_count(uat_target["hand_count"])
+			var max_hp = int(uat_target.get("max_hp", 3))
+			uat_target["hp"] = min(max_hp, int(uat_target.get("hp", 1)) + 1)
+			if uat_target.has("avatar_node") and is_instance_valid(uat_target["avatar_node"]):
+				uat_target["avatar_node"].update_hp(uat_target["hp"], max_hp)
+			for _d in range(2):
+				var drawn_card = _draw_card_from_pile()
+				if uat_khi_target_seat == my_seat:
+					_add_card_to_player_hand(drawn_card)
+				else:
+					uat_target["hand_cards"].append(drawn_card)
+					uat_target["hand_count"] = uat_target["hand_cards"].size()
+					uat_target["avatar_node"].update_hand_count(uat_target["hand_count"])
 				_animate_draw_to_seat(uat_khi_target_seat)
-			_add_log("💢 [UẤT KHÍ] %s cho %s rút 1 lá bài." % [generals_data[my_seat]["name"], uat_target["name"]])
+			_add_log("💢 [UẤT KHÍ] %s chọn %s: hồi 1 máu và rút 2 lá bài." % [generals_data[my_seat]["name"], uat_target["name"]])
 			_clear_uat_khi_selection()
 			uat_khi_pending = false
 			current_waiting_seat = 0
 			current_waiting_timer = 0.0
 			card_play_btn.visible = false
+			end_turn_btn.visible = false
+			_show_dead_player_exit()
 		return
 
 	if is_targeting_trieu_dang:
@@ -4605,12 +4616,12 @@ func _begin_uat_khi_prompt() -> void:
 	current_waiting_timer = 40.0
 	end_turn_btn.visible = true
 	end_turn_btn.disabled = false
-	end_turn_btn.text = "TỪ CHỐI"
+	end_turn_btn.text = "BỎ QUA"
 	if generals_data.has(my_seat) and generals_data[my_seat].has("avatar_node") and is_instance_valid(generals_data[my_seat]["avatar_node"]):
 		generals_data[my_seat]["avatar_node"].set_turn_active(true)
 		generals_data[my_seat]["avatar_node"].update_turn_timer(40)
 
-func _choose_ai_uat_khi_target(ai_seat: int) -> int:
+func _choose_ai_uat_khi_targets(ai_seat: int) -> Array[int]:
 	var ai_gen = generals_data.get(ai_seat, {})
 	var ai_team = ai_gen.get("isDragon", (ai_seat == 1 or ai_seat == 3))
 	var other_allies: Array[int] = []
@@ -4618,23 +4629,29 @@ func _choose_ai_uat_khi_target(ai_seat: int) -> int:
 		var s_num = int(s)
 		if s_num != ai_seat and generals_data.has(s_num):
 			var g = generals_data[s_num]
-			if g.get("is_alive", false):
+			if g.get("is_alive", false) and int(g.get("hp", 0)) > 0:
 				var s_team = g.get("isDragon", (s_num == 1 or s_num == 3))
 				if s_team == ai_team:
 					other_allies.append(s_num)
 	if other_allies.is_empty():
-		return ai_seat # Không còn đồng đội -> tự buff lên chính mình
+		return []
 	other_allies.sort_custom(func(a: int, b: int) -> bool:
+		var hp_a = float(generals_data[a].get("hp", 1)) / float(max(1, generals_data[a].get("max_hp", 1)))
+		var hp_b = float(generals_data[b].get("hp", 1)) / float(max(1, generals_data[b].get("max_hp", 1)))
+		if hp_a != hp_b:
+			return hp_a < hp_b
 		var count_a = hand_container.get_child_count() if a == my_seat else int(generals_data[a].get("hand_count", 0))
 		var count_b = hand_container.get_child_count() if b == my_seat else int(generals_data[b].get("hand_count", 0))
 		return count_a < count_b
 	)
-	var lowest_ally = other_allies[0]
-	var ally_cards = hand_container.get_child_count() if lowest_ally == my_seat else int(generals_data[lowest_ally].get("hand_count", 0))
-	var ai_cards = hand_container.get_child_count() if ai_seat == my_seat else int(generals_data[ai_seat].get("hand_count", 0))
-	if ally_cards <= ai_cards:
-		return lowest_ally
-	return ai_seat
+	var result: Array[int] = []
+	for i in range(min(2, other_allies.size())):
+		result.append(other_allies[i])
+	return result
+
+func _choose_ai_uat_khi_target(ai_seat: int) -> int:
+	var targets = _choose_ai_uat_khi_targets(ai_seat)
+	return targets[0] if not targets.is_empty() else 0
 
 func _clear_lien_chau_selection() -> void:
 	if lien_chau_cost_card and is_instance_valid(lien_chau_cost_card):
@@ -5073,7 +5090,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		card_play_btn.visible = false
 	# Uất Khí chỉ tồn tại trong đúng pha chờ server; dọn trạng thái cũ
 	# trước khi phần render pha hiện tại thiết lập lại nút hành động.
-	if server_phase != "AWAIT_UAT_KHI" and uat_khi_pending:
+	if server_phase != "AWAIT_UAT_KHI" and server_phase != "AWAIT_UAT_KHI_TARGET" and uat_khi_pending:
 		_clear_uat_khi_selection()
 		uat_khi_pending = false
 		uat_khi_submission_pending = false
@@ -5269,7 +5286,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			turn_indicator.text = "🛡️ NGHĨA TỬ: CHỊU THAY CHO %s? (%ds)" % [protected_name.to_upper(), server_waiting_timer]
 			_update_oai_nhuoc_selection()
 
-	elif server_phase == "AWAIT_UAT_KHI":
+	elif server_phase in ["AWAIT_UAT_KHI", "AWAIT_UAT_KHI_TARGET"]:
 		card_play_btn.visible = false
 		is_player_turn = false
 		if server_waiting_seat == my_seat:
@@ -5277,19 +5294,19 @@ func _apply_network_game_state(state: Dictionary) -> void:
 				_begin_uat_khi_prompt()
 			uat_khi_pending = true
 			end_turn_btn.visible = true
-			end_turn_btn.text = "TỪ CHỐI"
+			end_turn_btn.text = "BỎ QUA"
 			end_turn_btn.disabled = uat_khi_submission_pending
-			turn_indicator.text = "💢 UẤT KHÍ: CHỌN NGƯỜI RÚT BÀI (%ds)" % server_waiting_timer
+			turn_indicator.text = "💢 UẤT KHÍ: CHỌN MỤC TIÊU (%ds)" % server_waiting_timer
 			card_play_btn.visible = true
 			card_play_btn.disabled = uat_khi_submission_pending or uat_khi_target_seat <= 0
-			card_play_btn.text = "💢 CHỌN MỤC TIÊU UẤT KHÍ" if uat_khi_target_seat <= 0 else "💢 CHO %s RÚT 1 LÁ" % generals_data[uat_khi_target_seat]["name"].to_upper()
-			desc_text.text = "💢 [UẤT KHÍ] Chọn 1 mục tiêu còn sống, kể cả bản thân, rồi nhấn nút xác nhận."
+			card_play_btn.text = "💢 CHỌN MỤC TIÊU UẤT KHÍ" if uat_khi_target_seat <= 0 else "💢 CHO %s HỒI 1 MÁU & RÚT 2 LÁ" % generals_data[uat_khi_target_seat]["name"].to_upper()
+			desc_text.text = "💢 [UẤT KHÍ] Chọn người còn sống (tối đa 2 người) để hồi 1 máu và rút 2 lá."
 		else:
 			end_turn_btn.visible = false
 			var wait_gen = generals_data.get(server_waiting_seat, {})
 			var wait_name = wait_gen.get("name", "Ghế %d" % server_waiting_seat) if wait_gen is Dictionary else "Ghế %d" % server_waiting_seat
 			turn_indicator.text = "💢 ĐANG CHỜ %s DÙNG UẤT KHÍ (%ds)..." % [wait_name.to_upper(), server_waiting_timer]
-			desc_text.text = "💢 %s đang chọn có phát động [UẤT KHÍ] hay không." % wait_name
+			desc_text.text = "💢 %s đang chọn mục tiêu [UẤT KHÍ]." % wait_name
 
 	elif server_phase == "AWAIT_KHOI_BINH":
 		is_player_turn = false
@@ -6534,7 +6551,7 @@ func _on_network_action_received(delta: Dictionary) -> void:
 		"KHIEN_MAY_SUCCESS", "KHIEN_MAY_FAILED",
 		"BAI_COC_BACH_DANG_SAFE", "BAI_COC_BACH_DANG_TRIGGERED"
 	]
-	var is_uat_khi_prompt = act_type == "UAT_KHI_PROMPT"
+	var is_uat_khi_prompt = act_type in ["UAT_KHI_PROMPT", "UAT_KHI_TARGET_PROMPT"]
 	var skill_activations := _get_skill_activations(delta)
 	var is_visible_hero_skill_event = not skill_activations.is_empty()
 	var is_an_tich_defense = str(delta.get("defenseSkill", "")) == "Ẩn Tích"
@@ -6725,9 +6742,9 @@ func _on_network_action_received(delta: Dictionary) -> void:
 			var now_m = Time.get_ticks_msec()
 			if not (recent_heal_seats.has(victim_seat) and (now_m - recent_heal_seats[victim_seat] < 1500)):
 				AudioManager.play_damage()
-	elif act_type == "UAT_KHI_PROMPT" and caster_seat == my_seat:
+	elif (act_type == "UAT_KHI_PROMPT" or act_type == "UAT_KHI_TARGET_PROMPT") and caster_seat == my_seat:
 		_begin_uat_khi_prompt()
-		desc_text.text = "💢 [UẤT KHÍ] Chọn 1 người để cho người đó rút 1 lá."
+		desc_text.text = "💢 [UẤT KHÍ] Chọn người còn sống (tối đa 2 người) để hồi 1 máu và rút 2 lá."
 	elif act_type == "PLAYER_DIED":
 		var victim_seat = int(delta.get("targetSeat", 0))
 		if victim_seat > 0 and generals_data.has(victim_seat):
@@ -8202,29 +8219,6 @@ func _apply_damage_to_general(target_seat: int, amount: int, attacker_seat: int 
 			_add_log("✨ [HỊCH NGHĨA] %s rơi vào Cận Tử, rút 3 lá bài!" % tgt["name"])
 		_prompt_near_death_check(target_seat)
 	else:
-		if amount > 0 and _hero_has_skill(tgt, "uat_khi"):
-			if target_seat == my_seat:
-				_begin_uat_khi_prompt()
-				desc_text.text = "💢 [UẤT KHÍ] Chọn 1 người để cho người đó rút 1 lá."
-			else:
-				var chosen_seat = _choose_ai_uat_khi_target(target_seat)
-				if chosen_seat > 0 and generals_data.has(chosen_seat):
-					var c_gen = generals_data[chosen_seat]
-					var drawn_card = _draw_card_from_pile()
-					if chosen_seat == my_seat:
-						_add_card_to_player_hand(drawn_card)
-					else:
-						c_gen["hand_cards"].append(drawn_card)
-						c_gen["hand_count"] = c_gen["hand_cards"].size()
-						if c_gen.has("avatar_node") and is_instance_valid(c_gen["avatar_node"]):
-							c_gen["avatar_node"].update_hand_count(c_gen["hand_count"])
-					_animate_draw_to_seat(chosen_seat)
-					_add_log("💢 [UẤT KHÍ] %s phát động Uất Khí, cho %s rút 1 lá." % [tgt["name"], c_gen["name"]])
-					var tgt_avatar = tgt.get("avatar_node")
-					if is_instance_valid(tgt_avatar) and tgt_avatar.has_method("show_skill_banner"):
-						tgt_avatar.show_skill_banner("UẤT KHÍ", 2.0, true)
-					AudioManager.play_voice("Uất Khí")
-					AudioManager.play_skill()
 		_check_victory_condition()
 
 func _prompt_near_death_check(victim_seat: int) -> void:
@@ -8393,7 +8387,38 @@ func _handle_general_death(seat_num: int) -> void:
 			_animate_draw_to_seat(teammate_seat)
 			_add_log("🃏 %s rút 1 lá vì đồng đội %s đã tử trận." % [teammate["name"], g["name"]])
 			break
-	if seat_num == my_seat:
+
+	if not is_network_mode and _hero_has_skill(g, "uat_khi"):
+		if seat_num == my_seat:
+			_begin_uat_khi_prompt()
+			desc_text.text = "💢 [UẤT KHÍ] Chọn người còn sống (tối đa 2 người) để hồi 1 máu và rút 2 lá."
+		else:
+			var chosen_seats = _choose_ai_uat_khi_targets(seat_num)
+			for c_seat in chosen_seats:
+				if generals_data.has(c_seat):
+					var c_gen = generals_data[c_seat]
+					var max_hp = int(c_gen.get("max_hp", 3))
+					c_gen["hp"] = min(max_hp, int(c_gen.get("hp", 1)) + 1)
+					if c_gen.has("avatar_node") and is_instance_valid(c_gen["avatar_node"]):
+						c_gen["avatar_node"].update_hp(c_gen["hp"], max_hp)
+					for _d in range(2):
+						var drawn = _draw_card_from_pile()
+						if c_seat == my_seat:
+							_add_card_to_player_hand(drawn)
+						else:
+							c_gen["hand_cards"].append(drawn)
+							c_gen["hand_count"] = c_gen["hand_cards"].size()
+							if c_gen.has("avatar_node") and is_instance_valid(c_gen["avatar_node"]):
+								c_gen["avatar_node"].update_hand_count(c_gen["hand_count"])
+						_animate_draw_to_seat(c_seat)
+					_add_log("💢 [UẤT KHÍ] %s chọn %s: hồi 1 máu và rút 2 lá." % [g["name"], c_gen["name"]])
+			var dead_avatar = g.get("avatar_node")
+			if is_instance_valid(dead_avatar) and dead_avatar.has_method("show_skill_banner"):
+				dead_avatar.show_skill_banner("UẤT KHÍ", 2.0, true)
+			AudioManager.play_voice("Uất Khí")
+			AudioManager.play_skill()
+
+	if seat_num == my_seat and not uat_khi_pending:
 		_show_dead_player_exit()
 
 func _show_dead_player_exit() -> void:
@@ -9819,7 +9844,7 @@ func _on_end_turn_btn_clicked() -> void:
 		if is_network_mode:
 			uat_khi_submission_pending = true
 			end_turn_btn.disabled = true
-			NetworkClient.send_use_skill("Uất Khí", 0)
+			NetworkClient.send_respond_action(false, "")
 		else:
 			_clear_uat_khi_selection()
 			uat_khi_pending = false
@@ -9827,6 +9852,7 @@ func _on_end_turn_btn_clicked() -> void:
 			current_waiting_timer = 0.0
 			end_turn_btn.visible = false
 			_add_log("💢 Bạn từ chối phát động [UẤT KHÍ].")
+			_show_dead_player_exit()
 		return
 
 	if not is_player_turn and not is_discard_phase:

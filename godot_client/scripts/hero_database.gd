@@ -279,7 +279,7 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 	elif id == 3:
 		skills = [
 			{"id": "hich_nghia", "name": "Hịch Nghĩa", "desc": "Khi bạn rơi vào trạng thái Cận Tử, bạn lập tức rút 3 lá bài."},
-			{"id": "uat_khi", "name": "Uất Khí", "desc": "Khi bạn bị mất Máu mà chưa rơi vào trạng thái Cận Tử, bạn có thể cho 1 mục tiêu rút 1 lá bài."}
+			{"id": "uat_khi", "name": "Uất Khí", "desc": "Khi bạn tử trận, chọn tối đa 2 người, mỗi người trong họ được hồi 1 máu và rút 2 lá bài."}
 		]
 	elif id == 4:
 		skills = [

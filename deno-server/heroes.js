@@ -114,7 +114,7 @@ export const SKILLS = {
   XA_THUAN: { id: 'XA_THUAN', name: 'Xạ Thuẫn', type: 'PASSIVE', description: 'Bạn mặc định tăng 2 tầm Ngựa công.' },
   PHU_TRAN: { id: 'PHU_TRAN', name: 'Phù Trấn', type: 'TRIGGERED', description: 'Khi bạn sử dụng Trảm mà không đeo vũ khí, bạn được rút 1 lá bài.' },
   HICH_NGHIA: { id: 'HICH_NGHIA', name: 'Hịch Nghĩa', type: 'TRIGGERED', description: 'Khi bạn rơi vào trạng thái Cận Tử, bạn lập tức rút 3 lá bài.' },
-  UAT_KHI: { id: 'UAT_KHI', name: 'Uất Khí', type: 'OPTIONAL', description: 'Khi bạn bị mất Máu mà chưa rơi vào trạng thái Cận Tử, bạn có thể cho 1 mục tiêu rút 1 lá bài.' },
+  UAT_KHI: { id: 'UAT_KHI', name: 'Uất Khí', type: 'TRIGGERED', description: 'Khi bạn tử trận, chọn tối đa 2 người, mỗi người trong họ được hồi 1 máu và rút 2 lá bài.' },
   TRIEU_DANG: { id: 'TRIEU_DANG', name: 'Triều Dâng', type: 'ACTIVE', description: 'Một lần mỗi lượt, chỉ định hủy 1 lá trang bị của 1 người khác.' },
   LAP_LANG: { id: 'LAP_LANG', name: 'Lập Làng', type: 'TRIGGERED', description: 'Cuối lượt của mình, nếu bạn không gây sát thương, bạn rút 2 lá bài.' },
   DUNG_NU: { id: 'DUNG_NU', name: 'Dũng Nữ', type: 'PASSIVE', description: 'Đòn Trảm của bạn khiến mục tiêu phải đánh ra 2 lá Đỡ mới có thể triệt tiêu nếu mục tiêu có lượng Máu hiện tại nhiều hơn bạn.' },

@@ -130,33 +130,91 @@ assert.equal(HERO_MAX_HP[7], 4);
 }
 
 {
+  // Test: Uất Khí triggers on death (Thi Sách), heals 1 HP and draws 2 cards for up to 2 living players
   const state = freshState();
-  state.players[1].heroId = 3; // Thi Sach
-  put(state, 1, card("UAT_KHI_SLASH", "Trảm Thường", CARD_SUBTYPES.ATTACK_NORMAL));
-  assert.equal(handlePlayCard(state, 1, "UAT_KHI_SLASH", 2).success, true);
-  assert.equal(handleRespondAction(state, 2, false, null).success, true);
-  assert.equal(state.phase, "AWAIT_UAT_KHI");
+  state.players[1].heroId = 3; // Thi Sách (Seat 2)
+  state.players[1].hp = 1;
+  // Ally (Seat 4) damaged
+  state.players[3].hp = 2;
+  const allyHandBefore = state.players[3].hand.length;
+
+  // Thi Sách takes lethal damage
+  applyDamageToPlayer(state, 2, 1, "Kiểm thử tử trận");
+  assert.equal(state.phase, "AWAIT_NEAR_DEATH");
+  while (state.phase === "AWAIT_NEAR_DEATH") {
+    handleRespondAction(state, state.waitingTargetSeat, false, null);
+  }
+
+  // Thi Sách died, triggers Uất Khí
+  assert.equal(state.players[1].hp <= 0, true);
+  assert.equal(state.phase, "AWAIT_UAT_KHI_TARGET");
   assert.equal(state.waitingTargetSeat, 2);
   assert.equal(state.waitingTimer, 40);
-  assert.notEqual(state.activeCard, null);
-  state.players[1].isAI = true;
-  state.timerStartAt = Date.now() - 3_000;
-  tickGameState(state);
-  assert.equal(state.phase, "AWAIT_UAT_KHI");
-  assert.equal(state.waitingTargetSeat, 2);
-  assert.equal(handleUseSkill(state, 2, "Uất Khí", 0).success, true);
+
+  // Thi Sách picks ally (Seat 4) - finishes immediately as no other living allies remain
+  assert.equal(handleRespondAction(state, 2, true, "4").success, true);
+  assert.equal(state.players[3].hp, 3, "Đồng đội được hồi 1 máu");
+  assert.equal(state.players[3].hand.length, allyHandBefore + 2, "Đồng đội được rút 2 lá");
   assert.equal(state.phase, "PLAY");
-  assert.equal(state.activeCard, null);
+  assert.equal(state.uatKhiPending, null);
 }
 
 {
+  // Test: Uất Khí sequential 2-step selection (pick 1 target while another ally exists -> prompt again -> pick 2nd target)
   const state = freshState();
-  state.players[1].heroId = 3; // Thi Sach
-  const selfHandBefore = state.players[1].hand.length;
+  state.players[1].heroId = 3; // Thi Sách (Seat 2)
+  state.players[1].hp = 1;
+  state.players[0].hp = 2; // Enemy Seat 1
+  state.players[3].hp = 2; // Ally Seat 4
+  const seat1HandBefore = state.players[0].hand.length;
+  const seat4HandBefore = state.players[3].hand.length;
+
   applyDamageToPlayer(state, 2, 1, "Kiểm thử");
-  assert.equal(state.phase, "AWAIT_UAT_KHI");
-  assert.equal(handleUseSkill(state, 2, "Uất Khí", 2).success, true);
-  assert.equal(state.players[1].hand.length, selfHandBefore + 1, "Uất Khí phải cho phép chọn chính mình");
+  while (state.phase === "AWAIT_NEAR_DEATH") {
+    handleRespondAction(state, state.waitingTargetSeat, false, null);
+  }
+  assert.equal(state.phase, "AWAIT_UAT_KHI_TARGET");
+
+  // Step 1: Pick Seat 1 first (ally Seat 4 still remains)
+  assert.equal(handleRespondAction(state, 2, true, "1").success, true);
+  assert.equal(state.players[0].hp, 3);
+  assert.equal(state.players[0].hand.length, seat1HandBefore + 2);
+  assert.equal(state.phase, "AWAIT_UAT_KHI_TARGET");
+  assert.equal(state.waitingTargetSeat, 2);
+
+  // Step 2: Pick Seat 4 (allies now exhausted / 2 targets reached)
+  assert.equal(handleRespondAction(state, 2, true, "4").success, true);
+  assert.equal(state.players[3].hp, 3);
+  assert.equal(state.players[3].hand.length, seat4HandBefore + 2);
+  assert.equal(state.phase, "PLAY");
+  assert.equal(state.uatKhiPending, null);
+}
+
+{
+  // Test: Uất Khí supports choosing multiple targets at once ("4,1")
+  const state = freshState();
+  state.players[1].heroId = 3; // Thi Sách (Seat 2)
+  state.players[1].hp = 1;
+  state.players[0].hp = 2; // Enemy Seat 1
+  state.players[3].hp = 1; // Ally Seat 4
+  const seat1HandBefore = state.players[0].hand.length;
+  const seat4HandBefore = state.players[3].hand.length;
+
+  applyDamageToPlayer(state, 2, 1, "Sát thương chí mạng");
+  while (state.phase === "AWAIT_NEAR_DEATH") {
+    handleRespondAction(state, state.waitingTargetSeat, false, null);
+  }
+
+  assert.equal(state.phase, "AWAIT_UAT_KHI_TARGET");
+  // Choose two seats: 4 and 1
+  assert.equal(handleRespondAction(state, 2, true, "4,1").success, true);
+  assert.equal(state.players[3].hp, 2);
+  assert.equal(state.players[3].hand.length, seat4HandBefore + 2);
+  assert.equal(state.players[0].hp, 3);
+  assert.equal(state.players[0].hand.length, seat1HandBefore + 2);
+  // Reached maxTargets (2) -> completes immediately
+  assert.equal(state.phase, "PLAY");
+  assert.equal(state.uatKhiPending, null);
 }
 
 {
@@ -1287,29 +1345,45 @@ for (const [subType, name] of [
 }
 
 {
+  // Test: Uất Khí AI reaction and timeout decline
   const state = freshState();
-  state.players[1].heroId = 3; // Thi Sach
-  const receiver = state.players[2];
-  const handBefore = receiver.hand.length;
-  state.turnTimer = 7;
-  applyDamageToPlayer(state, 2, 1, "Kiểm thử");
-  assert.equal(state.phase, "AWAIT_UAT_KHI");
-  assert.equal(state.waitingTargetSeat, 2);
-  assert.equal(state.waitingTimer, 40);
-  assert.match(handleEndTurn(state, 1).error, /đang trong pha phản ứng/);
-  assert.equal(handleUseSkill(state, 2, "Uất Khí", 3).success, true);
-  assert.equal(receiver.hand.length, handBefore + 1);
-  assert.equal(state.phase, "PLAY");
-  assert.equal(state.waitingTargetSeat, 0);
-  assert.equal(state.turnTimer, 40);
+  state.players[1].heroId = 3; // Thi Sách (Seat 2)
+  state.players[1].isAI = true;
+  state.players[1].hp = 1;
+  state.players[3].hp = 2; // Ally Seat 4
+  const allyHandBefore = state.players[3].hand.length;
 
-  state.turnTimer = 7;
-  applyDamageToPlayer(state, 2, 1, "Kiểm thử timeout");
-  state.timerStartAt = Date.now() - 41000;
+  applyDamageToPlayer(state, 2, 1, "Sát thương chí mạng");
+  while (state.phase === "AWAIT_NEAR_DEATH") {
+    handleRespondAction(state, state.waitingTargetSeat, false, null);
+  }
+
+  assert.equal(state.phase, "AWAIT_UAT_KHI_TARGET");
+  assert.equal(state.waitingTargetSeat, 2);
+
+  // AI reacts automatically after elapsed time
+  state.timerStartAt = Date.now() - 3_000;
   tickGameState(state);
+
+  // AI selected living ally (Seat 4), healed 1 HP and drew 2 cards, then finished
+  assert.equal(state.players[3].hp, 3);
+  assert.equal(state.players[3].hand.length, allyHandBefore + 2);
   assert.equal(state.phase, "PLAY");
-  assert.equal(state.uatKhiQueue.length, 0);
-  assert.equal(state.turnTimer, 40);
+  assert.equal(state.uatKhiPending, null);
+
+  // Test timeout decline
+  const state2 = freshState();
+  state2.players[1].heroId = 3; // Thi Sách
+  state2.players[1].hp = 1;
+  applyDamageToPlayer(state2, 2, 1, "Sát thương chí mạng");
+  while (state2.phase === "AWAIT_NEAR_DEATH") {
+    handleRespondAction(state2, state2.waitingTargetSeat, false, null);
+  }
+  assert.equal(state2.phase, "AWAIT_UAT_KHI_TARGET");
+  state2.timerStartAt = Date.now() - 41_000;
+  tickGameState(state2);
+  assert.equal(state2.phase, "PLAY");
+  assert.equal(state2.uatKhiPending, null);
 }
 
 {
