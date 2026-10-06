@@ -411,10 +411,10 @@ func send_get_state() -> void:
 		"seat": my_seat
 	})
 
-func send_play_card(card_id: String, target_seat: int = 0) -> void:
-	send_play_card_for_seat(my_seat, card_id, target_seat)
+func send_play_card(card_id: String, target_seat: int = 0, pha_tong_card_id: String = "") -> void:
+	send_play_card_for_seat(my_seat, card_id, target_seat, 0, [], false, "", pha_tong_card_id)
 
-func send_play_card_for_seat(seat_num: int, card_id: String, target_seat: int = 0, target_seat2: int = 0, target_seats: Array = [], recast: bool = false, lien_chau_card_id: String = "") -> void:
+func send_play_card_for_seat(seat_num: int, card_id: String, target_seat: int = 0, target_seat2: int = 0, target_seats: Array = [], recast: bool = false, lien_chau_card_id: String = "", pha_tong_card_id: String = "") -> void:
 	var payload = {
 		"action": "PLAY_CARD",
 		"roomId": room_id,
@@ -430,6 +430,8 @@ func send_play_card_for_seat(seat_num: int, card_id: String, target_seat: int = 
 		payload["recast"] = true
 	if not lien_chau_card_id.is_empty():
 		payload["lienChauCardId"] = lien_chau_card_id
+	if not pha_tong_card_id.is_empty():
+		payload["phaTongCardId"] = pha_tong_card_id
 	send_json(payload)
 
 func send_use_skill(skill_id: String, target_seat: int = 0, card_id: String = "") -> void:
