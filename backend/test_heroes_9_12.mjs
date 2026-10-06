@@ -126,9 +126,6 @@ function game(heroIds = ["HERO_9", "HERO_1", "HERO_2", "HERO_3"]) {
   handlePlayCard(state, 1, "fire-one-damage", 2);
   handleRespondAction(state, 2, false, null);
   assert.equal(state.turnDamageDealt, true, "Chịu đòn qua Oai Nhược phải tính đúng một lần gây sát thương Trảm");
-  assert.equal(state.phase, "AWAIT_UAT_KHI");
-  assert.equal(state.uatKhiQueue.length, 1, "Mất 1 Máu do Oai Nhược chỉ kích hoạt Uất Khí một lần");
-  handleUseSkill(state, 2, "Uất Khí", 0);
   assert.equal(state.players[1].hp, 3, "Kết thúc Oai Nhược không được nhận thêm sát thương Trảm");
   assert.equal(state.phase, "PLAY");
   assert.equal(state.activeCard, null);

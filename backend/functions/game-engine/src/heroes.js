@@ -35,9 +35,17 @@ export const HEROES = {
   HERO_27: { id: 'HERO_27', name: 'Kiều Thuận', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['HOI_HO', 'PHONG_DUYEN'] },
   HERO_28: { id: 'HERO_28', name: 'Nguyễn Siêu', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['LIET_CHIEN', 'TAY_PHU'] },
   HERO_29: { id: 'HERO_29', name: 'Lã Đường', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['TE_GIANG', 'UU_THIEP'] },
-  HERO_30: { id: 'HERO_30', name: 'Đinh Bộ Lĩnh', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['CO_LAU', 'VAN_THANG'] },
+  HERO_30: { id: 'HERO_30', name: 'Đinh Bộ Lĩnh', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['THU_PHUC', 'VAN_THANG'] },
   HERO_31: { id: 'HERO_31', name: 'Đinh Liễn', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['TRU_QUAN', 'COT_KINH'] },
   HERO_32: { id: 'HERO_32', name: 'Đinh Điền', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['TRUNG_TIET', 'CAN_VE'] },
+  HERO_33: { id: 'HERO_33', name: 'Nguyễn Bặc', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['DINH_QUOC', 'TAN_TRUNG'] },
+  HERO_34: { id: 'HERO_34', name: 'Phạm Hạp', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['BAO_LAM', 'TRAN_THU'] },
+  HERO_35: { id: 'HERO_35', name: 'Lê Hoàn', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['PHA_TONG', 'THAN_CHINH_LE_HOAN'] },
+  HERO_36: { id: 'HERO_36', name: 'Dương Vân Nga', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['TRAO_BAO', 'NHIEP_CHINH'] },
+  HERO_37: { id: 'HERO_37', name: 'Lê Long Đĩnh', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['BAO_NO', 'NGOA_TRIEU'] },
+  HERO_38: { id: 'HERO_38', name: 'Đào Cam Mộc', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['PHO_TA', 'MUU_DINH'] },
+  HERO_39: { id: 'HERO_39', name: 'Lý Công Uẩn', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['DOI_DO', 'THAI_BINH_LY_CONG_UAN'] },
+  HERO_40: { id: 'HERO_40', name: 'Lý Phật Mã', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['THAN_CHINH_LY_PHAT_MA', 'PHAT_CHAM'] },
   TRAN_HUNG_DAO: {
     id: 'TRAN_HUNG_DAO',
     name: 'Trần Hưng Đạo',
@@ -145,7 +153,7 @@ export const SKILLS = {
   DE_NGHIEP: { id: 'DE_NGHIEP', name: 'Đế Nghiệp', type: 'TRIGGERED', description: 'Mỗi khi bạn gây sát thương đơn mục tiêu bằng Cẩm Nang, bạn rút 1 lá bài.' },
   KHOAN_GIAN: { id: 'KHOAN_GIAN', name: 'Khoan Giản', type: 'TRIGGERED', description: 'Sau giai đoạn Bỏ bài, bạn được rút X+1 lá, giới hạn trữ bài +(X+1) (X là một nửa số trang bị bạn đang mang, làm tròn lên).' },
   CHINH_THONG: { id: 'CHINH_THONG', name: 'Chính Thống', type: 'OPTIONAL', description: 'Đầu lượt của bạn, bạn có thể chọn 1 người chơi khác; người đó phải chuyển 1 lá bài trên tay cho bạn hoặc lộ diện toàn bộ bài trên tay.' },
-  KHOAN_HOA: { id: 'KHOAN_HOA', name: 'Khoan Hòa', type: 'OPTIONAL', description: 'Cuối lượt của bạn, nếu bạn không gây sát thương cho bất kỳ ai trong lượt đó, bạn rút 1 lá bài, sau đó bạn chọn tối đa 2 người chơi khác, mỗi người trong số họ rút 1 lá bài.' },
+  KHOAN_HOA: { id: 'KHOAN_HOA', name: 'Khoan Hòa', type: 'OPTIONAL', description: 'Cuối lượt của bạn, bạn rút 1 lá bài, sau đó bạn chọn tối đa 2 người chơi khác, mỗi người trong số họ rút 1 lá bài.' },
   CAI_CACH: { id: 'CAI_CACH', name: 'Cải Cách', type: 'ACTIVE', description: 'Trong Giai đoạn Ra bài, giới hạn 1 lần, bạn có thể đổi 2 lá bài lấy 2 lá bài mới.' },
   NGHIA_TU: { id: 'NGHIA_TU', name: 'Nghĩa Tử', type: 'OPTIONAL', description: 'Khi một người chơi khác bị nhận sát thương, bạn có thể bỏ 1 lá bài trên tay để chịu thay 1 sát thương cho họ.' },
   DUONG_BINH: { id: 'DUONG_BINH', name: 'Dưỡng Binh', type: 'TRIGGERED', description: 'Mỗi khi bạn chịu thay sát thương, rút 2 lá.' },
@@ -254,6 +262,108 @@ export const SKILLS = {
     name: 'Cận Vệ',
     type: 'OPTIONAL',
     description: 'Khi người chơi trong Tầm đánh 1 của bạn bị tấn công bởi Trảm, bạn có thể thay đổi mục tiêu bị Trảm thành bản thân.'
+  },
+  THU_PHUC: {
+    id: 'THU_PHUC',
+    name: 'Thu Phục',
+    type: 'OPTIONAL',
+    description: 'Khi bạn sử dụng lá bài Cẩm Nang thành công, bạn có thể chỉ định 1 người chơi có số Máu cao hơn bạn phải đưa cho bạn 1 lá bài ngẫu nhiên trên tay.'
+  },
+  DINH_QUOC: {
+    id: 'DINH_QUOC',
+    name: 'Định Quốc',
+    type: 'ACTIVE',
+    description: 'Bạn có thể dùng bất kỳ lá bài màu đen như lá Huyết Chiến.'
+  },
+  TAN_TRUNG: {
+    id: 'TAN_TRUNG',
+    name: 'Tận Trung',
+    type: 'TRIGGERED',
+    description: 'Tối đa 2 lần 1 lượt, sau khi bạn Huyết Chiến xong, bạn rút 1 lá bài.'
+  },
+  BAO_LAM: {
+    id: 'BAO_LAM',
+    name: 'Bao Lăm',
+    type: 'TRIGGERED',
+    description: 'Mỗi khi có người chơi khác hồi máu, bạn rút 1 lá.'
+  },
+  TRAN_THU: {
+    id: 'TRAN_THU',
+    name: 'Trấn Thủ',
+    type: 'OPTIONAL',
+    description: 'Khi bạn bị đánh bởi Trảm, bạn có thể bỏ 1 lá bài trang bị để xem như vừa ra 1 lá Đỡ.'
+  },
+  PHA_TONG: {
+    id: 'PHA_TONG',
+    name: 'Phá Tống',
+    type: 'OPTIONAL',
+    description: 'Khi đánh ra lá Trảm, bạn có thể bỏ thêm 1 lá bài ít điểm hơn trên tay để đòn Trảm đó không thể bị đối phương dùng Đỡ triệt tiêu.'
+  },
+  THAN_CHINH_LE_HOAN: {
+    id: 'THAN_CHINH_LE_HOAN',
+    name: 'Thân Chinh',
+    type: 'TRIGGERED',
+    description: 'Khi bạn gây sát thương lên mục tiêu không trang bị Áo Giáp hoặc Ngựa +, họ phải chọn giữa việc chịu thêm 1 điểm sát thương hoặc đưa cho bạn 1 lá bài trên tay.'
+  },
+  TRAO_BAO: {
+    id: 'TRAO_BAO',
+    name: 'Trao Bào',
+    type: 'ACTIVE',
+    description: 'Trong Giai đoạn Ra bài, bạn có thể chuyển 1 lá bài trang bị từ tay hoặc vùng trang bị của mình cho người chơi khác, người đó có thể chọn có muốn đeo nó ngay hay không. Sau đó, người đó hồi 1 Máu và bạn được rút 1 lá.'
+  },
+  NHIEP_CHINH: {
+    id: 'NHIEP_CHINH',
+    name: 'Nhiếp Chính',
+    type: 'OPTIONAL',
+    description: 'Khi một người khác nhận sát thương, bạn có thể chọn 1 người khác để đấu điểm, nếu bạn thắng, bạn được chọn 1 người đang mất máu hồi 1 máu.'
+  },
+  BAO_NO: {
+    id: 'BAO_NO',
+    name: 'Bạo Nộ',
+    type: 'ACTIVE',
+    description: 'Bạn có thể sử dụng lá Hủ Rượu không giới hạn số lần trong một lượt, sát thương được cộng dồn; cuối lượt nếu không gây sát thương cho ai và số máu của bạn không phải là một trong những người ít máu nhất, bạn phải tự mất 1 Máu.'
+  },
+  NGOA_TRIEU: {
+    id: 'NGOA_TRIEU',
+    name: 'Ngọa Triều',
+    type: 'PASSIVE',
+    description: 'Khi bạn ở mức 1 Máu, bạn không thể bị chỉ định bởi các lá Cẩm Nang thông thường không gây sát thương.'
+  },
+  PHO_TA: {
+    id: 'PHO_TA',
+    name: 'Phò Tá',
+    type: 'OPTIONAL',
+    description: 'Trong Giai đoạn Rút bài, bạn có thể cho 1 người chơi khác rút bài, thay vì bản thân. Nếu làm vậy, bạn được rút 1 lá bài.'
+  },
+  MUU_DINH: {
+    id: 'MUU_DINH',
+    name: 'Mưu Định',
+    type: 'ACTIVE',
+    description: 'Giới hạn 1 lần mỗi lượt, bạn có thể xem trước 2 lá bài đầu xấp rút và trao 1 lá cho một người, lá còn lại trả lại đầu xấp rút.'
+  },
+  DOI_DO: {
+    id: 'DOI_DO',
+    name: 'Dời Đô',
+    type: 'ACTIVE',
+    description: 'Trong Giai đoạn Ra bài, giới hạn 1 lần, bạn có thể bỏ toàn bộ bài trên tay để rút lại số lượng lá bài tương đương +1 lá từ xấp rút. Sau đó, bạn có thể chọn tối đa 4 người, họ được rút 1 lá bài.'
+  },
+  THAI_BINH_LY_CONG_UAN: {
+    id: 'THAI_BINH_LY_CONG_UAN',
+    name: 'Thái Bình',
+    type: 'TRIGGERED',
+    description: 'Đầu Giai đoạn Rút bài của bạn, nếu trên bàn không có người chơi nào mất từ 2 Máu trở lên, bạn được rút thêm 2 lá bài và giới hạn trữ bài được tăng thêm 2 lá.'
+  },
+  THAN_CHINH_LY_PHAT_MA: {
+    id: 'THAN_CHINH_LY_PHAT_MA',
+    name: 'Thân Chinh',
+    type: 'TRIGGERED',
+    description: 'Khi bạn lần đầu dùng Trảm gây sát thương thành công cho mục tiêu trong lượt, bạn được quyền đánh thêm 1 lá Trảm nữa trong lượt đó.'
+  },
+  PHAT_CHAM: {
+    id: 'PHAT_CHAM',
+    name: 'Phạt Chăm',
+    type: 'TRIGGERED',
+    description: 'Một lần mỗi lượt, nếu bạn gây ít nhất 2 sát thương trong giai đoạn ra bài, bạn được hồi 1 Máu.'
   }
 };
 
@@ -282,6 +392,14 @@ export function normalizeHeroId(heroId, generalName = "") {
     DINH_BO_LINH: "HERO_30",
     DINH_LIEN: "HERO_31",
     DINH_DIEN: "HERO_32",
+    NGUYEN_BAC: "HERO_33",
+    PHAM_HAP: "HERO_34",
+    LE_HOAN: "HERO_35",
+    DUONG_VAN_NGA: "HERO_36",
+    LE_LONG_DINH: "HERO_37",
+    DAO_CAM_MOC: "HERO_38",
+    LY_CONG_UAN: "HERO_39",
+    LY_PHAT_MA: "HERO_40",
   };
   const rawUpper = rawId.toUpperCase();
   const numericWireId = rawUpper.match(/^HERO_(\d+)$/)?.[1] || "";
@@ -328,6 +446,14 @@ export function normalizeHeroId(heroId, generalName = "") {
   if (key.includes("DINH BO LINH")) return "HERO_30";
   if (key.includes("DINH LIEN")) return "HERO_31";
   if (key.includes("DINH DIEN")) return "HERO_32";
+  if (key.includes("NGUYEN BAC")) return "HERO_33";
+  if (key.includes("PHAM HAP")) return "HERO_34";
+  if (key.includes("LE HOAN")) return "HERO_35";
+  if (key.includes("DUONG VAN NGA")) return "HERO_36";
+  if (key.includes("LE LONG DINH")) return "HERO_37";
+  if (key.includes("DAO CAM MOC")) return "HERO_38";
+  if (key.includes("LY CONG UAN")) return "HERO_39";
+  if (key.includes("LY PHAT MA")) return "HERO_40";
   if (key.includes("TRAN HUNG DAO") || key.includes("TRAN QUOC TUAN")) return "TRAN_HUNG_DAO";
   if (key.includes("LY THUONG KIET")) return "LY_THUONG_KIET";
   if (key.includes("TRAN QUOC TOAN")) return "TRAN_QUOC_TOAN";

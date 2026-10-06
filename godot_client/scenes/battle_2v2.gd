@@ -49,11 +49,28 @@ const HERO_SKILL_ACTIONS := {
 	"UU_THIEP_STEAL": {"name": "Ưu Thiếp"},
 	"CO_LAU_DRAW": {"name": "Cờ Lau"},
 	"CO_LAU_DESTROY": {"name": "Cờ Lau"},
+	"THU_PHUC_TRIGGERED": {"name": "Thu Phục"},
 	"VAN_THANG_TRIGGERED": {"name": "Vạn Thắng"},
 	"TRU_QUAN_TRIGGERED": {"name": "Trữ Quân"},
 	"COT_KINH_TRIGGERED": {"name": "Cột Kinh"},
 	"TRUNG_TIET_TRIGGERED": {"name": "Trung Tiết"},
-	"CAN_VE_TRIGGERED": {"name": "Cận Vệ"}
+	"CAN_VE_TRIGGERED": {"name": "Cận Vệ"},
+	"DINH_QUOC_TRIGGERED": {"name": "Định Quốc"},
+	"TAN_TRUNG_DRAW": {"name": "Tận Trung"},
+	"BAO_LAM_DRAW": {"name": "Bao Lăm"},
+	"TRAN_THU_TRIGGERED": {"name": "Trấn Thủ"},
+	"PHA_TONG_TRIGGERED": {"name": "Phá Tống"},
+	"THAN_CHINH_LE_HOAN_TRIGGERED": {"name": "Thân Chinh"},
+	"TRAO_BAO_TRIGGERED": {"name": "Trao Bào"},
+	"NHIEP_CHINH_TRIGGERED": {"name": "Nhiếp Chính"},
+	"BAO_NO_DAMAGE": {"name": "Bạo Nộ"},
+	"NGOA_TRIEU_BLOCKED": {"name": "Ngọa Triều"},
+	"PHO_TA_TRIGGERED": {"name": "Phò Tá"},
+	"MUU_DINH_TRIGGERED": {"name": "Mưu Định"},
+	"DOI_DO_TRIGGERED": {"name": "Dời Đô"},
+	"THAI_BINH_TRIGGERED": {"name": "Thái Bình"},
+	"THAN_CHINH_BONUS_SLASH": {"name": "Thân Chinh"},
+	"PHAT_CHAM_HEAL": {"name": "Phạt Chăm"}
 }
 const IMPLEMENTED_HERO_SKILL_NAMES := [
 	"Chế Nỏ", "Liên Châu", "Xạ Thuẫn", "Phù Trấn", "Hịch Nghĩa", "Uất Khí",
@@ -62,7 +79,8 @@ const IMPLEMENTED_HERO_SKILL_NAMES := [
 	"Dựng Nước", "Xưng Đế", "Tùng Nghĩa", "Trung Kiên", "Văn Sách", "Hán Lâm",
 	"Trấn Nam", "Hóa Dân", "Dạ Trạch", "Nỏ Đỉnh", "Phục Hổ", "An Dân", "Lực Địch", "Hùng Sức",
 	"Vạn An", "Đế Nghiệp", "Khoan Giản", "Chính Thống", "Khoan Hòa", "Cải Cách", "Thiên Cảm", "Nam Tấn", "Bình Sạn", "Cát Cứ", "Cố Thủ", "Hồi Hồ", "Phòng Duyện", "Liệt Chiến", "Tây Phu", "Nghĩa Tử", "Dưỡng Binh",
-	"Tế Giang", "Ưu Thiếp", "Cờ Lau", "Vạn Thắng", "Trữ Quân", "Cột Kinh", "Trung Tiết", "Cận Vệ"
+	"Tế Giang", "Ưu Thiếp", "Cờ Lau", "Thu Phục", "Vạn Thắng", "Trữ Quân", "Cột Kinh", "Trung Tiết", "Cận Vệ",
+	"Định Quốc", "Tận Trung", "Bao Lăm", "Trấn Thủ", "Phá Tống", "Thân Chinh", "Trao Bào", "Nhiếp Chính", "Bạo Nộ", "Ngọa Triều", "Phò Tá", "Mưu Định", "Dời Đô", "Thái Bình", "Phạt Chăm"
 ]
 
 # UI Node References
@@ -1854,6 +1872,14 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 		buttons.append({"id": "dan_cau", "text": "🌉 DẪN CẦU", "description": "Mỗi lượt 1 lần: trao 1 lá, ép Trảm mục tiêu chỉ định hoặc cướp 2 lá.", "selected": is_targeting_dan_cau})
 	if seat == my_seat and _hero_has_skill(g, "thuy_chien"):
 		buttons.append({"id": "thuy_chien", "text": "🌊 THỦY CHIẾN", "description": "Dùng bài Trắng hoặc bài Vàng như Bãi Cọc Bạch Đằng.", "selected": is_targeting_thuy_chien})
+	if seat == my_seat and _hero_has_skill(g, "dinh_quoc"):
+		buttons.append({"id": "dinh_quoc", "text": "⚔️ ĐỊNH QUỐC", "description": "Dùng bất kỳ lá bài Đen nào như Huyết Chiến."})
+	if seat == my_seat and _hero_has_skill(g, "trao_bao"):
+		buttons.append({"id": "trao_bao", "text": "👑 TRAO BÀO", "description": "Chuyển 1 trang bị cho người khác: hồi 1 máu, bạn rút 1 lá."})
+	if seat == my_seat and _hero_has_skill(g, "muu_dinh"):
+		buttons.append({"id": "muu_dinh", "text": "📜 MƯU ĐỊNH", "description": "Xem 2 lá đầu xấp rút, trao 1 lá cho người bất kỳ, đặt 1 lá lại lên đầu."})
+	if seat == my_seat and _hero_has_skill(g, "doi_do"):
+		buttons.append({"id": "doi_do", "text": "🏯 DỜI ĐÔ", "description": "Bỏ toàn bộ bài trên tay: rút lại + 1 lá, tối đa 4 người mỗi người rút 1 lá."})
 	var treasure = str(g.get("equipped_treasure", ""))
 	if seat == my_seat and treasure == "Trống Đồng Đông Sơn":
 		buttons.append({"id": "treasure_drum", "text": "🥁 ĐIỂM TRỐNG"})
@@ -2050,6 +2076,22 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 			desc_text.text = "🔄 Đã hủy chọn [CẢI CÁCH]."
 		_refresh_local_skill_buttons(s_num)
 		_update_action_btn()
+		return
+	if s_num == my_seat and skill_key == "doi_do":
+		if not is_player_turn or current_server_phase != "PLAY":
+			desc_text.text = "⚠️ [DỜI ĐÔ] chỉ dùng trong Giai đoạn Ra bài."
+			return
+		if is_network_mode and NetworkClient and NetworkClient.is_connected_to_server:
+			NetworkClient.send_use_skill("Dời Đô", 0)
+		desc_text.text = "🏯 Đã phát động [DỜI ĐÔ]!"
+		return
+	if s_num == my_seat and skill_key == "muu_dinh":
+		if not is_player_turn or current_server_phase != "PLAY":
+			desc_text.text = "⚠️ [MƯU ĐỊNH] chỉ dùng trong Giai đoạn Ra bài."
+			return
+		if is_network_mode and NetworkClient and NetworkClient.is_connected_to_server:
+			NetworkClient.send_use_skill("Mưu Định", my_seat)
+		desc_text.text = "📜 Đã phát động [MƯU ĐỊNH]!"
 		return
 	if s_num == my_seat and "hổ phù" in str(g.get("equipped_treasure", "")).to_lower():
 		if is_targeting_ho_phu_skill:

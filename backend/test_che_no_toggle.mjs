@@ -92,14 +92,19 @@ const uatKhiState = initGame("uat-khi", [
   { seat: 3, userId: "three", generalName: "Three", maxHp: 4 },
   { seat: 4, userId: "four", generalName: "Four", maxHp: 4 }
 ]);
-uatKhiState.players[0].hp = 2;
+uatKhiState.players[0].hp = 1;
+uatKhiState.players[1].hp = 3;
 const uatTargetHandBefore = uatKhiState.players[1].hand.length;
-assert.equal(applyDamageToPlayer(uatKhiState, 1, 1).enteredNearDeath, false);
-assert.deepEqual(uatKhiState.uatKhiQueue, [{ seat: 1 }]);
-assert.deepEqual(sanitizeGameStateForClient(uatKhiState, 1).uatKhiQueue, [{ seat: 1 }]);
-assert.equal(handleUseSkill(uatKhiState, 1, "Uất Khí", 2).success, true);
-assert.equal(uatKhiState.players[1].hand.length, uatTargetHandBefore + 1);
-assert.deepEqual(uatKhiState.uatKhiQueue, []);
+// Thi Sách chịu 1 sát thương gây tử trận
+applyDamageToPlayer(uatKhiState, 1, 1);
+while (uatKhiState.phase === "AWAIT_NEAR_DEATH") {
+  handleRespondAction(uatKhiState, uatKhiState.waitingTargetSeat, false, null);
+}
+assert.equal(uatKhiState.players[0].isAlive, false);
+assert.equal(uatKhiState.phase, "AWAIT_UAT_KHI_TARGET");
+handleRespondAction(uatKhiState, 1, true, "2");
+assert.equal(uatKhiState.players[1].hp, 4); // hồi 1 máu
+assert.equal(uatKhiState.players[1].hand.length, uatTargetHandBefore + 2); // rút 2 lá
 
 const hichNghiaState = initGame("hich-nghia", [
   { seat: 1, userId: "thi-sach", heroId: "HERO_3", generalName: "Thi Sách", maxHp: 4 },
