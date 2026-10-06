@@ -678,7 +678,7 @@ Deno.serve({ port, hostname }, async (req) => {
                 userName: String(matched.userName || (isAI ? `AI Ghế ${s}` : (s === boundSeat ? (payload.userName || `Ghế ${s}`) : `Ghế ${s}`))),
                 isAI: isAI,
                 role: "",
-                isDragon: dragonSeats.has(s),
+                isDragon: matched.isDragon !== undefined ? Boolean(matched.isDragon) : dragonSeats.has(s),
                 heroId: Number(matched.heroId || 0),
                 heroName: String(matched.heroName || ""),
                 maxHp: HERO_MAX_HP[Number(matched.heroId || 0)] || 4,

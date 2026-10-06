@@ -6567,8 +6567,9 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	_update_matchmaking_status_count(status_lbl, mm_current_room)
 
 	var is_fast_test = "--screenshot-matchmaking-filled" in OS.get_cmdline_user_args() or "--screenshot-matchmaking-filled" in OS.get_cmdline_args()
-	# Đúng 15s kể từ người cuối cùng ghép vào phòng, nếu chưa đủ 4 người thì bổ sung AI và vào trận luôn
-	var bot_fill_timeout: float = 1.0 if is_fast_test else 15.0
+	# Đúng thời gian kể từ người cuối cùng ghép vào phòng, nếu chưa đủ 4 người thì bổ sung AI và vào trận luôn
+	# Khi debug/editor tăng lên 45s để kịp click cả 4 cửa sổ; online thường là 25s
+	var bot_fill_timeout: float = 1.0 if is_fast_test else (45.0 if (OS.is_debug_build() or OS.has_feature("editor")) else 25.0)
 	var bot_fill_timer: float = 0.0
 	var last_real_player_at_ms: int = Time.get_ticks_msec()
 	var heartbeat_timer: float = 0.0
