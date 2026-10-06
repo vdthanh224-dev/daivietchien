@@ -209,7 +209,7 @@ func _send_http_request(url: String, method: int, body_json: String = "") -> Dic
 	}
 
 # --- 1. Find Best Waiting Room ---
-func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_diff: int = 500, my_user_name: String = "", include_room_id: String = "", mode_id: String = "") -> Dictionary:
+func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_diff: int = 12, my_user_name: String = "", include_room_id: String = "", mode_id: String = "") -> Dictionary:
 	var q_equal = "{\"method\":\"equal\",\"attribute\":\"userId\",\"values\":[\"ROOM_WAITING\"]}".uri_encode()
 	var q_order = "{\"method\":\"orderDesc\",\"attribute\":\"$createdAt\"}".uri_encode()
 	var q_limit = "{\"method\":\"limit\",\"values\":[100]}".uri_encode()
