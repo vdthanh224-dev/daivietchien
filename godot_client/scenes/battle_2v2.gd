@@ -2679,6 +2679,15 @@ func _on_general_avatar_clicked(seat_num: int) -> void:
 		if seat_num == my_seat:
 			desc_text.text = "⚠️ Thủy Chiến phải chọn người khác."
 			return
+		if _hero_has_skill(g, "thuy_chien"):
+			desc_text.text = "⚠️ %s có kỹ năng [Thủy Chiến], không thể trở thành mục tiêu của Bãi Cọc Bạch Đằng!" % g["name"]
+			return
+		if g.get("hp", 0) <= 1 and _hero_has_skill(g, "thien_cam"):
+			desc_text.text = "⚠️ %s có [Thiên Cảm] (Máu ≤ 1), miễn nhiễm Cẩm Nang Trì Hoãn!" % g["name"]
+			return
+		if g.get("has_bai_coc", false):
+			desc_text.text = "⚠️ %s đã có Bãi Cọc Bạch Đằng!" % g["name"]
+			return
 		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
 		selected_target_seat = seat_num
@@ -2695,6 +2704,15 @@ func _on_general_avatar_clicked(seat_num: int) -> void:
 			return
 		if is_targeting_van_an and selected_two_card_skill_nodes.size() != 2:
 			desc_text.text = "⚠️ [VẠN AN] cần chọn đúng 2 lá bài trước."
+			return
+		if is_targeting_van_an and _hero_has_skill(g, "thuy_chien"):
+			desc_text.text = "⚠️ %s có kỹ năng [Thủy Chiến], không thể trở thành mục tiêu của Bãi Cọc Bạch Đằng!" % g["name"]
+			return
+		if is_targeting_van_an and g.get("hp", 0) <= 1 and _hero_has_skill(g, "thien_cam"):
+			desc_text.text = "⚠️ %s có [Thiên Cảm] (Máu ≤ 1), miễn nhiễm Cẩm Nang Trì Hoãn!" % g["name"]
+			return
+		if is_targeting_van_an and g.get("has_bai_coc", false):
+			desc_text.text = "⚠️ %s đã có Bãi Cọc Bạch Đằng!" % g["name"]
 			return
 		if selected_target_seat > 0 and selected_target_seat != seat_num and generals_data.has(selected_target_seat):
 			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
@@ -2814,11 +2832,25 @@ func _on_general_avatar_clicked(seat_num: int) -> void:
 			_update_action_btn()
 			return
 
-	# Don't target self for attack
-	if seat_num == my_seat and selected_card_ui:
+	# Don't target self for attack or invalid scroll target
+	if selected_card_ui:
 		var c_info = _get_card_info_from_ui(selected_card_ui)
-		if "Trảm" in c_info.get("name", ""):
+		var c_name = c_info.get("name", "")
+		if seat_num == my_seat and "Trảm" in c_name:
 			return
+		if c_name == "Bãi Cọc Bạch Đằng":
+			if seat_num == my_seat:
+				desc_text.text = "⚠️ Không thể tự gài Bãi Cọc Bạch Đằng lên chính mình!"
+				return
+			if _hero_has_skill(g, "thuy_chien"):
+				desc_text.text = "⚠️ %s có kỹ năng [Thủy Chiến], không thể trở thành mục tiêu của Bãi Cọc Bạch Đằng!" % g["name"]
+				return
+			if g.get("hp", 0) <= 1 and _hero_has_skill(g, "thien_cam"):
+				desc_text.text = "⚠️ %s có [Thiên Cảm] (Máu ≤ 1), miễn nhiễm Cẩm Nang Trì Hoãn!" % g["name"]
+				return
+			if g.get("has_bai_coc", false):
+				desc_text.text = "⚠️ %s đã có Bãi Cọc Bạch Đằng!" % g["name"]
+				return
 	if selected_card_ui and selected_target_seat > 0 and seat_num != selected_target_seat:
 		var slash_info = _get_card_info_from_ui(selected_card_ui)
 		var me = generals_data.get(my_seat, {})
@@ -3402,6 +3434,10 @@ func _on_card_play_btn_clicked() -> void:
 		if selected_card_ui == null or selected_target_seat <= 0:
 			desc_text.text = "⚠️ Thủy Chiến cần chọn 1 lá và mục tiêu."
 			return
+		var tgt_gen = generals_data.get(selected_target_seat, {})
+		if _hero_has_skill(tgt_gen, "thuy_chien"):
+			desc_text.text = "⚠️ %s có kỹ năng [Thủy Chiến], không thể trở thành mục tiêu của Bãi Cọc Bạch Đằng!" % tgt_gen.get("name", "Mục tiêu")
+			return
 		NetworkClient.send_use_skill("Thủy Chiến", selected_target_seat, str(_get_card_info_from_ui(selected_card_ui).get("id", "")))
 		is_targeting_thuy_chien = false
 		return
@@ -3412,6 +3448,11 @@ func _on_card_play_btn_clicked() -> void:
 		if is_targeting_van_an and selected_target_seat <= 0:
 			desc_text.text = "⚠️ [VẠN AN] cần chọn 1 người chơi khác."
 			return
+		if is_targeting_van_an:
+			var tgt_gen = generals_data.get(selected_target_seat, {})
+			if _hero_has_skill(tgt_gen, "thuy_chien"):
+				desc_text.text = "⚠️ %s có kỹ năng [Thủy Chiến], không thể trở thành mục tiêu của Bãi Cọc Bạch Đằng!" % tgt_gen.get("name", "Mục tiêu")
+				return
 		var skill_card_ids: Array[String] = []
 		for card_node in selected_two_card_skill_nodes:
 			skill_card_ids.append(str(_get_card_info_from_ui(card_node).get("id", "")))
@@ -4970,6 +5011,9 @@ func _apply_network_game_state(state: Dictionary) -> void:
 					has_tram_ao = true
 				elif c_sub == 22 or "bạch đằng" in c_n or "bai coc bach dang" in c_n:
 					has_bai_coc = true
+
+		if _hero_has_skill(g, "thuy_chien"):
+			has_bai_coc = false
 
 		g["has_dai_hong_thuy"] = has_dai_hong_thuy
 		g["has_lightning"] = has_dai_hong_thuy # Legacy state alias.
@@ -9038,12 +9082,15 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 	elif card_name == "Bãi Cọc Bạch Đằng":
 		if target_seat > 0 and generals_data.has(target_seat):
 			var trap_target = generals_data[target_seat]
-			trap_target["has_bai_coc"] = true
-			if trap_target.has("avatar_node") and is_instance_valid(trap_target["avatar_node"]):
-				trap_target["avatar_node"].set_delayed_trick("bai_coc", true)
-			AudioManager.play_skill()
-			_animate_showcase_card(card_name, "%s gài [Bãi Cọc Bạch Đằng] lên mục tiêu!" % caster["name"], used_card)
-			_add_log("🪵 %s gài [Bãi Cọc Bạch Đằng] lên %s!" % [caster["name"], trap_target["name"]])
+			if _hero_has_skill(trap_target, "thuy_chien"):
+				_add_log("🛡️ %s có kỹ năng [Thủy Chiến], miễn nhiễm hoàn toàn với Bãi Cọc Bạch Đằng!" % trap_target["name"])
+			else:
+				trap_target["has_bai_coc"] = true
+				if trap_target.has("avatar_node") and is_instance_valid(trap_target["avatar_node"]):
+					trap_target["avatar_node"].set_delayed_trick("bai_coc", true)
+				AudioManager.play_skill()
+				_animate_showcase_card(card_name, "%s gài [Bãi Cọc Bạch Đằng] lên mục tiêu!" % caster["name"], used_card)
+				_add_log("🪵 %s gài [Bãi Cọc Bạch Đằng] lên %s!" % [caster["name"], trap_target["name"]])
 	elif card_name == "Mưa Tên Liên Châu":
 		AudioManager.play_voice("Mưa Tên Liên Châu")
 		AudioManager.play_skill()
@@ -11174,6 +11221,12 @@ func _resolve_local_bai_coc_action(actor_seat: int, attacker_seat: int) -> bool:
 	var actor = generals_data[actor_seat]
 	if not actor.get("has_bai_coc", false):
 		return true
+	if _hero_has_skill(actor, "thuy_chien"):
+		actor["has_bai_coc"] = false
+		actor["bai_coc_judgement_count"] = 0
+		if actor.has("avatar_node") and is_instance_valid(actor["avatar_node"]):
+			actor["avatar_node"].set_delayed_trick("bai_coc", false)
+		return true
 	if await _maybe_local_nullify_delayed(actor, "Bãi Cọc Bạch Đằng", "phá Bãi Cọc Bạch Đằng"):
 		actor["has_bai_coc"] = false
 		actor["bai_coc_judgement_count"] = 0
@@ -12114,6 +12167,9 @@ func _execute_local_van_an(target_seat: int, card_nodes: Array) -> void:
 		desc_text.text = "⚠️ [VẠN AN] cần chọn 1 người chơi khác."
 		return
 	var tgt = generals_data[target_seat]
+	if _hero_has_skill(tgt, "thuy_chien"):
+		desc_text.text = "⚠️ %s có kỹ năng [Thủy Chiến], không thể trở thành mục tiêu của Bãi Cọc Bạch Đằng!" % tgt["name"]
+		return
 	if tgt.get("has_bai_coc", false):
 		desc_text.text = "⚠️ %s đã có Bãi Cọc Bạch Đằng." % tgt["name"]
 		return

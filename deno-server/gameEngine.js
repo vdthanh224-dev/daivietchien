@@ -1462,6 +1462,14 @@ function beginBorrowSwordSlash(state, respondent, cardId) {
   };
   const trap = respondent.judgements?.find((judgement) => judgement.subType === CARD_SUBTYPES.BAI_COC_BACH_DANG);
   if (trap) {
+    if (heroHasSkill(respondent, "THUY_CHIEN")) {
+      const trapIdx = respondent.judgements.findIndex((j) => j.id === trap.id);
+      if (trapIdx >= 0) {
+        const removed = respondent.judgements.splice(trapIdx, 1)[0];
+        discardCard(state, removed);
+      }
+      return resolveBorrowSwordSlash(state, continuation);
+    }
     continuation.trapId = trap.id;
     return startNullifyChain(state, trap, Number(trap.attachedBySeat) || respondent.seat, respondent.seat, continuation);
   }
@@ -1720,14 +1728,22 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
       && [isSlash(card), card.subType === CARD_SUBTYPES.OFFENSIVE_HORSE, card.subType === CARD_SUBTYPES.DEFENSIVE_HORSE].some(Boolean)) {
     const trap = caster.judgements?.find((judgement) => judgement.subType === CARD_SUBTYPES.BAI_COC_BACH_DANG);
     if (trap) {
-      return startNullifyChain(state, trap, Number(trap.attachedBySeat) || casterSeat, casterSeat, {
-        type: "BAI_COC_ACTION",
-        seat: casterSeat,
-        actionCardId: selectedCard.id,
-        actionTargetSeat: targetSeat,
-        actionPayload: { ...(payload || {}), _baiCocResolved: true },
-        trapId: trap.id
-      });
+      if (heroHasSkill(caster, "THUY_CHIEN")) {
+        const trapIdx = caster.judgements.findIndex((j) => j.id === trap.id);
+        if (trapIdx >= 0) {
+          const removed = caster.judgements.splice(trapIdx, 1)[0];
+          discardCard(state, removed);
+        }
+      } else {
+        return startNullifyChain(state, trap, Number(trap.attachedBySeat) || casterSeat, casterSeat, {
+          type: "BAI_COC_ACTION",
+          seat: casterSeat,
+          actionCardId: selectedCard.id,
+          actionTargetSeat: targetSeat,
+          actionPayload: { ...(payload || {}), _baiCocResolved: true },
+          trapId: trap.id
+        });
+      }
     }
   }
 
@@ -1986,6 +2002,20 @@ function resolveBaiCocAction(state, continuation, nullified) {
 
   state.nullifyChain = null;
   resetWaitingState(state);
+
+  if (heroHasSkill(actor, "THUY_CHIEN")) {
+    consumeTrap();
+    if (continuation?.type === "BORROW_SWORD_SLASH") {
+      return resolveBorrowSwordSlash(state, continuation);
+    }
+    return handlePlayCard(
+      state,
+      actorSeat,
+      continuation?.actionCardId,
+      continuation?.actionTargetSeat || 0,
+      continuation?.actionPayload || { _baiCocResolved: true }
+    );
+  }
 
   if (nullified) {
     consumeTrap();
@@ -2501,6 +2531,8 @@ function buildAnDanOptions(state) {
       for (const destination of state.players || []) {
         if (!isLivingPlayer(destination) || destination.seat === source.seat) continue;
         if ((destination.judgements || []).some((judgement) => judgement.subType === card.subType)) continue;
+        if (card.subType === CARD_SUBTYPES.BAI_COC_BACH_DANG && heroHasSkill(destination, "THUY_CHIEN")) continue;
+        if (heroHasSkill(destination, "THIEN_CAM") && destination.hp <= 1) continue;
         options.push({
           token: `AN_DAN|${source.seat}|${card.id}|${destination.seat}`,
           zone: "JUDGEMENT",
@@ -2622,7 +2654,9 @@ function completeTargetCardSelection(state, chooserSeat, targetCardId) {
     const destination = state.players.find((player) => player.seat === Number(rawDestinationSeat));
     const cardIndex = source?.judgements?.findIndex((card) => card.id === cardId) ?? -1;
     if (!option || !source || !destination || source.seat === destination.seat || cardIndex < 0
-        || destination.judgements?.some((card) => card.subType === source.judgements[cardIndex].subType)) {
+        || destination.judgements?.some((card) => card.subType === source.judgements[cardIndex].subType)
+        || (source.judgements[cardIndex].subType === CARD_SUBTYPES.BAI_COC_BACH_DANG && heroHasSkill(destination, "THUY_CHIEN"))
+        || (heroHasSkill(destination, "THIEN_CAM") && destination.hp <= 1)) {
       return { error: "Lựa chọn An Dân không còn hợp lệ" };
     }
     const movedCard = source.judgements.splice(cardIndex, 1)[0];
@@ -3268,6 +3302,17 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0, paylo
   if (card.category === CARD_CATEGORIES.DELAYED_SCROLL || card.subType === CARD_SUBTYPES.DAI_HONG_THUY || card.subType === CARD_SUBTYPES.SUPPLY_SHORTAGE || card.subType === CARD_SUBTYPES.ACEDIA || card.subType === CARD_SUBTYPES.BAI_COC_BACH_DANG) {
     const attachTarget = (card.subType === CARD_SUBTYPES.DAI_HONG_THUY) ? caster : target;
     if (attachTarget) {
+      if (card.subType === CARD_SUBTYPES.BAI_COC_BACH_DANG && heroHasSkill(attachTarget, "THUY_CHIEN")) {
+        discardCard(state, card);
+        recordAction(state, {
+          type: "BAI_COC_BLOCKED_THUY_CHIEN",
+          casterSeat,
+          targetSeat: attachTarget.seat,
+          description: `🛡️ <b>${attachTarget.generalName}</b> có kỹ năng [Thủy Chiến], miễn nhiễm hoàn toàn với Bãi Cọc Bạch Đằng!`
+        });
+        resetWaitingState(state);
+        return { success: true, state };
+      }
       if (!attachTarget.judgements) attachTarget.judgements = [];
       card.attachedBySeat = casterSeat;
       if (card.subType === CARD_SUBTYPES.BAI_COC_BACH_DANG) card.baiCocJudgementCount = 0;
@@ -5849,13 +5894,16 @@ export function handleAIStep(state, aiSeat) {
     return handlePlayCard(state, aiSeat, delayed.id, aiSeat);
   }
   const delayedAttack = ai.hand.find((card) =>
-    card.subType === CARD_SUBTYPES.SUPPLY_SHORTAGE || card.subType === CARD_SUBTYPES.ACEDIA
+    card.subType === CARD_SUBTYPES.SUPPLY_SHORTAGE || card.subType === CARD_SUBTYPES.ACEDIA || card.subType === CARD_SUBTYPES.BAI_COC_BACH_DANG
   );
   const delayedTarget = delayedAttack
-    ? enemies.find((enemy) =>
-      getDistance(state, aiSeat, enemy.seat) <= 1
-      && !enemy.judgements.some((judgement) => judgement.subType === delayedAttack.subType)
-    )
+    ? enemies.find((enemy) => {
+      if (heroHasSkill(enemy, "THUY_CHIEN") && delayedAttack.subType === CARD_SUBTYPES.BAI_COC_BACH_DANG) return false;
+      if (heroHasSkill(enemy, "THIEN_CAM") && enemy.hp <= 1) return false;
+      if (enemy.judgements?.some((judgement) => judgement.subType === delayedAttack.subType)) return false;
+      if (delayedAttack.subType === CARD_SUBTYPES.BAI_COC_BACH_DANG) return true;
+      return getDistance(state, aiSeat, enemy.seat) <= 1;
+    })
     : null;
   if (delayedAttack && delayedTarget) {
     return handlePlayCard(state, aiSeat, delayedAttack.id, delayedTarget.seat);
@@ -6780,6 +6828,9 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
     const index = player.hand.findIndex((card) => card.id === cardId && ["Diamond", "Club"].includes(card.suit));
     if (index < 0) return { error: "Thủy Chiến cần 1 lá bài Trắng hoặc bài Vàng trên tay" };
     if (!target || !isLivingPlayer(target) || target.seat === seat) return { error: "Thủy Chiến cần chọn 1 người khác" };
+    if (heroHasSkill(target, "THUY_CHIEN")) return { error: "Thủy Chiến: mục tiêu không thể trở thành mục tiêu của Bãi Cọc Bạch Đằng" };
+    if (heroHasSkill(target, "THIEN_CAM") && target.hp <= 1) return { error: "Thiên Cảm: mục tiêu không thể nhận Cẩm Nang Trì Hoãn khi còn 1 Máu trở xuống" };
+    if ((target.judgements || []).some((card) => card.subType === CARD_SUBTYPES.BAI_COC_BACH_DANG)) return { error: "Mục tiêu đã có Bãi Cọc Bạch Đằng" };
     const source = player.hand.splice(index, 1)[0];
     const virtual = { id: `THUY_CHIEN_${seat}_${Date.now()}`, name: "Bãi Cọc Bạch Đằng", suit: source.suit, rank: source.rank, category: CARD_CATEGORIES.DELAYED_SCROLL, subType: CARD_SUBTYPES.BAI_COC_BACH_DANG, attachedBySeat: seat, desc: "Bãi Cọc Bạch Đằng" };
     recordAction(state, { type: "THUY_CHIEN_TRIGGERED", casterSeat: seat, targetSeat: target.seat, skillActivations: [{ name: "Thủy Chiến", seat }], description: `🌊 ${player.generalName} dùng 1 lá ${source.suit} như Bãi Cọc Bạch Đằng lên ${target.generalName}.` });
@@ -6913,6 +6964,8 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
     if (selectedCards.some((card) => !card)) return { error: "Vạn An chỉ dùng được 2 lá bài trên tay" };
     const target = state.players.find((candidate) => candidate.seat === Number(targetSeat));
     if (!target || !isLivingPlayer(target) || target.seat === seat) return { error: "Vạn An cần chọn 1 người chơi khác" };
+    if (heroHasSkill(target, "THUY_CHIEN")) return { error: "Thủy Chiến: mục tiêu không thể trở thành mục tiêu của Bãi Cọc Bạch Đằng" };
+    if (heroHasSkill(target, "THIEN_CAM") && target.hp <= 1) return { error: "Thiên Cảm: mục tiêu không thể nhận Cẩm Nang Trì Hoãn khi còn 1 Máu trở xuống" };
     if ((target.judgements || []).some((card) => card.subType === CARD_SUBTYPES.BAI_COC_BACH_DANG)) return { error: "Mục tiêu đã có Bãi Cọc Bạch Đằng" };
     for (const id of selectedIds) {
       const index = player.hand.findIndex((card) => card.id === id);

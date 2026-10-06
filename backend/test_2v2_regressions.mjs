@@ -1545,4 +1545,60 @@ for (const [subType, name] of [
   assert.equal(state.players[0].hand.length, 2);
 }
 
+{
+  // 6. Ngô Quyền (#22) - Miễn nhiễm hoàn toàn với Bãi Cọc Bạch Đằng (Thủy Chiến)
+  // 6a. Đánh trực tiếp Bãi Cọc từ tay vào Ngô Quyền
+  const stateDirect = freshState();
+  stateDirect.players[1].heroId = 22; // Ngô Quyền (seat 2)
+  put(stateDirect, 1, card("BAI_COC_CARD", "Bãi Cọc Bạch Đằng", CARD_SUBTYPES.BAI_COC_BACH_DANG, CARD_CATEGORIES.DELAYED_SCROLL));
+  const resDirect = handlePlayCard(stateDirect, 1, "BAI_COC_CARD", 2);
+  assert.equal(resDirect.error, "Thủy Chiến: mục tiêu không thể trở thành mục tiêu của Bãi Cọc Bạch Đằng");
+
+  // 6b. Mai Thúc Loan (#17) dùng Vạn An vào Ngô Quyền (#22)
+  const stateVanAn = freshState();
+  stateVanAn.players[0].heroId = 17; // Mai Thúc Loan
+  stateVanAn.players[1].heroId = 22; // Ngô Quyền
+  put(stateVanAn, 1, card("VA_A", "Lá A", CARD_SUBTYPES.PEACH));
+  put(stateVanAn, 1, card("VA_B", "Lá B", CARD_SUBTYPES.DODGE));
+  const resVanAn = handleUseSkill(stateVanAn, 1, "Vạn An", 2, "VA_A|VA_B");
+  assert.equal(resVanAn.error, "Thủy Chiến: mục tiêu không thể trở thành mục tiêu của Bãi Cọc Bạch Đằng");
+
+  // 6c. Ngô Quyền (#22) dùng Thủy Chiến vào một Ngô Quyền khác (#22)
+  const stateThuyChien = freshState();
+  stateThuyChien.players[0].heroId = 22;
+  stateThuyChien.players[1].heroId = 22;
+  put(stateThuyChien, 1, { id: "TC_CARD", name: "Lá Vàng", suit: "Diamond", rank: 5, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE });
+  const resThuyChien = handleUseSkill(stateThuyChien, 1, "Thủy Chiến", 2, "TC_CARD");
+  assert.equal(resThuyChien.error, "Thủy Chiến: mục tiêu không thể trở thành mục tiêu của Bãi Cọc Bạch Đằng");
+
+  // 6d. Ngô Quyền ra Trảm khi có Bãi Cọc: Bãi Cọc tự động tiêu biến mà không kích hoạt phán xét/sát thương
+  const statePlaySlash = freshState();
+  statePlaySlash.players[0].heroId = 22;
+  statePlaySlash.players[0].judgements = [card("TRAP_NGO", "Bãi Cọc Bạch Đằng", CARD_SUBTYPES.BAI_COC_BACH_DANG, CARD_CATEGORIES.DELAYED_SCROLL)];
+  put(statePlaySlash, 1, card("SLASH_NGO", "Trảm", CARD_SUBTYPES.ATTACK_NORMAL));
+  const resSlash = handlePlayCard(statePlaySlash, 1, "SLASH_NGO", 2);
+  assert.equal(resSlash.success, true);
+  assert.equal(statePlaySlash.players[0].judgements.length, 0);
+  assert.equal(statePlaySlash.phase, "AWAIT_SLASH_DEFENSE");
+  assert.equal(statePlaySlash.players[0].hp, 4);
+
+  // 6e. Mượn Gươm ép Ngô Quyền ra Trảm khi có Bãi Cọc: Bãi Cọc tự động tiêu biến, Trảm tiếp tục
+  const stateBorrow = freshState();
+  stateBorrow.players[1].heroId = 22; // Ngô Quyền (seat 2)
+  const weapon = card("WEAPON_2", "Vũ khí", CARD_SUBTYPES.WEAPON, CARD_CATEGORIES.EQUIPMENT);
+  weapon.range = 2;
+  stateBorrow.players[1].equipments = [weapon];
+  stateBorrow.players[1].judgements = [card("TRAP_BORROW_NGO", "Bãi Cọc Bạch Đằng", CARD_SUBTYPES.BAI_COC_BACH_DANG, CARD_CATEGORIES.DELAYED_SCROLL)];
+  put(stateBorrow, 1, card("BORROW_CARD", "Mượn Gươm Diệt Địch", CARD_SUBTYPES.MUON_GUOM_DIET_DICH, CARD_CATEGORIES.INSTANT_SCROLL));
+  put(stateBorrow, 2, card("SLASH_BORROW", "Trảm Thường", CARD_SUBTYPES.ATTACK_NORMAL));
+  assert.equal(handlePlayCard(stateBorrow, 1, "BORROW_CARD", 2, { targetSeat2: 4 }).success, true);
+  assert.equal(stateBorrow.phase, "AWAIT_BORROW_SWORD");
+  const resBorrow = handleRespondAction(stateBorrow, 2, true, "SLASH_BORROW");
+  assert.equal(resBorrow.success, true);
+  assert.equal(stateBorrow.players[1].judgements.length, 0);
+  assert.equal(stateBorrow.phase, "AWAIT_SLASH_DEFENSE");
+  assert.equal(stateBorrow.waitingTargetSeat, 4);
+  assert.equal(stateBorrow.players[1].hp, 4);
+}
+
 console.log("2v2 regression tests: PASS");
