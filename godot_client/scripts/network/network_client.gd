@@ -16,11 +16,11 @@ signal ping_updated(ping_ms: int)
 const CANDIDATE_SERVERS: Array[Dictionary] = [
 	# Draft and battle state must use one shared online authority. There is no
 	# localhost/LAN fallback because separate local processes do not share rooms.
-	# Deno Deploy can need several seconds to wake an idle isolate and finish TLS.
-	{ "type": "DENO_CLOUD", "name": "Máy Chủ Đám Mây (Deno Cloud)", "url": "wss://dai-viet-chien-server.vdthanh.deno.net", "timeout": 25.0 }
+	# Render container keeps the entire match in a single shared memory state.
+	{ "type": "RENDER_CLOUD", "name": "Máy Chủ Đám Mây (Render)", "url": "wss://daivietchien.onrender.com", "timeout": 30.0 }
 ]
 
-const CLOUD_SERVER_URL: String = "wss://dai-viet-chien-server.vdthanh.deno.net"
+const CLOUD_SERVER_URL: String = "wss://daivietchien.onrender.com"
 @export var server_url: String = CLOUD_SERVER_URL
 @export var auto_reconnect: bool = true
 
@@ -110,7 +110,7 @@ func _try_candidate(index: int) -> void:
 		if socket:
 			socket.close()
 		_reconnect_timer = 0.0
-		print("[NetworkClient] ❌ Chưa kết nối được Deno Cloud; sẽ tự động thử lại...")
+		print("[NetworkClient] ❌ Chưa kết nối được Render Cloud; sẽ tự động thử lại...")
 		error_received.emit("Không thể kết nối đến Máy Chủ Trận Đấu online.")
 		return
 
@@ -147,7 +147,7 @@ func _load_server_config() -> void:
 func save_server_url(new_url: String) -> void:
 	# Kept for compatibility with older UI scripts. The client is cloud-only.
 	server_url = CLOUD_SERVER_URL
-	print("[NetworkClient] Bỏ qua địa chỉ server tùy chỉnh; chỉ dùng Deno Cloud.")
+	print("[NetworkClient] Bỏ qua địa chỉ server tùy chỉnh; chỉ dùng Render Cloud.")
 	connect_to_server(CLOUD_SERVER_URL)
 
 func connect_to_server(url: String = "") -> void:
