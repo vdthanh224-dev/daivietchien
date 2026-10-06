@@ -452,7 +452,7 @@ func send_toggle_skill(skill_id: String) -> void:
 		"skillId": skill_id
 	})
 
-func send_respond_action(accepted: bool, card_id: String = "", target_card_id: String = "", card_ids: Array = []) -> void:
+func send_respond_action(accepted: bool, card_id: String = "", target_card_id: String = "", card_ids: Array = [], target_seat: int = 0, extra_payload: Dictionary = {}) -> void:
 	var payload = {
 		"action": "RESPOND_ACTION",
 		"roomId": room_id,
@@ -464,6 +464,10 @@ func send_respond_action(accepted: bool, card_id: String = "", target_card_id: S
 		payload["targetCardId"] = target_card_id
 	if not card_ids.is_empty():
 		payload["cardIds"] = card_ids
+	if target_seat > 0:
+		payload["targetSeat"] = target_seat
+	for k in extra_payload.keys():
+		payload[k] = extra_payload[k]
 	send_json(payload)
 
 func send_discard_cards(card_ids: Array) -> void:

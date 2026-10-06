@@ -249,7 +249,8 @@ function validateClientPayload(payload: any, rawBytes: number): string | null {
   if (rawBytes > MAX_WS_MESSAGE_BYTES) return "Gói tin vượt giới hạn cho phép";
   if (typeof payload.action !== "string" || !ALLOWED_WS_ACTIONS.has(payload.action)) return "Hành động không hợp lệ";
   if (payload.roomId !== undefined && (typeof payload.roomId !== "string" || payload.roomId.length > 128)) return "Mã phòng không hợp lệ";
-  for (const key of ["cardId", "targetCardId", "skillId", "heroName", "userId", "userName"]) {
+  for (const key of ["cardId", "targetCardId", "skillId", "heroName", "userId", "userName", "phaTongCardId", "phaTongCostCardId"]) {
+    if (payload[key] !== undefined && typeof payload[key] === "number") payload[key] = String(payload[key]);
     if (payload[key] !== undefined && (typeof payload[key] !== "string" || payload[key].length > 256)) return `${key} không hợp lệ`;
   }
   for (const key of ["seat", "targetSeat", "targetSeat2", "expectedVersion"]) {
@@ -292,21 +293,85 @@ const HERO_NAME_MAP: Record<number, string> = {
   26: "Đỗ Cảnh Thạc",
   27: "Kiều Thuận",
   28: "Nguyễn Siêu",
+  29: "Lã Đường",
+  30: "Đinh Bộ Lĩnh",
+  31: "Đinh Liễn",
+  32: "Đinh Điền",
+  33: "Nguyễn Bặc",
+  34: "Phạm Hạp",
+  35: "Lê Hoàn",
+  36: "Dương Vân Nga",
+  37: "Lê Long Đĩnh",
+  38: "Đào Cam Mộc",
+  39: "Lý Công Uẩn",
+  40: "Lý Phật Mã",
+  41: "Lý Nhật Tôn",
+  42: "Lý Đạo Thành",
+  43: "Ỷ Lan",
+  44: "Tông Đản",
+  45: "Thân Cảnh Phúc",
+  46: "Tô Hiến Thành",
   47: "Lý Thường Kiệt",
+  48: "Trần Cảnh",
+  49: "Trần Thủ Độ",
+  50: "Trần Liễu",
+  51: "Trần Hoảng",
+  52: "Trần Khâm",
   53: "Trần Quốc Tuấn",
+  54: "Trần Quang Khải",
+  55: "Trần Nhật Duật",
   56: "Trần Quốc Toản",
+  57: "Trần Bình Trọng",
+  58: "Trần Khánh Dư",
+  59: "Phạm Ngũ Lão",
+  60: "Yết Kiêu",
+  61: "Dã Tượng",
+  62: "Đỗ Khắc Chung",
+  63: "Hà Đặc",
+  64: "Hà Chương",
+  65: "Nguyễn Khoái",
+  66: "Trần Thì Kiến",
+  67: "Chu Văn An",
   68: "Trương Hán Siêu",
+  69: "Mạc Đĩnh Chi",
+  70: "Đoàn Nhữ Hài",
+  71: "Trần Nghệ Tông",
   72: "Trần Duệ Tông",
+  73: "Trần Khát Chân",
+  74: "Đỗ Tử Bình",
+  75: "Nguyễn Sư Tề",
+  76: "Hồ Quý Ly",
+  77: "Hồ Hán Thương",
+  78: "Hồ Nguyên Trừng",
+  79: "Trần Ngỗi",
+  80: "Trần Quý Khoáng",
+  81: "Đặng Dung",
+  82: "Đặng Tất",
   83: "Nguyễn Cảnh Chân",
+  84: "Nguyễn Cảnh Dị",
+  85: "Nguyễn Biểu",
   86: "Lê Lợi",
   87: "Nguyễn Trãi",
+  88: "Trần Nguyên Hãn",
+  89: "Lê Khôi",
+  90: "Nguyễn Xí",
+  91: "Đinh Liệt",
+  92: "Lưu Nhân Chú",
+  93: "Phạm Vấn",
+  94: "Lê Sát",
+  95: "Lý Triện",
+  96: "Đỗ Bí",
+  97: "Trịnh Khả",
+  98: "Nguyễn Chích",
+  99: "Lê Văn An",
+  100: "Bùi Quốc Hưng"
 };
 
 function getHeroName(heroId: number): string {
   return HERO_NAME_MAP[heroId] || `Chiến Tướng #${heroId}`;
 }
 
-const DEFAULT_HERO_POOL = Array.from({ length: 28 }, (_, i) => i + 1);
+const DEFAULT_HERO_POOL = Array.from({ length: 40 }, (_, i) => i + 1);
 
 function getAutoPickHeroId(excludeIds: number[]): number {
   for (const id of DEFAULT_HERO_POOL) {
@@ -988,7 +1053,7 @@ Deno.serve({ port, hostname }, async (req) => {
         } else if (action === "PLAY_CARD") {
           result = handlePlayCard(room.state, boundSeat, cardId, targetSeat, payload);
         } else if (action === "RESPOND_ACTION") {
-          result = handleRespondAction(room.state, boundSeat, accepted, cardId, targetCardId, cardIds);
+          result = handleRespondAction(room.state, boundSeat, accepted, cardId, targetCardId, cardIds, targetSeat, payload);
         } else if (action === "END_TURN") {
           result = handleEndTurn(room.state, boundSeat);
         } else if (action === "DISCARD_CARDS") {
@@ -1140,7 +1205,7 @@ Deno.serve({ port, hostname }, async (req) => {
       } else if (action === "PLAY_CARD") {
         result = handlePlayCard(room.state, requestSeat, cardId, targetSeat, payload);
       } else if (action === "RESPOND_ACTION") {
-        result = handleRespondAction(room.state, requestSeat, accepted, cardId, targetCardId, cardIds);
+        result = handleRespondAction(room.state, requestSeat, accepted, cardId, targetCardId, cardIds, targetSeat, payload);
       } else if (action === "END_TURN") {
         result = handleEndTurn(room.state, requestSeat);
       } else if (action === "DISCARD_CARDS") {
