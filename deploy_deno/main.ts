@@ -556,15 +556,6 @@ function resolveDraftSeat(room: RoomData, requestedSeat: number, payload: any, s
   const slots = room.draft?.slots || [];
   const normalize = (value: unknown) => String(value || "").trim().toLowerCase();
 
-  // Godot debug windows can share one UID/name through user://; honor their explicit seat.
-  const debugSeat = Number(payload.debugSeat);
-  if (debugSeat >= 1 && debugSeat <= 4) {
-    const existingSocket = room.sockets.get(debugSeat);
-    if (!existingSocket || existingSocket === socket || existingSocket.readyState !== WebSocket.OPEN) {
-      return debugSeat;
-    }
-  }
-
   const userId = normalize(payload.userId);
   const userName = normalize(payload.userName);
   const byId = userId ? slots.filter((slot: any) => normalize(slot.userId) === userId) : [];
@@ -574,6 +565,23 @@ function resolveDraftSeat(room: RoomData, requestedSeat: number, payload: any, s
       return byId[0].seat;
     }
   }
+
+  // Next priority: requested assigned seat
+  if (requestedSeat >= 1 && requestedSeat <= slots.length) {
+    const existingSocket = room.sockets.get(requestedSeat);
+    if (!existingSocket || existingSocket === socket || existingSocket.readyState !== WebSocket.OPEN) {
+      return requestedSeat;
+    }
+  }
+
+  const debugSeat = Number(payload.debugSeat);
+  if (debugSeat >= 1 && debugSeat <= slots.length) {
+    const existingSocket = room.sockets.get(debugSeat);
+    if (!existingSocket || existingSocket === socket || existingSocket.readyState !== WebSocket.OPEN) {
+      return debugSeat;
+    }
+  }
+
   const byName = userName ? slots.filter((slot: any) => normalize(slot.userName) === userName) : [];
   if (byName.length === 1) {
     const existingSocket = room.sockets.get(byName[0].seat);

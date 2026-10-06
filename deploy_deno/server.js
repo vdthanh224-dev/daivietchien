@@ -448,19 +448,19 @@ function resolveDraftSeat(room, requestedSeat, payload, socket) {
     return true;
   };
 
-  // Ưu tiên 1: Explicit debug seat (dành cho multi-instance debug cửa sổ 1, 2, 3, 4 trên cùng máy)
-  const debugSeat = Number(payload.debugSeat);
-  if (!isDynastyDraft(room.draft) && debugSeat >= 1 && debugSeat <= 4) {
-    const s = slots.find((e) => e.seat === debugSeat);
-    if (isAvailable(s)) return debugSeat;
-  }
-
-  // Ưu tiên 2: Khớp chính xác theo userId từ phòng ghép
+  // Ưu tiên 1: Khớp chính xác theo userId từ phòng ghép
   const byId = userId
     ? slots.filter((slot) => normalize(slot.userId) === userId)
     : [];
   if (byId.length === 1 && isAvailable(byId[0])) {
     return byId[0].seat;
+  }
+
+  // Ưu tiên 2: Explicit debug seat / assigned seat
+  const debugSeat = Number(payload.debugSeat || requestedSeat);
+  if (!isDynastyDraft(room.draft) && debugSeat >= 1 && debugSeat <= 4) {
+    const s = slots.find((e) => e.seat === debugSeat);
+    if (isAvailable(s)) return debugSeat;
   }
 
   // Ưu tiên 3: Khớp theo userName

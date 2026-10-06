@@ -107,18 +107,8 @@ func _ready() -> void:
 				owned_pool.append(hero)
 			else:
 				fallback_pool.append(hero)
-		var pool_rng = RandomNumberGenerator.new()
-		pool_rng.seed = hash(current_room_id) if not current_room_id.is_empty() else 12345
-		for i in range(owned_pool.size() - 1, 0, -1):
-			var j = pool_rng.randi_range(0, i)
-			var tmp = owned_pool[i]
-			owned_pool[i] = owned_pool[j]
-			owned_pool[j] = tmp
-		for i in range(fallback_pool.size() - 1, 0, -1):
-			var j = pool_rng.randi_range(0, i)
-			var tmp = fallback_pool[i]
-			fallback_pool[i] = fallback_pool[j]
-			fallback_pool[j] = tmp
+		owned_pool.shuffle()
+		fallback_pool.shuffle()
 		var limited: Array[Dictionary] = []
 		for hero in owned_pool:
 			if limited.size() >= 8: break
@@ -130,14 +120,8 @@ func _ready() -> void:
 	elif not is_user_admin and current_mode_id.begins_with("dynasty_"):
 		# Dynasty players keep the same eight-card-sized draft pool after the king
 		# pick, while all role information remains server authoritative.
-		var pool_rng = RandomNumberGenerator.new()
-		pool_rng.seed = hash(current_room_id) if not current_room_id.is_empty() else 12345
 		var dynasty_pool: Array[Dictionary] = available_heroes.duplicate()
-		for i in range(dynasty_pool.size() - 1, 0, -1):
-			var j = pool_rng.randi_range(0, i)
-			var tmp = dynasty_pool[i]
-			dynasty_pool[i] = dynasty_pool[j]
-			dynasty_pool[j] = tmp
+		dynasty_pool.shuffle()
 		available_heroes = dynasty_pool.slice(0, mini(8, dynasty_pool.size()))
 
 	_setup_draft_slots()
@@ -248,7 +232,7 @@ func _setup_draft_slots() -> void:
 	if my_seat_idx == -1:
 		my_seat_idx = 0
 
-	var my_seat_num = my_seat_idx + 1
+	var my_seat_num = int(slots[my_seat_idx].get("seatNumber", my_seat_idx + 1)) if (my_seat_idx >= 0 and my_seat_idx < slots.size() and slots[my_seat_idx] is Dictionary) else (my_seat_idx + 1)
 	if NetworkClient:
 		NetworkClient.my_seat = my_seat_num
 		if not (OS.is_debug_build() or OS.has_feature("editor")):

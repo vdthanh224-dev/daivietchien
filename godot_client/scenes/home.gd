@@ -6385,8 +6385,10 @@ func _sync_my_seat_from_room(room_data: Dictionary, my_uid: String, my_name: Str
 	for idx in range(slots.size()):
 		var sl = slots[idx]
 		if AppwriteMatchmaking and AppwriteMatchmaking.is_same_user(str(sl.get("userId", "")), str(sl.get("userName", "")), my_uid, my_name):
-			NetworkClient.my_seat = idx + 1
+			NetworkClient.my_seat = int(sl.get("seatNumber", idx + 1))
+			NetworkClient.seat_is_explicit = true
 			NetworkClient.update_debug_window_title(my_name)
+			print("[Matchmaking] Đồng bộ vị trí cố định: Ghế %d (UID: %s, Tên: %s, Phe: %s)" % [NetworkClient.my_seat, my_uid, my_name, "Rồng" if sl.get("isDragon", false) else "Phượng"])
 			return
 
 func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: Array, mode_id: String = "2v2", target_player_count: int = 4) -> void:
@@ -6567,9 +6569,8 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	_update_matchmaking_status_count(status_lbl, mm_current_room)
 
 	var is_fast_test = "--screenshot-matchmaking-filled" in OS.get_cmdline_user_args() or "--screenshot-matchmaking-filled" in OS.get_cmdline_args()
-	# Đúng thời gian kể từ người cuối cùng ghép vào phòng, nếu chưa đủ 4 người thì bổ sung AI và vào trận luôn
-	# Khi debug/editor tăng lên 45s để kịp click cả 4 cửa sổ; online thường là 25s
-	var bot_fill_timeout: float = 1.0 if is_fast_test else (45.0 if (OS.is_debug_build() or OS.has_feature("editor")) else 25.0)
+	# Đúng 15s kể từ người cuối cùng ghép vào phòng, nếu chưa đủ 4 người thì bổ sung AI và vào trận luôn
+	var bot_fill_timeout: float = 1.0 if is_fast_test else 15.0
 	var bot_fill_timer: float = 0.0
 	var last_real_player_at_ms: int = Time.get_ticks_msec()
 	var heartbeat_timer: float = 0.0
@@ -6760,22 +6761,57 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 				used_names.append(s.get("userName"))
 
 		var bot_seed_base = AppwriteMatchmaking.get_deterministic_hash_code(mm_active_room_id)
-		var slots = mm_current_room.get("slots", [])
-		for i in range(slots.size()):
-			var s = slots[i]
+		var existing_players: Array = []
+		for s in mm_current_room.get("slots", []):
 			if not (s is Dictionary):
 				continue
-			if s.get("isEmpty", false):
-				var bot_name = AppwriteMatchmaking.get_realistic_gamer_name(bot_seed_base + i * 17, used_names)
-				used_names.append(bot_name)
-				s["userId"] = "bot_" + str(randi()).md5_text().substr(0, 6)
-				s["userName"] = bot_name
-				s["rankPoints"] = maxi(20, my_rank_points + randi_range(-15, 15))
-				s["isAI"] = true
-				s["isEmpty"] = false
+			if not s.get("isEmpty", false) and str(s.get("userId", "")) != "" and str(s.get("userId", "")) != "empty":
+				existing_players.append(s.duplicate(true))
 
+		# Bổ sung bot nếu chưa đủ 4 người
+		while existing_players.size() < target_player_count:
+			var i = existing_players.size()
+			var bot_name = AppwriteMatchmaking.get_realistic_gamer_name(bot_seed_base + i * 17, used_names)
+			used_names.append(bot_name)
+			existing_players.append({
+				"userId": "bot_" + str(randi()).md5_text().substr(0, 6),
+				"userName": bot_name,
+				"rankPoints": maxi(20, my_rank_points + randi_range(-15, 15)),
+				"isAI": true,
+				"isEmpty": false
+			})
+
+		# 1. Random ngẫu nhiên 4 người vào 4 vị trí ghế 1->4
+		existing_players.shuffle()
+
+		# 2. Random ngẫu nhiên 2 Rồng và 2 Phượng
+		var team_roles: Array[bool] = [true, true, false, false]
+		team_roles.shuffle()
+
+		# 3. Cố định 4 vị trí và phe vào slots trước khi bắt đầu chọn tướng
+		var final_slots: Array = []
+		for idx in range(existing_players.size()):
+			var p = existing_players[idx]
+			var s_num = idx + 1
+			var is_drag = team_roles[idx]
+			final_slots.append({
+				"seatNumber": s_num,
+				"userId": str(p.get("userId", "")),
+				"userName": str(p.get("userName", "")),
+				"rankPoints": int(p.get("rankPoints", 0)),
+				"isDragon": is_drag,
+				"isAI": bool(p.get("isAI", false)),
+				"isEmpty": false
+			})
+
+		mm_current_room["slots"] = final_slots
 		mm_current_room["status"] = "STARTED"
 		await AppwriteMatchmaking.update_room_state(mm_current_room)
+
+	# Đảm bảo cả chủ phòng và khách đều có bản room state mới nhất với 4 ghế và phe cố định
+	var fresh_final = await AppwriteMatchmaking.poll_room_state(mm_active_room_id)
+	if not fresh_final.is_empty():
+		mm_current_room = fresh_final
 
 	if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
 		return
