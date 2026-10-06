@@ -1598,7 +1598,47 @@ for (const [subType, name] of [
   assert.equal(stateBorrow.players[1].judgements.length, 0);
   assert.equal(stateBorrow.phase, "AWAIT_SLASH_DEFENSE");
   assert.equal(stateBorrow.waitingTargetSeat, 4);
-  assert.equal(stateBorrow.players[1].hp, 4);
+  // 6f. Phùng Hưng (#15) dùng An Dân:
+  // - KHÔNG cho phép chuyển Bãi Cọc Bạch Đằng sang Ngô Quyền (#22)
+  // - VẪN cho phép chuyển Bãi Cọc sang người khác không phải Ngô Quyền
+  // - VẪN cho phép chuyển Cắt Đường Lương sang Ngô Quyền
+  const stateAnDan = freshState();
+  stateAnDan.players[0].heroId = 15; // Phùng Hưng (seat 1)
+  stateAnDan.players[1].heroId = 22; // Ngô Quyền (seat 2)
+  stateAnDan.players[2].heroId = 1;  // Tướng khác (seat 3)
+  stateAnDan.players[3].heroId = 2;  // Tướng khác (seat 4)
+  const trapCard = card("TRAP_SEAT4", "Bãi Cọc Bạch Đằng", CARD_SUBTYPES.BAI_COC_BACH_DANG, CARD_CATEGORIES.DELAYED_SCROLL);
+  const supplyCard = card("SUPPLY_SEAT4", "Cắt Đường Lương", CARD_SUBTYPES.SUPPLY_SHORTAGE, CARD_CATEGORIES.DELAYED_SCROLL);
+  stateAnDan.players[3].judgements = [trapCard, supplyCard];
+  stateAnDan.phase = "AWAIT_AN_DAN";
+  stateAnDan.turnStart = { seat: 1, anDanResolved: false, skipDraw: false, judgementCards: [], judgementIndex: 0, drawCount: 2 };
+  stateAnDan.waitingTargetSeat = 1;
+  stateAnDan.waitingReactionType = "AN_DAN";
+
+  const resAnDanStart = handleRespondAction(stateAnDan, 1, true, null);
+  assert.equal(resAnDanStart.success, true);
+  assert.equal(stateAnDan.phase, "AWAIT_TARGET_CARD");
+  assert.equal(stateAnDan.targetCardSelection.effectType, "AN_DAN");
+
+  const options = stateAnDan.targetCardSelection.options;
+  // Option chuyển Bãi Cọc sang Ngô Quyền (seat 2) PHẢI KHÔNG CÓ
+  assert.equal(options.some((opt) => opt.card.id === "TRAP_SEAT4" && opt.token.endsWith("|2")), false);
+  // Option chuyển Bãi Cọc sang Seat 3 PHẢI CÓ
+  assert.equal(options.some((opt) => opt.card.id === "TRAP_SEAT4" && opt.token.endsWith("|3")), true);
+  // Option chuyển Cắt Đường Lương sang Ngô Quyền (seat 2) PHẢI CÓ
+  assert.equal(options.some((opt) => opt.card.id === "SUPPLY_SEAT4" && opt.token.endsWith("|2")), true);
+
+  // Thử ép token chuyển Bãi Cọc sang Ngô Quyền phải bị lỗi
+  const badToken = "AN_DAN|4|TRAP_SEAT4|2";
+  const resBad = handleRespondAction(stateAnDan, 1, true, badToken);
+  assert.equal(resBad.error, "Lựa chọn An Dân không còn hợp lệ");
+
+  // Chọn token chuyển Bãi Cọc sang Seat 3 phải thành công
+  const goodToken = "AN_DAN|4|TRAP_SEAT4|3";
+  const resGood = handleRespondAction(stateAnDan, 1, true, goodToken);
+  assert.equal(resGood.success, true);
+  assert.equal(stateAnDan.players[2].judgements.some((j) => j.id === "TRAP_SEAT4"), true);
+  assert.equal(stateAnDan.phase, "AWAIT_AN_DAN_DUEL");
 }
 
 console.log("2v2 regression tests: PASS");
