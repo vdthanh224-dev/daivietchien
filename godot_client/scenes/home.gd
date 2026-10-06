@@ -584,9 +584,9 @@ func _build_tactical_command_dock() -> void:
 	d_vbox.add_child(d_div)
 
 	var modes_list = [
-		{"id": "2v2", "icon": "⚔️", "title": "Đấu Trường 2v2", "sub": "Xếp Hạng RP (1,200 RP)"},
-		{"id": "dynasty_5", "icon": "👑", "title": "Vương Triều 5 người", "sub": "Hoàng Tộc Tranh Bá"},
-		{"id": "dynasty_8", "icon": "👑", "title": "Vương Triều 8 người", "sub": "Hoàng Tộc Tranh Bá"}
+		{"id": "2v2", "icon": "⚔️", "title": "Đấu Trường 2v2", "sub": "Xếp Hạng"},
+		{"id": "dynasty_5", "icon": "👑", "title": "Vương Triều 5 người", "sub": "(Chưa làm xong)"},
+		{"id": "dynasty_8", "icon": "👑", "title": "Vương Triều 8 người", "sub": "(Chưa làm xong)"}
 	]
 
 	for m in modes_list:
@@ -5591,6 +5591,49 @@ func _build_settings_content() -> Control:
 	div.custom_minimum_size = Vector2(0, 1)
 	div.color = COLOR_GOLD_PRIMARY
 	container.add_child(div)
+
+	# UI Scale Section
+	var scale_v = VBoxContainer.new()
+	scale_v.add_theme_constant_override("separation", 8)
+	var scale_lbl = Label.new()
+	scale_lbl.text = "📱 TỈ LỆ CHỮ & GIAO DIỆN (UI SCALE):"
+	scale_lbl.add_theme_font_size_override("font_size", 13)
+	scale_lbl.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
+	scale_v.add_child(scale_lbl)
+
+	var scale_hbox = HBoxContainer.new()
+	scale_hbox.add_theme_constant_override("separation", 8)
+
+	var scale_options = [
+		{"label": "Chuẩn PC (100%)", "scale": 1.0},
+		{"label": "Mobile (125%)", "scale": 1.25},
+		{"label": "Chữ Lớn (135%)", "scale": 1.35},
+	]
+
+	var current_s = UIScaleManager.current_scale if is_instance_valid(UIScaleManager) else 1.0
+	for opt in scale_options:
+		var btn = Button.new()
+		btn.text = opt["label"]
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.custom_minimum_size = Vector2(0, 38)
+		btn.add_theme_font_size_override("font_size", 11)
+		var is_active = is_equal_approx(current_s, opt["scale"])
+		_style_leaderboard_tab_button(btn, is_active)
+		var target_scale = opt["scale"]
+		btn.pressed.connect(func():
+			if is_instance_valid(UIScaleManager):
+				UIScaleManager.set_scale_factor(target_scale)
+				_show_modal("THIẾT LẬP CHIẾN TRƯỜNG", _build_settings_content())
+		)
+		scale_hbox.add_child(btn)
+
+	scale_v.add_child(scale_hbox)
+	container.add_child(scale_v)
+
+	var div_scale = ColorRect.new()
+	div_scale.custom_minimum_size = Vector2(0, 1)
+	div_scale.color = COLOR_GOLD_PRIMARY
+	container.add_child(div_scale)
 
 	# Realtime match and draft state always use the shared online server.
 	var srv_v = VBoxContainer.new()

@@ -5,8 +5,7 @@ const OnboardingModalScene = preload("res://scenes/components/onboarding_modal.t
 # Background & VFX
 @onready var background_img: TextureRect = $BackgroundLayer/BackgroundImage
 @onready var embers_particles: CPUParticles2D = $BackgroundLayer/EmbersParticles
-@onready var sunburst_rays_center: Control = $TitleBrandCenter/SunburstRaysCenter
-@onready var crest_icon: TextureRect = $TitleBrandCenter/CrestIcon
+@onready var crest_icon: TextureRect = $CenterAuthCard/VBox/DrumHeader/DrumEmblem
 
 # Top Bar Utilities
 @onready var ping_label: Label = $TopBarUtilities/LeftGroup/PingBadge/Label
@@ -91,7 +90,6 @@ func _ready() -> void:
 	# 5. Hiệu ứng động học sống động
 	_setup_background_motion()
 	_setup_crest_motion()
-	_setup_sunburst_rays()
 	_setup_hover_effects()
 
 	# 6. Lắng nghe AuthManager & NetworkClient Ping
@@ -156,26 +154,8 @@ func _setup_crest_motion() -> void:
 		return
 	crest_icon.pivot_offset = crest_icon.custom_minimum_size * 0.5
 	var tw = create_tween().set_loops()
-	tw.tween_property(crest_icon, "scale", Vector2(1.06, 1.06), 2.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tw.parallel().tween_property(crest_icon, "position:y", crest_icon.position.y - 3.0, 2.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(crest_icon, "scale", Vector2(1.0, 1.0), 2.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tw.parallel().tween_property(crest_icon, "position:y", crest_icon.position.y, 2.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-
-func _setup_sunburst_rays() -> void:
-	if not sunburst_rays_center:
-		return
-	var num_rays = 16
-	for i in range(num_rays):
-		var ray = Line2D.new()
-		var angle = (float(i) / float(num_rays)) * TAU
-		var dir = Vector2(cos(angle), sin(angle))
-		ray.points = PackedVector2Array([Vector2.ZERO, dir * 360.0])
-		ray.width = 30.0
-		ray.default_color = Color(1.0, 0.85, 0.35, 0.06 if i % 2 == 0 else 0.025)
-		sunburst_rays_center.add_child(ray)
-
-	var rays_tw = sunburst_rays_center.create_tween().set_loops()
-	rays_tw.tween_property(sunburst_rays_center, "rotation", TAU, 30.0).as_relative()
+	tw.tween_property(crest_icon, "scale", Vector2(1.05, 1.05), 2.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(crest_icon, "scale", Vector2(1.0, 1.0), 2.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _setup_hover_effects() -> void:
 	_setup_micro_hover(quick_guest_btn)

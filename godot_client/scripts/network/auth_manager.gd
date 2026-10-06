@@ -15,6 +15,7 @@ var current_user_id: String = ""
 var current_user_labels: PackedStringArray = PackedStringArray()
 var session_secret: String = ""
 var session_cookie: String = ""
+var fallback_cookies: String = ""
 var is_logged_in: bool = false
 var is_deleting_session: bool = false
 
@@ -69,7 +70,9 @@ func get_auth_headers(include_session: bool = true) -> PackedStringArray:
 	if include_session:
 		if session_secret != "":
 			headers.append("X-Appwrite-Session: " + session_secret)
-		if session_cookie != "":
+		if fallback_cookies != "":
+			headers.append("X-Fallback-Cookies: " + fallback_cookies)
+		if session_cookie != "" and not OS.has_feature("web"):
 			headers.append("Cookie: " + session_cookie)
 	return headers
 
@@ -643,6 +646,7 @@ func reset_to_defaults() -> void:
 	current_user_labels.clear()
 	session_secret = ""
 	session_cookie = ""
+	fallback_cookies = ""
 	is_logged_in = false
 	current_level = 1
 	current_exp = 0
@@ -760,7 +764,7 @@ func register_email(email: String, password: String, name: String) -> void:
 				reset_to_defaults()
 				login_email(email, password)
 			else:
-				var err_msg = _parse_error_msg(resp_body)
+				var err_msg = _parse_error_msg(resp_body, response_code)
 				login_failed.emit("Đăng ký thất bại: " + err_msg)
 		)
 
@@ -810,9 +814,26 @@ func _handle_login_response(result: int, response_code: int, headers: PackedStri
 			is_logged_in = true
 
 			for h in headers:
-				if h.to_lower().begins_with("set-cookie:"):
+				var h_lower = h.to_lower()
+				if h_lower.begins_with("set-cookie:"):
 					var cookie_str = h.substr(11).strip_edges().split(";")[0]
 					session_cookie = cookie_str
+				elif h_lower.begins_with("x-fallback-cookies:"):
+					fallback_cookies = h.substr(19).strip_edges()
+
+			# Nếu secret bị trống (trên Web Appwrite không trả secret qua body), giải mã từ X-Fallback-Cookies
+			if session_secret == "" and fallback_cookies != "":
+				var parsed_fb = JSON.parse_string(fallback_cookies)
+				if parsed_fb is Dictionary:
+					for k in parsed_fb:
+						var val_str = str(parsed_fb[k])
+						var b64_bytes = Marshalls.base64_to_raw(val_str)
+						var b64_json_str = b64_bytes.get_string_from_utf8()
+						var sub_data = JSON.parse_string(b64_json_str)
+						if sub_data is Dictionary and sub_data.has("secret"):
+							session_secret = str(sub_data["secret"])
+							print("[AuthManager] Đã giải mã session_secret từ Fallback Cookies Web thành công!")
+							break
 
 			save_session()
 			# Thông báo thành công tức thì không bắt người chơi đợi nhiều vòng HTTP
@@ -827,7 +848,7 @@ func _handle_login_response(result: int, response_code: int, headers: PackedStri
 			})
 			fetch_account_info()
 	else:
-		var err_msg = _parse_error_msg(body)
+		var err_msg = _parse_error_msg(body, response_code)
 		if ("session is active" in err_msg.to_lower() or "prohibited when a session is active" in err_msg.to_lower()) and original_password != "":
 			# Nếu phiên đang active đúng là tài khoản này, sử dụng luôn không cần xóa đi tạo lại
 			if current_user_email == fallback_email and session_secret != "":
@@ -890,13 +911,19 @@ func fetch_account_info() -> void:
 
 	http.request(url, headers, HTTPClient.METHOD_GET)
 
-func _parse_error_msg(body: PackedByteArray) -> String:
+func _parse_error_msg(body: PackedByteArray, response_code: int = 0) -> String:
 	var json = JSON.new()
 	var raw = body.get_string_from_utf8()
 	if json.parse(raw) == OK:
 		var d = json.get_data()
 		if d is Dictionary and d.has("message"):
 			return d["message"]
+	if response_code == 0:
+		if OS.has_feature("web"):
+			return "Lỗi kết nối Web (CORS): Tên miền chưa được thêm vào mục Platforms trên Appwrite Console hoặc mạng bị gián đoạn."
+		return "Không thể kết nối máy chủ xác thực. Vui lòng kiểm tra kết nối mạng."
+	if response_code == 403:
+		return "Máy chủ từ chối kết nối (Mã 403 - Invalid Origin). Vui lòng thêm tên miền này vào Appwrite Console > Platforms."
 	return "Không thể kết nối máy chủ xác thực hoặc thông tin không chính xác."
 
 func get_save_path() -> String:
@@ -931,6 +958,7 @@ func save_session() -> void:
 			"userId": current_user_id,
 			"secret": session_secret,
 			"cookie": session_cookie,
+			"fallbackCookies": fallback_cookies,
 			"level": current_level,
 			"exp": current_exp,
 			"silver": current_silver,
@@ -1004,6 +1032,7 @@ func load_saved_session() -> void:
 					current_user_id = data.get("userId", "")
 					session_secret = data.get("secret", "")
 					session_cookie = data.get("cookie", "")
+					fallback_cookies = data.get("fallbackCookies", "")
 					current_level = int(data.get("level", 1))
 					current_exp = int(data.get("exp", 0))
 					current_silver = int(data.get("silver", 5000))
@@ -1040,7 +1069,7 @@ func load_saved_session() -> void:
 							onboarding_completed = true
 					if not onboarding_completed and (current_level > 1 or current_exp > 0 or current_generals.size() > 1):
 						onboarding_completed = true
-					if session_secret != "" or session_cookie != "":
+					if session_secret != "" or session_cookie != "" or fallback_cookies != "":
 						is_logged_in = true
 
 	if current_user_id == "":

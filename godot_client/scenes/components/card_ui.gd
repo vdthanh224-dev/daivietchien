@@ -113,20 +113,24 @@ func update_card(data: Resource) -> void:
 	if not is_inside_tree():
 		return
 
-	var suit_sym = data.get_suit_symbol()
 	var rank_str = data.get_rank_string()
-	suit_rank_lbl.text = "%s %s" % [suit_sym, rank_str]
-	var s_col = data.get_suit_color()
-	suit_rank_lbl.add_theme_color_override("font_color", s_col)
+	var suit_name = data.get_suit_name() if data.has_method("get_suit_name") else ""
+	if suit_name != "":
+		suit_rank_lbl.text = "%s %s" % [rank_str, suit_name]
+	else:
+		suit_rank_lbl.text = rank_str
+	UIScaleManager.scale_node_font(suit_rank_lbl, 11)
+
+	_apply_card_theme(data)
 
 	cat_lbl.text = data.get_category_name()
 	name_lbl.text = data.card_name
+	var base_card_font: int = 13
 	if data.card_name.length() >= 14:
-		name_lbl.add_theme_font_size_override("font_size", 9)
+		base_card_font = 9
 	elif data.card_name.length() >= 10:
-		name_lbl.add_theme_font_size_override("font_size", 11)
-	else:
-		name_lbl.add_theme_font_size_override("font_size", 13)
+		base_card_font = 11
+	UIScaleManager.scale_node_font(name_lbl, base_card_font)
 
 	# Tải hình minh họa lá bài (Artwork)
 	if artwork_rect:
@@ -141,7 +145,82 @@ func update_card(data: Resource) -> void:
 
 	if click_button:
 		var d_text = data.description if "description" in data and data.description != "" else data.card_name
-		click_button.tooltip_text = "%s\n%s" % [data.card_name, d_text]
+		var full_suit_text = ("%s %s" % [rank_str, suit_name]) if suit_name != "" else rank_str
+		click_button.tooltip_text = "[%s] %s\n%s" % [full_suit_text, data.card_name, d_text]
+
+func _apply_card_theme(data: Resource) -> void:
+	if not panel:
+		return
+	var p_box = panel.get_theme_stylebox("panel")
+	var panel_style: StyleBoxFlat = p_box.duplicate() if p_box is StyleBoxFlat else StyleBoxFlat.new()
+	var banner_node = $Panel/Margin/VBox/NameBanner
+	var b_box = banner_node.get_theme_stylebox("panel") if banner_node else null
+	var banner_style: StyleBoxFlat = b_box.duplicate() if b_box is StyleBoxFlat else StyleBoxFlat.new()
+
+	var is_red = data.has_method("is_red") and data.is_red()
+	var is_white = data.has_method("is_white") and data.is_white()
+	var is_yellow = data.has_method("is_yellow") and data.is_yellow()
+	var is_black = data.has_method("is_black") and data.is_black()
+
+	if is_red:
+		# LÁ BÀI ĐỎ: Màu đỏ thắm cổ phong, viền vàng kim
+		panel_style.bg_color = Color(0.70, 0.16, 0.16, 1.0)
+		panel_style.border_color = Color(0.96, 0.82, 0.38, 1.0)
+		banner_style.bg_color = Color(0.44, 0.08, 0.08, 0.95)
+		banner_style.border_color = Color(1.0, 0.85, 0.40, 0.9)
+		name_lbl.add_theme_color_override("font_color", Color(1.0, 0.96, 0.85, 1.0))
+		suit_rank_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.50, 1.0))
+		suit_rank_lbl.add_theme_color_override("font_outline_color", Color(0.28, 0.05, 0.05, 1.0))
+		suit_rank_lbl.add_theme_constant_override("outline_size", 2)
+		cat_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.72, 1.0))
+		if border:
+			border.border_color = Color(0.96, 0.82, 0.38, 0.85)
+
+	elif is_white:
+		# LÁ BÀI TRẮNG: Màu trắng ngà sáng thanh thoát, viền bạc xanh thép
+		panel_style.bg_color = Color(0.96, 0.97, 0.98, 1.0)
+		panel_style.border_color = Color(0.42, 0.50, 0.60, 1.0)
+		banner_style.bg_color = Color(0.22, 0.28, 0.36, 0.95)
+		banner_style.border_color = Color(0.60, 0.68, 0.78, 0.9)
+		name_lbl.add_theme_color_override("font_color", Color(0.98, 0.99, 1.0, 1.0))
+		suit_rank_lbl.add_theme_color_override("font_color", Color(0.12, 0.16, 0.22, 1.0))
+		suit_rank_lbl.add_theme_color_override("font_outline_color", Color(0.85, 0.90, 0.96, 1.0))
+		suit_rank_lbl.add_theme_constant_override("outline_size", 2)
+		cat_lbl.add_theme_color_override("font_color", Color(0.30, 0.38, 0.48, 1.0))
+		if border:
+			border.border_color = Color(0.42, 0.50, 0.60, 0.85)
+
+	elif is_yellow:
+		# LÁ BÀI VÀNG: Màu vàng hoàng kim rực rỡ, viền vàng sáng
+		panel_style.bg_color = Color(0.86, 0.66, 0.16, 1.0)
+		panel_style.border_color = Color(1.0, 0.92, 0.55, 1.0)
+		banner_style.bg_color = Color(0.46, 0.32, 0.05, 0.95)
+		banner_style.border_color = Color(1.0, 0.88, 0.45, 0.9)
+		name_lbl.add_theme_color_override("font_color", Color(1.0, 0.98, 0.90, 1.0))
+		suit_rank_lbl.add_theme_color_override("font_color", Color(0.22, 0.14, 0.02, 1.0))
+		suit_rank_lbl.add_theme_color_override("font_outline_color", Color(1.0, 0.94, 0.70, 1.0))
+		suit_rank_lbl.add_theme_constant_override("outline_size", 2)
+		cat_lbl.add_theme_color_override("font_color", Color(0.30, 0.20, 0.04, 1.0))
+		if border:
+			border.border_color = Color(1.0, 0.92, 0.55, 0.85)
+
+	elif is_black:
+		# LÁ BÀI ĐEN: Màu đen than obsidian quyền lực, viền bạc ánh trăng
+		panel_style.bg_color = Color(0.15, 0.16, 0.19, 1.0)
+		panel_style.border_color = Color(0.68, 0.72, 0.80, 1.0)
+		banner_style.bg_color = Color(0.07, 0.08, 0.10, 0.95)
+		banner_style.border_color = Color(0.55, 0.60, 0.70, 0.8)
+		name_lbl.add_theme_color_override("font_color", Color(0.95, 0.96, 0.98, 1.0))
+		suit_rank_lbl.add_theme_color_override("font_color", Color(0.90, 0.92, 0.96, 1.0))
+		suit_rank_lbl.add_theme_color_override("font_outline_color", Color(0.05, 0.05, 0.07, 1.0))
+		suit_rank_lbl.add_theme_constant_override("outline_size", 2)
+		cat_lbl.add_theme_color_override("font_color", Color(0.70, 0.75, 0.82, 1.0))
+		if border:
+			border.border_color = Color(0.68, 0.72, 0.80, 0.85)
+
+	panel.add_theme_stylebox_override("panel", panel_style)
+	if banner_node:
+		banner_node.add_theme_stylebox_override("panel", banner_style)
 
 func _on_card_mouse_entered() -> void:
 	is_hovered = true
@@ -191,7 +270,7 @@ func set_equipped_badge(visible: bool) -> void:
 		equipped_badge.offset_bottom = 90.0
 		equipped_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		equipped_badge.z_index = 50
-		equipped_badge.add_theme_font_size_override("font_size", 15)
+		UIScaleManager.scale_node_font(equipped_badge, 15)
 		equipped_badge.add_theme_color_override("font_color", Color(1.0, 0.08, 0.08, 1.0))
 		equipped_badge.add_theme_color_override("font_outline_color", Color(0.08, 0.0, 0.0, 1.0))
 		equipped_badge.add_theme_constant_override("outline_size", 5)

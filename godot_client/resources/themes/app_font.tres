@@ -1,0 +1,8 @@
+[gd_resource type="FontVariation" load_steps=3 format=3 uid="uid://dfontapp001"]
+
+[ext_resource type="FontFile" uid="uid://cjdol40cypgus" path="res://assets/fonts/main_font.ttf" id="1_main"]
+[ext_resource type="FontFile" uid="uid://3av53qbg6egr" path="res://assets/fonts/emoji.ttf" id="2_emoji"]
+
+[resource]
+base_font = ExtResource("1_main")
+fallbacks = Array[Font]([ExtResource("2_emoji")])

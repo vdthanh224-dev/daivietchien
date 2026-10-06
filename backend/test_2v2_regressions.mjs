@@ -7,6 +7,8 @@ import {
   handlePlayCard,
   handleRespondAction,
   handleUseSkill,
+  handleToggleSkill,
+  getHandLimit,
   hydrateGameState,
   initGame,
   getNextAliveSeat,
@@ -1339,6 +1341,29 @@ for (const [subType, name] of [
 
 {
   const state = freshState();
+  state.players[1].heroId = 5; // Thánh Thiên
+  put(state, 1, card("THU_MUC_SLASH_WHITE", "Trảm Thường", CARD_SUBTYPES.ATTACK_NORMAL));
+  put(state, 2, { ...card("THU_MUC_WHITE", "Bài Trắng", CARD_SUBTYPES.DODGE), suit: "Diamond" });
+  assert.equal(handlePlayCard(state, 1, "THU_MUC_SLASH_WHITE", 2).success, true);
+  assert.equal(handleRespondAction(state, 2, false, null).success, true);
+  assert.equal(state.phase, "AWAIT_THU_MUC");
+  assert.equal(handleRespondAction(state, 2, true, "THU_MUC_WHITE").success, true);
+  assert.equal(state.players[1].hp, 4);
+}
+
+{
+  const state = freshState();
+  state.players[1].heroId = 5; // Thánh Thiên
+  put(state, 1, card("THU_MUC_SLASH_BLACK", "Trảm Thường", CARD_SUBTYPES.ATTACK_NORMAL));
+  put(state, 2, { ...card("THU_MUC_BLACK", "Bài Đen", CARD_SUBTYPES.SLASH), suit: "Spade" });
+  assert.equal(handlePlayCard(state, 1, "THU_MUC_SLASH_BLACK", 2).success, true);
+  assert.equal(handleRespondAction(state, 2, false, null).success, true);
+  // Black card does not trigger AWAIT_THU_MUC
+  assert.notEqual(state.phase, "AWAIT_THU_MUC");
+}
+
+{
+  const state = freshState();
   state.players[0].heroId = 6; // Vũ Thị Thục
   put(state, 1, card("BAT_NA_BASIC", "Bánh Chưng", CARD_SUBTYPES.PEACH));
   assert.equal(handleUseSkill(state, 1, "Bát Nạ", 2, "BAT_NA_BASIC").success, true);
@@ -1379,6 +1404,145 @@ for (const [subType, name] of [
   assert.equal(state.phase, "AWAIT_HUYNH_TRUONG");
   assert.equal(handleUseSkill(state, 2, "Huynh Trưởng", 3, "HUYNH_TRUONG_GIVE").success, true);
   assert.equal(state.players[2].hand.some((c) => c.id === "HUYNH_TRUONG_GIVE"), true);
+}
+
+{
+  // 1. Cao Lỗ (#1) - Chế Nỏ: converts any black card (Spade or Đen) into Nỏ Thần Kim Quy
+  const state = freshState();
+  state.players[0].heroId = 1;
+  state.players[0].hand = [
+    { id: "CN_SPADE", name: "Đỡ", suit: "Spade", rank: 5, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE, desc: "test" },
+    { id: "CN_DEN", name: "Bánh Chưng", suit: "đen", rank: 6, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH, desc: "test" },
+    { id: "CN_RED", name: "Trảm - Hỏa", suit: "Heart", rank: 7, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_FIRE, desc: "test" }
+  ];
+  handleToggleSkill(state, 1, "Chế Nỏ");
+  assert.equal(state.players[0].hand[0].name, "Nỏ Thần Kim Quy");
+  assert.equal(state.players[0].hand[0].subType, CARD_SUBTYPES.WEAPON);
+  assert.equal(state.players[0].hand[1].name, "Nỏ Thần Kim Quy");
+  assert.equal(state.players[0].hand[1].subType, CARD_SUBTYPES.WEAPON);
+  assert.equal(state.players[0].hand[2].name, "Trảm - Hỏa");
+}
+
+{
+  // 2. Phạm Tu (#13) - Trấn Nam: Black or Yellow Normal Slash bypasses Giáp Đồng Sơn Vi
+  const state = freshState();
+  state.players[0].heroId = 13; // Phạm Tu
+  state.players[1].equipments.push({
+    id: "ARMOR_DONG",
+    name: "Giáp Đồng Sơn Vi",
+    subType: CARD_SUBTYPES.ARMOR,
+    category: CARD_CATEGORIES.EQUIPMENT,
+    desc: "test"
+  });
+  // Yellow normal slash bypasses Giáp Đồng Sơn Vi
+  put(state, 1, {
+    id: "YELLOW_SLASH",
+    name: "Trảm Thường",
+    suit: "Club",
+    rank: 7,
+    category: CARD_CATEGORIES.BASIC,
+    subType: CARD_SUBTYPES.ATTACK_NORMAL
+  });
+  const resYellow = handlePlayCard(state, 1, "YELLOW_SLASH", 2);
+  assert.equal(resYellow.success, true);
+  assert.equal(state.phase, "AWAIT_SLASH_DEFENSE");
+  assert.equal(state.waitingTargetSeat, 2);
+
+  // Red normal slash does NOT bypass Giáp Đồng Sơn Vi
+  const stateRed = freshState();
+  stateRed.players[0].heroId = 13;
+  stateRed.players[1].equipments.push({
+    id: "ARMOR_DONG_2",
+    name: "Giáp Đồng Sơn Vi",
+    subType: CARD_SUBTYPES.ARMOR,
+    category: CARD_CATEGORIES.EQUIPMENT,
+    desc: "test"
+  });
+  put(stateRed, 1, {
+    id: "RED_SLASH",
+    name: "Trảm Thường",
+    suit: "Heart",
+    rank: 7,
+    category: CARD_CATEGORIES.BASIC,
+    subType: CARD_SUBTYPES.ATTACK_NORMAL
+  });
+  const resRed = handlePlayCard(stateRed, 1, "RED_SLASH", 2);
+  assert.equal(resRed.success, true);
+  assert.equal(stateRed.phase, "PLAY");
+}
+
+{
+  // 3. Khúc Thừa Dụ (#18) - Khoan Giản: Hand limit +(X+1) and draw X+1 cards (X = ceil(equipments / 2))
+  const state = freshState();
+  state.players[0].heroId = 18;
+  state.players[0].hp = 3;
+  // 0 equipments: X = 0 -> limit += 1 -> 3 + 1 = 4
+  assert.equal(getHandLimit(state.players[0]), 4);
+
+  // 1 equipment: X = 1 -> limit += 2 -> 3 + 2 = 5
+  state.players[0].equipments = [{ id: "EQ1", name: "Vũ khí", subType: CARD_SUBTYPES.WEAPON }];
+  assert.equal(getHandLimit(state.players[0]), 5);
+
+  // 3 equipments: X = 2 -> limit += 3 -> 3 + 3 = 6
+  state.players[0].equipments = [
+    { id: "EQ1", name: "Vũ khí", subType: CARD_SUBTYPES.WEAPON },
+    { id: "EQ2", name: "Giáp", subType: CARD_SUBTYPES.ARMOR },
+    { id: "EQ3", name: "Ngựa", subType: CARD_SUBTYPES.OFFENSIVE_HORSE }
+  ];
+  assert.equal(getHandLimit(state.players[0]), 6);
+
+  // Draw X+1 cards on discard/endTurn
+  state.players[0].hand = [card("H1", "Bài", CARD_SUBTYPES.DODGE)];
+  handleEndTurn(state, 1);
+  assert.equal(state.players[0].hand.length, 4); // 1 + 3 = 4
+}
+
+{
+  // 4. Mai Thúc Loan (#17) - Vạn An: max 2 uses/turn, any 2 cards, 1st use draws 1
+  const state = freshState();
+  state.players[0].heroId = 17;
+  state.players[0].hand = [
+    { id: "VA_1", name: "Lá 1", suit: "Heart", rank: 1, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH },
+    { id: "VA_2", name: "Lá 2", suit: "Spade", rank: 2, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE },
+    { id: "VA_3", name: "Lá 3", suit: "Club", rank: 3, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
+    { id: "VA_4", name: "Lá 4", suit: "Diamond", rank: 4, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH },
+  ];
+  // 1st use: Red + Spade (different colors) on seat 2
+  const use1 = handleUseSkill(state, 1, "Vạn An", 2, "VA_1|VA_2");
+  assert.equal(use1.success, true);
+  assert.equal(state.players[0].hand.length, 3); // 4 - 2 + 1 = 3
+  assert.equal(state.players[1].judgements.some((j) => j.subType === CARD_SUBTYPES.BAI_COC_BACH_DANG), true);
+
+  // 2nd use: on seat 3 with remaining cards
+  const remainingIds = `${state.players[0].hand[0].id}|${state.players[0].hand[1].id}`;
+  const use2 = handleUseSkill(state, 1, "Vạn An", 3, remainingIds);
+  assert.equal(use2.success, true);
+  assert.equal(state.players[0].hand.length, 1); // 3 - 2 = 1
+  assert.equal(state.players[2].judgements.some((j) => j.subType === CARD_SUBTYPES.BAI_COC_BACH_DANG), true);
+
+  // 3rd use attempt should fail
+  put(state, 1, card("EXTRA1", "Extra 1", CARD_SUBTYPES.DODGE));
+  put(state, 1, card("EXTRA2", "Extra 2", CARD_SUBTYPES.DODGE));
+  const use3 = handleUseSkill(state, 1, "Vạn An", 4, `${state.players[0].hand[0].id}|${state.players[0].hand[1].id}`);
+  assert.equal(use3.error, "Vạn An chỉ dùng tối đa 2 lần mỗi lượt");
+}
+
+{
+  // 5. Dương Đình Nghệ (#20) - Nghĩa Tử & Dưỡng Binh
+  const state = freshState();
+  state.players[0].heroId = 20; // Dương Đình Nghệ
+  state.players[0].hp = 4;
+  put(state, 1, card("NGHIA_TU_HAND", "Lá hy sinh", CARD_SUBTYPES.PEACH));
+  // Player 2 takes damage
+  applyDamageToPlayer(state, 2, 1, "Trảm");
+  assert.equal(state.phase, "AWAIT_NGHIA_TU");
+  // Player 1 uses Nghĩa Tử
+  const res = handleRespondAction(state, 1, true, "NGHIA_TU_HAND");
+  assert.equal(res.success, true);
+  // Player 1 took 1 damage (4 -> 3)
+  assert.equal(state.players[0].hp, 3);
+  // Player 1 drew 2 cards from Dưỡng Binh
+  assert.equal(state.players[0].hand.length, 2);
 }
 
 console.log("2v2 regression tests: PASS");

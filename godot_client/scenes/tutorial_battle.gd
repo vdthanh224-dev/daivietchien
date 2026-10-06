@@ -181,11 +181,11 @@ func _ready() -> void:
 	elif "--screenshot-equip" in OS.get_cmdline_user_args():
 		_on_close_health_spotlight()
 		_start_step_3_slash()
-		player_avatar.set_equipment("weapon", "Kiếm Thuận Thiên", "♦A")
-		player_avatar.set_equipment("armor", "Khiên Mây Bện", "♦K")
-		player_avatar.set_equipment("offensive_mount", "Ngựa Trắng", "♠5")
-		player_avatar.set_equipment("defensive_mount", "Voi Chiến", "♥K")
-		player_avatar.set_equipment("treasure", "Bảo Vật Quốc Gia", "♥Q")
+		player_avatar.set_equipment("weapon", "Kiếm Thuận Thiên", "A Trắng")
+		player_avatar.set_equipment("armor", "Khiên Mây Bện", "K Trắng")
+		player_avatar.set_equipment("offensive_mount", "Ngựa Trắng", "5 Đen")
+		player_avatar.set_equipment("defensive_mount", "Voi Chiến", "K Đỏ")
+		player_avatar.set_equipment("treasure", "Bảo Vật Quốc Gia", "Q Đỏ")
 		await get_tree().process_frame
 		await get_tree().process_frame
 		var img = get_viewport().get_texture().get_image()
@@ -195,11 +195,11 @@ func _ready() -> void:
 	elif "--screenshot-modal" in OS.get_cmdline_user_args():
 		_on_close_health_spotlight()
 		_start_step_3_slash()
-		player_avatar.set_equipment("weapon", "Kiếm Thuận Thiên", "♦A")
-		player_avatar.set_equipment("armor", "Khiên Mây Bện", "♦K")
-		player_avatar.set_equipment("defensive_mount", "Voi Chiến", "♥K")
-		player_avatar.set_equipment("offensive_mount", "Ngựa Trắng", "♠5")
-		player_avatar.set_equipment("treasure", "Bảo Vật Quốc Gia", "♥Q")
+		player_avatar.set_equipment("weapon", "Kiếm Thuận Thiên", "A Trắng")
+		player_avatar.set_equipment("armor", "Khiên Mây Bện", "K Trắng")
+		player_avatar.set_equipment("defensive_mount", "Voi Chiến", "K Đỏ")
+		player_avatar.set_equipment("offensive_mount", "Ngựa Trắng", "5 Đen")
+		player_avatar.set_equipment("treasure", "Bảo Vật Quốc Gia", "Q Đỏ")
 		_show_general_info_modal("player")
 		await get_tree().create_timer(0.3).timeout
 		await get_tree().process_frame
@@ -252,11 +252,11 @@ func _ready() -> void:
 	elif "--test-click-info-btn" in OS.get_cmdline_user_args():
 		_on_close_health_spotlight()
 		_start_step_3_slash()
-		player_avatar.set_equipment("weapon", "Kiếm Thuận Thiên", "♦A")
-		player_avatar.set_equipment("armor", "Khiên Mây Bện", "♦K")
-		player_avatar.set_equipment("defensive_mount", "Voi Chiến", "♥K")
-		player_avatar.set_equipment("offensive_mount", "Ngựa Trắng", "♠5")
-		player_avatar.set_equipment("treasure", "Bảo Vật Quốc Gia", "♥Q")
+		player_avatar.set_equipment("weapon", "Kiếm Thuận Thiên", "A Trắng")
+		player_avatar.set_equipment("armor", "Khiên Mây Bện", "K Trắng")
+		player_avatar.set_equipment("defensive_mount", "Voi Chiến", "K Đỏ")
+		player_avatar.set_equipment("offensive_mount", "Ngựa Trắng", "5 Đen")
+		player_avatar.set_equipment("treasure", "Bảo Vật Quốc Gia", "Q Đỏ")
 		await get_tree().process_frame
 		player_avatar.info_btn.emit_signal("pressed")
 		await get_tree().create_timer(0.3).timeout
@@ -279,7 +279,7 @@ func _ready() -> void:
 		get_tree().quit()
 	elif "--screenshot-avatar-slots" in OS.get_cmdline_user_args():
 		_on_close_health_spotlight()
-		player_avatar.set_equipment("weapon", "Kiếm Thuận Thiên", "♦A")
+		player_avatar.set_equipment("weapon", "Kiếm Thuận Thiên", "A Trắng")
 		await get_tree().process_frame
 		await get_tree().process_frame
 		var img = get_viewport().get_texture().get_image()
@@ -288,7 +288,7 @@ func _ready() -> void:
 		get_tree().quit()
 	elif "--screenshot-khien-may-red" in OS.get_cmdline_user_args():
 		_on_close_health_spotlight()
-		player_avatar.set_equipment("armor", "Khiên Mây Bện", "♦K")
+		player_avatar.set_equipment("armor", "Khiên Mây Bện", "K Trắng")
 		await get_tree().process_frame
 		_execute_khien_may_judgement(player_avatar, "Lý Thường Kiệt", "Thủ Lĩnh Sơn Tặc", {"name": "Khiên Mây Bện", "rank": "K", "suit": "Diamond"})
 		await get_tree().create_timer(0.6).timeout
@@ -299,7 +299,7 @@ func _ready() -> void:
 		get_tree().quit()
 	elif "--screenshot-khien-may-black" in OS.get_cmdline_user_args():
 		_on_close_health_spotlight()
-		player_avatar.set_equipment("armor", "Khiên Mây Bện", "♦K")
+		player_avatar.set_equipment("armor", "Khiên Mây Bện", "K Trắng")
 		await get_tree().process_frame
 		_execute_khien_may_judgement(player_avatar, "Lý Thường Kiệt", "Thủ Lĩnh Sơn Tặc", {"name": "Trảm", "rank": "8", "suit": "Spade"})
 		await get_tree().create_timer(0.6).timeout
@@ -1554,7 +1554,7 @@ func _get_equipment_description(item_name: String) -> String:
 	elif "giáp đồng" in name_lower or "sơn vi" in name_lower:
 		return "Vô hiệu hóa toàn bộ mọi đòn Trảm Thường không có thuộc tính."
 	elif "khiên mây" in name_lower:
-		return "Khi cần Đỡ, lật phán xét chất Đỏ (Cơ/Rô) tự động tính là Đỡ thành công."
+		return "Khi cần Đỡ: phán xét bài Đỏ hoặc bài Trắng tự động tính là Đỡ thành công; bài Vàng hoặc bài Đen thất bại."
 	elif "áo bào" in name_lower:
 		return "Tất cả sát thương nhận vào giảm 1 (tối đa 3 lần)."
 	elif "voi chiến" in name_lower:
@@ -1577,15 +1577,17 @@ func _format_equipment_info(slot_icon: String, slot_name: String, equip_str: Str
 	var suit_rank_part = ""
 	var item_name_part = clean_str
 
-	if parts.size() >= 2 and (parts[0].begins_with("♠") or parts[0].begins_with("♥") or parts[0].begins_with("♦") or parts[0].begins_with("♣")):
-		suit_rank_part = parts[0]
-		item_name_part = parts[1]
+	if parts.size() >= 2:
+		var p0 = parts[0].to_lower()
+		if "đen" in p0 or "đỏ" in p0 or "trắng" in p0 or "vàng" in p0 or parts[0].begins_with("♠") or parts[0].begins_with("♥") or parts[0].begins_with("♦") or parts[0].begins_with("♣"):
+			suit_rank_part = parts[0].replace("♠", "Đen ").replace("♥", "Đỏ ").replace("♦", "Trắng ").replace("♣", "Vàng ").strip_edges()
+			item_name_part = parts[1]
 
 	var name_formatted = ""
 	if suit_rank_part != "":
-		var is_red = ("♥" in suit_rank_part or "♦" in suit_rank_part)
-		var color_hex = "#FF4D4D" if is_red else "#E2E8F0"
-		name_formatted = "[color=%s][b]%s[/b][/color] [color=%s][b]%s[/b][/color]" % [color_hex, suit_rank_part, default_color, item_name_part]
+		var s_lower = suit_rank_part.to_lower()
+		var color_hex = "#FF4D4D" if ("đỏ" in s_lower or "♥" in suit_rank_part) else ("#FFFFFF" if ("trắng" in s_lower or "♦" in suit_rank_part) else ("#F2C214" if ("vàng" in s_lower or "♣" in suit_rank_part) else "#CBD5E1"))
+		name_formatted = "[color=%s][b][%s][/b][/color] [color=%s][b]%s[/b][/color]" % [color_hex, suit_rank_part, default_color, item_name_part]
 	else:
 		name_formatted = "[color=%s][b]%s[/b][/color]" % [default_color, item_name_part]
 
@@ -1631,7 +1633,7 @@ func _show_general_info_modal(target: String) -> void:
 			"max_hp": 3,
 			"hand_count": 4,
 			"avatar_node": boss_avatar,
-			"equipped_weapon": boss_avatar.equipped_items.get("weapon", "♦8 Đại Đao Sơn Tặc"),
+			"equipped_weapon": boss_avatar.equipped_items.get("weapon", "8 Trắng Đại Đao Sơn Tặc"),
 			"equipped_armor": boss_avatar.equipped_items.get("armor", ""),
 			"equipped_off_horse": boss_avatar.equipped_items.get("offensive_mount", ""),
 			"equipped_def_horse": boss_avatar.equipped_items.get("defensive_mount", ""),
@@ -1716,8 +1718,18 @@ func _execute_khien_may_judgement(defender_avatar: Control, defender_name: Strin
 	var suit_str = judge_card.get("suit", "Heart")
 	var rank_str = str(judge_card.get("rank", "7"))
 	var card_name = judge_card.get("name", "Trảm")
-	var is_red = (suit_str.to_lower() == "heart" or suit_str.to_lower() == "diamond" or suit_str.to_lower() == "co" or suit_str.to_lower() == "ro")
-	var suit_sym = "♥" if suit_str.to_lower() == "heart" else ("♦" if suit_str.to_lower() == "diamond" else ("♠" if suit_str.to_lower() == "spade" else "♣"))
+	var s_lower = suit_str.to_lower()
+	var is_red = (s_lower in ["heart", "diamond", "red", "white", "co", "ro", "do", "trang"])
+	var suit_name = "Đỏ"
+	if s_lower in ["heart", "co", "do", "red"]:
+		suit_name = "Đỏ"
+	elif s_lower in ["diamond", "ro", "trang", "white"]:
+		suit_name = "Trắng"
+	elif s_lower in ["club", "chuon", "vang", "yellow"]:
+		suit_name = "Vàng"
+	elif s_lower in ["spade", "bich", "den", "black"]:
+		suit_name = "Đen"
+	var card_tag = "%s %s" % [rank_str, suit_name]
 
 	# 4. Hiển thị lá bài phán xét ở trung tâm
 	for child in showcase_card_slot.get_children():
@@ -1811,10 +1823,10 @@ func _execute_khien_may_judgement(defender_avatar: Control, defender_name: Strin
 
 	# 4.3. Biển hiệu kết quả phía dưới lá bài
 	if is_red:
-		showcase_label.text = "✔ PHÁN XÉT THÀNH CÔNG (%s%s) ➜ TỰ ĐỘNG ĐỠ!" % [suit_sym, rank_str]
+		showcase_label.text = "✔ PHÁN XÉT THÀNH CÔNG (%s) ➜ TỰ ĐỘNG ĐỠ!" % card_tag
 		showcase_label.add_theme_color_override("font_color", Color(0.35, 1.0, 0.45, 1.0))
 	else:
-		showcase_label.text = "✖ PHÁN XÉT THẤT BẠI (%s%s) ➜ CẦN DÙNG ĐỠ!" % [suit_sym, rank_str]
+		showcase_label.text = "✖ PHÁN XÉT THẤT BẠI (%s) ➜ CẦN DÙNG ĐỠ!" % card_tag
 		showcase_label.add_theme_color_override("font_color", Color(1.0, 0.45, 0.45, 1.0))
 
 	# 4.4. Hiệu ứng Scale Pop phóng to nhẹ nhàng (1.15x)
@@ -1827,12 +1839,12 @@ func _execute_khien_may_judgement(defender_avatar: Control, defender_name: Strin
 	# 5. Phát âm thanh kết quả & Ghi Log
 	if is_red:
 		AudioManager.play_parry()
-		_add_log("🛡️ [KHIÊN MÂY BỆN - THÀNH CÔNG ✔]: Lá phán xét là chất ĐỎ [%s %s]. %s tự động ĐỠ thành công!" % [suit_sym, rank_str, defender_name])
-		desc_text.text = "🛡️ ✔ Phán xét thành công (Chất Đỏ %s%s)! %s tự động hóa giải đòn Trảm!" % [suit_sym, rank_str, defender_name]
+		_add_log("🛡️ [KHIÊN MÂY BỆN - THÀNH CÔNG ✔]: Lá phán xét [%s] là bài Đỏ/Trắng. %s tự động ĐỠ thành công!" % [card_tag, defender_name])
+		desc_text.text = "🛡️ ✔ Phán xét thành công (Bài %s)! %s tự động hóa giải đòn Trảm!" % [card_tag, defender_name]
 	else:
 		AudioManager.play_damage()
-		_add_log("🛡️ [Khiên Mây Bện - Thất Bại ✖]: Lá phán xét là chất ĐEN [%s %s]. Phán xét thất bại, tiếp tục phòng thủ." % [suit_sym, rank_str])
-		desc_text.text = "🛡️ ✖ Phán xét thất bại (Chất Đen %s%s)! %s cần dùng Đỡ trên tay để né đòn." % [suit_sym, rank_str, defender_name]
+		_add_log("🛡️ [Khiên Mây Bện - Thất Bại ✖]: Lá phán xét [%s] là bài Vàng/Đen. Phán xét thất bại, tiếp tục phòng thủ." % card_tag)
+		desc_text.text = "🛡️ ✖ Phán xét thất bại (Bài %s)! %s cần dùng Đỡ trên tay để né đòn." % [card_tag, defender_name]
 
 	# Chờ người chơi chiêm ngưỡng kết quả phán xét
 	await get_tree().create_timer(2.0).timeout

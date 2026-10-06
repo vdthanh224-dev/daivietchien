@@ -149,12 +149,8 @@ func get_artwork_path() -> String:
 	return "res://assets/ui/cards/card_slash.png"
 
 func get_suit_symbol() -> String:
-	match suit.to_lower():
-		"heart": return "♥"
-		"diamond": return "♦"
-		"spade": return "♠"
-		"club": return "♣"
-		_: return "?"
+	# Game Việt Nam: Không sử dụng 4 chất bài tây (♥ ♦ ♣ ♠)
+	return ""
 
 func get_rank_string() -> String:
 	match rank:
@@ -164,15 +160,46 @@ func get_rank_string() -> String:
 		13: return "K"
 		_: return str(rank)
 
+func get_suit_name() -> String:
+	var s = suit.to_lower()
+	if s in ["heart", "co", "cơ", "đỏ", "do", "red", "♥"]:
+		return "Đỏ"
+	elif s in ["diamond", "ro", "rô", "trắng", "trang", "white", "♦"]:
+		return "Trắng"
+	elif s in ["club", "chuon", "chuồn", "tep", "tép", "vàng", "vang", "yellow", "♣"]:
+		return "Vàng"
+	elif s in ["spade", "bich", "bích", "đen", "den", "black", "♠"]:
+		return "Đen"
+	return ""
+
 func is_red() -> bool:
 	var s = suit.to_lower()
-	return s == "heart" or s == "diamond" or s == "co" or s == "ro"
+	return s in ["heart", "co", "cơ", "đỏ", "do", "red", "♥"]
+
+func is_white() -> bool:
+	var s = suit.to_lower()
+	return s in ["diamond", "ro", "rô", "trắng", "trang", "white", "♦"]
+
+func is_yellow() -> bool:
+	var s = suit.to_lower()
+	return s in ["club", "chuon", "chuồn", "tep", "tép", "vàng", "vang", "yellow", "♣"]
+
+func is_black() -> bool:
+	var s = suit.to_lower()
+	return s in ["spade", "bich", "bích", "đen", "den", "black", "♠"]
 
 func get_suit_color() -> Color:
-	if is_red():
-		return Color(0.92, 0.15, 0.15, 1.0) # Đỏ son rực rỡ
+	var s = suit.to_lower()
+	if s in ["heart", "co", "cơ", "♥"]:
+		return Color(0.92, 0.15, 0.15, 1.0) # Bài Đỏ: Đỏ rực rỡ
+	elif s in ["diamond", "ro", "rô", "♦"]:
+		return Color(0.98, 0.98, 0.98, 1.0) # Bài Trắng: Trắng sáng
+	elif s in ["club", "chuon", "chuồn", "tep", "tép", "♣"]:
+		return Color(0.95, 0.76, 0.08, 1.0) # Bài Vàng: Vàng kim
+	elif s in ["spade", "bich", "bích", "♠"]:
+		return Color(0.12, 0.12, 0.14, 1.0) # Bài Đen: Đen tuyền
 	else:
-		return Color(0.12, 0.12, 0.14, 1.0) # Đen mực sắc nét
+		return Color(0.12, 0.12, 0.14, 1.0)
 
 func get_category_name() -> String:
 	match category:

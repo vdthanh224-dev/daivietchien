@@ -443,15 +443,18 @@ func _format_slot(label: RichTextLabel, icon: String, slot_title: String, item_s
 	var parts = clean.split(" ", false, 1)
 	var suit_part: String = ""
 	var name_part: String = clean
-	if parts.size() >= 2 and (parts[0].begins_with("♠") or parts[0].begins_with("♥") or parts[0].begins_with("♦") or parts[0].begins_with("♣")):
-		suit_part = parts[0]
-		name_part = parts[1]
+	if parts.size() >= 2:
+		var p0_lower = parts[0].to_lower()
+		if "đen" in p0_lower or "đỏ" in p0_lower or "trắng" in p0_lower or "vàng" in p0_lower or parts[0].begins_with("♠") or parts[0].begins_with("♥") or parts[0].begins_with("♦") or parts[0].begins_with("♣"):
+			suit_part = parts[0]
+			name_part = parts[1]
 
 	var formatted_name := ""
 	if suit_part != "":
-		var is_red = ("♥" in suit_part or "♦" in suit_part)
-		var suit_col = "#FF5252" if is_red else "#ECEFF1"
-		formatted_name = "[color=%s][b]%s[/b][/color] [color=%s][b]%s[/b][/color]" % [suit_col, suit_part, accent_hex, name_part]
+		suit_part = suit_part.replace("♠", "Đen ").replace("♥", "Đỏ ").replace("♦", "Trắng ").replace("♣", "Vàng ").strip_edges()
+		var s_lower = suit_part.to_lower()
+		var suit_col = "#FF5252" if ("đỏ" in s_lower or "red" in s_lower) else ("#FAFAFA" if ("trắng" in s_lower or "white" in s_lower) else ("#FFD54F" if ("vàng" in s_lower or "yellow" in s_lower) else "#B0BEC5"))
+		formatted_name = "[color=%s][b][%s][/b][/color] [color=%s][b]%s[/b][/color]" % [suit_col, suit_part, accent_hex, name_part]
 	else:
 		formatted_name = "[color=%s][b]%s[/b][/color]" % [accent_hex, name_part]
 
@@ -470,8 +473,8 @@ func _get_equipment_description(item_name: String) -> String:
 		"Liêm Đao Đống Đa": return "Tầm 2 • Lần đầu mỗi lượt gây sát thương, rút 1 lá."
 		"Đoản Đao Lam Sơn": return "Tầm 2 • Trảm trúng có thể hủy 2 lá bài thay vì gây sát thương."
 		"Giáp Đồng Sơn Vi": return "Vô hiệu hóa toàn bộ Trảm Thường."
-		"Giáp Tây Sơn": return "Vô hiệu hóa mọi Trảm màu Đen (Bích hoặc Chuồn)."
-		"Khiên Mây Bện": return "Khi cần Đỡ, lật bài phán xét Đỏ tự động Đỡ."
+		"Giáp Tây Sơn": return "Vô hiệu hóa mọi Trảm bài Đen hoặc bài Vàng."
+		"Khiên Mây Bện": return "Khi cần Đỡ: phán xét bài Đỏ hoặc bài Trắng tự động Đỡ, bài Vàng hoặc bài Đen thất bại."
 		"Áo Bào Hoàng Tộc": return "Chặn tối đa 2 sát thương, sau đó bị hủy."
 		"Voi Chiến Đại Việt": return "+1 Khoảng cách phòng thủ (người khác tới bạn)."
 		"Ngựa Trắng Thuần Nông": return "-1 Khoảng cách tấn công (bạn tới người khác)."

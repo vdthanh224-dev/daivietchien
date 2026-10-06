@@ -58,6 +58,10 @@ func _detect_instance_index() -> int:
 				seat_is_explicit = true
 				return value
 
+	if OS.has_feature("web"):
+		seat_is_explicit = false
+		return 1
+
 	# Tự động nhận diện cửa sổ 1, 2, 3, 4 khi chạy nhiều instance (Godot Run Multiple Instances)
 	for s in range(1, 5):
 		var srv = TCPServer.new()

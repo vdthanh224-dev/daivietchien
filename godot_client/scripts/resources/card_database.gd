@@ -29,7 +29,7 @@ static func create_card_from_dict(data: Dictionary) -> Resource:
 		c.description = "Tấn công gây 1 sát thương thuộc tính Thủy, lan qua Xích Tâm Tỏa"
 	elif c.sub_type == CardResourceScript.CardSubType.DAI_HONG_THUY:
 		c.card_name = "Đại Hồng Thủy"
-		c.description = "Phán xét: Bích ♠ 2..9 chịu 3 sát thương Thủy, trượt chuyển tiếp cho người ngồi kế"
+		c.description = "Phán xét: Bài Đen từ 2 đến 9 chịu 3 sát thương Thủy, trượt chuyển tiếp cho người ngồi kế"
 	elif c.sub_type == CardResourceScript.CardSubType.HICH_TUONG_SI:
 		c.card_name = "Hịch Tướng Sĩ"
 		c.description = "Bạn và 1 người khác bạn chọn, bỏ 1 lá để nhận Sục Sôi: 1 vòng không giới hạn Trảm, tầm đánh +1. Có thể đổi lá để rút lá khác."
@@ -119,7 +119,7 @@ static func create_deck_80() -> Array:
 	list.append(_make_card_dict("D80_DO_DK", "Đỡ", "Diamond", 13, 0, 3, "Hóa giải 1 đòn Trảm"))
 	list.append(_make_card_dict("D80_DO_HK", "Đỡ", "Heart", 13, 0, 3, "Hóa giải 1 đòn Trảm"))
 
-	# 5. Bánh Chưng — 6 lá (Toàn bộ Cơ ♥)
+	# 5. Bánh Chưng — 6 lá (Toàn bộ Bài Đỏ)
 	list.append(_make_card_dict("D80_BC_H2", "Bánh Chưng", "Heart", 2, 0, 4, "Hồi phục 1 Máu hoặc cứu người chơi Cận Tử"))
 	list.append(_make_card_dict("D80_BC_H4", "Bánh Chưng", "Heart", 4, 0, 4, "Hồi phục 1 Máu hoặc cứu người chơi Cận Tử"))
 	list.append(_make_card_dict("D80_BC_H6", "Bánh Chưng", "Heart", 6, 0, 4, "Hồi phục 1 Máu hoặc cứu người chơi Cận Tử"))
@@ -151,9 +151,9 @@ static func create_deck_80() -> Array:
 
 	# 9. Áo Giáp — 4 lá
 	list.append(_make_card_dict("D80_AG_CK_GiapDong", "Giáp Đồng Sơn Vi", "Club", 13, 1, 7, "Vô hiệu hóa toàn bộ đòn Trảm Thường"))
-	list.append(_make_card_dict("D80_AG_DK_KhienMay", "Khiên Mây Bện", "Diamond", 13, 1, 7, "Bị Trảm/Mưa Tên: lật phán xét Đỏ tự động Đỡ, Đen thất bại"))
+	list.append(_make_card_dict("D80_AG_DK_KhienMay", "Khiên Mây Bện", "Diamond", 13, 1, 7, "Bị Trảm/Mưa Tên: lật phán xét Đỏ hoặc Trắng tự động Đỡ, Vàng hoặc Đen thất bại"))
 	list.append(_make_card_dict("D80_AG_HA_AoBao", "Áo Bào Hoàng Tộc", "Heart", 1, 1, 7, "Chặn tối đa 2 sát thương, rồi bị hủy"))
-	list.append(_make_card_dict("D80_AG_C6_GiapTaySon", "Giáp Tây Sơn", "Club", 6, 1, 7, "Vô hiệu hóa mọi Trảm màu đen (Bích hoặc Chuồn)"))
+	list.append(_make_card_dict("D80_AG_C6_GiapTaySon", "Giáp Tây Sơn", "Club", 6, 1, 7, "Vô hiệu hóa mọi Trảm bài Đen hoặc bài Vàng (Bích hoặc Chuồn)"))
 
 	# 10. Chiến Mã — 4 lá
 	list.append(_make_card_dict("D80_CM_HK_VoiChien", "Voi Chiến Đại Việt", "Heart", 13, 1, 9, "Ngựa Thủ: Tăng +1 Khoảng cách từ người chơi khác tới bạn", 1, 1))
@@ -186,11 +186,11 @@ static func create_deck_80() -> Array:
 	list.append(_make_card_dict("D80_CN_D5_PhuDe", "Phủ Để Trừu Tân", "Diamond", 5, 2, 30, "Đưa 1 Trang bị của mục tiêu về tay họ, sau đó rút 1 lá bài"))
 
 	# 12. Cẩm Nang Trì Hoãn — 3 lá
-	list.append(_make_card_dict("D80_TH_CA_SamSet", "Đại Hồng Thủy", "Club", 1, 3, 19, "Phán xét: Bích ♠ 2..9 chịu 3 sát thương Thủy, trượt chuyển tiếp cho người ngồi kế"))
-	list.append(_make_card_dict("D80_TH_DQ_CatLuong", "Cắt Đường Lương", "Diamond", 12, 3, 20, "Phán xét: Không phải Chuồn ♣ -> bỏ qua Rút bài"))
-	list.append(_make_card_dict("D80_TH_HK_TramAo", "Trầm Ảo Sa Bẫy", "Heart", 13, 3, 21, "Phán xét: Không phải Cơ ♥ -> bỏ qua Ra bài"))
-	list.append(_make_card_dict("D80_TH_S9_BaiCocBachDang", "Bãi Cọc Bạch Đằng", "Spade", 9, 3, 22, "Khi mục tiêu dùng Trảm hoặc Chiến Mã, phán xét 1 lần: Đen hủy hành động và chịu 1 sát thương; Đỏ hành động được tiếp tục, sau đó Bãi Cọc rời đi"))
-	list.append(_make_card_dict("D80_TH_C9_BaiCocBachDang", "Bãi Cọc Bạch Đằng", "Club", 9, 3, 22, "Khi mục tiêu dùng Trảm hoặc Chiến Mã, phán xét 1 lần: Đen hủy hành động và chịu 1 sát thương; Đỏ hành động được tiếp tục, sau đó Bãi Cọc rời đi"))
+	list.append(_make_card_dict("D80_TH_CA_SamSet", "Đại Hồng Thủy", "Club", 1, 3, 19, "Phán xét: Bài Đen từ 2 đến 9 chịu 3 sát thương Thủy, trượt chuyển tiếp cho người ngồi kế"))
+	list.append(_make_card_dict("D80_TH_DQ_CatLuong", "Cắt Đường Lương", "Diamond", 12, 3, 20, "Phán xét: Không phải bài Vàng -> bỏ qua Rút bài"))
+	list.append(_make_card_dict("D80_TH_HK_TramAo", "Trầm Ảo Sa Bẫy", "Heart", 13, 3, 21, "Phán xét: Không phải bài Đỏ -> bỏ qua Ra bài"))
+	list.append(_make_card_dict("D80_TH_S9_BaiCocBachDang", "Bãi Cọc Bạch Đằng", "Spade", 9, 3, 22, "Khi mục tiêu dùng Trảm hoặc Chiến Mã, phán xét 1 lần: Vàng hoặc Đen hủy hành động và chịu 1 sát thương; Đỏ hoặc Trắng hành động được tiếp tục, sau đó Bãi Cọc rời đi"))
+	list.append(_make_card_dict("D80_TH_C9_BaiCocBachDang", "Bãi Cọc Bạch Đằng", "Club", 9, 3, 22, "Khi mục tiêu dùng Trảm hoặc Chiến Mã, phán xét 1 lần: Vàng hoặc Đen hủy hành động và chịu 1 sát thương; Đỏ hoặc Trắng hành động được tiếp tục, sau đó Bãi Cọc rời đi"))
 
 	return list
 
@@ -214,24 +214,24 @@ static func create_deck_150() -> Array:
 	for r in heart_ranks:
 		list.append(_make_card_dict("D150_TN_H%d" % r, "Trảm Thường", "Heart", r, 0, 0, "Tấn công gây 1 sát thương thường"))
 
-	# 2. Trảm - Thủy — 12 lá (Toàn bộ Đen, 6 ♠, 6 ♣, mã 8..K)
+	# 2. Trảm - Thủy — 12 lá (Toàn bộ Bài Đen)
 	var thuy_ranks = [8, 9, 10, 11, 12, 13]
 	for r in thuy_ranks:
 		list.append(_make_card_dict("D150_TL_S%d" % r, "Trảm - Thủy", "Spade", r, 0, 2, "Tấn công gây 1 sát thương thuộc tính Thủy, lan qua Xích Tâm Tỏa"))
 		list.append(_make_card_dict("D150_TL_C%d" % r, "Trảm - Thủy", "Club", r, 0, 2, "Tấn công gây 1 sát thương thuộc tính Thủy, lan qua Xích Tâm Tỏa"))
 
-	# 3. Trảm - Hỏa — 12 lá (Toàn bộ Đỏ, 6 ♦, 6 ♥, mã 8..K)
+	# 3. Trảm - Hỏa — 12 lá (Toàn bộ Bài Đỏ)
 	var hoa_ranks = [8, 9, 10, 11, 12, 13]
 	for r in hoa_ranks:
 		list.append(_make_card_dict("D150_TH_D%d" % r, "Trảm - Hỏa", "Diamond", r, 0, 1, "Tấn công gây 1 sát thương thuộc tính Hỏa, lan qua Xích Tâm Tỏa"))
 		list.append(_make_card_dict("D150_TH_H%d" % r, "Trảm - Hỏa", "Heart", r, 0, 1, "Tấn công gây 1 sát thương thuộc tính Hỏa, lan qua Xích Tâm Tỏa"))
 
-	# 4. Đỡ — 26 lá (Toàn bộ Đỏ, 13 ♦, 13 ♥: từ 2 đến K + A)
+	# 4. Đỡ — 26 lá (Toàn bộ Bài Đỏ)
 	for r in range(1, 14):
 		list.append(_make_card_dict("D150_DO_D%d" % r, "Đỡ", "Diamond", r, 0, 3, "Hóa giải 1 đòn Trảm"))
 		list.append(_make_card_dict("D150_DO_H%d" % r, "Đỡ", "Heart", r, 0, 3, "Hóa giải 1 đòn Trảm"))
 
-	# 5. Bánh Chưng — 12 lá (Toàn bộ Cơ ♥ từ 2 đến K)
+	# 5. Bánh Chưng — 12 lá (Toàn bộ Bài Đỏ từ 2 đến K)
 	for r in range(2, 14):
 		list.append(_make_card_dict("D150_BC_H%d" % r, "Bánh Chưng", "Heart", r, 0, 4, "Hồi phục 1 Máu hoặc cứu người chơi Cận Tử"))
 
@@ -267,8 +267,8 @@ static func create_deck_150() -> Array:
 	# 9. Áo Giáp — 6 lá (Mỗi loại 2 lá)
 	list.append(_make_card_dict("D150_AG_CK_GiapDong", "Giáp Đồng Sơn Vi", "Club", 13, 1, 7, "Vô hiệu hóa toàn bộ Trảm Thường"))
 	list.append(_make_card_dict("D150_AG_S2_GiapDong", "Giáp Đồng Sơn Vi", "Spade", 2, 1, 7, "Vô hiệu hóa toàn bộ Trảm Thường"))
-	list.append(_make_card_dict("D150_AG_DK_KhienMay", "Khiên Mây Bện", "Diamond", 13, 1, 7, "Khi bị Trảm: lật phán xét Đỏ tự động Đỡ, Đen thất bại"))
-	list.append(_make_card_dict("D150_AG_C2_KhienMay", "Khiên Mây Bện", "Club", 2, 1, 7, "Khi bị Trảm: lật phán xét Đỏ tự động Đỡ, Đen thất bại"))
+	list.append(_make_card_dict("D150_AG_DK_KhienMay", "Khiên Mây Bện", "Diamond", 13, 1, 7, "Bị Trảm/Mưa Tên: lật phán xét Đỏ hoặc Trắng tự động Đỡ, Vàng hoặc Đen thất bại"))
+	list.append(_make_card_dict("D150_AG_C2_KhienMay", "Khiên Mây Bện", "Club", 2, 1, 7, "Bị Trảm/Mưa Tên: lật phán xét Đỏ hoặc Trắng tự động Đỡ, Vàng hoặc Đen thất bại"))
 	list.append(_make_card_dict("D150_AG_HA_AoBao", "Áo Bào Hoàng Tộc", "Heart", 1, 1, 7, "Chặn tối đa 2 sát thương, rồi bị hủy"))
 	list.append(_make_card_dict("D150_AG_D3_AoBao", "Áo Bào Hoàng Tộc", "Diamond", 3, 1, 7, "Chặn tối đa 2 sát thương, rồi bị hủy"))
 
@@ -307,12 +307,12 @@ static func create_deck_150() -> Array:
 	list.append(_make_card_dict("D150_CN_DK_HichTuongSi", "Hịch Tướng Sĩ", "Diamond", 13, 2, 26, "Bạn và 1 người khác bạn chọn, bỏ 1 lá để nhận Sục Sôi: 1 vòng không giới hạn Trảm, tầm đánh +1. Có thể đổi lá để rút lá khác."))
 
 	# 12. Cẩm Nang Trì Hoãn — 4 lá
-	list.append(_make_card_dict("D150_TH_CA_SamSet", "Đại Hồng Thủy", "Club", 1, 3, 19, "Phán xét: Bích ♠ 2..9 chịu 3 sát thương Thủy, trượt chuyển tiếp cho người ngồi kế"))
-	list.append(_make_card_dict("D150_TH_DQ_CatLuong", "Cắt Đường Lương", "Diamond", 12, 3, 20, "Phán xét: Không phải Chuồn ♣ -> bỏ qua Rút bài"))
-	list.append(_make_card_dict("D150_TH_C4_CatLuong", "Cắt Đường Lương", "Club", 4, 3, 20, "Phán xét: Không phải Chuồn ♣ -> bỏ qua Rút bài"))
-	list.append(_make_card_dict("D150_TH_HK_TramAo", "Trầm Ảo Sa Bẫy", "Heart", 13, 3, 21, "Phán xét: Không phải Cơ ♥ -> bỏ qua Ra bài"))
-	list.append(_make_card_dict("D150_TH_S9_BaiCocBachDang", "Bãi Cọc Bạch Đằng", "Spade", 9, 3, 22, "Khi mục tiêu dùng Trảm hoặc Chiến Mã, phán xét 1 lần: Đen hủy hành động và chịu 1 sát thương; Đỏ hành động được tiếp tục, sau đó Bãi Cọc rời đi"))
-	list.append(_make_card_dict("D150_TH_C9_BaiCocBachDang", "Bãi Cọc Bạch Đằng", "Club", 9, 3, 22, "Khi mục tiêu dùng Trảm hoặc Chiến Mã, phán xét 1 lần: Đen hủy hành động và chịu 1 sát thương; Đỏ hành động được tiếp tục, sau đó Bãi Cọc rời đi"))
+	list.append(_make_card_dict("D150_TH_CA_SamSet", "Đại Hồng Thủy", "Club", 1, 3, 19, "Phán xét: Bài Đen từ 2 đến 9 chịu 3 sát thương Thủy, trượt chuyển tiếp cho người ngồi kế"))
+	list.append(_make_card_dict("D150_TH_DQ_CatLuong", "Cắt Đường Lương", "Diamond", 12, 3, 20, "Phán xét: Không phải bài Vàng -> bỏ qua Rút bài"))
+	list.append(_make_card_dict("D150_TH_C4_CatLuong", "Cắt Đường Lương", "Club", 4, 3, 20, "Phán xét: Không phải bài Vàng -> bỏ qua Rút bài"))
+	list.append(_make_card_dict("D150_TH_HK_TramAo", "Trầm Ảo Sa Bẫy", "Heart", 13, 3, 21, "Phán xét: Không phải bài Đỏ -> bỏ qua Ra bài"))
+	list.append(_make_card_dict("D150_TH_S9_BaiCocBachDang", "Bãi Cọc Bạch Đằng", "Spade", 9, 3, 22, "Khi mục tiêu dùng Trảm hoặc Chiến Mã, phán xét 1 lần: Vàng hoặc Đen hủy hành động và chịu 1 sát thương; Đỏ hoặc Trắng hành động được tiếp tục, sau đó Bãi Cọc rời đi"))
+	list.append(_make_card_dict("D150_TH_C9_BaiCocBachDang", "Bãi Cọc Bạch Đằng", "Club", 9, 3, 22, "Khi mục tiêu dùng Trảm hoặc Chiến Mã, phán xét 1 lần: Vàng hoặc Đen hủy hành động và chịu 1 sát thương; Đỏ hoặc Trắng hành động được tiếp tục, sau đó Bãi Cọc rời đi"))
 
 	return list
 
@@ -461,12 +461,12 @@ static func create_card_from_id(id: String) -> Resource:
 		c.card_name = "Đại Hồng Thủy"
 		c.category = CardResourceScript.CardCategory.TRI_HOAN
 		c.sub_type = CardResourceScript.CardSubType.DAI_HONG_THUY
-		c.description = "Phán xét: Bích ♠ 2..9 chịu 3 sát thương Thủy, trượt chuyển tiếp cho người ngồi kế"
+		c.description = "Phán xét: Bài Đen từ 2 đến 9 chịu 3 sát thương Thủy, trượt chuyển tiếp cho người ngồi kế"
 	elif id.contains("BaiCocBachDang"):
 		c.card_name = "Bãi Cọc Bạch Đằng"
 		c.category = CardResourceScript.CardCategory.TRI_HOAN
 		c.sub_type = CardResourceScript.CardSubType.BAI_COC_BACH_DANG
-		c.description = "Khi mục tiêu dùng Trảm hoặc Chiến Mã, phán xét 1 lần: Đen hủy hành động và chịu 1 sát thương; Đỏ hành động được tiếp tục, sau đó Bãi Cọc rời đi"
+		c.description = "Khi mục tiêu dùng Trảm hoặc Chiến Mã, phán xét 1 lần: Vàng hoặc Đen hủy hành động và chịu 1 sát thương; Đỏ hoặc Trắng hành động được tiếp tục, sau đó Bãi Cọc rời đi"
 	elif id.contains("GiacToi") or id.contains("BaiCoc"):
 		c.card_name = "Giặc Tới"
 		c.category = CardResourceScript.CardCategory.CAM_NANG
@@ -491,12 +491,12 @@ static func create_card_from_id(id: String) -> Resource:
 		c.card_name = "Cắt Đường Lương"
 		c.category = CardResourceScript.CardCategory.TRI_HOAN
 		c.sub_type = CardResourceScript.CardSubType.CAT_LUONG
-		c.description = "Phán xét: Không phải Chuồn ♣ -> bỏ qua Rút bài"
+		c.description = "Phán xét: Không phải bài Vàng -> bỏ qua Rút bài"
 	elif id.contains("TramAo"):
 		c.card_name = "Trầm Ảo Sa Bẫy"
 		c.category = CardResourceScript.CardCategory.TRI_HOAN
 		c.sub_type = CardResourceScript.CardSubType.TRAM_AO
-		c.description = "Phán xét: Không phải Cơ ♥ -> bỏ qua Ra bài"
+		c.description = "Phán xét: Không phải bài Đỏ -> bỏ qua Ra bài"
 	elif id.contains("ThuyTrieuRut"):
 		c.card_name = "Thủy Triều Rút"
 		c.category = CardResourceScript.CardCategory.CAM_NANG

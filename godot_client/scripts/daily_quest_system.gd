@@ -173,7 +173,6 @@ func record_progress(quest_id: String, amount: int = 1) -> void:
 	if new_p != current_p:
 		q_state["progress"] = new_p
 		AuthManager.save_session()
-		AuthManager.save_profile_to_appwrite()
 		quests_updated.emit()
 
 func claim_quest(quest_id: String) -> Dictionary:
