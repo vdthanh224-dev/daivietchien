@@ -2785,7 +2785,7 @@ func _on_general_avatar_clicked(seat_num: int) -> void:
 
 	if uat_khi_pending:
 		if seat_num == my_seat or int(g.get("hp", 0)) <= 0 or not g.get("is_alive", false):
-			_show_toast("Chỉ có thể chọn người chơi khác còn sống!")
+			desc_text.text = "⚠️ Chỉ có thể chọn người chơi khác còn sống!"
 			return
 		_clear_uat_khi_selection()
 		uat_khi_target_seat = seat_num
@@ -10418,6 +10418,11 @@ func _is_aoe_showcase(c_name: String, banner_text: String) -> bool:
 	return c_name in ["Giặc Tới", "Mưa Tên Liên Châu"] \
 		or "Giặc Tới" in banner_text \
 		or "Mưa Tên Liên Châu" in banner_text
+
+func _show_toast(msg: String) -> void:
+	if desc_text and is_instance_valid(desc_text):
+		desc_text.text = "⚠️ " + msg
+	_add_log("⚠️ " + msg)
 
 func _add_log(msg: String) -> void:
 	msg = _normalize_log_markup(msg)
