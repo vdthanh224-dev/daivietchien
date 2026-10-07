@@ -266,6 +266,9 @@ var card_pick_source_card_id: String = ""
 var card_pick_source_card_name: String = ""
 var card_pick_effect_type: String = ""
 var pending_pha_tong_data: Dictionary = {}
+var card_pick_submission_pending: bool = false
+var card_pick_submitted_selection_id: String = ""
+var card_pick_current_selection: Dictionary = {}
 
 # Remote Player State (Real Human Player on other machine)
 var is_remote_turn_active: bool = false
@@ -528,6 +531,9 @@ func _ready() -> void:
 	victory_defeat_modal.visible = false
 	iron_chain_modal.visible = false
 	card_pick_modal.visible = false
+	card_pick_submission_pending = false
+	card_pick_submitted_selection_id = ""
+	card_pick_current_selection.clear()
 	center_showcase.visible = false
 	card_play_btn.visible = false
 	hich_recast_btn.visible = false
@@ -4704,6 +4710,8 @@ func _on_network_error_received(err_msg: String) -> void:
 	reaction_submission_version = -1
 	discard_submission_pending = false
 	uat_khi_submission_pending = false
+	card_pick_submission_pending = false
+	card_pick_submitted_selection_id = ""
 	thuy_trieu_rut_give_sent = false
 
 	if err_msg.contains("Không phải lượt phản ứng") or err_msg.contains("Chưa tới lượt"):
@@ -5173,7 +5181,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		# selected Trảm.
 		var incoming_phase := str(state.get("phase", current_server_phase))
 		var incoming_waiting_seat := int(state.get("waitingTargetSeat", current_waiting_seat))
-		if incoming_phase not in ["AWAIT_SLASH_DEFENSE", "AWAIT_DAN_CAU"] or incoming_waiting_seat != my_seat:
+		if incoming_phase not in ["AWAIT_SLASH_DEFENSE", "AWAIT_DAN_CAU", "AWAIT_TARGET_CARD"] or incoming_waiting_seat != my_seat:
 			reaction_submission_pending = false
 			reaction_submission_version = -1
 
@@ -5477,6 +5485,12 @@ func _apply_network_game_state(state: Dictionary) -> void:
 
 	var turn_gen = generals_data.get(server_turn_seat, {})
 	var turn_gen_name = turn_gen.get("name", "Ghế %d" % server_turn_seat)
+
+	if server_phase != "AWAIT_TARGET_CARD":
+		if card_pick_modal.visible and card_pick_effect_type not in ["PHA_TONG", "AN_TICH_DEFENSE"]:
+			card_pick_modal.visible = false
+		card_pick_submission_pending = false
+		card_pick_submitted_selection_id = ""
 
 	if server_phase == "PLAY":
 		is_targeting_chinh_thong = false
@@ -6093,9 +6107,13 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			wait_gen = {}
 		var wait_name = wait_gen.get("name", "Ghế %d" % server_waiting_seat)
 		var effect_type = str(sel.get("effectType", ""))
+		var current_sel_id = _get_target_card_selection_id(sel)
 
 		if server_waiting_seat == my_seat:
-			if not card_pick_modal.visible and not sel.is_empty():
+			if current_sel_id != card_pick_submitted_selection_id:
+				card_pick_submission_pending = false
+
+			if not card_pick_modal.visible and not sel.is_empty() and not card_pick_submission_pending:
 				_show_card_pick_modal(is_steal, tgt_s, sel)
 			if effect_type == "COT_KINH_DISCARD":
 				turn_indicator.text = "🏛️ CỘT KINH: BỎ 1 LÁ TRÊN TAY (%ds)!" % server_waiting_timer
@@ -6105,6 +6123,8 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		else:
 			if card_pick_modal.visible:
 				card_pick_modal.visible = false
+			card_pick_submission_pending = false
+			card_pick_submitted_selection_id = ""
 			if effect_type == "COT_KINH_DISCARD":
 				turn_indicator.text = "🏛️ %s ĐANG BỎ BÀI CỘT KINH (%ds)..." % [wait_name, server_waiting_timer]
 				desc_text.text = "🏛️ Đang chờ %s bỏ 1 lá bài trên tay theo [Cột Kinh]..." % wait_name
@@ -12060,12 +12080,30 @@ func _hide_iron_chain_modal() -> void:
 	iron_chain_modal.visible = false
 	selected_chain_seats.clear()
 
+func _get_target_card_selection_id(sel: Dictionary) -> String:
+	if sel.is_empty():
+		return ""
+	var chooser = str(sel.get("chooserSeat", sel.get("ownerSeat", "")))
+	var target = str(sel.get("targetSeat", ""))
+	var card_id = str(sel.get("cardId", ""))
+	var eff = str(sel.get("effectType", ""))
+	var op = str(sel.get("operation", ""))
+	var rem = str(sel.get("remainingCount", 1))
+	return "%s|%s|%s|%s|%s|%s" % [chooser, target, card_id, eff, op, rem]
+
 # ==========================================================
 # 🗡️🌾 CƯỚP / PHÁ HỦY BÀI: TỰ CHỌN BÀI ÚP HOẶC TRANG BỊ
 # ==========================================================
 func _show_card_pick_modal(is_steal: bool, target_seat: int, selection_data: Dictionary = {}) -> void:
 	if not card_pick_modal or not generals_data.has(target_seat):
 		return
+	card_pick_current_selection = selection_data.duplicate()
+	if not card_pick_current_selection.has("targetSeat"):
+		card_pick_current_selection["targetSeat"] = target_seat
+	if not card_pick_current_selection.has("chooserSeat"):
+		card_pick_current_selection["chooserSeat"] = my_seat
+	if not card_pick_current_selection.has("operation"):
+		card_pick_current_selection["operation"] = "STEAL" if is_steal else "DESTROY"
 	var tgt = generals_data[target_seat]
 	card_pick_is_steal = is_steal
 	card_pick_target_seat = target_seat
@@ -12082,6 +12120,7 @@ func _show_card_pick_modal(is_steal: bool, target_seat: int, selection_data: Dic
 		c.queue_free()
 
 	var effect_type = card_pick_effect_type
+	card_pick_cancel_btn.visible = (effect_type in ["UU_THIEP", "PHA_TONG"])
 	if effect_type == "THUONG_NGAU":
 		card_pick_title.text = "🗡️ THƯƠNG NGÂU LÃNG BẠC: PHÁ HỦY BÀI CỦA %s" % tgt["name"].to_upper()
 		card_pick_confirm_btn.text = "🗡️ XÁC NHẬN PHÁ HỦY"
@@ -12362,6 +12401,8 @@ func _on_card_pick_confirmed() -> void:
 	var effect_type = card_pick_effect_type
 	var opt = selected_card_pick_option
 	card_pick_modal.visible = false
+	card_pick_confirm_btn.disabled = true
+	card_pick_cancel_btn.visible = true
 
 	if effect_type == "PHA_TONG":
 		var cost_id = str(opt.get("token", opt.get("id", "")))
@@ -12401,6 +12442,10 @@ func _on_card_pick_confirmed() -> void:
 			target_token = "EQUIPMENT:%s" % opt.get("item_name", "")
 
 	if is_network_mode and NetworkClient and NetworkClient.is_connected_to_server:
+		card_pick_submission_pending = true
+		card_pick_submitted_selection_id = _get_target_card_selection_id(card_pick_current_selection)
+		reaction_submission_pending = true
+		reaction_submission_version = last_server_version
 		if card_pick_effect_type == "AN_TICH_DEFENSE":
 			NetworkClient.send_respond_action(true, target_token)
 		else:
@@ -12545,6 +12590,7 @@ func _hide_card_pick_modal() -> void:
 		pending_pha_tong_data.clear()
 		card_pick_modal.visible = false
 		card_pick_confirm_btn.visible = true
+		card_pick_cancel_btn.visible = true
 		card_pick_cancel_btn.text = "HỦY"
 		card_pick_effect_type = ""
 		card_pick_target_seat = -1
@@ -12562,10 +12608,16 @@ func _hide_card_pick_modal() -> void:
 			null
 		)
 		return
-	if is_network_mode and current_server_phase == "AWAIT_TARGET_CARD" and card_pick_effect_type == "UU_THIEP":
-		NetworkClient.send_respond_action(false)
+	if is_network_mode and current_server_phase == "AWAIT_TARGET_CARD":
+		card_pick_submission_pending = true
+		card_pick_submitted_selection_id = _get_target_card_selection_id(card_pick_current_selection)
+		reaction_submission_pending = true
+		reaction_submission_version = last_server_version
+		if card_pick_effect_type == "UU_THIEP":
+			NetworkClient.send_respond_action(false)
 	card_pick_modal.visible = false
 	card_pick_confirm_btn.visible = true
+	card_pick_cancel_btn.visible = true
 	card_pick_cancel_btn.text = "HỦY"
 	if card_pick_effect_type == "TRIEU_DANG" and selected_target_seat > 0 and generals_data.has(selected_target_seat):
 		generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
