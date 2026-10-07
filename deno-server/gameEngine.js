@@ -3654,10 +3654,15 @@ function resolveSlashDamageAfterDefense(state, targetSeat) {
   else if (slashElement === "NORMAL" && (activeCard.subType === CARD_SUBTYPES.ATTACK_WATER || String(activeCard.name || "").includes("Thủy"))) slashElement = "WATER";
   const damageResult = applyDamageToPlayer(state, targetSeat, damage, "đòn Trảm", slashElement, true);
   if (state.phase !== "PLAY") {
-    state.pendingAfterUatKhi = { type: "SLASH_AFTER_DAMAGE", targetSeat, finalDamage: damageResult?.finalDamage || 0 };
+    state.pendingAfterUatKhi = {
+      type: "SLASH_AFTER_DAMAGE",
+      targetSeat,
+      casterSeat: activeCard.casterSeat || state.turnSeat,
+      finalDamage: damageResult?.finalDamage || 0
+    };
     return { success: true, state };
   }
-  return continueSlashDamageAfterUatKhi(state, targetSeat, damageResult?.finalDamage || 0);
+  return continueSlashDamageAfterUatKhi(state, targetSeat, damageResult?.finalDamage || 0, activeCard.casterSeat || state.turnSeat);
 }
 
 function triggerUuThiep(state, casterSeat, targetSeat) {
@@ -3667,7 +3672,16 @@ function triggerUuThiep(state, casterSeat, targetSeat) {
   const candidateTargets = state.players.filter(
     (p) => isLivingPlayer(p) && p.seat !== caster.seat && (p.equipments || []).length > 0
   );
-  if (candidateTargets.length === 0) return null;
+  if (candidateTargets.length === 0) {
+    recordAction(state, {
+      type: "UU_THIEP_NO_EQUIPMENT",
+      casterSeat: caster.seat,
+      targetSeat: Number(targetSeat),
+      skillActivations: [{ name: "Ưu Thiếp", seat: caster.seat }],
+      description: `🐎 <b>${caster.generalName}</b> kích hoạt [Ưu Thiếp], nhưng không có mục tiêu nào có trang bị để cướp.`
+    });
+    return null;
+  }
 
   const options = [];
   for (const cand of candidateTargets) {
@@ -3761,10 +3775,11 @@ function triggerCoLau(state, casterSeat, targetSeat) {
   return { success: true, state };
 }
 
-function continueSlashDamageAfterUatKhi(state, targetSeat, finalDamage) {
+function continueSlashDamageAfterUatKhi(state, targetSeat, finalDamage, fallbackCasterSeat) {
   const activeCard = state.activeCard || {};
-  const caster = state.players.find((player) => player.seat === activeCard.casterSeat);
-  const target = state.players.find((player) => player.seat === targetSeat);
+  const casterSeat = fallbackCasterSeat ?? activeCard.casterSeat ?? state.turnSeat;
+  const caster = state.players.find((player) => player.seat === Number(casterSeat));
+  const target = state.players.find((player) => player.seat === Number(targetSeat));
   if (finalDamage > 0 && heroHasSkill(caster, "NAM_TAN")) {
     drawCards(state, caster.seat, 1);
     recordAction(state, {
@@ -4041,7 +4056,7 @@ function resumeAfterUatKhi(state) {
   }
 
   if (!pending) return null;
-  if (pending.type === "SLASH_AFTER_DAMAGE") return continueSlashDamageAfterUatKhi(state, pending.targetSeat, pending.finalDamage);
+  if (pending.type === "SLASH_AFTER_DAMAGE") return continueSlashDamageAfterUatKhi(state, pending.targetSeat, pending.finalDamage, pending.casterSeat);
   if (pending.type === "KHO_NHUC_KE") {
     drawCards(state, pending.casterSeat, 3);
     if (!continueLienChau(state)) resetWaitingState(state);
@@ -7727,7 +7742,15 @@ export function handleAIReaction(state, aiSeat) {
 
   if (state.phase === "AWAIT_TARGET_CARD" && state.waitingTargetSeat === aiSeat) {
     const selection = state.targetCardSelection;
-    const token = selection?.options?.[0]?.token || null;
+    let chosenOption = selection?.options?.[0];
+    if (selection?.effectType === "UU_THIEP") {
+      const enemyOption = selection.options?.find(opt => {
+        const owner = opt.ownerSeat || opt.targetSeat;
+        return owner && !areTeammatesInState(state, aiSeat, owner);
+      });
+      if (enemyOption) chosenOption = enemyOption;
+    }
+    const token = chosenOption?.token || null;
     return handleRespondAction(state, aiSeat, true, null, token);
   }
 

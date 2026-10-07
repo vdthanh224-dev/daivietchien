@@ -266,6 +266,7 @@ var card_pick_source_card_id: String = ""
 var card_pick_source_card_name: String = ""
 var card_pick_effect_type: String = ""
 var pending_pha_tong_data: Dictionary = {}
+var pending_local_uu_thiep: Dictionary = {}
 var card_pick_submission_pending: bool = false
 var card_pick_submitted_selection_id: String = ""
 var card_pick_current_selection: Dictionary = {}
@@ -534,6 +535,7 @@ func _ready() -> void:
 	card_pick_submission_pending = false
 	card_pick_submitted_selection_id = ""
 	card_pick_current_selection.clear()
+	pending_local_uu_thiep.clear()
 	center_showcase.visible = false
 	card_play_btn.visible = false
 	hich_recast_btn.visible = false
@@ -7610,6 +7612,8 @@ func _restore_turn_timer_to_attacker(attacker_seat: int, victim_seat: int = 0) -
 	if attacker_seat > 0 and generals_data.has(attacker_seat) and generals_data[attacker_seat].has("avatar_node") and is_instance_valid(generals_data[attacker_seat]["avatar_node"]):
 		generals_data[attacker_seat]["avatar_node"].set_turn_active(true)
 		generals_data[attacker_seat]["avatar_node"].update_turn_timer(40)
+	if card_pick_modal and card_pick_modal.visible:
+		return
 	if attacker_seat == my_seat:
 		is_player_turn = true
 		current_turn_timer = 40.0
@@ -7687,6 +7691,7 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 		_animate_showcase_card("Không Thể Đỡ", "Đòn Trảm không thể bị hóa giải!")
 		_apply_damage_to_general(target_seat, damage_amount, attacker_seat, damage_element)
 		if not is_network_mode:
+			_trigger_local_uu_thiep_if_applicable(attacker_seat, target_seat)
 			_restore_turn_timer_to_attacker(attacker_seat, target_seat)
 		return
 
@@ -7757,6 +7762,8 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 		_restore_turn_timer_to_attacker(attacker_seat, target_seat)
 	else:
 		_apply_damage_to_general(target_seat, damage_amount, attacker_seat, damage_element)
+		if not is_network_mode:
+			_trigger_local_uu_thiep_if_applicable(attacker_seat, target_seat)
 		_restore_turn_timer_to_attacker(attacker_seat, target_seat)
 
 func _get_effect_damage(card_data: Dictionary, fallback: int = 1) -> int:
@@ -8332,6 +8339,7 @@ func _on_dodge_passed() -> void:
 	_broadcast_player_battle_action("DODGE_RESPONSE", "pass", dodge_attacker_seat)
 	if not is_network_mode:
 		_apply_damage_to_general(my_seat, incoming_slash_damage, dodge_attacker_seat, incoming_slash_element)
+		_trigger_local_uu_thiep_if_applicable(dodge_attacker_seat, my_seat)
 	else:
 		_add_log("💥 Bạn chấp nhận Chịu Đòn! Đang chờ Server tính sát thương...")
 
@@ -8875,6 +8883,13 @@ func _check_victory_condition() -> void:
 		is_game_over = true
 		var player_won = (my_team_is_dragon and phoenix_alive == 0) or (not my_team_is_dragon and dragon_alive == 0)
 		_show_victory_defeat_modal(player_won)
+		return
+
+	if not pending_local_uu_thiep.is_empty():
+		var u_atk = int(pending_local_uu_thiep.get("attacker_seat", 0))
+		var u_tgt = int(pending_local_uu_thiep.get("target_seat", 0))
+		pending_local_uu_thiep.clear()
+		_trigger_local_uu_thiep_if_applicable(u_atk, u_tgt)
 
 func _show_victory_defeat_modal(is_win: bool) -> void:
 	if not victory_defeat_modal:
@@ -12244,7 +12259,7 @@ func _show_card_pick_modal(is_steal: bool, target_seat: int, selection_data: Dic
 				if (effect_type == "UU_THIEP" or (owner_seat > 0 and owner_seat != target_seat)) and generals_data.has(owner_seat):
 					var owner_name = generals_data[owner_seat].get("name", "Ghế %d" % owner_seat)
 					slot_title = "%s (%s)" % [slot_title, owner_name]
-				_add_visible_card_pick_option(slot_title, item_name, "equipment", token, c_dict)
+				_add_visible_card_pick_option(slot_title, item_name, "equipment", token, c_dict, owner_seat)
 			elif zone == "AN_TICH":
 				has_options = true
 				var hidden_name = c_dict.get("name", "Ẩn") if c_dict is Dictionary else "Ẩn"
@@ -12345,7 +12360,7 @@ func _get_equipment_slot_title(card_info: Dictionary, item_name: String) -> Stri
 		return "🥁 BẢO VẬT"
 	return "🗡️ VŨ KHÍ"
 
-func _add_visible_card_pick_option(slot_title: String, item_name: String, option_type: String, token: String, card_info: Dictionary = {}) -> void:
+func _add_visible_card_pick_option(slot_title: String, item_name: String, option_type: String, token: String, card_info: Dictionary = {}, owner_seat: int = 0) -> void:
 	var info = _get_showcase_card_info(item_name, card_info)
 	var card_ui = CardUIScene.instantiate()
 	card_ui.custom_minimum_size = Vector2(118, 168)
@@ -12358,7 +12373,7 @@ func _add_visible_card_pick_option(slot_title: String, item_name: String, option
 		str(info.get("desc", info.get("description", ""))),
 		int(info.get("subType", -1))
 	)
-	var opt = {"type": option_type, "item_name": item_name, "token": token, "label": "%s: %s" % [slot_title, item_name], "button": card_ui, "card": info}
+	var opt = {"type": option_type, "item_name": item_name, "token": token, "label": "%s: %s" % [slot_title, item_name], "button": card_ui, "card": info, "owner_seat": owner_seat}
 	card_ui.card_clicked.connect(func(_card): _select_card_pick_option(opt))
 	card_pick_equipment_hbox.add_child(card_ui)
 
@@ -12493,6 +12508,9 @@ func _on_card_pick_confirmed() -> void:
 
 		elif opt_type in ["weapon", "armor", "def_horse", "off_horse", "treasure", "equipment", "judgement"]:
 			var item_name = opt.get("item_name", "")
+			var opt_owner_seat = int(opt.get("owner_seat", 0))
+			if opt_owner_seat > 0 and generals_data.has(opt_owner_seat):
+				tgt = generals_data[opt_owner_seat]
 			match opt_type:
 				"weapon":
 					tgt["equipped_weapon"] = ""
@@ -12615,6 +12633,9 @@ func _hide_card_pick_modal() -> void:
 		reaction_submission_version = last_server_version
 		if card_pick_effect_type == "UU_THIEP":
 			NetworkClient.send_respond_action(false)
+	elif not is_network_mode and card_pick_effect_type == "UU_THIEP":
+		_add_log("🐎 [ƯU THIẾP] Bạn đã bỏ qua kích hoạt Ưu Thiếp.")
+		_reset_player_turn_timer()
 	card_pick_modal.visible = false
 	card_pick_confirm_btn.visible = true
 	card_pick_cancel_btn.visible = true
@@ -13216,6 +13237,7 @@ func _resolve_local_song_cung_if_applicable(attacker_seat: int, target_seat: int
 			_add_log("🏹 [Song Cung Mường Nhạ] của bạn bỏ 2 lá, bỏ qua Đỡ: Trảm gây %d sát thương lên %s!" % [damage_amount, tgt.get("name", "Ghế %d" % target_seat)])
 			AudioManager.play_skill()
 			_apply_damage_to_general(target_seat, damage_amount, attacker_seat, damage_element)
+			_trigger_local_uu_thiep_if_applicable(attacker_seat, target_seat)
 
 	# Case 2: Attacker is an AI bot
 	else:
@@ -13237,3 +13259,108 @@ func _resolve_local_song_cung_if_applicable(attacker_seat: int, target_seat: int
 				_add_log("🏹 [Song Cung Mường Nhạ] của <b>%s</b> bỏ 2 lá, bỏ qua Đỡ: Trảm gây %d sát thương lên <b>%s</b>!" % [atk.get("name", "AI"), damage_amount, tgt.get("name", "Ghế %d" % target_seat)])
 				AudioManager.play_skill()
 				_apply_damage_to_general(target_seat, damage_amount, attacker_seat, damage_element)
+				_trigger_local_uu_thiep_if_applicable(attacker_seat, target_seat)
+
+func _trigger_local_uu_thiep_if_applicable(attacker_seat: int, target_seat: int) -> void:
+	if is_network_mode:
+		return
+	if not generals_data.has(attacker_seat):
+		return
+	var atk = generals_data[attacker_seat]
+	if not atk.get("is_alive", false) or not _hero_has_skill(atk, "uu_thiep"):
+		return
+
+	# Nếu mục tiêu hoặc ai đó đang rơi vào Cận Tử thì hoãn lại sau khi cứu xong
+	if near_death_victim_seat > 0:
+		pending_local_uu_thiep = {
+			"attacker_seat": attacker_seat,
+			"target_seat": target_seat
+		}
+		return
+
+	# Thu thập tất cả trang bị của các tướng còn sống khác (loại trừ người phát động)
+	var options: Array = []
+	var equip_slots = [
+		["equipped_weapon", "VŨ KHÍ"],
+		["equipped_armor", "ÁO GIÁP"],
+		["equipped_def_horse", "NGỰA THỦ"],
+		["equipped_off_horse", "NGỰA CÔNG"],
+		["equipped_treasure", "BẢO VẬT"]
+	]
+
+	for seat in range(1, battle_seat_count + 1):
+		if seat == attacker_seat or not generals_data.has(seat):
+			continue
+		var g = generals_data[seat]
+		if not g.get("is_alive", false):
+			continue
+		for slot in equip_slots:
+			var item_name: String = str(g.get(slot[0], ""))
+			if not item_name.is_empty():
+				var c_dict = _find_card_dict_by_name(item_name)
+				options.append({
+					"token": "EQUIPMENT:%s:%d" % [item_name, seat],
+					"zone": "EQUIPMENT",
+					"label": "%s (%s)" % [slot[1], g.get("name", "Ghế %d" % seat)],
+					"card": c_dict,
+					"ownerSeat": seat,
+					"targetSeat": seat
+				})
+
+	if options.is_empty():
+		_add_log("🐎 [ƯU THIẾP] %s kích hoạt Ưu Thiếp nhưng không có mục tiêu nào có trang bị để cướp." % atk.get("name", "Lã Đường"))
+		return
+
+	if attacker_seat == my_seat:
+		_show_card_pick_modal(true, target_seat, {
+			"effectType": "UU_THIEP",
+			"options": options,
+			"chooserSeat": attacker_seat,
+			"targetSeat": target_seat
+		})
+	else:
+		# Bot AI Lã Đường: chọn ngẫu nhiên một trang bị của đối thủ (hoặc người khác) để cướp
+		var enemy_opts: Array = []
+		var atk_dragon: bool = atk.get("isDragon", false)
+		for opt in options:
+			var owner_seat: int = int(opt.get("ownerSeat", 0))
+			var is_enemy = false
+			if generals_data.has(owner_seat):
+				is_enemy = (generals_data[owner_seat].get("isDragon", false) != atk_dragon)
+			if is_enemy:
+				enemy_opts.append(opt)
+		var pool = enemy_opts if not enemy_opts.is_empty() else options
+		var chosen = pool[randi() % pool.size()]
+		var stolen_card = chosen.get("card", {})
+		var owner_seat = int(chosen.get("ownerSeat", 0))
+		var owner_gen = generals_data[owner_seat]
+		var item_name = str(stolen_card.get("name", chosen.get("token", "").split(":")[1]))
+
+		# Gỡ trang bị từ nạn nhân
+		if owner_gen.get("equipped_weapon", "") == item_name:
+			owner_gen["equipped_weapon"] = ""
+			owner_gen["avatar_node"].set_equipment("weapon", "", "")
+		elif owner_gen.get("equipped_armor", "") == item_name:
+			owner_gen["equipped_armor"] = ""
+			owner_gen["avatar_node"].set_equipment("armor", "", "")
+		elif owner_gen.get("equipped_def_horse", "") == item_name:
+			owner_gen["equipped_def_horse"] = ""
+			owner_gen["avatar_node"].set_equipment("def_horse", "", "")
+		elif owner_gen.get("equipped_off_horse", "") == item_name:
+			owner_gen["equipped_off_horse"] = ""
+			owner_gen["avatar_node"].set_equipment("off_horse", "", "")
+		elif owner_gen.get("equipped_treasure", "") == item_name:
+			owner_gen["equipped_treasure"] = ""
+			owner_gen["avatar_node"].set_equipment("treasure", "", "")
+			owner_gen["avatar_node"].set_skill("")
+
+		# Trao bài về tay AI
+		if not (stolen_card is Dictionary) or stolen_card.is_empty():
+			stolen_card = _find_card_dict_by_name(item_name)
+		atk["hand_cards"].append(stolen_card)
+		atk["hand_count"] = atk["hand_cards"].size()
+		if atk.has("avatar_node") and is_instance_valid(atk["avatar_node"]):
+			atk["avatar_node"].update_hand_count(atk["hand_count"])
+		AudioManager.play_skill()
+		_animate_showcase_card(item_name, "%s dùng Ưu Thiếp cướp [%s] từ %s!" % [atk.get("name", "Lã Đường"), item_name, owner_gen.get("name", "Ghế %d" % owner_seat)], stolen_card)
+		_add_log("🐎 [ƯU THIẾP] <b>%s</b> cướp trang bị [%s] của <b>%s</b>!" % [atk.get("name", "Lã Đường"), item_name, owner_gen.get("name", "Ghế %d" % owner_seat)])
