@@ -12361,7 +12361,6 @@ func _on_card_pick_confirmed() -> void:
 		return
 
 	var tgt = generals_data[card_pick_target_seat]
-	var opt = selected_card_pick_option
 	var opt_type = opt.get("type", "")
 	var target_token = opt.get("token", "")
 	if target_token.is_empty():
