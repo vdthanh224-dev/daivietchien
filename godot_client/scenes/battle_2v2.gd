@@ -5801,10 +5801,32 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			else:
 				card_play_btn.text = "🛡️ PHÁT ĐỘNG TRUNG KIÊN"
 				turn_indicator.text = "🛡️ TRUNG KIÊN: CỨU NGƯỜI SẮP TỬ TRẬN (%ds)" % server_waiting_timer
-				desc_text.text = "Tự giảm 1 Máu để giúp người sắp tử trận hồi đến 1 Máu."
 		else:
 			card_play_btn.visible = false
 			end_turn_btn.visible = false
+			var wait_gen = generals_data.get(server_waiting_seat, {})
+			var wait_name = wait_gen.get("name", "Ghế %d" % server_waiting_seat) if wait_gen is Dictionary else "Ghế %d" % server_waiting_seat
+			if server_phase == "AWAIT_COT_KINH_TARGET":
+				turn_indicator.text = "🏛️ ĐANG CHỜ %s CHỌN MỤC TIÊU CỘT KINH (%ds)..." % [wait_name, server_waiting_timer]
+				desc_text.text = "🏛️ %s đang chọn 1 người chơi phải bỏ bài theo [Cột Kinh]..." % wait_name
+			elif server_phase == "AWAIT_NHIEP_CHINH":
+				turn_indicator.text = "👑 ĐANG CHỜ %s PHÁT ĐỘNG NHIẾP CHÍNH (%ds)..." % [wait_name, server_waiting_timer]
+				desc_text.text = "👑 %s đang quyết định đấu điểm [Nhiếp Chính]..." % wait_name
+			elif server_phase == "AWAIT_NHIEP_CHINH_DUEL_OPPONENT":
+				turn_indicator.text = "👑 ĐANG CHỜ %s RA LÁ ĐẤU ĐIỂM (%ds)..." % [wait_name, server_waiting_timer]
+				desc_text.text = "👑 %s đang chọn 1 lá trên tay để đấu điểm..." % wait_name
+			elif server_phase == "AWAIT_NHIEP_CHINH_HEAL":
+				turn_indicator.text = "👑 ĐANG CHỜ %s CHỌN NGƯỜI HỒI MÁU (%ds)..." % [wait_name, server_waiting_timer]
+				desc_text.text = "👑 %s đang chọn người mất máu để hồi 1 Máu..." % wait_name
+			elif server_phase == "AWAIT_TRAO_BAO_EQUIP":
+				turn_indicator.text = "👑 ĐANG CHỜ %s CHỌN TRANG BỊ (%ds)..." % [wait_name, server_waiting_timer]
+				desc_text.text = "👑 %s đang quyết định trang bị [Trao Bào]..." % wait_name
+			elif server_phase == "AWAIT_THAN_CHINH_LE_HOAN":
+				turn_indicator.text = "⚔️ ĐANG CHỜ %s PHẢN HỒI THÂN CHINH (%ds)..." % [wait_name, server_waiting_timer]
+				desc_text.text = "⚔️ %s đang chọn giao 1 lá bài hoặc chịu 1 sát thương..." % wait_name
+			else:
+				turn_indicator.text = "⏳ ĐANG CHỜ %s QUYẾT ĐỊNH (%ds)..." % [wait_name, server_waiting_timer]
+				desc_text.text = "⏳ Đang chờ %s phản hồi..." % wait_name
 
 	elif server_phase == "AWAIT_AN_TICH":
 		is_player_turn = false
@@ -6070,16 +6092,25 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		if not (wait_gen is Dictionary):
 			wait_gen = {}
 		var wait_name = wait_gen.get("name", "Ghế %d" % server_waiting_seat)
+		var effect_type = str(sel.get("effectType", ""))
 
 		if server_waiting_seat == my_seat:
-			if not card_pick_modal.visible:
+			if not card_pick_modal.visible and not sel.is_empty():
 				_show_card_pick_modal(is_steal, tgt_s, sel)
-			turn_indicator.text = "🗡️ BẠN ĐANG CHỌN BÀI MỤC TIÊU (%ds)!" % server_waiting_timer
+			if effect_type == "COT_KINH_DISCARD":
+				turn_indicator.text = "🏛️ CỘT KINH: BỎ 1 LÁ TRÊN TAY (%ds)!" % server_waiting_timer
+				desc_text.text = "🏛️ [Cột Kinh]: Bạn phải chọn 1 lá bài trên tay để bỏ."
+			else:
+				turn_indicator.text = "🗡️ BẠN ĐANG CHỌN BÀI MỤC TIÊU (%ds)!" % server_waiting_timer
 		else:
 			if card_pick_modal.visible:
 				card_pick_modal.visible = false
-			turn_indicator.text = "🗡️ %s ĐANG CHỌN BÀI MỤC TIÊU (%ds)..." % [wait_name, server_waiting_timer]
-			desc_text.text = "🗡️ Đang chờ %s chọn lá bài để cướp hoặc phá..." % wait_name
+			if effect_type == "COT_KINH_DISCARD":
+				turn_indicator.text = "🏛️ %s ĐANG BỎ BÀI CỘT KINH (%ds)..." % [wait_name, server_waiting_timer]
+				desc_text.text = "🏛️ Đang chờ %s bỏ 1 lá bài trên tay theo [Cột Kinh]..." % wait_name
+			else:
+				turn_indicator.text = "🗡️ %s ĐANG CHỌN BÀI MỤC TIÊU (%ds)..." % [wait_name, server_waiting_timer]
+				desc_text.text = "🗡️ Đang chờ %s chọn lá bài để cướp hoặc phá..." % wait_name
 
 	elif server_phase == "AWAIT_DOAN_DAO_CHOICE":
 		if server_waiting_seat == my_seat and not dodge_modal.visible:

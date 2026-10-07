@@ -2916,6 +2916,7 @@ function completeTargetCardSelection(state, chooserSeat, targetCardId) {
     });
     const resumeType = selection.cotKinhResumeType;
     state.targetCardSelection = null;
+    resetWaitingState(state, false);
     if (resumeType === "TURN_START") return continueTurnStart(state);
     const resume = resumeAfterUatKhi(state);
     if (resume) return resume;
@@ -3652,7 +3653,7 @@ function resolveSlashDamageAfterDefense(state, targetSeat) {
   if (slashElement === "NORMAL" && (activeCard.subType === CARD_SUBTYPES.ATTACK_FIRE || String(activeCard.name || "").includes("Hỏa"))) slashElement = "FIRE";
   else if (slashElement === "NORMAL" && (activeCard.subType === CARD_SUBTYPES.ATTACK_WATER || String(activeCard.name || "").includes("Thủy"))) slashElement = "WATER";
   const damageResult = applyDamageToPlayer(state, targetSeat, damage, "đòn Trảm", slashElement, true);
-  if (["AWAIT_NEAR_DEATH", "AWAIT_UAT_KHI", "AWAIT_KHOI_BINH", "AWAIT_HUYNH_TRUONG", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_KIEN", "AWAIT_TRUNG_TIET", "AWAIT_NGHIA_TU"].includes(state.phase)) {
+  if (state.phase !== "PLAY") {
     state.pendingAfterUatKhi = { type: "SLASH_AFTER_DAMAGE", targetSeat, finalDamage: damageResult?.finalDamage || 0 };
     return { success: true, state };
   }
@@ -3881,7 +3882,7 @@ function continueSlashDamageAfterUatKhi(state, targetSeat, finalDamage) {
       }
     }
   }
-  if (state.phase !== "AWAIT_NEAR_DEATH" && state.phase !== "AWAIT_TARGET_CARD") {
+  if (state.phase !== "AWAIT_NEAR_DEATH" && state.phase !== "AWAIT_THAN_CHINH_LE_HOAN" && (!state.targetCardSelection || state.phase !== "AWAIT_TARGET_CARD")) {
     if (!continueLienChau(state)) resetWaitingState(state);
   }
   checkGameOver(state);
@@ -5132,6 +5133,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
           targetSeat: chosenTarget.seat,
           description: `🏛️ <b>${chosenTarget.generalName}</b> không có lá bài nào trên tay để bỏ theo [Cột Kinh].`
         });
+        resetWaitingState(state, false);
         if (resumeType === "TURN_START") return continueTurnStart(state);
         const resume = resumeAfterUatKhi(state);
         if (resume) return resume;
@@ -5167,6 +5169,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       return { success: true, state };
     }
     // Declined
+    resetWaitingState(state, false);
     if (resumeType === "TURN_START") return continueTurnStart(state);
     const resume = resumeAfterUatKhi(state);
     if (resume) return resume;
@@ -5186,6 +5189,45 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     } else {
       recordAction(state, { type: "KHOI_BINH_DECLINED", casterSeat: respondentSeat, targetSeat: source?.seat, description: `⚔️ ${respondent.generalName} từ chối kích hoạt [Khởi Binh].` });
     }
+    resetWaitingState(state, false);
+    const resume = resumeAfterUatKhi(state);
+    if (resume) return resume;
+    resetWaitingState(state);
+    return { success: true, state };
+  }
+
+  if (state.phase === "AWAIT_HUYNH_TRUONG") {
+    const pending = state.huynhTruongQueue?.[0];
+    if (state.waitingTargetSeat !== respondentSeat || !pending || pending.seat !== respondentSeat) {
+      return { error: "Không phải lượt kích hoạt Huynh Trưởng của bạn" };
+    }
+    state.huynhTruongQueue.shift();
+    if (accepted && (cardId || targetCardId) && targetSeat) {
+      const target = state.players.find((candidate) => candidate.seat === Number(targetSeat));
+      const cardIndex = respondent.hand.findIndex((card) => card.id === (cardId || targetCardId));
+      if (!target || !isLivingPlayer(target) || target.seat === respondentSeat || cardIndex < 0) {
+        state.huynhTruongQueue.unshift(pending);
+        return { error: "Huynh Trưởng cần chọn 1 người khác và 1 lá trên tay để đưa" };
+      }
+      const givenCard = respondent.hand.splice(cardIndex, 1)[0];
+      target.hand.push(givenCard);
+      drawCards(state, respondentSeat, 1);
+      recordAction(state, {
+        type: "HUYNH_TRUONG_TRIGGERED",
+        casterSeat: respondentSeat,
+        targetSeat: target.seat,
+        cardId: givenCard.id,
+        cardName: givenCard.name,
+        description: `🤝 ${respondent.generalName} kích hoạt [Huynh Trưởng], đưa 1 lá cho ${target.generalName} rồi rút 1 lá.`
+      });
+    } else {
+      recordAction(state, {
+        type: "HUYNH_TRUONG_DECLINED",
+        casterSeat: respondentSeat,
+        description: `🤝 ${respondent.generalName} từ chối kích hoạt [Huynh Trưởng].`
+      });
+    }
+    resetWaitingState(state, false);
     const resume = resumeAfterUatKhi(state);
     if (resume) return resume;
     resetWaitingState(state);
@@ -5978,7 +6020,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       if (["AWAIT_NEAR_DEATH", "AWAIT_TRUNG_KIEN"].includes(state.phase)) {
         return { success: true, state };
       }
-      if (["AWAIT_UAT_KHI", "AWAIT_NGHIA_TU"].includes(state.phase)) {
+      if (state.phase !== "PLAY" && !["AWAIT_NEAR_DEATH", "AWAIT_TRUNG_KIEN"].includes(state.phase)) {
         state.pendingAfterUatKhi = { type: "AOE" };
         return { success: true, state };
       }
@@ -6061,7 +6103,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     applyDamageToPlayer(state, respondentSeat, 1, "Huyết Chiến", "NORMAL", false, {
       singleTargetScrollCasterSeat: Number(state.activeCard?.casterSeat) || Number(state.duelCasterSeat) || 0
     });
-    if (["AWAIT_UAT_KHI", "AWAIT_TRUNG_KIEN", "AWAIT_NGHIA_TU"].includes(state.phase)) {
+    if (state.phase !== "PLAY" && state.phase !== "AWAIT_NEAR_DEATH") {
       state.pendingAfterUatKhi = { type: "DUEL" };
     } else if (state.phase !== "AWAIT_NEAR_DEATH") {
       state.duelCasterSeat = 0;
@@ -8370,6 +8412,7 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
         description: `🤝 ${player.generalName} kích hoạt [Huynh Trưởng], đưa 1 lá cho ${target.generalName} rồi rút 1 lá.`
       });
     }
+    resetWaitingState(state, false);
     const resume = resumeAfterUatKhi(state);
     if (resume) return resume;
     resetWaitingState(state);

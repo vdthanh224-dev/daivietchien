@@ -2010,9 +2010,12 @@ for (const [subType, name] of [
   put(state, 1, eq);
   const handBeforeTB = state.players[0].hand.length;
 
-  // Trao Bào: trao trang bị cho seat 2, seat 2 hồi 1 máu, seat 1 rút 1 lá
+  // Trao Bào: trao trang bị cho seat 2, hỏi đeo, seat 2 hồi 1 máu, seat 1 rút 1 lá
   const tbRes = handleUseSkill(state, 1, "Trao Bào", 2, "EQ_DVN");
   assert.equal(tbRes.success, true);
+  assert.equal(state.phase, "AWAIT_TRAO_BAO_EQUIP");
+  assert.equal(state.waitingTargetSeat, 2);
+  handleRespondAction(state, 2, true, null); // seat 2 agrees to equip
   assert.equal(state.players[1].hp, 3);
   assert.equal(state.players[1].equipments.length, 1);
   assert.equal(state.players[0].hand.length, handBeforeTB); // bỏ 1 trang bị (-1) + rút 1 lá (+1)
@@ -2025,9 +2028,55 @@ for (const [subType, name] of [
   applyDamageToPlayer(state, 2, 1, "Sát thương");
   assert.equal(state.phase, "AWAIT_NHIEP_CHINH");
   assert.equal(state.waitingTargetSeat, 1);
-  // Dương Vân Nga đấu điểm với seat 3 (K vs 3 -> thắng) và hồi máu cho seat 2
-  handleRespondAction(state, 1, true, "DVN_HIGH", null, null, 3, { duelTargetSeat: 3, healTargetSeat: 2 });
+  // Dương Vân Nga chọn đấu điểm với seat 3
+  handleRespondAction(state, 1, true, "DVN_HIGH", null, null, 3, { duelTargetSeat: 3 });
+  assert.equal(state.phase, "AWAIT_NHIEP_CHINH_DUEL_OPPONENT");
+  assert.equal(state.waitingTargetSeat, 3);
+  // Seat 3 ra bài 3 (K vs 3 -> DVN thắng) và hồi máu cho người bị thương duy nhất (seat 2)
+  handleRespondAction(state, 3, true, "S3_LOW");
   assert.equal(state.players[1].hp, 2); // ban đầu 2, nhận 1 damage = 1, hồi 1 máu = 2
+}
+
+{
+  // Cột Kinh kích hoạt từ đòn Trảm của Lã Đường lên Đinh Liễn
+  const state = freshState();
+  state.players[0].heroId = "HERO_29"; // Lã Đường (seat 1)
+  state.players[0].generalName = "Lã Đường";
+  state.players[1].heroId = "HERO_31"; // Đinh Liễn (seat 2)
+  state.players[1].generalName = "Đinh Liễn";
+  state.players[1].hp = 4;
+  put(state, 1, card("SLASH_LD", "Trảm Thường", CARD_SUBTYPES.ATTACK_NORMAL));
+  put(state, 1, card("DISCARD_LD", "Lá Bỏ", CARD_SUBTYPES.ATTACK_NORMAL));
+  put(state, 2, card("HAND_DL", "Lá ĐL", CARD_SUBTYPES.ATTACK_NORMAL));
+
+  // Lã Đường Trảm Đinh Liễn
+  const playRes = handlePlayCard(state, 1, "SLASH_LD", 2);
+  assert.equal(playRes.success, true);
+  assert.equal(state.phase, "AWAIT_SLASH_DEFENSE");
+  assert.equal(state.waitingTargetSeat, 2);
+
+  // Đinh Liễn không né -> nhận 1 sát thương -> kích hoạt Cột Kinh
+  handleRespondAction(state, 2, false, null);
+  assert.equal(state.players[1].hp, 3);
+  assert.equal(state.phase, "AWAIT_COT_KINH_TARGET");
+  assert.equal(state.waitingTargetSeat, 2);
+
+  // Đinh Liễn chỉ định Lã Đường (seat 1)
+  handleRespondAction(state, 2, true, "1");
+  assert.equal(state.phase, "AWAIT_TARGET_CARD");
+  assert.equal(state.waitingTargetSeat, 1);
+  assert.equal(state.targetCardSelection.effectType, "COT_KINH_DISCARD");
+
+  // Lã Đường tự bỏ 1 lá trên tay
+  handleRespondAction(state, 1, true, null, "HAND:0");
+
+  // Game phải trở về PLAY, lượt vẫn là của Lã Đường (seat 1), activeCard đã được dọn
+  assert.equal(state.phase, "PLAY");
+  assert.equal(state.turnSeat, 1);
+  assert.equal(state.waitingTargetSeat, 0);
+  assert.equal(state.activeCard, null);
+  assert.equal(state.targetCardSelection, null);
+  assert.equal(state.players[0].hand.length, 0);
 }
 
 {
