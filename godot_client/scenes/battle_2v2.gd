@@ -47,6 +47,9 @@ const HERO_SKILL_ACTIONS := {
 	"TAY_PHU_TRIGGERED": {"name": "Tây Phu"},
 	"NGHIA_TU_TRIGGERED": {"name": "Nghĩa Tử"},
 	"UU_THIEP_STEAL": {"name": "Ưu Thiếp"},
+	"UU_THIEP_NO_EQUIPMENT": {"name": "Ưu Thiếp"},
+	"UU_THIEP_TRIGGERED": {"name": "Ưu Thiếp"},
+	"UU_THIEP_SKIPPED": {"name": "Ưu Thiếp"},
 	"CO_LAU_DRAW": {"name": "Cờ Lau"},
 	"CO_LAU_DESTROY": {"name": "Cờ Lau"},
 	"THU_PHUC_TRIGGERED": {"name": "Thu Phục"},
@@ -1797,7 +1800,20 @@ func _init_generals_from_draft() -> void:
 func _hero_has_skill(g: Dictionary, skill_id: String) -> bool:
 	var hero = g.get("hero_data", {})
 	var hero_id = int(hero.get("id", g.get("hero_id", 0)))
-	return hero_id > 0 and HeroDatabase.has_hero_skill(hero_id, skill_id)
+	if hero_id <= 0 and g.has("heroId"):
+		var raw_hid = str(g.get("heroId", ""))
+		if raw_hid.begins_with("HERO_"):
+			hero_id = int(raw_hid.trim_prefix("HERO_"))
+		elif raw_hid.is_valid_int():
+			hero_id = int(raw_hid)
+	if hero_id <= 0 and HeroDatabase:
+		var h = HeroDatabase.get_hero_by_name(str(g.get("name", "")))
+		if h is Dictionary and not h.is_empty():
+			hero_id = int(h.get("id", 0))
+	var s_id = skill_id.to_lower().strip_edges()
+	if hero_id > 0 and HeroDatabase:
+		return HeroDatabase.has_hero_skill(hero_id, s_id)
+	return false
 
 func _is_da_trach_slash_blocked(target_seat: int) -> bool:
 	if not generals_data.has(target_seat):
@@ -1897,7 +1913,9 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 		buttons.append({"id": "doi_do", "text": "🏯 DỜI ĐÔ", "description": "Bỏ toàn bộ bài trên tay: rút lại + 1 lá, tối đa 4 người mỗi người rút 1 lá."})
 	var treasure = str(g.get("equipped_treasure", ""))
 	if seat == my_seat and treasure == "Trống Đồng Đông Sơn":
-		buttons.append({"id": "treasure_drum", "text": "🥁 ĐIỂM TRỐNG"})
+		var drum_used := bool(g.get("diem_trong_used", false))
+		if not drum_used:
+			buttons.append({"id": "treasure_drum", "text": "🥁 ĐIỂM TRỐNG"})
 	elif seat == my_seat and treasure == "Hổ Phù Trần Triều":
 		buttons.append({"id": "treasure_ho_phu", "text": "🐯 HỔ PHÙ"})
 	avatar.set_skill_buttons(buttons)
@@ -2572,6 +2590,9 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 			selected_two_card_skill_nodes.append(card_node)
 			card_node.set_selected(true)
 		else:
+			if _calculate_distance(selected_target_seat, seat_num) > _get_attack_range(selected_target_seat):
+				desc_text.text = "⚠️ Mục tiêu Trảm phải nằm trong tầm đánh của người được chọn đánh."
+				return
 			desc_text.text = "⚠️ [TÂY PHU] chỉ chọn đúng 2 lá."
 		_update_action_btn()
 		return
@@ -3165,10 +3186,13 @@ func _update_action_btn() -> void:
 		card_play_btn.text = "🏯 DÙNG VẠN AN" if van_an_ready else "🏯 VẠN AN: CHỌN 2 LÁ VÀ MỤC TIÊU"
 		return
 	if is_targeting_dan_cau:
-		var dan_ready := selected_card_ui != null and is_instance_valid(selected_card_ui) and selected_target_seat > 0 and dan_cau_forced_target_seat > 0
+		var dan_target_in_range := false
+		if selected_target_seat > 0 and dan_cau_forced_target_seat > 0:
+			dan_target_in_range = _calculate_distance(selected_target_seat, dan_cau_forced_target_seat) <= _get_attack_range(selected_target_seat)
+		var dan_ready := selected_card_ui != null and is_instance_valid(selected_card_ui) and selected_target_seat > 0 and dan_cau_forced_target_seat > 0 and dan_target_in_range
 		card_play_btn.visible = true
 		card_play_btn.disabled = not dan_ready
-		card_play_btn.text = "🌉 DÙNG DẪN CẦU" if dan_ready else "🌉 DẪN CẦU: CHỌN BÀI VÀ 2 MỤC TIÊU"
+		card_play_btn.text = "🌉 DÙNG DẪN CẦU" if dan_ready else "🌉 DẪN CẦU: MỤC TIÊU 2 PHẢI TRONG TẦM NGƯỜI BỊ ÉP"
 		return
 	if is_targeting_thuy_chien:
 		var thuy_ready := selected_card_ui != null and is_instance_valid(selected_card_ui) and selected_target_seat > 0
@@ -3291,6 +3315,12 @@ func _update_action_btn() -> void:
 	card_play_btn.disabled = false
 
 	if "Trảm" in c_name:
+		var slash_limit_reached := slashes_used_this_turn >= 1 and not _has_no_than(generals_data.get(my_seat, {})) and int(generals_data.get(my_seat, {}).get("suc_soi_turns_remaining", 0)) <= 0
+		if slash_limit_reached:
+			card_play_btn.visible = false
+			card_play_btn.disabled = true
+			desc_text.text = "⚠️ Bạn đã hết lượt Trảm trong lượt này."
+			return
 		if lien_chau_target_seat > 0 and generals_data.has(lien_chau_target_seat):
 			card_play_btn.text = "🏹 LIÊN CHÂU ➜ %s & %s" % [generals_data[selected_target_seat]["name"], generals_data[lien_chau_target_seat]["name"]]
 			card_play_btn.disabled = lien_chau_cost_card == null or not is_instance_valid(lien_chau_cost_card)
@@ -7210,6 +7240,14 @@ func _on_network_action_received(delta: Dictionary) -> void:
 	elif act_type == "LAP_LANG_DRAW":
 		_animate_showcase_card("Lập Làng", str(delta.get("description", "Lập Làng rút 2 lá bài.")))
 		AudioManager.play_skill()
+	elif act_type == "UU_THIEP_NO_EQUIPMENT":
+		AudioManager.play_skill()
+		var c_name = generals_data.get(caster_seat, {}).get("name", "Lã Đường")
+		_animate_showcase_card("Ưu Thiếp", "🐎 %s kích hoạt [Ưu Thiếp], nhưng không có mục tiêu nào mang Trang bị để cướp!" % c_name, {}, 2.0)
+		_add_log("🐎 [ƯU THIẾP] %s kích hoạt Ưu Thiếp thành công, nhưng không ai có Trang bị để cướp." % c_name)
+	elif act_type == "UU_THIEP_SKIPPED":
+		var c_name = generals_data.get(caster_seat, {}).get("name", "Lã Đường")
+		_add_log("🐎 [ƯU THIẾP] %s đã bỏ qua cướp Trang bị từ Ưu Thiếp." % c_name)
 	elif act_type in ["OAI_NHUOC_DISCARD", "DUNG_NUOC_TRIGGERED", "TUNG_NGHIA_DRAW", "VAN_SACH_TRIGGERED", "HAN_LAM_KEEP", "HAN_LAM_BOTTOM", "TRUNG_KIEN_TRIGGERED"]:
 		var skill_effect_names = {
 			"OAI_NHUOC_DISCARD": "Oai Nhược",
@@ -13278,6 +13316,11 @@ func _trigger_local_uu_thiep_if_applicable(attacker_seat: int, target_seat: int)
 		}
 		return
 
+	var avatar = atk.get("avatar_node")
+	if is_instance_valid(avatar) and avatar.has_method("show_skill_banner"):
+		avatar.show_skill_banner("ƯU THIẾP", 2.0, true)
+	AudioManager.play_skill()
+
 	# Thu thập tất cả trang bị của các tướng còn sống khác (loại trừ người phát động)
 	var options: Array = []
 	var equip_slots = [
@@ -13308,7 +13351,8 @@ func _trigger_local_uu_thiep_if_applicable(attacker_seat: int, target_seat: int)
 				})
 
 	if options.is_empty():
-		_add_log("🐎 [ƯU THIẾP] %s kích hoạt Ưu Thiếp nhưng không có mục tiêu nào có trang bị để cướp." % atk.get("name", "Lã Đường"))
+		_animate_showcase_card("Ưu Thiếp", "🐎 %s kích hoạt [Ưu Thiếp], nhưng không có mục tiêu nào mang Trang bị để cướp!" % atk.get("name", "Lã Đường"), {}, 2.0)
+		_add_log("🐎 [ƯU THIẾP] %s kích hoạt Ưu Thiếp thành công, nhưng không có mục tiêu nào có trang bị để cướp." % atk.get("name", "Lã Đường"))
 		return
 
 	if attacker_seat == my_seat:

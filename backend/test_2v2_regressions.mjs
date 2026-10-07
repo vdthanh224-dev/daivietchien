@@ -2125,6 +2125,53 @@ for (const [subType, name] of [
 }
 
 {
+  // Test Lã Đường: Ưu Thiếp fallback token match, sanitizer ownerSeat/targetSeat, and skip option
+  const state = freshState();
+  state.players[0].heroId = "HERO_29";
+  state.players[0].generalName = "Lã Đường";
+  state.players[1].heroId = "HERO_1";
+  state.players[1].generalName = "Cao Lỗ";
+  const noThan = card("D80_VK_SK_NoThan", "Nỏ Thần Kim Quy", CARD_SUBTYPES.WEAPON, CARD_CATEGORIES.EQUIPMENT);
+  state.players[1].equipments.push(noThan);
+
+  put(state, 1, card("SLASH_UT_TOKEN", "Trảm", CARD_SUBTYPES.ATTACK_NORMAL));
+  assert.equal(handlePlayCard(state, 1, "SLASH_UT_TOKEN", 2).success, true);
+  handleRespondAction(state, 2, false, null);
+
+  assert.equal(state.phase, "AWAIT_TARGET_CARD");
+  assert.equal(state.targetCardSelection.effectType, "UU_THIEP");
+
+  // Sanitizer preserves ownerSeat and targetSeat
+  const sanitized = sanitizeGameStateForClient(state, 1);
+  assert.equal(sanitized.targetCardSelection.options[0].ownerSeat, 2);
+  assert.equal(sanitized.targetCardSelection.options[0].targetSeat, 2);
+  assert.equal(sanitized.targetCardSelection.remainingCount, 1);
+
+  // Client sends EQUIPMENT:Nỏ Thần Kim Quy (name token fallback)
+  const stealByName = handleRespondAction(state, 1, true, null, "EQUIPMENT:Nỏ Thần Kim Quy");
+  assert.equal(stealByName.success, true);
+  assert.equal(state.players[1].equipments.length, 0);
+  assert.equal(state.players[0].hand.some((c) => c.name === "Nỏ Thần Kim Quy"), true);
+  assert.equal(state.phase, "PLAY");
+
+  // Skip Ưu Thiếp test
+  const state2 = freshState();
+  state2.players[0].heroId = "HERO_29";
+  state2.players[0].generalName = "Lã Đường";
+  state2.players[1].heroId = "HERO_1";
+  state2.players[1].generalName = "Cao Lỗ";
+  state2.players[1].equipments.push(noThan);
+  put(state2, 1, card("SLASH_UT_SKIP", "Trảm", CARD_SUBTYPES.ATTACK_NORMAL));
+  handlePlayCard(state2, 1, "SLASH_UT_SKIP", 2);
+  handleRespondAction(state2, 2, false, null);
+  assert.equal(state2.phase, "AWAIT_TARGET_CARD");
+  const skipRes = handleRespondAction(state2, 1, false);
+  assert.equal(skipRes.success, true);
+  assert.equal(state2.phase, "PLAY");
+  assert.ok(state2.actionHistory?.some((a) => a.type === "UU_THIEP_SKIPPED"));
+}
+
+{
   // Hero 37: Lê Long Đĩnh - Bạo Nộ & Ngọa Triều
   const state = freshState();
   state.players[0].heroId = "HERO_37"; // Lê Long Đĩnh (seat 1)

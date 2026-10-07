@@ -29,9 +29,13 @@ func get_hero_skills(hero_id: int) -> Array:
 	return get_hero(hero_id).get("skills", []).duplicate(true)
 
 func has_hero_skill(hero_id: int, skill_id: String) -> bool:
+	var target = skill_id.to_lower().strip_edges()
 	for skill in get_hero_skills(hero_id):
-		if skill is Dictionary and str(skill.get("id", "")) == skill_id:
-			return true
+		if skill is Dictionary:
+			var s_id = str(skill.get("id", "")).to_lower().strip_edges()
+			var s_name = str(skill.get("name", "")).to_lower().strip_edges()
+			if s_id == target or s_name == target:
+				return true
 	return false
 
 func get_skill_summary(hero_id: int) -> String:

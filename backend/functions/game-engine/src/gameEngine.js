@@ -1033,6 +1033,15 @@ function canUseCardAsDodge(player, card) {
     || (isNguyenCanhChan && card?.suit === "Club");
 }
 
+function canUseCardAsDodgeAgainstSlash(player, card, attacker, slashCard) {
+  if (!canUseCardAsDodge(player, card)) return false;
+  if (getEquippedWeapon(attacker, "Súng Thần Công") && sameCardColor(card?.suit, slashCard?.suit)) return false;
+  if (heroHasSkill(attacker, "TRUC_CHIEN") && Number(card?.rank || 0) < 7) return false;
+  if (heroHasSkill(attacker, "THO_BINH") && getDistance({ players: [attacker, player] }, attacker.seat, player.seat) <= 2
+      && Number(card?.rank || 0) >= 2 && Number(card?.rank || 0) <= 5) return false;
+  return true;
+}
+
 function maybeStartVanSachPrompt(state) {
   if (state.phase !== "PLAY") return false;
   const owner = state.players.find((player) =>
@@ -2639,12 +2648,26 @@ function startTargetCardSelection(state, card, casterSeat, targetSeat, selection
 
 function resolveTargetCardToken(state, selection, targetCardId) {
   if (!selection || !targetCardId) return null;
-  let option = selection.options?.find((candidate) => candidate.token === targetCardId);
-  if (!option && targetCardId) {
+  const rawId = String(targetCardId).trim();
+  let option = selection.options?.find((candidate) => candidate.token === rawId);
+  if (!option && rawId) {
+    let cleanId = rawId;
+    if (cleanId.startsWith("EQUIPMENT:")) cleanId = cleanId.slice("EQUIPMENT:".length).split(":")[0];
+    else if (cleanId.startsWith("JUDGEMENT:")) cleanId = cleanId.slice("JUDGEMENT:".length).split(":")[0];
+
     option = selection.options?.find((candidate) =>
-      candidate.card?.id === targetCardId ||
-      candidate.token === `EQUIPMENT:${targetCardId}` ||
-      candidate.token?.startsWith(`EQUIPMENT:${targetCardId}:`)
+      candidate.card?.id === rawId ||
+      candidate.card?.name === rawId ||
+      candidate.card?.id === cleanId ||
+      candidate.card?.name === cleanId ||
+      candidate.token === `EQUIPMENT:${rawId}` ||
+      candidate.token?.startsWith(`EQUIPMENT:${rawId}:`) ||
+      candidate.token === `EQUIPMENT:${cleanId}` ||
+      candidate.token?.startsWith(`EQUIPMENT:${cleanId}:`) ||
+      candidate.token === `JUDGEMENT:${rawId}` ||
+      candidate.token?.startsWith(`JUDGEMENT:${rawId}:`) ||
+      candidate.token === `JUDGEMENT:${cleanId}` ||
+      candidate.token?.startsWith(`JUDGEMENT:${cleanId}:`)
     );
   }
   if (!option) return null;
@@ -2653,16 +2676,30 @@ function resolveTargetCardToken(state, selection, targetCardId) {
   if (!target) return null;
 
   if (option.zone === "HAND") {
-    const index = Number(targetCardId.slice("HAND:".length));
+    const index = Number(rawId.startsWith("HAND:") ? rawId.slice("HAND:".length) : rawId);
     if (!Number.isInteger(index) || index < 0 || index >= target.hand.length) return null;
     return { target, option, index, card: target.hand[index] };
   }
 
   const prefix = option.zone === "EQUIPMENT" ? "EQUIPMENT:" : "JUDGEMENT:";
-  if (!targetCardId.startsWith(prefix) && !option.card) return null;
-  const cardId = option.card?.id || targetCardId.slice(prefix.length).split(":")[0];
+  let cardId = option.card?.id;
+  let cardName = option.card?.name;
+  if (!cardId && rawId.startsWith(prefix)) {
+    cardId = rawId.slice(prefix.length).split(":")[0];
+  }
   const cards = option.zone === "EQUIPMENT" ? target.equipments : target.judgements;
-  const index = cards.findIndex((card) => card.id === cardId);
+  let index = -1;
+  if (option.card) {
+    index = cards.indexOf(option.card);
+  }
+  if (index < 0) {
+    index = cards.findIndex((card) =>
+      (cardId && card.id === cardId) ||
+      (cardName && card.name === cardName) ||
+      card.id === rawId ||
+      card.name === rawId
+    );
+  }
   if (index < 0) return null;
   return { target, option, index, card: cards[index] };
 }
@@ -3719,6 +3756,7 @@ function triggerUuThiep(state, casterSeat, targetSeat) {
     targetSeat: defaultTarget.seat,
     cardId: "UU_THIEP",
     cardName: "Ưu Thiếp",
+    skillActivations: [{ name: "Ưu Thiếp", seat: caster.seat }],
     description: `🐎 ${caster.generalName} kích hoạt [Ưu Thiếp], chọn cướp 1 lá Trang bị.`
   });
   return { success: true, state };
@@ -5044,6 +5082,20 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         skillActivations: [{ name: "Cận Vệ", seat: guard.seat }],
         description: `🛡️ <b>${guard.generalName}</b> kích hoạt [Cận Vệ], đỡ đòn thay cho <b>${originalTarget ? originalTarget.generalName : 'đồng đội'}</b>, trở thành mục tiêu mới của Trảm!`
       });
+      if (!active.tranNamBypass && !getEquippedWeapon(caster, "Thuận Thiên")
+          && active.damageElement === "NORMAL"
+          && (guard.equipments || []).some((equipment) => equipment.subType === CARD_SUBTYPES.ARMOR && equipment.name?.includes("Giáp Đồng"))) {
+        resetWaitingState(state);
+        recordAction(state, {
+          type: "SLASH_BLOCKED_BY_ARMOR",
+          casterSeat: active.casterSeat,
+          targetSeat: guard.seat,
+          cardId: active.cardId,
+          cardName: active.cardName,
+          description: `🛡️ [Giáp Đồng Sơn Vi] của ${guard.generalName} đã vô hiệu hóa đòn Trảm sau khi [Cận Vệ].`
+        });
+        return { success: true, state };
+      }
     }
     const oaiNhuocRequired = !!active.oaiNhuocRequired;
     state.phase = oaiNhuocRequired ? "AWAIT_OAI_NHUOC" : "AWAIT_SLASH_DEFENSE";
@@ -5733,8 +5785,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       const caster = state.players.find((player) => player.seat === state.activeCard?.casterSeat);
       const holyCannon = getEquippedWeapon(caster, "Súng Thần Công");
       const selectedCards = selectedIndexes.map((index) => respondent.hand[index]);
-      const dodgeCard = selectedCards.find((card) => canUseCardAsDodge(respondent, card)
-        && (!holyCannon || sameCardColor(card.suit, state.activeCard?.suit)));
+      const dodgeCard = selectedCards.find((card) => canUseCardAsDodgeAgainstSlash(respondent, card, caster, state.activeCard));
       if (!dodgeCard) return { error: "[Oai Nhược] 2 lá phải có 1 lá Đỡ hợp lệ" };
       const costCard = selectedCards.find((card) => card !== dodgeCard);
       respondent.hand.splice(respondent.hand.indexOf(costCard), 1);
@@ -5850,8 +5901,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
 
       const caster = state.players.find(x => x.seat === (state.activeCard ? state.activeCard.casterSeat : 0));
       const holyCannon = getEquippedWeapon(caster, "Súng Thần Công");
-      const idx = respondent.hand.findIndex(c => (c.id === cardId || c.name === cardId || ((cardId === "DO" || cardId === "do") && isDodge(c))) && canUseCardAsDodge(respondent, c)
-        && (!holyCannon || sameCardColor(c.suit, state.activeCard?.suit)));
+      const idx = respondent.hand.findIndex(c => (c.id === cardId || c.name === cardId || ((cardId === "DO" || cardId === "do") && isDodge(c))) && canUseCardAsDodgeAgainstSlash(respondent, c, caster, state.activeCard));
       if (idx < 0) return { error: "Lá Đỡ không còn hợp lệ cho đòn Trảm này" };
       {
         const dodgeCard = respondent.hand.splice(idx, 1)[0];
@@ -7574,8 +7624,7 @@ export function handleAIReaction(state, aiSeat) {
       return handleRespondAction(state, aiSeat, true, "KHIEN_MAY");
     }
     const cannon = getEquippedWeapon(caster, "Súng Thần Công");
-    const dodge = ai.hand.find(c => canUseCardAsDodge(ai, c)
-      && (!cannon || sameCardColor(c.suit, state.activeCard?.suit)));
+    const dodge = ai.hand.find(c => canUseCardAsDodgeAgainstSlash(ai, c, caster, state.activeCard));
     if (dodge) {
       return handleRespondAction(state, aiSeat, true, dodge.id);
     } else if (heroHasSkill(ai, "TRAN_THU") && (ai.equipments || []).length > 0) {
@@ -7743,6 +7792,9 @@ export function handleAIReaction(state, aiSeat) {
   if (state.phase === "AWAIT_TARGET_CARD" && state.waitingTargetSeat === aiSeat) {
     const selection = state.targetCardSelection;
     let chosenOption = selection?.options?.[0];
+    if (selection?.effectType === "DOAN_DAO") {
+      chosenOption = selection.options?.find((option) => option.zone === "EQUIPMENT") || chosenOption;
+    }
     if (selection?.effectType === "UU_THIEP") {
       const enemyOption = selection.options?.find(opt => {
         const owner = opt.ownerSeat || opt.targetSeat;
@@ -7755,7 +7807,8 @@ export function handleAIReaction(state, aiSeat) {
   }
 
   if (state.phase === "AWAIT_DOAN_DAO_CHOICE" && state.waitingTargetSeat === aiSeat) {
-    return handleRespondAction(state, aiSeat, true, null);
+    const target = state.players.find((player) => player.seat === state.activeCard?.targetSeat);
+    return handleRespondAction(state, aiSeat, !!(target?.equipments || []).length, null);
   }
 
   if (state.phase === "AWAIT_HICH_CASTER_DISCARD" && state.waitingTargetSeat === aiSeat) {
@@ -7986,10 +8039,13 @@ function sanitizeTargetCardSelection(selection, requestingSeat) {
     cardId: selection.cardId,
     cardName: selection.cardName,
     effectType: selection.effectType || "TARGET_CARD",
+    remainingCount: selection.remainingCount !== undefined ? selection.remainingCount : 1,
     options: (selection.options || []).map((option) => ({
       token: option.token,
       zone: option.zone,
       label: option.label,
+      ownerSeat: option.ownerSeat,
+      targetSeat: option.targetSeat,
       card: option.zone === "HAND" || !option.card ? null : {
         id: option.card.id,
         name: option.card.name,
@@ -8266,7 +8322,7 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
     const forcedTarget = state.players.find((candidate) => candidate.seat === Number(parts[1] || 0));
     if (costIndex < 0) return { error: "Dẫn Cầu cần trao 1 lá trên tay" };
     if (!forced || !isLivingPlayer(forced) || forced.seat === seat) return { error: "Dẫn Cầu cần chọn người bị ép" };
-    if (!forcedTarget || !isLivingPlayer(forcedTarget) || forcedTarget.seat === forced.seat || !hasWeaponRange(state, forced.seat, forcedTarget.seat)) return { error: "Mục tiêu Trảm không hợp lệ hoặc ngoài tầm người bị ép" };
+    if (!forcedTarget || !isLivingPlayer(forcedTarget) || forcedTarget.seat === forced.seat || !hasWeaponRange(state, forced.seat, forcedTarget.seat)) return { error: "Mục tiêu Trảm không hợp lệ: phải chọn người trong tầm của người được chọn đánh" };
     if (!player.usedSkills) player.usedSkills = {};
     player.usedSkills.DanCau = true;
     forced.hand.push(player.hand.splice(costIndex, 1)[0]);
