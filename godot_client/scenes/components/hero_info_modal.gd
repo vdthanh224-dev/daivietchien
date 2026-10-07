@@ -468,7 +468,7 @@ func _get_equipment_description(item_name: String) -> String:
 		"Nỏ Thần Kim Quy": return "Tầm 1 • Không giới hạn số lá Trảm trong lượt."
 		"Trường Đao Nam Sơn": return "Tầm 3 • Khi Trảm bị Đỡ, không mất lượt dùng Trảm."
 		"Thương Ngâu Lãng Bạc": return "Tầm 4 • Trảm trúng hủy 1 lá trên tay hoặc trang bị."
-		"Súng Thần Công Hồ Triều": return "Tầm 5 • Mục tiêu không được Đỡ cùng màu với Trảm."
+		"Súng Thần Công Hồ Triều": return "Tầm 5 • Mục tiêu không được dùng Đỡ nhỏ hơn 7."
 		"Hỏa Mai Tây Sơn": return "Tầm 4 • Trảm Thường có thể xem như Trảm Hỏa."
 		"Liêm Đao Đống Đa": return "Tầm 2 • Lần đầu mỗi lượt gây sát thương, rút 1 lá."
 		"Đoản Đao Lam Sơn": return "Tầm 2 • Trảm trúng có thể hủy 2 lá bài thay vì gây sát thương."

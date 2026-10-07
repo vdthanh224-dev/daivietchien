@@ -1318,7 +1318,7 @@ func _show_level_up_modal(old_lvl: int, new_lvl: int, on_close: Callable = Calla
 	# 3. Floating Golden Sparkle Particles
 	for i in range(20):
 		var sp = Label.new()
-		sp.text = "✦" if i % 3 == 0 else ("✨" if i % 3 == 1 else "★")
+		sp.text = "✦" if i % 3 == 0 else ("✨" if i % 3 == 1 else "⭐")
 		sp.add_theme_font_size_override("font_size", randi_range(12, 20))
 		sp.add_theme_color_override("font_color", Color(1.0, randf_range(0.8, 0.95), randf_range(0.3, 0.6), randf_range(0.5, 0.9)))
 		sp.position = Vector2(randf_range(300, 980), randf_range(150, 600))
@@ -1388,7 +1388,7 @@ func _show_level_up_modal(old_lvl: int, new_lvl: int, on_close: Callable = Calla
 	div.color = Color(0.88, 0.72, 0.22, 0.8)
 	vbox.add_child(div)
 
-	# Centerpiece: Level Upgrade Transition (CẤP X ➔➔➔ CẤP Y)
+	# Centerpiece: Level Upgrade Transition (CẤP X →→→ CẤP Y)
 	var trans_hbox = HBoxContainer.new()
 	trans_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	trans_hbox.add_theme_constant_override("separation", 18)
@@ -1420,7 +1420,7 @@ func _show_level_up_modal(old_lvl: int, new_lvl: int, on_close: Callable = Calla
 
 	# Glowing Golden Arrow
 	var arrow_lbl = Label.new()
-	arrow_lbl.text = "➔➔➔"
+	arrow_lbl.text = "→→→"
 	arrow_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	arrow_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	arrow_lbl.add_theme_font_size_override("font_size", 22)
@@ -1567,7 +1567,7 @@ func _show_level_up_modal(old_lvl: int, new_lvl: int, on_close: Callable = Calla
 	var confirm_btn = Button.new()
 	confirm_btn.custom_minimum_size = Vector2(340, 44)
 	confirm_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	confirm_btn.text = "TIẾP NHẬN BỔNG LỘC & TIẾP TỤC ➜"
+	confirm_btn.text = "TIẾP NHẬN BỔNG LỘC & TIẾP TỤC →"
 	_style_white_gold_action_button(confirm_btn)
 
 	confirm_btn.pressed.connect(func():
@@ -2266,7 +2266,7 @@ func _build_7day_rewards_content() -> Control:
 	container.add_theme_constant_override("separation", 14)
 
 	var desc_lbl = Label.new()
-	desc_lbl.text = "Triều đình ban thưởng mỗi ngày đăng nhập! Nhận Vé Quay Tướng để hiệu triệu 28 Hào Kiệt Đại Việt tại Thần Điện."
+	desc_lbl.text = "Triều đình ban thưởng mỗi ngày đăng nhập! Nhận Vé Quay Tướng để hiệu triệu 40 Hào Kiệt Đại Việt tại Thần Điện."
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc_lbl.add_theme_font_size_override("font_size", 13)
 	desc_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
@@ -2619,7 +2619,7 @@ func _show_fullscreen_than_dien() -> void:
 	title_vbox.add_child(title_lbl)
 
 	var sub_title = Label.new()
-	sub_title.text = "Hiệu triệu 28 Hào Kiệt Đại Việt (Tướng 1 ➔ 28) • Trùng tướng nhận 1,000 Bạc"
+	sub_title.text = "Hiệu triệu 40 Hào Kiệt Đại Việt (Tướng 1 → 40) • Trùng tướng nhận 1,000 Bạc"
 	sub_title.add_theme_font_size_override("font_size", 12)
 	sub_title.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
 	title_vbox.add_child(sub_title)
@@ -2718,7 +2718,7 @@ func _show_fullscreen_than_dien() -> void:
 	stage_margin.add_child(stage_hbox)
 
 	# --- WING 1: FEATURED HERO SPOTLIGHT ALTAR (LEFT, ~460px) ---
-	var featured_ids = [3, 9, 22, 1, 4, 5, 10, 18]
+	var featured_ids = [3, 9, 22, 1, 4, 5, 10, 18, 29, 30, 31, 35, 36, 37, 38, 40]
 	if not (_than_dien_selected_hero_id in featured_ids):
 		_than_dien_selected_hero_id = 3
 
@@ -2965,7 +2965,7 @@ func _show_fullscreen_than_dien() -> void:
 	sp_owned_panel.add_theme_stylebox_override("panel", spop_style)
 
 	var sp_owned_lbl = Label.new()
-	sp_owned_lbl.text = "✓ ĐÃ SỞ HỮU" if is_spotlight_owned else "✨ CÓ THỂ HIỆU TRIỆU (Xác suất 1/28)"
+	sp_owned_lbl.text = "✓ ĐÃ SỞ HỮU" if is_spotlight_owned else "✨ CÓ THỂ HIỆU TRIỆU (Xác suất 1/40)"
 	sp_owned_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sp_owned_lbl.add_theme_font_size_override("font_size", 11)
 	sp_owned_lbl.add_theme_color_override("font_color", Color(0.65, 1.0, 0.8, 1.0) if is_spotlight_owned else Color(1.0, 0.88, 0.4, 1.0))
@@ -3003,16 +3003,16 @@ func _show_fullscreen_than_dien() -> void:
 	tablet_panel.add_child(tp_vbox)
 
 	# Section 1: Collection Progress Tablet ("Bách Tướng Đồ")
-	var owned_count_28 = 0
-	for hid in range(1, 29):
+	var owned_count_40 = 0
+	for hid in range(1, 41):
 		if HeroDatabase and HeroDatabase.is_hero_owned(hid):
-			owned_count_28 += 1
+			owned_count_40 += 1
 
 	var prog_header = HBoxContainer.new()
 	tp_vbox.add_child(prog_header)
 
 	var prog_title = Label.new()
-	prog_title.text = "📜 BÁCH TƯỚNG BẢNG (TIẾN ĐỘ THU THẬP TƯỚNG 1 ➔ 28)"
+	prog_title.text = "📜 BÁCH TƯỚNG BẢNG (TIẾN ĐỘ THU THẬP TƯỚNG 1 → 40)"
 	prog_title.add_theme_font_size_override("font_size", 13)
 	prog_title.add_theme_color_override("font_color", Color(1.0, 0.88, 0.42, 1.0))
 	prog_header.add_child(prog_title)
@@ -3022,8 +3022,8 @@ func _show_fullscreen_than_dien() -> void:
 	prog_header.add_child(prog_sp)
 
 	var prog_num_lbl = Label.new()
-	var pct = int((float(owned_count_28) / 28.0) * 100.0)
-	prog_num_lbl.text = "%d / 28 Danh Tướng (%d%%)" % [owned_count_28, pct]
+	var pct = int((float(owned_count_40) / 40.0) * 100.0)
+	prog_num_lbl.text = "%d / 40 Danh Tướng (%d%%)" % [owned_count_40, pct]
 	prog_num_lbl.add_theme_font_size_override("font_size", 13)
 	prog_num_lbl.add_theme_color_override("font_color", Color(0.4, 0.92, 0.6, 1.0))
 	prog_header.add_child(prog_num_lbl)
@@ -3031,8 +3031,8 @@ func _show_fullscreen_than_dien() -> void:
 	# Progress Bar
 	var pbar = ProgressBar.new()
 	pbar.custom_minimum_size = Vector2(0, 12)
-	pbar.max_value = 28
-	pbar.value = owned_count_28
+	pbar.max_value = 40
+	pbar.value = owned_count_40
 	pbar.show_percentage = false
 
 	var pb_bg = StyleBoxFlat.new()
@@ -3190,13 +3190,13 @@ func _show_fullscreen_than_dien() -> void:
 	rpv.add_child(r_title)
 
 	var r1 = Label.new()
-	r1.text = "• Bể Hiệu Triệu gồm toàn bộ 28 Hào Kiệt Đại Việt lịch sử đầu tiên (ID từ 1 đến 28)."
+	r1.text = "• Bể Hiệu Triệu gồm toàn bộ 40 Hào Kiệt Đại Việt lịch sử đầu tiên (ID từ 1 đến 40)."
 	r1.add_theme_font_size_override("font_size", 11)
 	r1.add_theme_color_override("font_color", Color(0.85, 0.88, 0.92, 0.95))
 	rpv.add_child(r1)
 
 	var r2 = Label.new()
-	r2.text = "• Khi quay trúng Danh Tướng đã sở hữu ➔ Tự động quy đổi thành +1,000 BẠC 🥈 nạp ngay vào ngân khố!"
+	r2.text = "• Khi quay trúng Danh Tướng đã sở hữu → Tự động quy đổi thành +1,000 BẠC 🥈 nạp ngay vào ngân khố!"
 	r2.add_theme_font_size_override("font_size", 11)
 	r2.add_theme_color_override("font_color", Color(1.0, 0.90, 0.45, 1.0))
 	rpv.add_child(r2)
@@ -3251,7 +3251,7 @@ func _show_fullscreen_than_dien() -> void:
 	summon_hbox.add_child(btn_roll_5)
 
 	var note_lbl = Label.new()
-	note_lbl.text = "• Bể hiệu triệu gồm 28 Danh Tướng • Tự động bồi hoàn 1,000 Bạc khi trùng lặp"
+	note_lbl.text = "• Bể hiệu triệu gồm 40 Danh Tướng • Tự động bồi hoàn 1,000 Bạc khi trùng lặp"
 	note_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	note_lbl.add_theme_font_size_override("font_size", 11)
 	note_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
@@ -3271,8 +3271,8 @@ func _execute_gacha_summon(count: int) -> void:
 
 	var results: Array[Dictionary] = []
 	for i in range(count):
-		# Pool: heroes 1 -> 28
-		var rolled_id = randi_range(1, 28)
+		# Pool: heroes 1 -> 40
+		var rolled_id = randi_range(1, 40)
 		var hero = HeroDatabase.get_hero(rolled_id) if HeroDatabase else {}
 		var is_owned = HeroDatabase.is_hero_owned(rolled_id) if HeroDatabase else false
 
@@ -3669,7 +3669,7 @@ func _show_28_heroes_modal() -> void:
 	grid.add_theme_constant_override("v_separation", 10)
 	grid.size_flags_horizontal = SIZE_EXPAND_FILL
 
-	for hid in range(1, 29):
+	for hid in range(1, 41):
 		var h = HeroDatabase.get_hero(hid) if HeroDatabase else {}
 		var is_owned = HeroDatabase.is_hero_owned(hid) if HeroDatabase else false
 
@@ -3780,7 +3780,7 @@ func _show_28_heroes_modal() -> void:
 		grid.add_child(p)
 
 	scroll.add_child(grid)
-	_show_modal("DANH SÁCH 28 HÀO KIỆT THẦN ĐIỆN", scroll)
+	_show_modal("DANH SÁCH 40 HÀO KIỆT THẦN ĐIỆN", scroll)
 
 func _build_equipment_content() -> Control:
 	var container = VBoxContainer.new()
@@ -4323,16 +4323,10 @@ func _create_leaderboard_player_row(rank_num: int, player: Dictionary, is_self: 
 
 		var star_lbl = Label.new()
 		if rank_idx >= 11:
-			star_lbl.text = "👑 %d★ (Hoàng Tộc)" % stars
+			star_lbl.text = "👑 %d⭐ (Hoàng Tộc)" % stars
 			star_lbl.add_theme_color_override("font_color", COLOR_GOLD_PRIMARY)
 		else:
-			var star_str = ""
-			for s in range(5):
-				if s < stars:
-					star_str += "★ "
-				else:
-					star_str += "☆ "
-			star_lbl.text = star_str.strip_edges()
+			star_lbl.text = "%d/5 ⭐" % stars
 			star_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
 		star_lbl.add_theme_font_size_override("font_size", 13)
 		star_box.add_child(star_lbl)
@@ -4414,13 +4408,13 @@ func _create_leaderboard_player_row(rank_num: int, player: Dictionary, is_self: 
 		gen_box.add_theme_constant_override("separation", 2)
 
 		var gen_lbl = Label.new()
-		gen_lbl.text = "👥 %d / 28 Tướng" % gen_cnt
+		gen_lbl.text = "👥 %d / 40 Tướng" % gen_cnt
 		gen_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		gen_lbl.add_theme_font_size_override("font_size", 13)
 		gen_lbl.add_theme_color_override("font_color", COLOR_TEXT_DARK)
 		gen_box.add_child(gen_lbl)
 
-		var pct = int(float(gen_cnt) / 28.0 * 100.0)
+		var pct = int(float(gen_cnt) / 40.0 * 100.0)
 		var pct_lbl = Label.new()
 		pct_lbl.text = "%d%% Danh Tướng" % pct
 		pct_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -4491,7 +4485,7 @@ func _create_my_position_card(my_pos: int, my_data: Dictionary) -> PanelContaine
 		var badge = str(r_info.get("badge", "🛡️"))
 
 		var stat_lbl = Label.new()
-		stat_lbl.text = "%s %s • %d★ (%d/100 Điểm Tích Lũy)" % [badge, r_name, r_stars, r_acc]
+		stat_lbl.text = "%s %s • %d⭐ (%d/100 Điểm Tích Lũy)" % [badge, r_name, r_stars, r_acc]
 		stat_lbl.add_theme_font_size_override("font_size", 13)
 		stat_lbl.add_theme_color_override("font_color", COLOR_TEXT_DARK)
 		center_box.add_child(stat_lbl)
@@ -4518,7 +4512,7 @@ func _create_my_position_card(my_pos: int, my_data: Dictionary) -> PanelContaine
 		center_box.add_child(stat_lbl)
 
 		var sub_lbl = Label.new()
-		sub_lbl.text = "Đã chiêu mộ: %d / 28 Danh Tướng (%d%% Bộ Sưu Tập)" % [gen_cnt, int(float(gen_cnt) / 28.0 * 100.0)]
+		sub_lbl.text = "Đã chiêu mộ: %d / 40 Danh Tướng (%d%% Bộ Sưu Tập)" % [gen_cnt, int(float(gen_cnt) / 40.0 * 100.0)]
 		sub_lbl.add_theme_font_size_override("font_size", 11)
 		sub_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
 		center_box.add_child(sub_lbl)
@@ -5320,7 +5314,7 @@ func _build_inventory_content() -> Control:
 		# 3. Nút Đến Thần Điện (cho ai muốn xem toàn cảnh Thần Điện)
 		var goto_td_btn = Button.new()
 		goto_td_btn.custom_minimum_size = Vector2(140, 28)
-		goto_td_btn.text = "ĐẾN THẦN ĐIỆN ➜"
+		goto_td_btn.text = "ĐẾN THẦN ĐIỆN →"
 		_style_white_gold_button(goto_td_btn, 6, 2, Vector2(0, 1))
 		goto_td_btn.pressed.connect(func():
 			AudioManager.play_card_select()
@@ -5547,7 +5541,7 @@ func _build_mail_content() -> Control:
 
 		var r_btn = Button.new()
 		r_btn.custom_minimum_size = Vector2(100, 34)
-		r_btn.text = "NHẬN ➜"
+		r_btn.text = "NHẬN →"
 		_style_white_gold_button(r_btn, 6, 3, Vector2(0, 2))
 		r_btn.pressed.connect(func():
 			AudioManager.play_parry()
@@ -5898,13 +5892,15 @@ func _build_profile_content() -> Control:
 	stars_hbox.add_theme_constant_override("separation", 3)
 	for s in range(5):
 		var s_lbl = Label.new()
-		s_lbl.text = "★"
+		s_lbl.text = "⭐"
 		s_lbl.add_theme_font_size_override("font_size", 15)
 		if s < rank_stars:
 			s_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.2))
 			s_lbl.add_theme_color_override("font_shadow_color", Color(0.9, 0.6, 0.1, 0.7))
+			s_lbl.modulate = Color(1.0, 1.0, 1.0, 1.0)
 		else:
 			s_lbl.add_theme_color_override("font_color", Color(0.25, 0.28, 0.38, 0.8))
+			s_lbl.modulate = Color(0.35, 0.38, 0.45, 0.45)
 		stars_hbox.add_child(s_lbl)
 
 	var s_count = Label.new()
@@ -6129,7 +6125,7 @@ func _start_2v2_matchmaking(mode_id: String = "2v2") -> void:
 	if rank_idx >= 11:
 		# Bậc Hoàng Đế (vô hạn sao)
 		var star_lbl = Label.new()
-		star_lbl.text = "★"
+		star_lbl.text = "⭐"
 		star_lbl.add_theme_font_size_override("font_size", 20)
 		star_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.2, 1.0))
 		stars_hbox.add_child(star_lbl)
@@ -6142,7 +6138,7 @@ func _start_2v2_matchmaking(mode_id: String = "2v2") -> void:
 		var max_stars = 5
 		for s in range(max_stars):
 			var star_lbl = Label.new()
-			star_lbl.text = "★"
+			star_lbl.text = "⭐"
 			star_lbl.add_theme_font_size_override("font_size", 20)
 			if s < rank_stars:
 				# Sao sáng (màu vàng kim rực rỡ)
@@ -6150,9 +6146,11 @@ func _start_2v2_matchmaking(mode_id: String = "2v2") -> void:
 				star_lbl.add_theme_color_override("font_shadow_color", Color(0.9, 0.6, 0.1, 0.7))
 				star_lbl.add_theme_constant_override("shadow_offset_x", 0)
 				star_lbl.add_theme_constant_override("shadow_offset_y", 1)
+				star_lbl.modulate = Color(1.0, 1.0, 1.0, 1.0)
 			else:
 				# Sao tối (màu xám tối)
 				star_lbl.add_theme_color_override("font_color", Color(0.25, 0.28, 0.38, 0.8))
+				star_lbl.modulate = Color(0.35, 0.38, 0.45, 0.45)
 			stars_hbox.add_child(star_lbl)
 	rank_col.add_child(stars_hbox)
 

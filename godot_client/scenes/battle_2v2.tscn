@@ -302,7 +302,7 @@ offset_right = 765.0
 offset_bottom = 472.0
 focus_mode = 0
 theme_override_font_sizes/font_size = 12
-text = "⚔️ XUẤT BÀI ➜ ĐỐI THỦ"
+text = "⚔️ XUẤT BÀI → ĐỐI THỦ"
 
 [node name="EndTurnBtn" type="Button" parent="TableTop"]
 custom_minimum_size = Vector2(145, 42)

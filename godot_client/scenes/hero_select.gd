@@ -34,6 +34,10 @@ var _pending_pick_hero_id: int = 0
 var _pending_pick_seat: int = 0
 # Drop delayed draft snapshots so a late packet cannot roll a client back.
 var _last_draft_revision: int = 0
+var active_pick_seats: Array[int] = []
+var draft_round: int = 1
+var my_candidate_hero_ids: Array[int] = []
+var full_available_heroes_pool: Array[Dictionary] = []
 
 # UI References
 var draft_status_lbl: Label
@@ -89,42 +93,30 @@ func _ready() -> void:
 		var filtered_heroes: Array[Dictionary] = []
 		for h in available_heroes:
 			var hid = int(h.get("id", 0))
-			if hid >= 1 and hid <= 28:
+			if hid >= 1 and hid <= 40:
 				filtered_heroes.append(h)
 		available_heroes = filtered_heroes
-	# Mỗi lượt chọn chỉ mở 8 tướng ngẫu nhiên; tướng sở hữu được ưu tiên,
-	# sau đó bù bằng tướng miễn phí tuần trong nhóm 1..28.
-	if not is_user_admin and current_mode_id == "2v2":
-		var owned_ids: Array = []
-		if HeroDatabase:
-			for hero in available_heroes:
-				if HeroDatabase.is_hero_owned(int(hero.get("id", 0))):
-					owned_ids.append(int(hero.get("id", 0)))
-		var owned_pool: Array[Dictionary] = []
-		var fallback_pool: Array[Dictionary] = []
-		for hero in available_heroes:
-			if int(hero.get("id", 0)) in owned_ids:
-				owned_pool.append(hero)
-			else:
-				fallback_pool.append(hero)
-		owned_pool.shuffle()
-		fallback_pool.shuffle()
-		var limited: Array[Dictionary] = []
-		for hero in owned_pool:
-			if limited.size() >= 8: break
-			limited.append(hero)
-		for hero in fallback_pool:
-			if limited.size() >= 8: break
-			limited.append(hero)
-		available_heroes = limited
+	full_available_heroes_pool = available_heroes.duplicate()
+
+	_setup_draft_slots()
+
+	if current_mode_id == "2v2":
+		if draft_slots.size() >= 2:
+			active_pick_seats = [int(draft_slots[0].get("seatNumber", 1)), int(draft_slots[1].get("seatNumber", 2))]
+		else:
+			active_pick_seats = [1, 2]
+		_setup_local_disjoint_hero_pools(1)
+		var my_seat_num = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 and NetworkClient.my_seat <= 8 else 1
+		var my_slot_idx = _find_draft_slot_index(my_seat_num)
+		if my_slot_idx >= 0 and my_slot_idx < draft_slots.size():
+			var cand = draft_slots[my_slot_idx].get("candidateHeroes", [])
+			if not cand.is_empty():
+				available_heroes = cand
 	elif not is_user_admin and current_mode_id.begins_with("dynasty_"):
-		# Dynasty players keep the same eight-card-sized draft pool after the king
-		# pick, while all role information remains server authoritative.
 		var dynasty_pool: Array[Dictionary] = available_heroes.duplicate()
 		dynasty_pool.shuffle()
 		available_heroes = dynasty_pool.slice(0, mini(8, dynasty_pool.size()))
 
-	_setup_draft_slots()
 	_build_ui()
 
 	if not available_heroes.is_empty():
@@ -307,6 +299,78 @@ func _setup_draft_slots() -> void:
 				"isLocked": false
 			})
 
+func _setup_local_disjoint_hero_pools(round_num: int) -> void:
+	if current_mode_id != "2v2" or draft_slots.size() < 4:
+		return
+	var pool_source: Array[Dictionary] = full_available_heroes_pool.duplicate()
+	if pool_source.is_empty():
+		pool_source = available_heroes.duplicate()
+	pool_source.shuffle()
+
+	if round_num == 1:
+		var slot0 = draft_slots[0]
+		var slot1 = draft_slots[1]
+		var half1: Array[Dictionary] = []
+		var half2: Array[Dictionary] = []
+		for h in pool_source:
+			var hid = int(h.get("id", 0))
+			if hid < 1 or hid > 40: continue
+			if half1.size() < 8:
+				half1.append(h)
+			elif half2.size() < 8:
+				half2.append(h)
+			if half1.size() >= 8 and half2.size() >= 8:
+				break
+		slot0["candidateHeroes"] = half1
+		var cids0: Array[int] = []
+		for c in half1: cids0.append(int(c.get("id", 0)))
+		slot0["candidateHeroIds"] = cids0
+
+		slot1["candidateHeroes"] = half2
+		var cids1: Array[int] = []
+		for c in half2: cids1.append(int(c.get("id", 0)))
+		slot1["candidateHeroIds"] = cids1
+	elif round_num == 2:
+		var slot2 = draft_slots[2]
+		var slot3 = draft_slots[3]
+		var half3: Array[Dictionary] = []
+		var half4: Array[Dictionary] = []
+		for h in pool_source:
+			var hid = int(h.get("id", 0))
+			if hid < 1 or hid > 40 or hid in selected_hero_ids: continue
+			if half3.size() < 8:
+				half3.append(h)
+			elif half4.size() < 8:
+				half4.append(h)
+			if half3.size() >= 8 and half4.size() >= 8:
+				break
+		slot2["candidateHeroes"] = half3
+		var cids2: Array[int] = []
+		for c in half3: cids2.append(int(c.get("id", 0)))
+		slot2["candidateHeroIds"] = cids2
+
+		slot3["candidateHeroes"] = half4
+		var cids3: Array[int] = []
+		for c in half4: cids3.append(int(c.get("id", 0)))
+		slot3["candidateHeroIds"] = cids3
+
+func _rebuild_hero_grid(heroes_to_show: Array[Dictionary]) -> void:
+	available_heroes = heroes_to_show
+	if not is_instance_valid(hero_grid_scroll): return
+	var grid = hero_grid_scroll.get_child(0) as GridContainer
+	if not is_instance_valid(grid): return
+	for c in grid.get_children():
+		c.queue_free()
+	hero_card_nodes.clear()
+	for hero in available_heroes:
+		var card = _create_hero_grid_card(hero)
+		grid.add_child(card)
+		hero_card_nodes[hero["id"]] = card
+		if int(hero.get("id", 0)) in selected_hero_ids:
+			card.modulate = Color(0.4, 0.4, 0.4, 0.8)
+	if not available_heroes.is_empty():
+		_inspect_hero(available_heroes[0])
+
 func _get_anonymous_slot_name(slot_idx: int) -> String:
 	if slot_idx < 0 or slot_idx >= draft_slots.size():
 		return "Người chơi"
@@ -462,7 +526,7 @@ func _build_left_slots_column() -> Control:
 	col.add_theme_constant_override("separation", 8)
 
 	var title = Label.new()
-	title.text = "⚔️ THỨ TỰ CHỌN (#1 ➜ #%d):" % draft_slots.size()
+	title.text = "⚔️ THỨ TỰ CHỌN (#1 → #%d):" % draft_slots.size()
 	title.add_theme_font_size_override("font_size", 13)
 	title.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 	col.add_child(title)
@@ -956,7 +1020,7 @@ func _inspect_hero(hero: Dictionary) -> void:
 	var hid = int(hero.get("id", 1))
 	var hname = hero.get("name", "")
 	var is_free = bool(hero.get("is_weekly_free", false))
-	var tag = "[🌟 FREE TUẦN]" if is_free else "[ĐÃ SỞ HỮU]"
+	var tag = "[⭐ FREE TUẦN]" if is_free else "[ĐÃ SỞ HỮU]"
 
 	var fac = hero.get("faction", "")
 	inspect_title_lbl.text = hname.to_upper()
@@ -1012,6 +1076,8 @@ func _is_my_turn() -> bool:
 		var own_idx := _find_draft_slot_index(my_seat_num)
 		if own_idx >= 0:
 			return not bool(draft_slots[own_idx].get("isLocked", false))
+	if current_mode_id == "2v2":
+		return active_pick_seats.has(my_seat_num) and not is_player_locked
 	if current_picker_index >= 0 and current_picker_index < draft_slots.size():
 		var slot = draft_slots[current_picker_index]
 		var s_num = int(slot.get("seatNumber", slot.get("seat", current_picker_index + 1)))
@@ -1043,9 +1109,9 @@ func _update_lock_in_button_state() -> void:
 	else:
 		lock_in_btn.disabled = true
 		if is_player_locked:
-			_set_lock_in_text("⏳ ĐANG CHỜ CÁC TƯỚNG KHÁC...")
+			_set_lock_in_text("✅ ĐÃ KHÓA (Đang chờ người khác chọn tướng...)")
 		else:
-			_set_lock_in_text("⏳ ĐANG CHỜ GHẾ #%d CHỌN..." % (current_picker_index + 1))
+			_set_lock_in_text("⏳ Đang chờ người khác chọn tướng...")
 
 # --- Luồng Chọn Tướng Theo Lượt (Turn-based Draft Sequence chuẩn Unity) ---
 func _show_no_server_modal(message: String = "") -> void:
@@ -1150,55 +1216,101 @@ func _run_local_draft_loop() -> void:
 	draft_status_lbl.text = "🎮 Chọn Tướng Cục Bộ (Local vs AI)..."
 	draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 
-	var locked_hero_ids: Array[int] = []
-	for _slot in draft_slots:
-		locked_hero_ids.append(0)
+func _run_local_draft_loop() -> void:
+	print("[HeroSelect] ⚙️ Đang chạy chọn tướng chế độ Cục Bộ (Local Draft 2v2)...")
+	var my_seat_num = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 and NetworkClient.my_seat <= 8 else 1
 
-	for slot_idx in range(draft_slots.size()):
-		if not is_draft_active:
-			return
-
-		current_picker_index = slot_idx
-		var slot = draft_slots[slot_idx]
-		turn_timer = 40.0
-		_highlight_active_picker(slot_idx)
-		_update_lock_in_button_state()
-
-		var is_bot = bool(slot.get("isAI", false))
-		var is_player = bool(slot.get("isPlayer", false))
-
-		if is_player:
-			draft_status_lbl.text = "👑 ĐẾN LƯỢT BẠN CHỌN TƯỚNG! (Bạn có 40 giây)"
-			draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
-		else:
-			draft_status_lbl.text = "⏳ %s đang suy nghĩ..." % _get_anonymous_slot_name(slot_idx)
-			draft_status_lbl.add_theme_color_override("font_color", COLOR_DRAGON_CYAN if slot["isDragon"] else COLOR_PHOENIX_RED)
-
-		while locked_hero_ids[slot_idx] == 0 and turn_timer > 0.0 and is_draft_active:
-			turn_timer = maxf(0.0, turn_timer - 0.5)
-			turn_timer_lbl.text = "⏳ %ds" % maxi(0, int(ceilf(turn_timer)))
-
-			if is_player:
-				if slot.get("isLocked", false) and slot.has("chosenHero") and (slot["chosenHero"] is Dictionary):
-					locked_hero_ids[slot_idx] = int(slot["chosenHero"].get("id", 0))
-					break
+	if current_mode_id == "2v2" and draft_slots.size() >= 4:
+		for r_idx in range(1, 3):
+			if not is_draft_active:
+				return
+			draft_round = r_idx
+			var active_slots: Array[Dictionary] = []
+			if r_idx == 1:
+				active_slots = [draft_slots[0], draft_slots[1]]
 			else:
-				# Bot suy nghĩ 1.5 giây rồi tự chọn tướng
-				if turn_timer <= 38.5:
-					var bot_pick = _choose_bot_hero()
-					locked_hero_ids[slot_idx] = int(bot_pick.get("id", 1))
-					_lock_hero_for_slot(slot, bot_pick)
+				active_slots = [draft_slots[2], draft_slots[3]]
+
+			active_pick_seats = [int(active_slots[0]["seatNumber"]), int(active_slots[1]["seatNumber"])]
+			_setup_local_disjoint_hero_pools(r_idx)
+			turn_timer = 40.0
+
+			var player_in_this_round = false
+			for s in active_slots:
+				if int(s["seatNumber"]) == my_seat_num:
+					player_in_this_round = true
+					var c_heroes = s.get("candidateHeroes", [])
+					if not c_heroes.is_empty():
+						_rebuild_hero_grid(c_heroes)
 					break
+
+			_highlight_active_picker()
+			_update_lock_in_button_state()
+
+			if player_in_this_round:
+				draft_status_lbl.text = "👑 ĐẾN LƯỢT BẠN CHỌN TƯỚNG! (Bạn có 40 giây)"
+				draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+			else:
+				draft_status_lbl.text = "⏳ Đang chờ người khác chọn tướng..."
+				draft_status_lbl.add_theme_color_override("font_color", COLOR_DRAGON_CYAN)
+
+			while turn_timer > 0.0 and is_draft_active:
+				var all_locked = true
+				for s in active_slots:
+					if not bool(s.get("isLocked", false)):
+						all_locked = false
+						break
+				if all_locked:
+					break
+
+				turn_timer = maxf(0.0, turn_timer - 0.5)
+				turn_timer_lbl.text = "⏳ %ds" % maxi(0, int(ceilf(turn_timer)))
+
+				for s in active_slots:
+					if not bool(s.get("isLocked", false)):
+						var is_bot = bool(s.get("isAI", false)) or (not bool(s.get("isPlayer", false)) and int(s.get("seatNumber", 0)) != my_seat_num)
+						if is_bot and turn_timer <= 38.5:
+							var bot_pick = _choose_bot_hero(s)
+							_lock_hero_for_slot(s, bot_pick)
+
+				await get_tree().create_timer(0.5).timeout
+
+			for s in active_slots:
+				if not bool(s.get("isLocked", false)):
+					var fallback_pick = _choose_bot_hero(s)
+					_lock_hero_for_slot(s, fallback_pick)
 
 			await get_tree().create_timer(0.5).timeout
+	else:
+		for slot_idx in range(draft_slots.size()):
+			if not is_draft_active:
+				return
+			current_picker_index = slot_idx
+			var slot = draft_slots[slot_idx]
+			turn_timer = 40.0
+			_highlight_active_picker(slot_idx)
+			_update_lock_in_button_state()
+			var is_player = bool(slot.get("isPlayer", false))
+			if is_player:
+				draft_status_lbl.text = "👑 ĐẾN LƯỢT BẠN CHỌN TƯỚNG! (Bạn có 40 giây)"
+				draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+			else:
+				draft_status_lbl.text = "⏳ Đang chờ người khác chọn tướng..."
+				draft_status_lbl.add_theme_color_override("font_color", COLOR_DRAGON_CYAN)
 
-		# Hết thời gian mà chưa khóa thì tự lấy tướng đầu tiên hợp lệ
-		if locked_hero_ids[slot_idx] == 0 and is_draft_active:
-			var fallback_pick = _get_first_available_candidate()
-			locked_hero_ids[slot_idx] = int(fallback_pick.get("id", 1))
-			_lock_hero_for_slot(slot, fallback_pick)
+			while not bool(slot.get("isLocked", false)) and turn_timer > 0.0 and is_draft_active:
+				turn_timer = maxf(0.0, turn_timer - 0.5)
+				turn_timer_lbl.text = "⏳ %ds" % maxi(0, int(ceilf(turn_timer)))
+				if not is_player and turn_timer <= 38.5:
+					var bot_pick = _choose_bot_hero(slot)
+					_lock_hero_for_slot(slot, bot_pick)
+					break
+				await get_tree().create_timer(0.5).timeout
 
-		await get_tree().create_timer(0.5).timeout
+			if not bool(slot.get("isLocked", false)) and is_draft_active:
+				var fallback = _get_first_available_candidate()
+				_lock_hero_for_slot(slot, fallback)
+			await get_tree().create_timer(0.5).timeout
 
 	# Đếm ngược 3 giây vào trận
 	AudioManager.play_victory()
@@ -1212,24 +1324,25 @@ func _run_local_draft_loop() -> void:
 
 	_on_draft_completed()
 
-func _highlight_active_picker(idx: int) -> void:
+func _highlight_active_picker(idx: int = -1) -> void:
 	for i in range(left_slot_nodes.size()):
 		var node = left_slot_nodes[i]
-		var is_current = (i == idx)
 		var sp_style: StyleBoxFlat = node["style"]
 		var status_l: Label = node["status"]
 		var slot_data = node["data"]
+		var s_num = int(slot_data.get("seatNumber", i + 1))
+		var is_current = active_pick_seats.has(s_num) if current_mode_id == "2v2" else (i == idx)
 
-		if is_current:
-			sp_style.border_color = Color(1.0, 0.95, 0.4, 1.0)
-			sp_style.bg_color = Color(0.12, 0.18, 0.32, 0.98)
-			status_l.text = "⏳ Đang chọn..."
-			status_l.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
-		elif slot_data["isLocked"]:
+		if slot_data.get("isLocked", false):
 			sp_style.border_color = COLOR_GOLD_ACCENT if str(slot_data.get("role", "")) == "KING" else COLOR_TEXT_MUTED
 			sp_style.bg_color = Color(0.06, 0.10, 0.16, 0.95)
 			status_l.text = "✅ ĐÃ KHÓA"
 			status_l.add_theme_color_override("font_color", Color(0.35, 0.95, 0.5, 1.0))
+		elif is_current:
+			sp_style.border_color = Color(1.0, 0.95, 0.4, 1.0)
+			sp_style.bg_color = Color(0.12, 0.18, 0.32, 0.98)
+			status_l.text = "⏳ Đang chọn..."
+			status_l.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 		else:
 			sp_style.border_color = Color(0.2, 0.28, 0.4, 0.6)
 			sp_style.bg_color = Color(0.04, 0.06, 0.10, 0.9)
@@ -1272,25 +1385,42 @@ func _lock_hero_for_slot(slot: Dictionary, hero: Dictionary) -> void:
 
 	_update_lock_in_button_state()
 
-func _choose_bot_hero() -> Dictionary:
-	var pool = available_heroes.duplicate()
-	pool.shuffle()
-	for h in pool:
-		var hid = int(h.get("id", 0))
-		if not hid in selected_hero_ids:
-			return h
-	return _get_first_available_candidate()
+func _choose_bot_hero(slot: Dictionary = {}) -> Dictionary:
+	var candidate_ids: Array = slot.get("candidateHeroIds", [])
+	var pool: Array[Dictionary] = []
+	if not candidate_ids.is_empty():
+		for cid in candidate_ids:
+			var hid = int(cid)
+			if not hid in selected_hero_ids and hid >= 1 and hid <= 40:
+				var h = HeroDatabase.get_hero(hid) if HeroDatabase else {}
+				if not h.is_empty():
+					pool.append(h)
+	if pool.is_empty():
+		var all_pool = available_heroes.duplicate()
+		for h in all_pool:
+			var hid = int(h.get("id", 0))
+			if not hid in selected_hero_ids and hid >= 1 and hid <= 40:
+				pool.append(h)
+	if pool.is_empty() and HeroDatabase:
+		for h in HeroDatabase.all_heroes:
+			var hid = int(h.get("id", 0))
+			if hid >= 1 and hid <= 40 and not hid in selected_hero_ids:
+				pool.append(h)
+	if not pool.is_empty():
+		pool.shuffle()
+		return pool[0]
+	return HeroDatabase.get_hero(randi_range(1, 40)) if HeroDatabase else {}
 
 func _get_first_available_candidate() -> Dictionary:
 	for h in available_heroes:
 		var hid = int(h.get("id", 0))
-		if not hid in selected_hero_ids:
+		if not hid in selected_hero_ids and hid >= 1 and hid <= 40:
 			return h
 	if HeroDatabase:
 		var is_user_admin = AuthManager and AuthManager.is_admin()
 		for h in HeroDatabase.all_heroes:
 			var hid = int(h.get("id", 0))
-			if not is_user_admin and (hid < 1 or hid > 28):
+			if not is_user_admin and (hid < 1 or hid > 40):
 				continue
 			if not hid in selected_hero_ids:
 				return h
@@ -1316,10 +1446,10 @@ func _on_confirm_pick_pressed() -> void:
 	if _is_my_turn() and not is_player_locked:
 		if not (inspecting_hero is Dictionary) or inspecting_hero.is_empty():
 			return
-		var pick_index := current_picker_index
-		if current_mode_id.begins_with("dynasty_") and draft_slots.size() > 4 and bool(draft_slots[0].get("isLocked", false)):
-			var own_seat := NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 else 1
-			pick_index = _find_draft_slot_index(own_seat)
+		var my_seat_num = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 and NetworkClient.my_seat <= 8 else 1
+		var pick_index := _find_draft_slot_index(my_seat_num)
+		if pick_index < 0 or pick_index >= draft_slots.size():
+			pick_index = current_picker_index
 		if pick_index < 0 or pick_index >= draft_slots.size():
 			return
 		var slot = draft_slots[pick_index]
@@ -1639,6 +1769,14 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 		turn_timer_lbl.text = "⚔️ %ds" % t
 		return
 
+	# Đọc danh sách ghế đang chọn và vòng chọn từ Server (2 người chọn 1 lúc)
+	var server_active = data.get("activeSeats", [])
+	if server_active is Array and not server_active.is_empty():
+		active_pick_seats.clear()
+		for s in server_active:
+			active_pick_seats.append(int(s))
+	draft_round = int(data.get("round", 1))
+
 	# The server publishes a seat and a canonical index. Resolve by seat locally
 	# because matchmaking snapshots can arrive with slots in a different order.
 	var server_current_seat := int(data.get("currentSeat", 0))
@@ -1656,6 +1794,25 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 	var server_slots = data.get("slots", [])
 	if server_slots is Array:
 		_apply_authoritative_draft_slots(server_slots)
+		# Đồng bộ danh sách tướng ứng cử viên riêng biệt của người chơi này (disjoint candidateHeroIds)
+		for s_info in server_slots:
+			if not (s_info is Dictionary):
+				continue
+			if int(s_info.get("seatNumber", s_info.get("seat", 0))) == server_seat:
+				var c_ids = s_info.get("candidateHeroIds", [])
+				if c_ids is Array and not c_ids.is_empty():
+					var new_ids: Array[int] = []
+					for cid in c_ids:
+						new_ids.append(int(cid))
+					if new_ids != my_candidate_hero_ids:
+						my_candidate_hero_ids = new_ids
+						var list: Array[Dictionary] = []
+						for cid in my_candidate_hero_ids:
+							var h = HeroDatabase.get_hero(cid) if HeroDatabase else {}
+							if not h.is_empty():
+								list.append(h)
+						_rebuild_hero_grid(list)
+				break
 	if current_mode_id.begins_with("dynasty_"):
 		# Do not render any other seat's selection, name, preview, or role on this screen.
 		for node in left_slot_nodes:
@@ -1693,9 +1850,8 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 		if current_mode_id.begins_with("dynasty_"):
 			draft_status_lbl.text = "⏳ Đang chờ người chơi khác chọn tướng (%ds)..." % t
 		else:
-			var anon_n = _get_anonymous_slot_name(current_picker_index)
-			draft_status_lbl.text = "⏳ %s đang chọn (%ds)..." % [anon_n, t]
-		draft_status_lbl.add_theme_color_override("font_color", COLOR_DRAGON_CYAN if active_slot.get("isDragon", true) else COLOR_PHOENIX_RED)
+			draft_status_lbl.text = "⏳ Đang chờ người khác chọn tướng (%ds)..." % t
+		draft_status_lbl.add_theme_color_override("font_color", COLOR_DRAGON_CYAN)
 
 func _on_server_draft_completed(data: Dictionary) -> void:
 	if is_draft_active:
@@ -1792,7 +1948,7 @@ func _show_battle_launch_dialog() -> void:
 		row.add_child(team_tag)
 
 		var p_lbl = Label.new()
-		p_lbl.text = "%s ➜ Tướng: %s" % [_get_anonymous_slot_name(i), hname]
+		p_lbl.text = "%s → Tướng: %s" % [_get_anonymous_slot_name(i), hname]
 		p_lbl.add_theme_font_size_override("font_size", 13)
 		p_lbl.add_theme_color_override("font_color", Color.WHITE)
 		row.add_child(p_lbl)

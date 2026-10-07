@@ -146,8 +146,8 @@ func get_rank_icon_path(rank_idx: int) -> String:
 func get_rank_display(rank_idx: int, stars: int) -> String:
 	var info := get_rank_info(rank_idx)
 	if rank_idx >= 11:
-		return "%s (%d★)" % [info.name, stars]
-	return "%s (%d/5★)" % [info.name, stars]
+		return "%s (%d⭐)" % [info.name, stars]
+	return "%s (%d/5⭐)" % [info.name, stars]
 
 # Xử lý kết quả trận đấu 2v2:
 # Trả về Dictionary chứa:

@@ -1035,7 +1035,7 @@ function canUseCardAsDodge(player, card) {
 
 function canUseCardAsDodgeAgainstSlash(player, card, attacker, slashCard) {
   if (!canUseCardAsDodge(player, card)) return false;
-  if (getEquippedWeapon(attacker, "Súng Thần Công") && sameCardColor(card?.suit, slashCard?.suit)) return false;
+  if (getEquippedWeapon(attacker, "Súng Thần Công") && Number(card?.rank || 0) < 7) return false;
   if (heroHasSkill(attacker, "TRUC_CHIEN") && Number(card?.rank || 0) < 7) return false;
   if (heroHasSkill(attacker, "THO_BINH") && getDistance({ players: [attacker, player] }, attacker.seat, player.seat) <= 2
       && Number(card?.rank || 0) >= 2 && Number(card?.rank || 0) <= 5) return false;
@@ -1534,7 +1534,7 @@ function startSlashResolution(state, slashCard, casterSeat, targetSeat, options 
 
   const cannon = getEquippedWeapon(caster, "Súng Thần Công");
   const requiredDodges = state.activeCard.requiredDodgeCount;
-  const requiredDodgeText = `${requiredDodges > 1 ? ` (cần ${requiredDodges} lá Đỡ do [Dũng Nữ])` : ""}${cannon ? " (KHÔNG được dùng lá Đỡ cùng màu với Trảm)" : ""}`;
+  const requiredDodgeText = `${requiredDodges > 1 ? ` (cần ${requiredDodges} lá Đỡ do [Dũng Nữ])` : ""}${cannon ? " (chỉ được dùng lá Đỡ từ 7 trở lên)" : ""}`;
   const skillActivations = [];
   if (heroHasSkill(caster, "XA_THUAN")) skillActivations.push({ name: "Xạ Thuẫn", seat: casterSeat });
   if (cocNgamBonus) skillActivations.push({ name: "Cọc Ngầm", seat: casterSeat });
@@ -4858,7 +4858,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       dvnRank,
       oppRank,
       dvnWon,
-      description: `👑 <b>ĐẤU ĐIỂM [Nhiếp Chính]</b>: <b>${dvnPlayer ? dvnPlayer.generalName : "Dương Vân Nga"}</b> ra ${formatCardText(pending.dvnCard)} (Điểm ${dvnRank}), <b>${opponent.generalName}</b> ra ${formatCardText(oppCard)} (Điểm ${oppRank}) ➜ ${dvnWon ? "👑 DƯƠNG VÂN NGA THẮNG!" : "❌ THẤT BẠI (Điểm không lớn hơn)!"}`
+      description: `👑 <b>ĐẤU ĐIỂM [Nhiếp Chính]</b>: <b>${dvnPlayer ? dvnPlayer.generalName : "Dương Vân Nga"}</b> ra ${formatCardText(pending.dvnCard)} (Điểm ${dvnRank}), <b>${opponent.generalName}</b> ra ${formatCardText(oppCard)} (Điểm ${oppRank}) → ${dvnWon ? "👑 DƯƠNG VÂN NGA THẮNG!" : "❌ THẤT BẠI (Điểm không lớn hơn)!"}`
     });
 
     if (!dvnWon) {
@@ -5111,7 +5111,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
 
     const cannon = getEquippedWeapon(caster, "Súng Thần Công");
     const requiredDodges = active.requiredDodgeCount;
-    const requiredDodgeText = `${requiredDodges > 1 ? ` (cần ${requiredDodges} lá Đỡ do [Dũng Nữ])` : ""}${cannon ? " (KHÔNG được dùng lá Đỡ cùng màu với Trảm)" : ""}`;
+    const requiredDodgeText = `${requiredDodges > 1 ? ` (cần ${requiredDodges} lá Đỡ do [Dũng Nữ])` : ""}${cannon ? " (chỉ được dùng lá Đỡ từ 7 trở lên)" : ""}`;
     const slashCard = { id: active.cardId, name: active.cardName, subType: active.subType, suit: active.suit };
     recordAction(state, {
       type: "PLAY_SLASH",
@@ -5783,7 +5783,6 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         return { error: "[Oai Nhược] bài đã chọn không còn hợp lệ" };
       }
       const caster = state.players.find((player) => player.seat === state.activeCard?.casterSeat);
-      const holyCannon = getEquippedWeapon(caster, "Súng Thần Công");
       const selectedCards = selectedIndexes.map((index) => respondent.hand[index]);
       const dodgeCard = selectedCards.find((card) => canUseCardAsDodgeAgainstSlash(respondent, card, caster, state.activeCard));
       if (!dodgeCard) return { error: "[Oai Nhược] 2 lá phải có 1 lá Đỡ hợp lệ" };
@@ -5900,7 +5899,6 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       }
 
       const caster = state.players.find(x => x.seat === (state.activeCard ? state.activeCard.casterSeat : 0));
-      const holyCannon = getEquippedWeapon(caster, "Súng Thần Công");
       const idx = respondent.hand.findIndex(c => (c.id === cardId || c.name === cardId || ((cardId === "DO" || cardId === "do") && isDodge(c))) && canUseCardAsDodgeAgainstSlash(respondent, c, caster, state.activeCard));
       if (idx < 0) return { error: "Lá Đỡ không còn hợp lệ cho đòn Trảm này" };
       {
@@ -7538,9 +7536,7 @@ export function handleAIReaction(state, aiSeat) {
 
   if (state.phase === "AWAIT_OAI_NHUOC" && state.waitingTargetSeat === aiSeat) {
     const caster = state.players.find((player) => player.seat === state.activeCard?.casterSeat);
-    const holyCannon = getEquippedWeapon(caster, "Súng Thần Công");
-    const dodge = ai.hand.find((card) => canUseCardAsDodge(ai, card)
-      && (!holyCannon || sameCardColor(card.suit, state.activeCard?.suit)));
+    const dodge = ai.hand.find((card) => canUseCardAsDodgeAgainstSlash(ai, card, caster, state.activeCard));
     const cost = ai.hand.find((card) => card !== dodge);
     return dodge && cost
       ? handleRespondAction(state, aiSeat, true, null, null, [cost.id, dodge.id])

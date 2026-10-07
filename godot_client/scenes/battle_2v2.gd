@@ -2212,7 +2212,7 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 
 		if selected_target_seat > 0 and selected_target_seat != my_seat and generals_data.has(selected_target_seat) and generals_data[selected_target_seat].get("is_alive", false):
 			var tgt = generals_data[selected_target_seat]
-			card_play_btn.text = "🥁 DÙNG TRỐNG ĐỒNG ➜ %s" % tgt["name"]
+			card_play_btn.text = "🥁 DÙNG TRỐNG ĐỒNG → %s" % tgt["name"]
 			card_play_btn.disabled = false
 			card_play_btn.visible = true
 			desc_text.text = "🥁 [TRỐNG ĐỒNG ĐÔNG SƠN - ĐIỂM TRỐNG]: Đã chọn %s. Nhấn nút kích hoạt để bắt đầu!" % tgt["name"]
@@ -2509,7 +2509,7 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 		card_play_btn.visible = true
 		if current_server_phase == "AWAIT_NHIEP_CHINH":
 			if selected_target_seat > 0 and generals_data.has(selected_target_seat):
-				card_play_btn.text = "👑 ĐẤU ĐIỂM ➜ %s" % generals_data[selected_target_seat]["name"].to_upper()
+				card_play_btn.text = "👑 ĐẤU ĐIỂM → %s" % generals_data[selected_target_seat]["name"].to_upper()
 				card_play_btn.disabled = false
 			else:
 				card_play_btn.text = "👑 CHỌN ĐỐI THỦ ĐẤU ĐIỂM"
@@ -2590,9 +2590,6 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 			selected_two_card_skill_nodes.append(card_node)
 			card_node.set_selected(true)
 		else:
-			if _calculate_distance(selected_target_seat, seat_num) > _get_attack_range(selected_target_seat):
-				desc_text.text = "⚠️ Mục tiêu Trảm phải nằm trong tầm đánh của người được chọn đánh."
-				return
 			desc_text.text = "⚠️ [TÂY PHU] chỉ chọn đúng 2 lá."
 		_update_action_btn()
 		return
@@ -2721,9 +2718,8 @@ func _handle_dodge_hand_card_selection(card_node: Control, _c_info: Dictionary) 
 		var atk = generals_data.get(dodge_attacker_seat, {}) if is_current_reaction_slash else {}
 		var slash_suit = atk.get("last_slash_suit", "") if is_current_reaction_slash else ""
 		var card_suit = info.get("suit", "")
-		if is_current_reaction_slash and _has_equipped_weapon_name(atk, "Súng Thần Công Hồ Triều") and slash_suit != "" and _is_same_card_color(card_suit, slash_suit):
-			var forbidden_color = _get_suit_name(slash_suit).to_upper()
-			desc_text.text = "❌ Súng Thần Công không cho phép bạn dùng Đỡ bài %s cho lượt Trảm này!" % forbidden_color
+		if is_current_reaction_slash and _has_equipped_weapon_name(atk, "Súng Thần Công Hồ Triều") and int(info.get("rank", 1)) < 7:
+			desc_text.text = "❌ Súng Thần Công chỉ cho phép dùng lá Đỡ từ 7 trở lên!"
 		else:
 			var required_label = _get_reaction_required_label(current_reaction_required_type)
 			desc_text.text = "❌ Lá [%s] không thể dùng cho phản ứng này! Hãy chạm lá [%s] hợp lệ trên tay." % [c_name, required_label]
@@ -2789,7 +2785,7 @@ func _on_general_avatar_clicked(seat_num: int) -> void:
 		g["avatar_node"].set_target_highlight(true)
 		card_play_btn.visible = true
 		card_play_btn.disabled = false
-		card_play_btn.text = "👑 HỒI 1 MÁU ➜ %s" % g["name"].to_upper()
+		card_play_btn.text = "👑 HỒI 1 MÁU → %s" % g["name"].to_upper()
 		return
 	if is_targeting_chinh_thong or is_targeting_khoan_hoa or current_server_phase in ["AWAIT_AN_DAN_DUEL", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_COT_KINH_TARGET", "AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_NHIEP_CHINH"]:
 		if seat_num == my_seat:
@@ -2816,11 +2812,11 @@ func _on_general_avatar_clicked(seat_num: int) -> void:
 		elif current_server_phase == "AWAIT_COT_KINH_TARGET":
 			card_play_btn.text = "🏛️ ÉP %s BỎ BÀI" % g["name"].to_upper()
 		elif current_server_phase == "AWAIT_THU_PHUC":
-			card_play_btn.text = "👑 THU PHỤC ➜ %s" % g["name"].to_upper()
+			card_play_btn.text = "👑 THU PHỤC → %s" % g["name"].to_upper()
 		elif current_server_phase == "AWAIT_PHO_TA":
-			card_play_btn.text = "📜 PHÒ TÁ ➜ %s" % g["name"].to_upper()
+			card_play_btn.text = "📜 PHÒ TÁ → %s" % g["name"].to_upper()
 		elif current_server_phase == "AWAIT_NHIEP_CHINH":
-			card_play_btn.text = "👑 ĐẤU ĐIỂM ➜ %s" % g["name"].to_upper()
+			card_play_btn.text = "👑 ĐẤU ĐIỂM → %s" % g["name"].to_upper()
 		else:
 			card_play_btn.text = "👑 YÊU CẦU BỎ BÀI"
 		return
@@ -2974,7 +2970,7 @@ func _on_general_avatar_clicked(seat_num: int) -> void:
 		selected_target_seat = seat_num
 		g["avatar_node"].set_target_highlight(true)
 		AudioManager.play_card_select()
-		card_play_btn.text = "🥁 DÙNG TRỐNG ĐỒNG ➜ %s" % g["name"]
+		card_play_btn.text = "🥁 DÙNG TRỐNG ĐỒNG → %s" % g["name"]
 		card_play_btn.disabled = false
 		card_play_btn.visible = true
 		desc_text.text = "🥁 [TRỐNG ĐỒNG]: Đã chọn %s. Nhấn [DÙNG TRỐNG ĐỒNG] để kích hoạt." % g["name"]
@@ -3242,7 +3238,7 @@ func _update_action_btn() -> void:
 			hung_card_valid = int(hung_card.get("cat", -1)) == 1 and int(hung_card.get("subType", -1)) == 6
 		card_play_btn.visible = true
 		card_play_btn.disabled = not (hung_target_valid and hung_card_valid)
-		card_play_btn.text = "💪 HÙNG SỨC ➜ %s" % generals_data[selected_target_seat]["name"] if hung_target_valid and hung_card_valid else "💪 HÙNG SỨC: CHỌN VŨ KHÍ VÀ MỤC TIÊU"
+		card_play_btn.text = "💪 HÙNG SỨC → %s" % generals_data[selected_target_seat]["name"] if hung_target_valid and hung_card_valid else "💪 HÙNG SỨC: CHỌN VŨ KHÍ VÀ MỤC TIÊU"
 		return
 	if is_targeting_van_sach:
 		var van_sach_card_valid = selected_card_ui != null and is_instance_valid(selected_card_ui) and int(_get_card_info_from_ui(selected_card_ui).get("cat", -1)) == 0
@@ -3255,14 +3251,14 @@ func _update_action_btn() -> void:
 		var huynh_card_valid = selected_card_ui != null and is_instance_valid(selected_card_ui)
 		card_play_btn.visible = true
 		card_play_btn.disabled = not (huynh_target_valid and huynh_card_valid)
-		card_play_btn.text = "🤝 ĐƯA BÀI ➜ %s" % generals_data[selected_target_seat]["name"] if huynh_target_valid and huynh_card_valid else "🤝 HUYNH TRƯỞNG: CHỌN TƯỚNG VÀ BÀI"
+		card_play_btn.text = "🤝 ĐƯA BÀI → %s" % generals_data[selected_target_seat]["name"] if huynh_target_valid and huynh_card_valid else "🤝 HUYNH TRƯỞNG: CHỌN TƯỚNG VÀ BÀI"
 		return
 	if is_targeting_bat_na:
 		var bat_na_target_valid = selected_target_seat > 0 and selected_target_seat != my_seat and generals_data.has(selected_target_seat) and generals_data[selected_target_seat].get("is_alive", false)
 		var bat_na_card_valid = selected_card_ui != null and is_instance_valid(selected_card_ui) and int(_get_card_info_from_ui(selected_card_ui).get("cat", -1)) == 0
 		card_play_btn.visible = true
 		card_play_btn.disabled = not (bat_na_target_valid and bat_na_card_valid)
-		card_play_btn.text = "🎭 BÁT NẠ ➜ %s" % generals_data[selected_target_seat]["name"] if bat_na_target_valid and bat_na_card_valid else "🎭 BÁT NẠ: CHỌN BÀI CƠ BẢN VÀ MỤC TIÊU"
+		card_play_btn.text = "🎭 BÁT NẠ → %s" % generals_data[selected_target_seat]["name"] if bat_na_target_valid and bat_na_card_valid else "🎭 BÁT NẠ: CHỌN BÀI CƠ BẢN VÀ MỤC TIÊU"
 		return
 	if is_targeting_dinh_quoc:
 		var dq_target_valid = selected_target_seat > 0 and selected_target_seat != my_seat and generals_data.has(selected_target_seat) and generals_data[selected_target_seat].get("is_alive", false)
@@ -3270,7 +3266,7 @@ func _update_action_btn() -> void:
 		var dq_card_valid = not dq_card_info.is_empty() and _get_card_color(str(dq_card_info.get("suit", ""))) == "BLACK"
 		card_play_btn.visible = true
 		card_play_btn.disabled = not (dq_target_valid and dq_card_valid)
-		card_play_btn.text = "⚔️ ĐỊNH QUỐC ➜ %s" % generals_data[selected_target_seat]["name"] if dq_target_valid and dq_card_valid else "⚔️ ĐỊNH QUỐC: CHỌN LÁ ĐEN VÀ MỤC TIÊU"
+		card_play_btn.text = "⚔️ ĐỊNH QUỐC → %s" % generals_data[selected_target_seat]["name"] if dq_target_valid and dq_card_valid else "⚔️ ĐỊNH QUỐC: CHỌN LÁ ĐEN VÀ MỤC TIÊU"
 		return
 	if is_targeting_trao_bao:
 		var tb_target_valid = selected_target_seat > 0 and selected_target_seat != my_seat and generals_data.has(selected_target_seat) and generals_data[selected_target_seat].get("is_alive", false)
@@ -3278,7 +3274,7 @@ func _update_action_btn() -> void:
 		var tb_card_valid = not tb_card_info.is_empty() and (int(tb_card_info.get("cat", tb_card_info.get("category", -1))) == 1 or (selected_card_ui != null and selected_card_ui.has_meta("hung_suc_equipped_preview")))
 		card_play_btn.visible = true
 		card_play_btn.disabled = not (tb_target_valid and tb_card_valid)
-		card_play_btn.text = "👑 TRAO BÀO ➜ %s" % generals_data[selected_target_seat]["name"] if tb_target_valid and tb_card_valid else "👑 TRAO BÀO: CHỌN TRANG BỊ VÀ MỤC TIÊU"
+		card_play_btn.text = "👑 TRAO BÀO → %s" % generals_data[selected_target_seat]["name"] if tb_target_valid and tb_card_valid else "👑 TRAO BÀO: CHỌN TRANG BỊ VÀ MỤC TIÊU"
 		return
 	if is_targeting_ho_phu_skill:
 		var ho_phu_target_valid = selected_target_seat > 0 and selected_target_seat != my_seat and generals_data.has(selected_target_seat) and generals_data[selected_target_seat].get("is_alive", false)
@@ -3287,7 +3283,7 @@ func _update_action_btn() -> void:
 		card_play_btn.disabled = not (ho_phu_target_valid and ho_phu_card_valid)
 		if ho_phu_target_valid and ho_phu_card_valid:
 			var given_name = str(_get_card_info_from_ui(selected_card_ui).get("name", "lá bài"))
-			card_play_btn.text = "🐯 GIAO [%s] ➜ %s" % [given_name.to_upper(), generals_data[selected_target_seat]["name"]]
+			card_play_btn.text = "🐯 GIAO [%s] → %s" % [given_name.to_upper(), generals_data[selected_target_seat]["name"]]
 		elif not ho_phu_target_valid:
 			card_play_btn.text = "🐯 HỔ PHÙ: CHỌN TƯỚNG..."
 		else:
@@ -3297,7 +3293,7 @@ func _update_action_btn() -> void:
 		if selected_target_seat > 0 and selected_target_seat != my_seat and generals_data.has(selected_target_seat):
 			var tgt = generals_data[selected_target_seat]
 			if tgt.get("is_alive", false):
-				card_play_btn.text = "🥁 DÙNG TRỐNG ĐỒNG ➜ %s" % tgt["name"]
+				card_play_btn.text = "🥁 DÙNG TRỐNG ĐỒNG → %s" % tgt["name"]
 				card_play_btn.disabled = false
 				card_play_btn.visible = true
 				return
@@ -3322,14 +3318,14 @@ func _update_action_btn() -> void:
 			desc_text.text = "⚠️ Bạn đã hết lượt Trảm trong lượt này."
 			return
 		if lien_chau_target_seat > 0 and generals_data.has(lien_chau_target_seat):
-			card_play_btn.text = "🏹 LIÊN CHÂU ➜ %s & %s" % [generals_data[selected_target_seat]["name"], generals_data[lien_chau_target_seat]["name"]]
+			card_play_btn.text = "🏹 LIÊN CHÂU → %s & %s" % [generals_data[selected_target_seat]["name"], generals_data[lien_chau_target_seat]["name"]]
 			card_play_btn.disabled = lien_chau_cost_card == null or not is_instance_valid(lien_chau_cost_card)
 			card_play_btn.visible = true
 			return
 		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 			var tgt = generals_data[selected_target_seat]
 			if tgt["is_alive"]:
-				card_play_btn.text = "⚔️ %s ➜ %s" % [c_name.to_upper(), tgt["name"]]
+				card_play_btn.text = "⚔️ %s → %s" % [c_name.to_upper(), tgt["name"]]
 				card_play_btn.visible = true
 				return
 		card_play_btn.text = "⚔️ CHỌN MỤC TIÊU..."
@@ -3389,14 +3385,14 @@ func _update_action_btn() -> void:
 	elif c_name == "Vườn Không Nhà Trống":
 		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 			var tgt = generals_data[selected_target_seat]
-			card_play_btn.text = "🌾 PHÁ HỦY BÀI ➜ %s" % tgt["name"]
+			card_play_btn.text = "🌾 PHÁ HỦY BÀI → %s" % tgt["name"]
 		else:
 			card_play_btn.text = "🌾 CHỌN MỤC TIÊU ĐỂ PHÁ HỦY..."
 		card_play_btn.visible = true
 	elif c_name == "Đột Kích Trộm Lương":
 		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 			var tgt = generals_data[selected_target_seat]
-			card_play_btn.text = "🗡️ CƯỚP BÀI ➜ %s" % tgt["name"]
+			card_play_btn.text = "🗡️ CƯỚP BÀI → %s" % tgt["name"]
 		else:
 			card_play_btn.text = "🗡️ CHỌN MỤC TIÊU ĐỂ CƯỚP..."
 		card_play_btn.visible = true
@@ -3405,7 +3401,7 @@ func _update_action_btn() -> void:
 		card_play_btn.visible = true
 	elif c_name == "Bãi Cọc Bạch Đằng":
 		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
-			card_play_btn.text = "🪵 BÃI CỌC BẠCH ĐẰNG ➜ %s" % generals_data[selected_target_seat]["name"]
+			card_play_btn.text = "🪵 BÃI CỌC BẠCH ĐẰNG → %s" % generals_data[selected_target_seat]["name"]
 		else:
 			card_play_btn.text = "🪵 CHỌN MỤC TIÊU ĐỂ GÀI BÃI CỌC..."
 		card_play_btn.visible = true
@@ -3416,7 +3412,7 @@ func _update_action_btn() -> void:
 		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 			var tgt = generals_data[selected_target_seat]
 			if tgt["seat"] != my_seat and tgt["is_alive"]:
-				card_play_btn.text = "⚔️ HUYẾT CHIẾN ➜ %s" % tgt["name"]
+				card_play_btn.text = "⚔️ HUYẾT CHIẾN → %s" % tgt["name"]
 				card_play_btn.visible = true
 				return
 		card_play_btn.text = "⚔️ CHỌN MỤC TIÊU HUYẾT CHIẾN..."
@@ -3431,7 +3427,7 @@ func _update_action_btn() -> void:
 		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 			var tide_target = generals_data[selected_target_seat]
 			if selected_target_seat != my_seat and tide_target.get("is_alive", false) and int(tide_target.get("hand_count", 0)) > 0:
-				card_play_btn.text = "🌊 THỦY TRIỀU RÚT ➜ %s" % tide_target["name"]
+				card_play_btn.text = "🌊 THỦY TRIỀU RÚT → %s" % tide_target["name"]
 			else:
 				card_play_btn.disabled = true
 				card_play_btn.text = "🌊 CHỌN MỤC TIÊU CÒN BÀI TAY..."
@@ -3444,10 +3440,10 @@ func _update_action_btn() -> void:
 			card_play_btn.text = "🗡️ CHỌN NGƯỜI CÓ VŨ KHÍ..."
 			card_play_btn.disabled = true
 		elif borrow_sword_target_seat <= 0 or not generals_data.has(borrow_sword_target_seat):
-			card_play_btn.text = "🗡️ TỪ %s ➜ CHỌN MỤC TIÊU" % generals_data[borrow_sword_owner_seat]["name"]
+			card_play_btn.text = "🗡️ TỪ %s → CHỌN MỤC TIÊU" % generals_data[borrow_sword_owner_seat]["name"]
 			card_play_btn.disabled = true
 		else:
-			card_play_btn.text = "🗡️ %s ➜ %s" % [
+			card_play_btn.text = "🗡️ %s → %s" % [
 				generals_data[borrow_sword_owner_seat]["name"],
 				generals_data[borrow_sword_target_seat]["name"]
 			]
@@ -3457,7 +3453,7 @@ func _update_action_btn() -> void:
 		hich_recast_btn.visible = true
 		hich_recast_btn.disabled = false
 		if selected_target_seat > 0 and selected_target_seat != my_seat and generals_data.has(selected_target_seat) and generals_data[selected_target_seat].get("is_alive", false):
-			card_play_btn.text = "📣 HỊCH TƯỚNG SĨ ➜ %s" % generals_data[selected_target_seat]["name"]
+			card_play_btn.text = "📣 HỊCH TƯỚNG SĨ → %s" % generals_data[selected_target_seat]["name"]
 		else:
 			card_play_btn.disabled = true
 			card_play_btn.text = "📣 CHỌN 1 NGƯỜI KHÁC CÒN SỐNG..."
@@ -5816,7 +5812,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 				turn_indicator.text = "👑 NHIẾP CHÍNH: ĐẤU ĐIỂM HỒI MÁU (%ds)" % server_waiting_timer
 				if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 					var opp_name = generals_data[selected_target_seat]["name"]
-					card_play_btn.text = "👑 ĐẤU ĐIỂM ➜ %s" % opp_name.to_upper()
+					card_play_btn.text = "👑 ĐẤU ĐIỂM → %s" % opp_name.to_upper()
 					card_play_btn.disabled = (selected_card_ui == null)
 				else:
 					card_play_btn.text = "👑 CHỌN ĐỐI THỦ & 1 LÁ"
@@ -5838,7 +5834,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 				turn_indicator.text = "👑 NHIẾP CHÍNH THẮNG: CHỌN NGƯỜI HỒI MÁU (%ds)" % server_waiting_timer
 				if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 					var heal_name = generals_data[selected_target_seat]["name"]
-					card_play_btn.text = "👑 HỒI 1 MÁU ➜ %s" % heal_name.to_upper()
+					card_play_btn.text = "👑 HỒI 1 MÁU → %s" % heal_name.to_upper()
 					card_play_btn.disabled = false
 				else:
 					card_play_btn.text = "👑 CHỌN NGƯỜI ĐANG MẤT MÁU"
@@ -7775,9 +7771,9 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 	for idx in range(tgt["hand_cards"].size()):
 		var c = tgt["hand_cards"][idx]
 		if c.get("name", "") == "Đỡ":
-			# Nếu người tấn công có Súng Thần Công Hồ Triều: không được Đỡ cùng màu với Trảm
+			# Súng Thần Công Hồ Triều chỉ cho phép lá Đỡ từ 7 trở lên.
 			var has_sung = _has_equipped_weapon_name(atk, "Súng Thần Công Hồ Triều")
-			if has_sung and slash_card_suit != "" and _is_same_card_color(c.get("suit", ""), slash_card_suit):
+			if has_sung and int(c.get("rank", 1)) < 7:
 				continue
 			dodge_idx = idx
 			break
@@ -7845,12 +7841,8 @@ func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_e
 	var slash_suit = atk.get("last_slash_suit", "")
 	var defender_name = generals_data[my_seat].get("name", "Bạn") if generals_data.has(my_seat) else "Bạn"
 	var has_sung = _has_equipped_weapon_name(atk, "Súng Thần Công Hồ Triều")
-	var forbidden_color = ""
-	if has_sung and slash_suit != "":
-		forbidden_color = _get_suit_name(slash_suit).to_upper()
-
-	if has_sung and forbidden_color != "":
-		dodge_desc_lbl.text = "⚠️ [Trảm] của %s đang tác động lên %s.\nSúng Thần Công không cho phép bạn dùng Đỡ bài %s cho lượt Trảm này.\nHãy chọn lá Đỡ hợp lệ trên tay hoặc bấm [CHỊU ĐÒN]:" % [atk["name"], defender_name, forbidden_color]
+	if has_sung:
+		dodge_desc_lbl.text = "⚠️ [Trảm] của %s đang tác động lên %s.\nSúng Thần Công chỉ cho phép dùng lá Đỡ từ 7 trở lên.\nHãy chọn lá Đỡ hợp lệ trên tay hoặc bấm [CHỊU ĐÒN]:" % [atk["name"], defender_name]
 	else:
 		dodge_desc_lbl.text = "[Trảm] của %s đang tác động lên %s.\nHãy CHỌN một lá bài trên tay để Đỡ hoặc bấm [CHỊU ĐÒN]:" % [atk["name"], defender_name]
 
@@ -7925,10 +7917,9 @@ func _is_card_valid_for_dodge(card_ui: Control, attacker_seat: int, is_slash_att
 
 	# Các điều kiện hạn chế né đòn này CHỈ áp dụng cho đòn TRẢM trực tiếp, không áp dụng cho cẩm nang Mưa Tên Liên Châu:
 	if is_slash_attack and attacker_seat > 0 and atk_gen is Dictionary and not atk_gen.is_empty():
-		# 1. Súng Thần Công Hồ Triều: Mục tiêu không được dùng Đỡ cùng màu với Trảm
+		# 1. Súng Thần Công Hồ Triều: Mục tiêu không được dùng Đỡ nhỏ hơn 7
 		if _has_equipped_weapon_name(atk_gen, "Súng Thần Công Hồ Triều"):
-			var slash_suit = atk_gen.get("last_slash_suit", "")
-			if slash_suit != "" and _is_same_card_color(suit, slash_suit):
+			if rank < 7:
 				return false
 
 		# 2. Hero 72: Trần Duệ Tông ("Trực Chiến"): Đỡ phải >= 7
@@ -9110,7 +9101,7 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 	star_header.add_child(star_title)
 
 	var star_tag = Label.new()
-	star_tag.text = " +1 ★" if is_win else " -1 ★"
+	star_tag.text = " +1 ⭐" if is_win else " -1 ⭐"
 	star_tag.add_theme_font_size_override("font_size", 13)
 	star_tag.add_theme_color_override("font_color", Color(0.35, 0.95, 0.45) if is_win else Color(1.0, 0.35, 0.35))
 	star_header.add_child(star_tag)
@@ -9123,7 +9114,7 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 	var star_nodes: Array = []
 	for s in range(5):
 		var star_lbl = Label.new()
-		star_lbl.text = "★"
+		star_lbl.text = "⭐"
 		star_lbl.add_theme_font_size_override("font_size", 24)
 		star_lbl.pivot_offset = Vector2(12, 14)
 		if s < res["old_stars"]:
@@ -9181,7 +9172,7 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 	acc_section.add_child(acc_bar)
 
 	var acc_text_lbl = Label.new()
-	acc_text_lbl.text = "%d/100 Điểm (Đủ 100đ đổi +1★)" % res["old_acc_points"]
+	acc_text_lbl.text = "%d/100 Điểm (Đủ 100đ đổi +1⭐)" % res["old_acc_points"]
 	acc_text_lbl.add_theme_font_size_override("font_size", 11)
 	acc_text_lbl.add_theme_color_override("font_color", Color(0.65, 0.75, 0.85))
 	acc_section.add_child(acc_text_lbl)
@@ -9311,7 +9302,7 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 		bar_tw.tween_property(acc_bar, "value", 100.0, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		await bar_tw.finished
 		
-		acc_text_lbl.text = "⚡ ĐẦY 100 ĐIỂM TÍCH LŨY ➔ THƯỞNG +1 SAO! ⚡"
+		acc_text_lbl.text = "⚡ ĐẦY 100 ĐIỂM TÍCH LŨY → THƯỞNG +1 SAO! ⚡"
 		acc_text_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.2))
 		AudioManager.play_skill()
 
@@ -9329,12 +9320,12 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 		var bar_reset_tw = create_tween()
 		bar_reset_tw.tween_property(acc_bar, "value", float(res["accumulation_points"]), 0.4)
 		await bar_reset_tw.finished
-		acc_text_lbl.text = "%d/100 Điểm (Đủ 100đ đổi +1★)" % res["accumulation_points"]
+		acc_text_lbl.text = "%d/100 Điểm (Đủ 100đ đổi +1⭐)" % res["accumulation_points"]
 		acc_text_lbl.add_theme_color_override("font_color", Color(0.65, 0.75, 0.85))
 	else:
 		bar_tw.tween_property(acc_bar, "value", float(res["accumulation_points"]), 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		await bar_tw.finished
-		acc_text_lbl.text = "%d/100 Điểm (Đủ 100đ đổi +1★)" % res["accumulation_points"]
+		acc_text_lbl.text = "%d/100 Điểm (Đủ 100đ đổi +1⭐)" % res["accumulation_points"]
 
 	# 4. Hoạt Họa Lên Rank (Promotion)
 	if res["promoted"]:
@@ -10602,7 +10593,7 @@ func _handle_dai_hong_thuy_judgement(seat_num: int) -> void:
 			g["avatar_node"].set_delayed_trick("dai_hong_thuy", false)
 		_animate_showcase_card("Đại Hồng Thủy ập đến!", "🌊🌊🌊 Lật [Bài %s %s]: ĐẠI HỒNG THỦY CUỐN TRÔI %s (-3 MÁU)!" % [rank_str, suit_name, g["name"]], judge_card)
 		_show_judgement_result(true, "Đại Hồng Thủy", judge_card)
-		_add_log("🌊🌊🌊 [Đại Hồng Thủy] ập đến! Lật [Bài %s %s] (bài Đen 2..9) ➜ %s chịu 3 Sát Thương Thủy!" % [rank_str, suit_name, g["name"]])
+		_add_log("🌊🌊🌊 [Đại Hồng Thủy] ập đến! Lật [Bài %s %s] (bài Đen 2..9) → %s chịu 3 Sát Thương Thủy!" % [rank_str, suit_name, g["name"]])
 		AudioManager.play_voice("Đại Hồng Thủy")
 		AudioManager.play_skill()
 		_apply_damage_to_general(seat_num, 3, seat_num, "WATER")
@@ -11454,7 +11445,7 @@ func _get_equipment_description(item_name: String) -> String:
 		"Nỏ Thần Kim Quy": return "Tầm 1; không giới hạn số lá Trảm trong lượt."
 		"Trường Đao Nam Sơn": return "Tầm 3; khi Trảm bị Đỡ, xem như chưa sử dụng lượt Trảm trong lượt chơi này."
 		"Thương Ngâu Lãng Bạc": return "Tầm 4; Trảm trúng hủy 1 lá tay hoặc trang bị."
-		"Súng Thần Công Hồ Triều": return "Tầm 5; mục tiêu không được dùng Đỡ cùng màu với Trảm."
+		"Súng Thần Công Hồ Triều": return "Tầm 5; mục tiêu không được dùng Đỡ nhỏ hơn 7."
 		"Hỏa Mai Tây Sơn": return "Tầm 4; Trảm Thường có thể xem như Trảm Hỏa."
 		"Liêm Đao Đống Đa": return "Tầm 2; lần đầu mỗi lượt gây sát thương, rút 1 lá."
 		"Đoản Đao Lam Sơn": return "Tầm 2; Trảm trúng có thể hủy 2 lá trên tay hoặc trang bị của mục tiêu thay vì gây sát thương."

@@ -2267,4 +2267,76 @@ for (const [subType, name] of [
   assert.equal(state.players[0].hp, 3);
 }
 
+{
+  // Test: 2v2 Disjoint Hero Pool Generation & Round 2 Exclusion (1..40)
+  function testGenerate2v2RoundPools(draft, round) {
+    const allIds = Array.from({ length: 40 }, (_, i) => i + 1);
+    for (let i = allIds.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allIds[i], allIds[j]] = [allIds[j], allIds[i]];
+    }
+    if (round === 1) {
+      if (draft.slots[0]) draft.slots[0].candidateHeroIds = allIds.slice(0, 8);
+      if (draft.slots[1]) draft.slots[1].candidateHeroIds = allIds.slice(8, 16);
+    } else if (round === 2) {
+      const used = new Set(draft.slots.filter(s => s.isLocked).map(s => s.heroId));
+      const remaining = allIds.filter(id => !used.has(id));
+      if (draft.slots[2]) draft.slots[2].candidateHeroIds = remaining.slice(0, 8);
+      if (draft.slots[3]) draft.slots[3].candidateHeroIds = remaining.slice(8, 16);
+    }
+  }
+
+  const mockDraft = {
+    modeId: "2v2",
+    round: 1,
+    activeSeats: [1, 2],
+    slots: [
+      { seat: 1, isLocked: false, heroId: 0, candidateHeroIds: [] },
+      { seat: 2, isLocked: false, heroId: 0, candidateHeroIds: [] },
+      { seat: 3, isLocked: false, heroId: 0, candidateHeroIds: [] },
+      { seat: 4, isLocked: false, heroId: 0, candidateHeroIds: [] },
+    ],
+  };
+
+  testGenerate2v2RoundPools(mockDraft, 1);
+  const p1Pool = mockDraft.slots[0].candidateHeroIds;
+  const p2Pool = mockDraft.slots[1].candidateHeroIds;
+
+  assert.equal(p1Pool.length, 8);
+  assert.equal(p2Pool.length, 8);
+  // Ensure all candidates are within 1..40
+  assert.ok(p1Pool.every(id => id >= 1 && id <= 40));
+  assert.ok(p2Pool.every(id => id >= 1 && id <= 40));
+  // Ensure disjoint: no overlap between active picker 1 and active picker 2
+  const intersectionR1 = p1Pool.filter(id => p2Pool.includes(id));
+  assert.equal(intersectionR1.length, 0, "Round 1 candidate pools must be mutually disjoint");
+
+  // Pick heroes for round 1
+  mockDraft.slots[0].heroId = p1Pool[0];
+  mockDraft.slots[0].isLocked = true;
+  mockDraft.slots[1].heroId = p2Pool[0];
+  mockDraft.slots[1].isLocked = true;
+
+  // Advance to round 2
+  mockDraft.round = 2;
+  mockDraft.activeSeats = [3, 4];
+  testGenerate2v2RoundPools(mockDraft, 2);
+
+  const p3Pool = mockDraft.slots[2].candidateHeroIds;
+  const p4Pool = mockDraft.slots[3].candidateHeroIds;
+
+  assert.equal(p3Pool.length, 8);
+  assert.equal(p4Pool.length, 8);
+  assert.ok(p3Pool.every(id => id >= 1 && id <= 40));
+  assert.ok(p4Pool.every(id => id >= 1 && id <= 40));
+  // Ensure disjoint between active picker 3 and active picker 4
+  const intersectionR2 = p3Pool.filter(id => p4Pool.includes(id));
+  assert.equal(intersectionR2.length, 0, "Round 2 candidate pools must be mutually disjoint");
+  // Ensure heroes picked in Round 1 are NOT present in Round 2
+  assert.ok(!p3Pool.includes(mockDraft.slots[0].heroId));
+  assert.ok(!p3Pool.includes(mockDraft.slots[1].heroId));
+  assert.ok(!p4Pool.includes(mockDraft.slots[0].heroId));
+  assert.ok(!p4Pool.includes(mockDraft.slots[1].heroId));
+}
+
 console.log("2v2 regression tests: PASS");

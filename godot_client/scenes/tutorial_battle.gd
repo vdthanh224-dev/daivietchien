@@ -377,7 +377,7 @@ func _start_step_2_draw() -> void:
 	banner_title.text = "📜 GIAI ĐOẠN 1: RÚT BÀI ĐẦU LƯỢT"
 	banner_desc.text = "Người đầu tiên chơi sẽ BỐC 1 LÁ BÀI; các lượt sau tự động bốc 2 lá từ kho bài!"
 	action_btn.visible = true
-	action_btn.text = "VÀO GIAI ĐOẠN RA BÀI ➜"
+	action_btn.text = "VÀO GIAI ĐOẠN RA BÀI →"
 	action_btn.disabled = false
 	card_play_btn.visible = false
 
@@ -527,7 +527,7 @@ func _handle_free_battle_card_selected(c_ui: Control) -> void:
 		else:
 			card_play_btn.visible = true
 			card_play_btn.disabled = false
-			card_play_btn.text = "⚔️ DÙNG BÀI ➜ SƠN TẶC"
+			card_play_btn.text = "⚔️ DÙNG BÀI → SƠN TẶC"
 	elif "Bánh Chưng" in c_name:
 		if player_hp >= 4:
 			desc_text.text = "⚠️ Máu của bạn đã đầy (4/4 đóa sen), không thể sử dụng Bánh Chưng!"
@@ -554,17 +554,17 @@ func _on_boss_avatar_clicked() -> void:
 	if current_step == 3 and selected_card_ui and "Trảm" in selected_card_ui.card_name:
 		boss_targeted = true
 		boss_avatar.set_target_highlight(true)
-		banner_desc.text = "🎯 Đã nhắm mục tiêu Sơn Tặc! Nhấn nút [⚔️ DÙNG BÀI ➜ SƠN TẶC] sát trên thanh mô tả để tấn công!"
+		banner_desc.text = "🎯 Đã nhắm mục tiêu Sơn Tặc! Nhấn nút [⚔️ DÙNG BÀI → SƠN TẶC] sát trên thanh mô tả để tấn công!"
 		card_play_btn.visible = true
 		card_play_btn.disabled = false
-		card_play_btn.text = "⚔️ DÙNG BÀI ➜ SƠN TẶC"
+		card_play_btn.text = "⚔️ DÙNG BÀI → SƠN TẶC"
 		await get_tree().process_frame
 		_show_arrow(card_play_btn.global_position + Vector2(-15, 21), "BẤM DÙNG BÀI")
 	elif is_free_battle and selected_card_ui and "Trảm" in selected_card_ui.card_name:
 		if slashes_used_this_turn < 1:
 			card_play_btn.visible = true
 			card_play_btn.disabled = false
-			card_play_btn.text = "⚔️ DÙNG BÀI ➜ SƠN TẶC"
+			card_play_btn.text = "⚔️ DÙNG BÀI → SƠN TẶC"
 
 func _on_card_play_btn_clicked() -> void:
 	card_play_btn.release_focus()
@@ -647,7 +647,7 @@ func _execute_slash() -> void:
 	banner_desc.text = "Trong cùng một lượt, mỗi người chơi chỉ được ra TỐI ĐA 1 LÁ TRẢM (trừ khi trang bị Nỏ Thần Kim Quy)!\nBây giờ, hãy tìm hiểu kỹ năng độc quyền của tướng."
 	action_btn.visible = true
 	action_btn.disabled = false
-	action_btn.text = "TÌM HIỂU KỸ NĂNG TƯỚNG ➜"
+	action_btn.text = "TÌM HIỂU KỸ NĂNG TƯỚNG →"
 
 func _start_step_4_5_skill() -> void:
 	current_step = 40
@@ -676,7 +676,7 @@ func _on_player_skill_clicked() -> void:
 			c.setup_card_data(c.card_data.id, "Trảm", c.card_data.get_rank_string(), c.card_data.suit, 0, "Tấn công gây 1 sát thương.", 0)
 			count_do += 1
 
-	_add_log("✨ LÝ THƯỜNG KIỆT [TIẾN THOÁI]! Đã hoán chuyển %d Trảm ➜ Đỡ và %d Đỡ ➜ Trảm trên tay!" % [count_tram, count_do])
+	_add_log("✨ LÝ THƯỜNG KIỆT [TIẾN THOÁI]! Đã hoán chuyển %d Trảm → Đỡ và %d Đỡ → Trảm trên tay!" % [count_tram, count_do])
 
 	if is_waiting_dodge_reaction:
 		_update_dodge_reaction_ui()
@@ -690,7 +690,7 @@ func _on_player_skill_clicked() -> void:
 		banner_desc.text = "Toàn bộ lá Trảm trên tay đã hóa thành ĐỠ, và ĐỠ hóa thành TRẢM!\nBạn đã dùng xong bài trong lượt. Hãy nhấn [KẾT THÚC LƯỢT]!"
 		action_btn.visible = true
 		action_btn.disabled = false
-		action_btn.text = "KẾT THÚC LƯỢT ➜"
+		action_btn.text = "KẾT THÚC LƯỢT →"
 
 func _start_step_4_8_discard_lesson() -> void:
 	current_step = 42
@@ -822,7 +822,7 @@ func _player_turn_start_free_play() -> void:
 	slashes_used_this_turn = 0
 	card_play_btn.visible = false
 	end_turn_btn.disabled = false
-	end_turn_btn.text = "KẾT THÚC LƯỢT ➜"
+	end_turn_btn.text = "KẾT THÚC LƯỢT →"
 	desc_text.text = "💡 Lượt của bạn! Chọn lá bài trên tay để sử dụng hoặc nhấn Kết thúc lượt."
 	_add_log("=== LƯỢT MỚI CỦA BẠN ===")
 
@@ -992,7 +992,7 @@ func _on_end_turn_btn_clicked() -> void:
 	if is_waiting_dodge_reaction:
 		is_waiting_dodge_reaction = false
 		card_play_btn.visible = false
-		end_turn_btn.text = "KẾT THÚC LƯỢT ➜"
+		end_turn_btn.text = "KẾT THÚC LƯỢT →"
 		_player_take_boss_damage()
 		return
 
@@ -1085,7 +1085,7 @@ func _update_dodge_reaction_ui() -> void:
 		if has_khien_may:
 			desc_text.text = "⚠️ SƠN TẶC VỪA TẤN CÔNG BẠN! Bạn có thể bấm [🎲 LẬT KHIÊN MÂY (ĐỎ = ĐỠ)] để né, hoặc bấm [💔 CHỊU ĐÒN (-1)]!"
 		elif has_slash:
-			desc_text.text = "⚠️ Bạn chưa có [ĐỠ], nhưng có thể bấm [⚡ TIẾN THOÁI] đổi Trảm ➜ Đỡ, hoặc bấm [💔 CHỊU ĐÒN (-1)]!"
+			desc_text.text = "⚠️ Bạn chưa có [ĐỠ], nhưng có thể bấm [⚡ TIẾN THOÁI] đổi Trảm → Đỡ, hoặc bấm [💔 CHỊU ĐÒN (-1)]!"
 		else:
 			desc_text.text = "⚠️ Trên tay không có lá [ĐỠ]! Bạn hãy bấm nút [💔 CHỊU ĐÒN (-1)] để tiếp tục trận đấu."
 
@@ -1101,7 +1101,7 @@ func _on_khien_may_reaction_clicked() -> void:
 		if khien_may_reaction_btn:
 			khien_may_reaction_btn.visible = false
 		card_play_btn.visible = false
-		end_turn_btn.text = "KẾT THÚC LƯỢT ➜"
+		end_turn_btn.text = "KẾT THÚC LƯỢT →"
 		_add_log("🛡️ [KHIÊN MÂY BỆN]: Bạn kích hoạt phán xét ĐỎ thành công né đòn Trảm!")
 		desc_text.text = "🛡️ Khiên Mây Bện phán xét Đỏ né thành công đòn Trảm của Sơn Tặc!"
 		await get_tree().create_timer(1.2).timeout
@@ -1118,7 +1118,7 @@ func _execute_free_play_dodge() -> void:
 	if khien_may_reaction_btn:
 		khien_may_reaction_btn.visible = false
 	card_play_btn.visible = false
-	end_turn_btn.text = "KẾT THÚC LƯỢT ➜"
+	end_turn_btn.text = "KẾT THÚC LƯỢT →"
 
 	# Tiêu hao 1 lá Đỡ trên tay:
 	var target_dodge: Control = null
@@ -1330,7 +1330,7 @@ func _show_reward_modal() -> void:
 	dv.add_child(d_speech)
 
 	var d_mil = Label.new()
-	d_mil.text = "🎖️ Exp Quân Hàm: Cứ 1 tướng sở hữu +5đ ➜ Tướng Lý Thường Kiệt: +5 Exp Quân Hàm (🔰 Tân Binh 5/100đ)!"
+	d_mil.text = "🎖️ Exp Quân Hàm: Cứ 1 tướng sở hữu +5đ → Tướng Lý Thường Kiệt: +5 Exp Quân Hàm (🔰 Tân Binh 5/100đ)!"
 	d_mil.add_theme_font_size_override("font_size", 12)
 	d_mil.add_theme_color_override("font_color", Color(0.18, 0.50, 0.20, 1.0))
 	dv.add_child(d_mil)
@@ -1486,7 +1486,7 @@ func _show_reward_modal() -> void:
 	var claim_btn = Button.new()
 	claim_btn.custom_minimum_size = Vector2(360, 46)
 	claim_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	claim_btn.text = "NHẬN THƯỞNG & VỀ SẢNH CHÍNH ➜"
+	claim_btn.text = "NHẬN THƯỞNG & VỀ SẢNH CHÍNH →"
 
 	var btn_normal = StyleBoxFlat.new()
 	btn_normal.bg_color = Color(0.96, 0.80, 0.28, 1.0)
@@ -1823,10 +1823,10 @@ func _execute_khien_may_judgement(defender_avatar: Control, defender_name: Strin
 
 	# 4.3. Biển hiệu kết quả phía dưới lá bài
 	if is_red:
-		showcase_label.text = "✔ PHÁN XÉT THÀNH CÔNG (%s) ➜ TỰ ĐỘNG ĐỠ!" % card_tag
+		showcase_label.text = "✔ PHÁN XÉT THÀNH CÔNG (%s) → TỰ ĐỘNG ĐỠ!" % card_tag
 		showcase_label.add_theme_color_override("font_color", Color(0.35, 1.0, 0.45, 1.0))
 	else:
-		showcase_label.text = "✖ PHÁN XÉT THẤT BẠI (%s) ➜ CẦN DÙNG ĐỠ!" % card_tag
+		showcase_label.text = "✖ PHÁN XÉT THẤT BẠI (%s) → CẦN DÙNG ĐỠ!" % card_tag
 		showcase_label.add_theme_color_override("font_color", Color(1.0, 0.45, 0.45, 1.0))
 
 	# 4.4. Hiệu ứng Scale Pop phóng to nhẹ nhàng (1.15x)

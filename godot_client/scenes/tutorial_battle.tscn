@@ -275,7 +275,7 @@ grow_horizontal = 2
 grow_vertical = 0
 focus_mode = 0
 theme_override_font_sizes/font_size = 13
-text = "⚔️ DÙNG BÀI ➜ SƠN TẶC"
+text = "⚔️ DÙNG BÀI → SƠN TẶC"
 
 [node name="EndTurnBtn" type="Button" parent="TableTop"]
 visible = false
@@ -294,7 +294,7 @@ grow_horizontal = 2
 grow_vertical = 0
 focus_mode = 0
 theme_override_font_sizes/font_size = 12
-text = "KẾT THÚC LƯỢT ➜"
+text = "KẾT THÚC LƯỢT →"
 
 [node name="CardDescBar" type="PanelContainer" parent="TableTop"]
 custom_minimum_size = Vector2(650, 40)
@@ -392,7 +392,7 @@ alignment = 2
 layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 11
-text = "VÀO GIAI ĐOẠN RA BÀI ➜"
+text = "VÀO GIAI ĐOẠN RA BÀI →"
 
 [node name="TutorialArrow" type="Control" parent="."]
 visible = false
@@ -570,7 +570,7 @@ custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 13
-text = "TIẾP TỤC (ĐẦU LƯỢT RÚT BÀI) ➜"
+text = "TIẾP TỤC (ĐẦU LƯỢT RÚT BÀI) →"
 
 [node name="BossSpotlightLotus" type="PanelContainer" parent="HealthSpotlightOverlay"]
 custom_minimum_size = Vector2(28, 218)
@@ -654,7 +654,7 @@ offset_right = -14.0
 offset_bottom = 18.0
 theme_override_colors/font_color = Color(1, 0.45, 0.45, 1)
 theme_override_font_sizes/font_size = 11
-text = "MÁU SƠN TẶC (3/3) ➜"
+text = "MÁU SƠN TẶC (3/3) →"
 horizontal_alignment = 2
 
 [node name="ArrowPlayerHealth" type="Control" parent="HealthSpotlightOverlay"]
@@ -689,7 +689,7 @@ offset_right = -14.0
 offset_bottom = 18.0
 theme_override_colors/font_color = Color(0.45, 0.95, 0.55, 1)
 theme_override_font_sizes/font_size = 11
-text = "MÁU CỦA BẠN (4/4) ➜"
+text = "MÁU CỦA BẠN (4/4) →"
 horizontal_alignment = 2
 
 [node name="RewardModal" type="Control" parent="."]
@@ -841,7 +841,7 @@ autowrap_mode = 2
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 focus_mode = 0
-text = "NHẬN THƯỞNG & VÀO CHIẾN TRƯỜNG ➜"
+text = "NHẬN THƯỞNG & VÀO CHIẾN TRƯỜNG →"
 
 [node name="GeneralInfoModal" parent="." instance=ExtResource("8_hero_info_modal")]
 visible = false

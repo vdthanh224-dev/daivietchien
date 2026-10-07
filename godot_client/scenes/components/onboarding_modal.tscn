@@ -156,7 +156,7 @@ autowrap_mode = 2
 [node name="BtnTutorial" type="Button" parent="DimBackground/ModalBox/Margin/VBox/CardsContainer/CardTutorial/Margin/VBox"]
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
-text = "HƯỚNG DẪN TÔI ➜"
+text = "HƯỚNG DẪN TÔI →"
 
 [node name="CardVeteran" type="PanelContainer" parent="DimBackground/ModalBox/Margin/VBox/CardsContainer"]
 layout_mode = 2
@@ -201,4 +201,4 @@ autowrap_mode = 2
 [node name="BtnVeteran" type="Button" parent="DimBackground/ModalBox/Margin/VBox/CardsContainer/CardVeteran/Margin/VBox"]
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
-text = "VÀO TRÒ CHƠI ➜"
+text = "VÀO TRÒ CHƠI →"

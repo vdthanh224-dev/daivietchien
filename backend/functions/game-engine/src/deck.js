@@ -152,7 +152,7 @@ export function createDeck80() {
   list.push(createCard("D80_VK_CQ_NoThan", "Nỏ Thần Kim Quy", "Club", 12, 1, 6, "Tầm 1. Không giới hạn số lá Trảm trong lượt", 1));
   list.push(createCard("D80_VK_CJ_TruongDao", "Trường Đao Nam Sơn", "Club", 11, 1, 6, "Tầm 3. Khi Trảm bị Đỡ, xem như chưa sử dụng lượt Trảm trong lượt chơi này", 3));
   list.push(createCard("D80_VK_DQ_ThuongNgau", "Thương Ngâu Lãng Bạc", "Diamond", 12, 1, 6, "Tầm 4. Khi Trảm trúng, hủy 1 lá trên tay hoặc trang bị đối phương", 4));
-  list.push(createCard("D80_VK_SA_SungThanCong", "Súng Thần Công Hồ Triều", "Spade", 1, 1, 6, "Tầm 5. Mục tiêu không được dùng Đỡ cùng màu với Trảm", 5));
+  list.push(createCard("D80_VK_SA_SungThanCong", "Súng Thần Công Hồ Triều", "Spade", 1, 1, 6, "Tầm 5. Mục tiêu không được dùng Đỡ nhỏ hơn 7", 5));
   list.push(createCard("D80_VK_C5_HoaMai", "Hỏa Mai Tây Sơn", "Club", 5, 1, 6, "Tầm 4. Trảm Thường có thể xem như Trảm Hỏa", 4));
   list.push(createCard("D80_VK_D9_LiemDao", "Liêm Đao Đống Đa", "Diamond", 9, 1, 6, "Tầm 2. Lần đầu mỗi lượt gây sát thương, rút 1 lá", 2));
   list.push(createCard("D80_VK_S7_DoanDao", "Đoản Đao Lam Sơn", "Spade", 7, 1, 6, "Tầm 2. Khi Trảm trúng, có thể hủy 2 lá tay hoặc Trang bị của mục tiêu thay vì gây sát thương", 2));
@@ -303,8 +303,8 @@ export function createDeck150() {
   list.push(createCard("D150_VK_DQ_TruongDao", "Trường Đao Nam Sơn", "Diamond", 12, 1, 6, "Tầm 3. Khi Trảm bị Đỡ, xem như chưa sử dụng lượt Trảm trong lượt chơi này", 3));
   list.push(createCard("D150_VK_DQ_ThuongNgau", "Thương Ngâu Lãng Bạc", "Diamond", 12, 1, 6, "Tầm 4. Khi Trảm trúng, hủy 1 lá trên tay hoặc trang bị", 4));
   list.push(createCard("D150_VK_C5_ThuongNgau", "Thương Ngâu Lãng Bạc", "Club", 5, 1, 6, "Tầm 4. Khi Trảm trúng, hủy 1 lá trên tay hoặc trang bị", 4));
-  list.push(createCard("D150_VK_SA_SungThanCong", "Súng Thần Công Hồ Triều", "Spade", 1, 1, 6, "Tầm 5. Mục tiêu không được dùng Đỡ cùng màu với Trảm", 5));
-  list.push(createCard("D150_VK_DA_SungThanCong", "Súng Thần Công Hồ Triều", "Diamond", 1, 1, 6, "Tầm 5. Mục tiêu không được dùng Đỡ cùng màu với Trảm", 5));
+  list.push(createCard("D150_VK_SA_SungThanCong", "Súng Thần Công Hồ Triều", "Spade", 1, 1, 6, "Tầm 5. Mục tiêu không được dùng Đỡ nhỏ hơn 7", 5));
+  list.push(createCard("D150_VK_DA_SungThanCong", "Súng Thần Công Hồ Triều", "Diamond", 1, 1, 6, "Tầm 5. Mục tiêu không được dùng Đỡ nhỏ hơn 7", 5));
 
   // ==========================================
   // 9. ÁO GIÁP — 6 LÁ (Mỗi loại 2 lá)

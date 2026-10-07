@@ -18,8 +18,8 @@ const QUEST_DEFS: Dictionary = {
 	"battle": {
 		"id": "battle",
 		"name": "Xông pha trận mạc",
-		"desc": "Tham gia 1 trận đấu bất kỳ (2v2 hoặc Luyện tập).",
-		"target": 1,
+		"desc": "Tham gia 3 trận đấu bất kỳ (2v2 hoặc Luyện tập).",
+		"target": 3,
 		"points": 20,
 		"icon": "⚔️",
 		"nav_action": "battle"
@@ -27,8 +27,8 @@ const QUEST_DEFS: Dictionary = {
 	"slash": {
 		"id": "slash",
 		"name": "Thanh gươm sắc bén",
-		"desc": "Dùng thành công 3 lá [Trảm] (Thường, Hỏa hoặc Thủy).",
-		"target": 3,
+		"desc": "Dùng thành công 10 lá [Trảm] (Thường, Hỏa hoặc Thủy).",
+		"target": 10,
 		"points": 20,
 		"icon": "🗡️",
 		"nav_action": "battle"
@@ -36,8 +36,8 @@ const QUEST_DEFS: Dictionary = {
 	"dodge": {
 		"id": "dodge",
 		"name": "Kiên cường phòng ngự",
-		"desc": "Đánh ra 2 lá [Đỡ] hoặc kích hoạt Khiên Mây Bện.",
-		"target": 2,
+		"desc": "Đánh ra 5 lá [Đỡ] hoặc kích hoạt Khiên Mây Bện.",
+		"target": 5,
 		"points": 20,
 		"icon": "🛡️",
 		"nav_action": "battle"
@@ -54,8 +54,8 @@ const QUEST_DEFS: Dictionary = {
 	"heal": {
 		"id": "heal",
 		"name": "Nồi Bánh Chưng ấm",
-		"desc": "Hồi phục 1 Máu bằng [Bánh Chưng] (tự dùng hoặc cứu đồng đội).",
-		"target": 1,
+		"desc": "Hồi phục 3 Máu bằng [Bánh Chưng] (tự dùng hoặc cứu đồng đội).",
+		"target": 3,
 		"points": 15,
 		"icon": "🍲",
 		"nav_action": "battle"
@@ -63,8 +63,8 @@ const QUEST_DEFS: Dictionary = {
 	"win": {
 		"id": "win",
 		"name": "Khải hoàn thắng trận",
-		"desc": "Giành chiến thắng 1 trận đấu bất kỳ.",
-		"target": 1,
+		"desc": "Giành chiến thắng 3 trận đấu bất kỳ.",
+		"target": 3,
 		"points": 25,
 		"icon": "🏆",
 		"nav_action": "battle"
