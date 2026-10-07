@@ -1212,11 +1212,6 @@ func _start_network_draft_watchdog() -> void:
 		_show_no_server_modal("Deno Cloud chưa gửi trạng thái chọn tướng. Vui lòng kết nối lại để mọi người dùng cùng một phòng online.")
 
 func _run_local_draft_loop() -> void:
-	print("[HeroSelect] ⚙️ Đang chạy chọn tướng chế độ Cục Bộ (Local Draft)...")
-	draft_status_lbl.text = "🎮 Chọn Tướng Cục Bộ (Local vs AI)..."
-	draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
-
-func _run_local_draft_loop() -> void:
 	print("[HeroSelect] ⚙️ Đang chạy chọn tướng chế độ Cục Bộ (Local Draft 2v2)...")
 	var my_seat_num = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 and NetworkClient.my_seat <= 8 else 1
 
