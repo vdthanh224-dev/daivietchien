@@ -1,0 +1,13 @@
+{
+  "name": "dai-viet-chien-game-engine",
+  "version": "1.0.0",
+  "description": "Serverless Game Engine Trọng Tài Đồng Bộ Cho Game Đại Việt Chiến 2v2",
+  "main": "src/main.js",
+  "type": "module",
+  "scripts": {
+    "test": "node ../../test_game_engine.js"
+  },
+  "dependencies": {
+    "node-appwrite": "^14.1.0"
+  }
+}

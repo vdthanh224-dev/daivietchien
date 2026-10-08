@@ -20,4 +20,4 @@ jobs:
         with:
           project: dai-viet-chien-server
           entrypoint: server.js
-          root: deno-server
+          root: server

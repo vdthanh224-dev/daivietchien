@@ -3,7 +3,7 @@ FROM denoland/deno:latest
 WORKDIR /app
 
 # Copy server code
-COPY deploy_deno/ .
+COPY server/ .
 
 # Cache entry point
 RUN deno cache main.ts
