@@ -467,7 +467,7 @@ func _delete_document_async(doc_id: String) -> void:
 	var delete_url = "%s/databases/%s/collections/%s/documents/%s" % [ENDPOINT, DATABASE_ID, COLLECTION_ID, doc_id]
 	_send_http_request(delete_url, HTTPClient.METHOD_DELETE)
 
-# --- 9. Draft & Battle State Protocols (Đã hủy Appwrite trong trận, chuyển 100% sang WebSocket Deno) ---
+# --- 9. Draft & Battle State Protocols (Đã hủy Appwrite trong trận, chuyển 100% sang WebSocket Render Cloud) ---
 func send_draft_host_state(_state: Dictionary) -> bool:
 	return true
 

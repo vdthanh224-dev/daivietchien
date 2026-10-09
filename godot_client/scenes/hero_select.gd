@@ -34,9 +34,9 @@ var _pending_pick_hero_id: int = 0
 var _pending_pick_seat: int = 0
 # Drop delayed draft snapshots so a late packet cannot roll a client back.
 var _last_draft_revision: int = 0
-var active_pick_seats: Array[int] = []
+var active_pick_seats: Array = []
 var draft_round: int = 1
-var my_candidate_hero_ids: Array[int] = []
+var my_candidate_hero_ids: Array = []
 var full_available_heroes_pool: Array[Dictionary] = []
 
 # UI References
@@ -46,6 +46,7 @@ var left_slot_nodes: Array[Dictionary] = []
 var hero_card_nodes: Dictionary = {} # hero_id -> card Node
 var right_inspect_panel: Control
 var hero_grid_scroll: ScrollContainer = null
+var hero_wait_lbl: Label = null
 var hero_swipe_active: bool = false
 var hero_swipe_last_y: float = 0.0
 var inspect_title_lbl: Label
@@ -101,10 +102,11 @@ func _ready() -> void:
 	_setup_draft_slots()
 
 	if current_mode_id == "2v2":
-		if draft_slots.size() >= 2:
-			active_pick_seats = [int(draft_slots[0].get("seatNumber", 1)), int(draft_slots[1].get("seatNumber", 2))]
+		active_pick_seats.clear()
+		if not draft_slots.is_empty():
+			active_pick_seats.append(int(draft_slots[0].get("seatNumber", 1)))
 		else:
-			active_pick_seats = [1, 2]
+			active_pick_seats.append(1)
 		_setup_local_disjoint_hero_pools(1)
 		var my_seat_num = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 and NetworkClient.my_seat <= 8 else 1
 		var my_slot_idx = _find_draft_slot_index(my_seat_num)
@@ -118,13 +120,19 @@ func _ready() -> void:
 		available_heroes = dynasty_pool.slice(0, mini(8, dynasty_pool.size()))
 
 	_build_ui()
+	# Chỉ người đang tới lượt mới được thấy bể tướng; các ghế còn lại chỉ chờ.
+	var initial_seat = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 else 1
+	if current_mode_id == "2v2" and initial_seat != 1:
+		_rebuild_hero_grid([])
+		draft_status_lbl.text = "Đang chờ người chơi 1 chọn."
+		draft_status_lbl.add_theme_color_override("font_color", COLOR_DRAGON_CYAN)
 
 	if not available_heroes.is_empty():
 		_inspect_hero(available_heroes[0])
 
 	_connect_network_draft()
 
-	# Kiểm tra kết nối máy chủ WebSocket Deno
+	# Kiểm tra kết nối máy chủ WebSocket Render Cloud
 	if NetworkClient:
 		# A scene transition can land while the autoload is between reconnect
 		# attempts. Start the cloud connection here instead of failing before
@@ -211,13 +219,8 @@ func _setup_draft_slots() -> void:
 		if my_seat_idx == -1 and NetworkClient and NetworkClient.seat_is_explicit and NetworkClient.my_seat >= 1 and NetworkClient.my_seat <= 8:
 			my_seat_idx = NetworkClient.my_seat - 1
 
-		# 4. Cuối cùng mới chọn ghế người thật đầu tiên
-		if my_seat_idx == -1:
-			for i in range(slots.size()):
-				var s = slots[i]
-				if not bool(s.get("isAI", false)) and not bool(s.get("isEmpty", false)):
-					my_seat_idx = i
-					break
+		# Do not claim another player's lobby slot when this client has no match.
+		# The server confirms the requested debug seat after JOIN_DRAFT.
 	elif NetworkClient and NetworkClient.my_seat >= 1 and NetworkClient.my_seat <= 8:
 		my_seat_idx = NetworkClient.my_seat - 1
 
@@ -356,6 +359,10 @@ func _setup_local_disjoint_hero_pools(round_num: int) -> void:
 
 func _rebuild_hero_grid(heroes_to_show: Array[Dictionary]) -> void:
 	available_heroes = heroes_to_show
+	if hero_wait_lbl and is_instance_valid(hero_wait_lbl):
+		hero_wait_lbl.visible = heroes_to_show.is_empty()
+	if hero_grid_scroll and is_instance_valid(hero_grid_scroll):
+		hero_grid_scroll.visible = not heroes_to_show.is_empty()
 	if not is_instance_valid(hero_grid_scroll): return
 	var grid = hero_grid_scroll.get_child(0) as GridContainer
 	if not is_instance_valid(grid): return
@@ -370,6 +377,19 @@ func _rebuild_hero_grid(heroes_to_show: Array[Dictionary]) -> void:
 			card.modulate = Color(0.4, 0.4, 0.4, 0.8)
 	if not available_heroes.is_empty():
 		_inspect_hero(available_heroes[0])
+
+func _show_fallback_candidate_pool() -> void:
+	var fallback: Array[Dictionary] = []
+	var source: Array[Dictionary] = full_available_heroes_pool.duplicate()
+	source.shuffle()
+	for hero in source:
+		var hid := int(hero.get("id", 0))
+		if hid >= 1 and hid <= 40 and not selected_hero_ids.has(hid):
+			fallback.append(hero)
+			if fallback.size() >= 8:
+				break
+	if not fallback.is_empty():
+		_rebuild_hero_grid(fallback)
 
 func _get_anonymous_slot_name(slot_idx: int) -> String:
 	if slot_idx < 0 or slot_idx >= draft_slots.size():
@@ -655,6 +675,17 @@ func _build_center_grid_column() -> Control:
 	title.add_theme_font_size_override("font_size", 13)
 	title.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0, 0.95))
 	col.add_child(title)
+
+	hero_wait_lbl = Label.new()
+	hero_wait_lbl.text = "ĐANG CHỜ NGƯỜI CHƠI 1 CHỌN"
+	hero_wait_lbl.add_theme_font_size_override("font_size", 30)
+	hero_wait_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+	hero_wait_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hero_wait_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hero_wait_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hero_wait_lbl.custom_minimum_size = Vector2(0, 220)
+	hero_wait_lbl.visible = available_heroes.is_empty()
+	col.add_child(hero_wait_lbl)
 
 	var scroll = ScrollContainer.new()
 	hero_grid_scroll = scroll
@@ -1160,7 +1191,7 @@ func _show_no_server_modal(message: String = "") -> void:
 	vbox.add_child(title_lbl)
 
 	var desc_lbl = Label.new()
-	desc_lbl.text = message if message != "" else "Không thể kết nối đến Máy Chủ Deno (Cloud hoặc Local 8080).\nTrận đấu không thể tiếp tục khi không có máy chủ."
+	desc_lbl.text = message if message != "" else "Không thể kết nối đến Máy Chủ Render Cloud (hoặc Local 8080).\nTrận đấu không thể tiếp tục khi không có máy chủ."
 	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc_lbl.add_theme_font_size_override("font_size", 13)
@@ -1187,13 +1218,15 @@ func _show_no_server_modal(message: String = "") -> void:
 
 var _server_state_received: bool = false
 
-# --- Luồng Chọn Tướng Theo Lượt (chỉ qua Deno Cloud) ---
+# --- Luồng Chọn Tướng Theo Lượt (chỉ qua Render Cloud) ---
 func _start_draft_sequence() -> void:
 	current_picker_index = 0
 	if not is_network_mode:
-		_show_no_server_modal("Chưa kết nối được Deno Cloud. Không thể bắt đầu chọn tướng khi thiếu máy chủ online.")
+		_show_no_server_modal("Chưa kết nối được Render Cloud. Không thể bắt đầu chọn tướng khi thiếu máy chủ online.")
 		return
-	draft_status_lbl.text = "⚡ Đang đồng bộ tiến trình chọn tướng từ Deno Cloud..."
+	# Keep the local eligible pool visible while the authoritative snapshot arrives.
+	# The server still validates every lock-in against its candidateHeroIds.
+	draft_status_lbl.text = "⚡ Đang đồng bộ tiến trình chọn tướng từ Render Cloud..."
 	draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 	_start_network_draft_watchdog()
 
@@ -1204,40 +1237,34 @@ func _start_network_draft_watchdog() -> void:
 		if _server_state_received or not is_draft_active or not is_network_mode:
 			return
 		if NetworkClient and NetworkClient.is_connected_to_server and not _server_state_received:
-			print("[HeroSelect] 🔁 Chưa nhận trạng thái chọn tướng từ Deno, gửi lại JOIN_DRAFT lần %d." % (retry + 1))
+			print("[HeroSelect] 🔁 Chưa nhận trạng thái chọn tướng từ Render, gửi lại JOIN_DRAFT lần %d." % (retry + 1))
 			_on_network_connected_for_draft(true)
 
 	if not _server_state_received and is_draft_active and is_network_mode:
 		print("[HeroSelect] ⚠️ Máy chủ không phản hồi lượt chọn tướng.")
-		_show_no_server_modal("Deno Cloud chưa gửi trạng thái chọn tướng. Vui lòng kết nối lại để mọi người dùng cùng một phòng online.")
+		_show_no_server_modal("Render Cloud chưa gửi trạng thái chọn tướng. Vui lòng kết nối lại để mọi người dùng cùng một phòng online.")
 
 func _run_local_draft_loop() -> void:
 	print("[HeroSelect] ⚙️ Đang chạy chọn tướng chế độ Cục Bộ (Local Draft 2v2)...")
 	var my_seat_num = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 and NetworkClient.my_seat <= 8 else 1
 
 	if current_mode_id == "2v2" and draft_slots.size() >= 4:
-		for r_idx in range(1, 3):
+		for slot_idx in range(4):
 			if not is_draft_active:
 				return
-			draft_round = r_idx
-			var active_slots: Array[Dictionary] = []
-			if r_idx == 1:
-				active_slots = [draft_slots[0], draft_slots[1]]
-			else:
-				active_slots = [draft_slots[2], draft_slots[3]]
-
-			active_pick_seats = [int(active_slots[0]["seatNumber"]), int(active_slots[1]["seatNumber"])]
-			_setup_local_disjoint_hero_pools(r_idx)
+			draft_round = 1 if slot_idx < 2 else 2
+			if slot_idx == 0 or slot_idx == 2:
+				_setup_local_disjoint_hero_pools(draft_round)
+			var active_slot: Dictionary = draft_slots[slot_idx]
+			active_pick_seats.clear()
+			active_pick_seats.append(int(active_slot["seatNumber"]))
 			turn_timer = 40.0
 
-			var player_in_this_round = false
-			for s in active_slots:
-				if int(s["seatNumber"]) == my_seat_num:
-					player_in_this_round = true
-					var c_heroes = s.get("candidateHeroes", [])
-					if not c_heroes.is_empty():
-						_rebuild_hero_grid(c_heroes)
-					break
+			var player_in_this_round = int(active_slot["seatNumber"]) == my_seat_num
+			if player_in_this_round:
+				var c_heroes = active_slot.get("candidateHeroes", [])
+				if not c_heroes.is_empty():
+					_rebuild_hero_grid(c_heroes)
 
 			_highlight_active_picker()
 			_update_lock_in_button_state()
@@ -1250,30 +1277,21 @@ func _run_local_draft_loop() -> void:
 				draft_status_lbl.add_theme_color_override("font_color", COLOR_DRAGON_CYAN)
 
 			while turn_timer > 0.0 and is_draft_active:
-				var all_locked = true
-				for s in active_slots:
-					if not bool(s.get("isLocked", false)):
-						all_locked = false
-						break
-				if all_locked:
+				if bool(active_slot.get("isLocked", false)):
 					break
 
 				turn_timer = maxf(0.0, turn_timer - 0.5)
 				turn_timer_lbl.text = "⏳ %ds" % maxi(0, int(ceilf(turn_timer)))
 
-				for s in active_slots:
-					if not bool(s.get("isLocked", false)):
-						var is_bot = bool(s.get("isAI", false)) or (not bool(s.get("isPlayer", false)) and int(s.get("seatNumber", 0)) != my_seat_num)
-						if is_bot and turn_timer <= 38.5:
-							var bot_pick = _choose_bot_hero(s)
-							_lock_hero_for_slot(s, bot_pick)
+				if not bool(active_slot.get("isLocked", false)):
+					var is_bot = bool(active_slot.get("isAI", false)) or (not bool(active_slot.get("isPlayer", false)) and int(active_slot.get("seatNumber", 0)) != my_seat_num)
+					if is_bot and turn_timer <= 38.5:
+						_lock_hero_for_slot(active_slot, _choose_bot_hero(active_slot))
 
 				await get_tree().create_timer(0.5).timeout
 
-			for s in active_slots:
-				if not bool(s.get("isLocked", false)):
-					var fallback_pick = _choose_bot_hero(s)
-					_lock_hero_for_slot(s, fallback_pick)
+			if not bool(active_slot.get("isLocked", false)):
+				_lock_hero_for_slot(active_slot, _choose_bot_hero(active_slot))
 
 			await get_tree().create_timer(0.5).timeout
 	else:
@@ -1482,7 +1500,7 @@ func _rollback_pending_pick() -> void:
 	_highlight_active_picker(current_picker_index)
 	_update_lock_in_button_state()
 
-# --- Kết Nối Đồng Bộ Deno Server (Authoritative Draft Phase) ---
+# --- Kết Nối Đồng Bộ Render Server (Authoritative Draft Phase) ---
 func _connect_network_draft() -> void:
 	if not NetworkClient:
 		return
@@ -1529,7 +1547,13 @@ func _on_network_connected_for_draft(force: bool = false) -> void:
 			})
 
 	print("[HeroSelect] Gửi JOIN_DRAFT: room=%s, seat=%d, user=%s" % [current_room_id, my_seat_num, my_name])
-	NetworkClient.send_join_draft(current_room_id, my_seat_num, my_uid, my_name, slots_data, current_mode_id)
+	var available_ids: Array[int] = []
+	for hero in full_available_heroes_pool:
+		if hero is Dictionary:
+			var hero_id := int(hero.get("id", 0))
+			if hero_id > 0:
+				available_ids.append(hero_id)
+	NetworkClient.send_join_draft(current_room_id, my_seat_num, my_uid, my_name, slots_data, current_mode_id, available_ids)
 
 func _on_network_draft_joined(assigned_seat: int) -> void:
 	_draft_joined = true
@@ -1632,7 +1656,7 @@ func _apply_authoritative_draft_slots(server_slots: Array) -> void:
 			var server_locked := bool(s_info.get("isLocked", false))
 			var is_own_slot: bool = s_num == (NetworkClient.my_seat if NetworkClient else 0)
 			# Other players expose only that they have locked a pick; their hero stays hidden.
-			var is_locked := server_locked and (hid > 0 or not is_own_slot)
+			var is_locked := server_locked
 			if is_locked:
 				var locked_hero: Dictionary = {}
 				if hid > 0:
@@ -1742,7 +1766,14 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 		return
 	_server_state_received = true
 	var revision := int(data.get("revision", 0))
-	if revision > 0 and revision <= _last_draft_revision:
+	var server_slots_preview = data.get("slots", [])
+	var has_locked_state = false
+	if server_slots_preview is Array:
+		for preview_slot in server_slots_preview:
+			if preview_slot is Dictionary and bool(preview_slot.get("isLocked", false)):
+				has_locked_state = true
+				break
+	if revision > 0 and revision < _last_draft_revision and not has_locked_state:
 		return
 	if revision > 0:
 		_last_draft_revision = revision
@@ -1770,6 +1801,12 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 		active_pick_seats.clear()
 		for s in server_active:
 			active_pick_seats.append(int(s))
+	else:
+		# Older Cloud snapshots omit activeSeats; currentSeat is still authoritative.
+		active_pick_seats.clear()
+		var fallback_seat := int(data.get("currentSeat", 0))
+		if fallback_seat > 0:
+			active_pick_seats.append(fallback_seat)
 	draft_round = int(data.get("round", 1))
 
 	# The server publishes a seat and a canonical index. Resolve by seat locally
@@ -1787,6 +1824,7 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 
 	# Đồng bộ trạng thái khóa và phe từ Server.
 	var server_slots = data.get("slots", [])
+	var is_my_active_seat := current_mode_id != "2v2" or active_pick_seats.has(server_seat)
 	if server_slots is Array:
 		_apply_authoritative_draft_slots(server_slots)
 		# Đồng bộ danh sách tướng ứng cử viên riêng biệt của người chơi này (disjoint candidateHeroIds)
@@ -1795,11 +1833,11 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 				continue
 			if int(s_info.get("seatNumber", s_info.get("seat", 0))) == server_seat:
 				var c_ids = s_info.get("candidateHeroIds", [])
-				if c_ids is Array and not c_ids.is_empty():
+				if c_ids is Array and not c_ids.is_empty() and is_my_active_seat:
 					var new_ids: Array[int] = []
 					for cid in c_ids:
 						new_ids.append(int(cid))
-					if new_ids != my_candidate_hero_ids:
+					if new_ids != my_candidate_hero_ids or hero_card_nodes.is_empty():
 						my_candidate_hero_ids = new_ids
 						var list: Array[Dictionary] = []
 						for cid in my_candidate_hero_ids:
@@ -1807,7 +1845,15 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 							if not h.is_empty():
 								list.append(h)
 						_rebuild_hero_grid(list)
+						my_candidate_hero_ids = new_ids
+				elif not is_my_active_seat:
+					my_candidate_hero_ids.clear()
+					_rebuild_hero_grid([])
+				elif is_my_active_seat and hero_card_nodes.is_empty():
+					_show_fallback_candidate_pool()
 				break
+		if current_mode_id == "2v2" and _is_my_turn() and is_my_active_seat and hero_card_nodes.is_empty():
+			_show_fallback_candidate_pool()
 	if current_mode_id.begins_with("dynasty_"):
 		# Do not render any other seat's selection, name, preview, or role on this screen.
 		for node in left_slot_nodes:
@@ -1842,7 +1888,21 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 		draft_status_lbl.text = "👑 ĐẾN LƯỢT BẠN CHỌN TƯỚNG! (Còn %d giây)" % t
 		draft_status_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 	else:
-		if current_mode_id.begins_with("dynasty_"):
+		if current_mode_id == "2v2" and not active_pick_seats.has(server_seat):
+			var waiting_seat = int(active_slot.get("seatNumber", server_current_seat))
+			var own_slot_idx := _find_draft_slot_index(server_seat)
+			var own_slot: Dictionary = draft_slots[own_slot_idx] if own_slot_idx >= 0 else {}
+			var own_hero = own_slot.get("chosenHero", {})
+			if bool(own_slot.get("isLocked", false)) and own_hero is Dictionary and not own_hero.is_empty():
+				_rebuild_hero_grid([own_hero])
+				draft_status_lbl.text = "✅ BẠN ĐÃ CHỌN: %s" % own_hero.get("name", "TƯỚNG")
+			else:
+				_rebuild_hero_grid([])
+				if hero_wait_lbl and is_instance_valid(hero_wait_lbl):
+					hero_wait_lbl.text = "ĐANG CHỜ NGƯỜI CHƠI %d CHỌN" % waiting_seat
+					hero_wait_lbl.visible = true
+				draft_status_lbl.text = "ĐANG CHỜ NGƯỜI CHƠI %d CHỌN" % waiting_seat
+		elif current_mode_id.begins_with("dynasty_"):
 			draft_status_lbl.text = "⏳ Đang chờ người chơi khác chọn tướng (%ds)..." % t
 		else:
 			draft_status_lbl.text = "⏳ Đang chờ người khác chọn tướng (%ds)..." % t

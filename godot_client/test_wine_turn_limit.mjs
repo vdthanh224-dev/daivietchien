@@ -4,8 +4,8 @@ import {
   handlePlayCard,
   handleRespondAction,
   initGame,
-} from "../deploy_deno/functions/game-engine/src/gameEngine.js";
-import { CARD_CATEGORIES, CARD_SUBTYPES } from "../deploy_deno/functions/game-engine/src/deck.js";
+} from "../server/functions/game-engine/src/gameEngine.js";
+import { CARD_CATEGORIES, CARD_SUBTYPES } from "../server/functions/game-engine/src/deck.js";
 
 const wine = (id) => ({
   id,

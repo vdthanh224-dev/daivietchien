@@ -6,8 +6,8 @@ import {
   handleRespondAction,
   handleUseSkill,
   initGame,
-} from "../deploy_deno/functions/game-engine/src/gameEngine.js";
-import { CARD_CATEGORIES, CARD_SUBTYPES } from "../deploy_deno/functions/game-engine/src/deck.js";
+} from "../server/functions/game-engine/src/gameEngine.js";
+import { CARD_CATEGORIES, CARD_SUBTYPES } from "../server/functions/game-engine/src/deck.js";
 
 const slash = (id, suit = "Spade", subType = CARD_SUBTYPES.ATTACK_NORMAL) => ({
   id,

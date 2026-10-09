@@ -38,7 +38,7 @@ var _ping_timer: float = 2.5
 var _last_ping_send_time: int = 0
 var _ping_awaiting_pong: bool = false
 
-var active_server_type: String = "NONE" # "DENO_CLOUD"
+var active_server_type: String = "NONE" # "RENDER_CLOUD"
 var active_server_name: String = ""
 var active_server_url: String = ""
 var candidate_index: int = 0
@@ -337,7 +337,7 @@ func send_json(dict: Dictionary) -> void:
 	else:
 		print("[NetworkClient] Cảnh báo: Socket chưa sẵn sàng để gửi!")
 
-func send_join_draft(target_room: String, seat: int, user_id: String, user_name: String, slots_data: Array = [], mode_id: String = "2v2") -> void:
+func send_join_draft(target_room: String, seat: int, user_id: String, user_name: String, slots_data: Array = [], mode_id: String = "2v2", available_hero_ids: Array = []) -> void:
 	room_id = target_room
 	my_seat = seat
 	last_processed_action_seq = -1
@@ -347,12 +347,13 @@ func send_join_draft(target_room: String, seat: int, user_id: String, user_name:
 		"seat": seat,
 		"userId": user_id,
 		"userName": user_name,
-		"modeId": mode_id
+		"modeId": mode_id,
+		"availableHeroIds": available_hero_ids
 	}
 	if not slots_data.is_empty():
 		payload["slots"] = slots_data
-	if seat_is_explicit or OS.is_debug_build() or OS.has_feature("editor"):
-		# Debug windows may share one local auth session; keep their requested seats distinct.
+	if seat_is_explicit:
+		# An explicitly requested seat is only used for local multi-window debugging.
 		payload["debugSeat"] = my_seat
 	send_json(payload)
 

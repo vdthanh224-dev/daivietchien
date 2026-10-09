@@ -42,7 +42,7 @@ export const HEROES = {
   HERO_34: { id: 'HERO_34', name: 'Phạm Hạp', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['BAO_LAM', 'TRAN_THU'] },
   HERO_35: { id: 'HERO_35', name: 'Lê Hoàn', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['PHA_TONG', 'THAN_CHINH_LE_HOAN'] },
   HERO_36: { id: 'HERO_36', name: 'Dương Vân Nga', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['TRAO_BAO', 'NHIEP_CHINH'] },
-  HERO_37: { id: 'HERO_37', name: 'Lê Long Đĩnh', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['BAO_NO', 'NGOA_TRIEU'] },
+  HERO_37: { id: 'HERO_37', name: 'Lê Long Đĩnh', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['BAO_NO', 'TRAC_LAC', 'NGOA_TRIEU'] },
   HERO_38: { id: 'HERO_38', name: 'Đào Cam Mộc', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['PHO_TA', 'MUU_DINH'] },
   HERO_39: { id: 'HERO_39', name: 'Lý Công Uẩn', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['DOI_DO', 'THAI_BINH_LY_CONG_UAN'] },
   HERO_40: { id: 'HERO_40', name: 'Lý Phật Mã', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['THAN_CHINH_LY_PHAT_MA', 'PHAT_CHAM'] },
@@ -267,7 +267,7 @@ export const SKILLS = {
     id: 'THU_PHUC',
     name: 'Thu Phục',
     type: 'OPTIONAL',
-    description: 'Khi bạn sử dụng lá bài Cẩm Nang thành công, bạn có thể chỉ định 1 người chơi có số Máu cao hơn bạn phải đưa cho bạn 1 lá bài ngẫu nhiên trên tay.'
+    description: 'Hai lần mỗi lượt, Khi bạn sử dụng lá bài Cẩm Nang thành công, bạn có thể chỉ định 1 người chơi có số Máu không ít hơn bạn phải đưa cho bạn 1 lá bài ngẫu nhiên trên tay.'
   },
   DINH_QUOC: {
     id: 'DINH_QUOC',

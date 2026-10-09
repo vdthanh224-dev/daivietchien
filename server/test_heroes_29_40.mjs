@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { CARD_CATEGORIES, CARD_SUBTYPES } from "./deck.js";
-import { handleRespondAction, handleUseSkill, handlePlayCard, initGame, applyDamageToPlayer } from "./gameEngine.js";
+import { CARD_CATEGORIES, CARD_SUBTYPES } from "./functions/game-engine/src/deck.js";
+import { handleRespondAction, handleUseSkill, handlePlayCard, initGame, applyDamageToPlayer } from "./functions/game-engine/src/gameEngine.js";
 
 console.log("=== Testing Heroes 29-40 Skills ===");
 

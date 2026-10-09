@@ -137,7 +137,7 @@ export default async ({ req, res, log, error }) => {
 
     // 4. Phản hồi đòn đánh / cẩm nang (RESPOND_ACTION)
     if (action === "RESPOND_ACTION") {
-      const result = handleRespondAction(state, seat, accepted, cardId, targetCardId, cardIds);
+      const result = handleRespondAction(state, seat, accepted, cardId, targetCardId, cardIds, targetSeat, payload);
       if (result.error) {
         return res.json({ success: false, error: result.error, state: sanitizeGameStateForClient(state, seat) });
       }

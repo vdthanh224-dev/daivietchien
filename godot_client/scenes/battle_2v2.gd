@@ -252,6 +252,25 @@ var borrow_sword_target_seat: int = -1
 var is_game_over: bool = false
 var exit_battle_btn: Button = null
 var match_result_recorded: bool = false
+var doi_do_used_this_turn: bool = false
+var doi_do_modal: Control = null
+var doi_do_grid: HBoxContainer = null
+var doi_do_status_lbl: Label = null
+var doi_do_confirm_btn: Button = null
+var doi_do_decline_btn: Button = null
+var doi_do_cancel_btn: Button = null
+var selected_doi_do_seats: Array = []
+var muu_dinh_used_this_turn: bool = false
+var muu_dinh_modal: Control = null
+var muu_dinh_cards_container: HBoxContainer = null
+var muu_dinh_targets_container: HBoxContainer = null
+var muu_dinh_status_lbl: Label = null
+var muu_dinh_confirm_btn: Button = null
+var muu_dinh_cancel_btn: Button = null
+var muu_dinh_peeked_cards: Array = []
+var selected_muu_dinh_card_idx: int = -1
+var selected_muu_dinh_target_seat: int = -1
+var is_using_trac_lac: bool = false
 
 # Multi-target Chain State
 var selected_chain_seats: Array = []
@@ -395,7 +414,7 @@ var card_deck_pile: Array = []
 var hand_layout_refresh_timer: float = 0.0
 
 func _show_no_server_modal(message: String = "") -> void:
-	print("[Battle 2v2] ❌ Không có kết nối WebSocket Deno Server! Dừng trận đấu.")
+	print("[Battle 2v2] ❌ Không có kết nối WebSocket Render Cloud Server! Dừng trận đấu.")
 	is_game_over = true
 	var dim = ColorRect.new()
 	dim.set_anchors_preset(PRESET_FULL_RECT)
@@ -443,7 +462,7 @@ func _show_no_server_modal(message: String = "") -> void:
 	vbox.add_child(title_lbl)
 
 	var desc_lbl = Label.new()
-	desc_lbl.text = message if message != "" else "Không thể kết nối Máy Chủ Trận Đấu (Deno Cloud hoặc Local 8080).\nTrận đấu đã bị dừng do không có máy chủ điều phối."
+	desc_lbl.text = message if message != "" else "Không thể kết nối Máy Chủ Trận Đấu (Render Cloud hoặc Local 8080).\nTrận đấu đã bị dừng do không có máy chủ điều phối."
 	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc_lbl.add_theme_font_size_override("font_size", 13)
@@ -577,7 +596,7 @@ func _ready() -> void:
 			is_network_mode = true
 			_on_network_connected()
 		elif NetworkClient.has_method("is_connecting") and NetworkClient.is_connecting():
-			# Chờ tối đa 1.5s nếu NetworkClient đang trong tiến trình dò quét ưu tiên Deno / Local
+			# Chờ tối đa 1.5s nếu NetworkClient đang trong tiến trình dò quét ưu tiên Render / Local
 			var wait_t = 0.0
 			while wait_t < 1.5 and NetworkClient.is_connecting() and not NetworkClient.is_connected_to_server:
 				await get_tree().create_timer(0.1).timeout
@@ -1811,6 +1830,14 @@ func _hero_has_skill(g: Dictionary, skill_id: String) -> bool:
 		if h is Dictionary and not h.is_empty():
 			hero_id = int(h.get("id", 0))
 	var s_id = skill_id.to_lower().strip_edges()
+	if hero_id == 37 and (s_id == "trac_lac" or s_id == "bao_no" or s_id == "ngoa_trieu"):
+		return true
+	var skills_arr = g.get("skills", [])
+	if skills_arr is Array:
+		for sk in skills_arr:
+			var sk_str = str(sk).to_lower().strip_edges()
+			if sk_str == s_id or sk_str.begins_with(s_id + "_") or s_id.begins_with(sk_str + "_"):
+				return true
 	if hero_id > 0 and HeroDatabase:
 		return HeroDatabase.has_hero_skill(hero_id, s_id)
 	return false
@@ -1899,6 +1926,12 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 		buttons.append({"id": "dan_cau", "text": "🌉 DẪN CẦU", "description": "Mỗi lượt 1 lần: trao 1 lá, ép Trảm mục tiêu chỉ định hoặc cướp 2 lá.", "selected": is_targeting_dan_cau})
 	if seat == my_seat and _hero_has_skill(g, "thuy_chien"):
 		buttons.append({"id": "thuy_chien", "text": "🌊 THỦY CHIẾN", "description": "Dùng bài Trắng hoặc bài Vàng như Bãi Cọc Bạch Đằng.", "selected": is_targeting_thuy_chien})
+	if seat == my_seat and _hero_has_skill(g, "trac_lac"):
+		var cur_hp = int(g.get("hp", 4))
+		if cur_hp <= 2:
+			buttons.append({"id": "trac_lac", "text": "🍶 TRÁC LẠC", "description": "Khi <= 2 Máu, mọi lá Đen trên tay có thể xem như lá Rượu.", "selected": is_using_trac_lac})
+		else:
+			buttons.append({"id": "trac_lac", "text": "🍶 TRÁC LẠC (≤2 MÁU)", "description": "Chỉ kích hoạt khi bạn có <= 2 Máu.", "disabled": true})
 	if seat == my_seat and _hero_has_skill(g, "dinh_quoc"):
 		buttons.append({"id": "dinh_quoc", "text": "⚔️ ĐỊNH QUỐC", "description": "Dùng bất kỳ lá bài Đen nào như Huyết Chiến.", "selected": is_targeting_dinh_quoc})
 	if seat == my_seat and _hero_has_skill(g, "trao_bao"):
@@ -1908,9 +1941,15 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 		if has_eq:
 			buttons.append({"id": "tran_thu", "text": "🛡️ TRẤN THỦ", "description": "Bỏ 1 trang bị đang đeo để Đỡ đòn Trảm."})
 	if seat == my_seat and _hero_has_skill(g, "muu_dinh"):
-		buttons.append({"id": "muu_dinh", "text": "📜 MƯU ĐỊNH", "description": "Xem 2 lá đầu xấp rút, trao 1 lá cho người bất kỳ, đặt 1 lá lại lên đầu."})
+		if muu_dinh_used_this_turn:
+			buttons.append({"id": "muu_dinh", "text": "📜 ĐÃ DÙNG MƯU ĐỊNH", "description": "Mưu Định chỉ dùng 1 lần mỗi lượt.", "disabled": true})
+		else:
+			buttons.append({"id": "muu_dinh", "text": "📜 MƯU ĐỊNH", "description": "Xem 2 lá đầu xấp rút, trao 1 lá cho người bất kỳ, đặt 1 lá lại lên đầu."})
 	if seat == my_seat and _hero_has_skill(g, "doi_do"):
-		buttons.append({"id": "doi_do", "text": "🏯 DỜI ĐÔ", "description": "Bỏ toàn bộ bài trên tay: rút lại + 1 lá, tối đa 4 người mỗi người rút 1 lá."})
+		if doi_do_used_this_turn:
+			buttons.append({"id": "doi_do", "text": "🏯 ĐÃ DÙNG DỜI ĐÔ", "description": "Dời Đô chỉ dùng 1 lần mỗi lượt.", "disabled": true})
+		else:
+			buttons.append({"id": "doi_do", "text": "🏯 DỜI ĐÔ", "description": "Bỏ toàn bộ bài trên tay: rút lại + 1 lá, chọn tối đa 4 người mỗi người rút 1 lá."})
 	var treasure = str(g.get("equipped_treasure", ""))
 	if seat == my_seat and treasure == "Trống Đồng Đông Sơn":
 		var drum_used := bool(g.get("diem_trong_used", false))
@@ -1931,6 +1970,7 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 		avatar.set_skill_button_selected("tay_phu", is_targeting_tay_phu)
 		avatar.set_skill_button_selected("dinh_quoc", is_targeting_dinh_quoc)
 		avatar.set_skill_button_selected("trao_bao", is_targeting_trao_bao)
+		avatar.set_skill_button_selected("trac_lac", is_using_trac_lac)
 	if avatar.has_method("set_treasure_skill_selected"):
 		avatar.set_treasure_skill_selected(is_targeting_drum_skill or is_targeting_ho_phu_skill)
 	_relayout_hand_cards()
@@ -1949,6 +1989,9 @@ func _set_local_che_no_hand(active: bool) -> void:
 func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 	if not generals_data.has(s_num):
 		return
+	if s_num == my_seat and skill_key != "trao_bao" and is_targeting_trao_bao:
+		is_targeting_trao_bao = false
+		_clear_trao_bao_equipped_previews()
 	var g = generals_data[s_num]
 	var h_data = g.get("hero_data", {})
 	if not (h_data is Dictionary):
@@ -2113,20 +2156,43 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 		_update_action_btn()
 		return
 	if s_num == my_seat and skill_key == "doi_do":
-		if not is_player_turn or current_server_phase != "PLAY":
-			desc_text.text = "⚠️ [DỜI ĐÔ] chỉ dùng trong Giai đoạn Ra bài."
+		if not is_player_turn or (is_network_mode and current_server_phase != "PLAY"):
+			desc_text.text = "⚠️ [DỜI ĐÔ] chỉ dùng trong Giai đoạn Ra bài của bạn."
 			return
-		if is_network_mode and NetworkClient and NetworkClient.is_connected_to_server:
-			NetworkClient.send_use_skill("Dời Đô", 0)
-		desc_text.text = "🏯 Đã phát động [DỜI ĐÔ]!"
+		if doi_do_used_this_turn:
+			desc_text.text = "⚠️ [DỜI ĐÔ] chỉ dùng 1 lần mỗi lượt."
+			return
+		_show_doi_do_modal()
 		return
 	if s_num == my_seat and skill_key == "muu_dinh":
-		if not is_player_turn or current_server_phase != "PLAY":
-			desc_text.text = "⚠️ [MƯU ĐỊNH] chỉ dùng trong Giai đoạn Ra bài."
+		if not is_player_turn or (is_network_mode and current_server_phase != "PLAY"):
+			desc_text.text = "⚠️ [MƯU ĐỊNH] chỉ dùng trong Giai đoạn Ra bài của bạn."
+			return
+		if muu_dinh_used_this_turn:
+			desc_text.text = "⚠️ [MƯU ĐỊNH] chỉ dùng 1 lần mỗi lượt."
 			return
 		if is_network_mode and NetworkClient and NetworkClient.is_connected_to_server:
-			NetworkClient.send_use_skill("Mưu Định", my_seat)
-		desc_text.text = "📜 Đã phát động [MƯU ĐỊNH]!"
+			NetworkClient.send_use_skill("Mưu Định", 0)
+			desc_text.text = "📜 Đang phát động [MƯU ĐỊNH]..."
+		else:
+			_execute_local_muu_dinh_start()
+		return
+	if s_num == my_seat and skill_key == "trac_lac":
+		if not is_player_turn or (is_network_mode and current_server_phase != "PLAY"):
+			desc_text.text = "⚠️ [TRÁC LẠC] chỉ dùng trong Giai đoạn Ra bài của bạn."
+			return
+		var cur_hp = int(generals_data.get(my_seat, {}).get("hp", 4))
+		if cur_hp > 2:
+			desc_text.text = "⚠️ [TRÁC LẠC] chỉ kích hoạt khi bạn còn <= 2 Máu."
+			return
+		is_using_trac_lac = not is_using_trac_lac
+		if is_using_trac_lac:
+			desc_text.text = "🍶 [TRÁC LẠC] Chọn 1 lá bài Đen trên tay để dùng như Hủ Rượu (+1 sát thương Trảm)."
+			turn_indicator.text = "🍶 TRÁC LẠC: CHỌN 1 LÁ ĐEN ĐỂ UỐNG RƯỢU"
+		else:
+			desc_text.text = "🍶 Đã hủy chọn [TRÁC LẠC]."
+		_update_action_btn()
+		_refresh_local_skill_buttons(s_num)
 		return
 	if s_num == my_seat and skill_key == "dinh_quoc":
 		if not is_player_turn or current_server_phase != "PLAY":
@@ -2134,6 +2200,7 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 			return
 		is_targeting_dinh_quoc = not is_targeting_dinh_quoc
 		is_targeting_trao_bao = false
+		_clear_trao_bao_equipped_previews()
 		_clear_hung_suc_equipped_weapon_previews()
 		selected_target_seat = -1
 		if is_targeting_dinh_quoc:
@@ -2145,18 +2212,23 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 		_update_action_btn()
 		return
 	if s_num == my_seat and skill_key == "trao_bao":
-		if not is_player_turn or current_server_phase != "PLAY":
+		if not is_player_turn or (is_network_mode and current_server_phase != "PLAY"):
 			desc_text.text = "⚠️ [TRAO BÀO] chỉ dùng trong Giai đoạn Ra bài của bạn."
 			return
 		is_targeting_trao_bao = not is_targeting_trao_bao
 		is_targeting_dinh_quoc = false
+		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
+			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
 		selected_target_seat = -1
+		if selected_card_ui and is_instance_valid(selected_card_ui):
+			selected_card_ui.set_selected(false)
+			selected_card_ui = null
 		if is_targeting_trao_bao:
-			_refresh_hung_suc_equipped_weapon_previews()
+			_refresh_trao_bao_equipped_previews()
 			desc_text.text = "👑 [TRAO BÀO] Chọn 1 trang bị (trên tay hoặc đang đeo) và 1 người chơi nhận bài."
 			turn_indicator.text = "👑 TRAO BÀO: CHỌN TRANG BỊ VÀ NGƯỜI NHẬN"
 		else:
-			_clear_hung_suc_equipped_weapon_previews()
+			_clear_trao_bao_equipped_previews()
 			desc_text.text = "👑 Đã hủy chọn [TRAO BÀO]."
 		_refresh_local_skill_buttons(s_num)
 		_update_action_btn()
@@ -2318,6 +2390,15 @@ func _clear_hung_suc_equipped_weapon_previews() -> void:
 			child.queue_free()
 	_relayout_hand_cards()
 
+func _clear_trao_bao_equipped_previews() -> void:
+	for child in hand_container.get_children():
+		if child.has_meta("trao_bao_equipped_preview"):
+			if selected_card_ui == child:
+				selected_card_ui = null
+			hand_container.remove_child(child)
+			child.queue_free()
+	_relayout_hand_cards()
+
 func _clear_song_cung_equipped_previews() -> void:
 	for child in hand_container.get_children():
 		if child.has_meta("song_cung_equipped_preview"):
@@ -2363,6 +2444,56 @@ func _refresh_song_cung_equipped_previews() -> void:
 			int(equipment.get("subType", -1))
 		)
 		card_ui.set_meta("song_cung_equipped_preview", equipment_id)
+		if card_ui.has_method("set_equipped_badge"):
+			card_ui.set_equipped_badge(true)
+		var c_info = {
+			"id": equipment_id,
+			"name": _get_card_display_name(equipment),
+			"rank": equipment.get("rank", 1),
+			"suit": str(equipment.get("suit", "Spade")),
+			"cat": int(equipment.get("category", 1)),
+			"desc": str(equipment.get("desc", "")),
+			"subType": int(equipment.get("subType", -1)),
+			"is_equipped": true,
+			"card_node": card_ui
+		}
+		card_ui.card_clicked.connect(func(_c): _on_player_hand_card_clicked(card_ui, c_info))
+	_relayout_hand_cards()
+
+func _refresh_trao_bao_equipped_previews() -> void:
+	if not is_targeting_trao_bao or not generals_data.has(my_seat):
+		return
+	var desired: Dictionary = {}
+	var equipment_cards = _get_local_equipment_cards_for_song_cung(generals_data[my_seat])
+	if equipment_cards is Array:
+		for equipment in equipment_cards:
+			if equipment is Dictionary:
+				desired[str(equipment.get("id", ""))] = equipment
+	for child in hand_container.get_children():
+		if not child.has_meta("trao_bao_equipped_preview"):
+			continue
+		var preview_id := str(child.get_meta("trao_bao_equipped_preview"))
+		if desired.has(preview_id):
+			desired.erase(preview_id)
+		else:
+			if selected_card_ui == child:
+				selected_card_ui = null
+			hand_container.remove_child(child)
+			child.queue_free()
+	for equipment_id in desired:
+		var equipment: Dictionary = desired[equipment_id]
+		var card_ui = CardUIScene.instantiate()
+		hand_container.add_child(card_ui)
+		card_ui.setup_card_data(
+			str(equipment.get("id", "")),
+			_get_card_display_name(equipment),
+			equipment.get("rank", 1),
+			str(equipment.get("suit", "Spade")),
+			int(equipment.get("category", 1)),
+			str(equipment.get("desc", "")),
+			int(equipment.get("subType", -1))
+		)
+		card_ui.set_meta("trao_bao_equipped_preview", equipment_id)
 		if card_ui.has_method("set_equipped_badge"):
 			card_ui.set_equipped_badge(true)
 		var c_info = {
@@ -2569,6 +2700,26 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 		card_node.set_selected(true)
 		_update_action_btn()
 		return
+	if is_targeting_trao_bao:
+		var is_eq = int(c_info.get("cat", c_info.get("category", -1))) == 1 or card_node.has_meta("trao_bao_equipped_preview") or card_node.has_meta("hung_suc_equipped_preview")
+		if not is_eq:
+			desc_text.text = "⚠️ [TRAO BÀO] chỉ chọn lá Trang Bị trên tay hoặc đang đeo."
+			return
+		if selected_card_ui == card_node:
+			selected_card_ui.set_selected(false)
+			selected_card_ui = null
+			desc_text.text = "👑 [TRAO BÀO] Chọn 1 trang bị (trên tay hoặc đang đeo) và 1 người chơi nhận bài."
+			_update_action_btn()
+			return
+		if selected_card_ui and is_instance_valid(selected_card_ui) and selected_card_ui != card_node:
+			selected_card_ui.set_selected(false)
+		selected_card_ui = card_node
+		card_node.set_selected(true)
+		AudioManager.play_card_select()
+		var c_name = c_info.get("name", "")
+		desc_text.text = "👑 [TRAO BÀO] Đã chọn [%s]%s. Chọn 1 người chơi nhận bài." % [c_name, " (Đang mang)" if card_node.has_meta("trao_bao_equipped_preview") else ""]
+		_update_action_btn()
+		return
 	if is_targeting_binh_san:
 		if int(c_info.get("cat", c_info.get("category", -1))) != 1 and not card_node.has_meta("hung_suc_equipped_preview"):
 			desc_text.text = "⚠️ [BÌNH SẠN] chỉ bỏ được lá trang bị."
@@ -2742,7 +2893,11 @@ func _handle_rescue_hand_card_selection(card_node: Control, _c_info: Dictionary)
 		AudioManager.play_card_select()
 		var suit_sym = _get_suit_icon(info.get("suit", ""))
 		var rank_str = _format_rank(info.get("rank", 1))
-		rescue_confirm_btn.text = "🍲 DÙNG [%s %s %s]" % [suit_sym, rank_str, c_name.to_upper()]
+		var is_tl_rescue = (c_name != "Bánh Chưng" and c_name != "Hủ Rượu" and _hero_has_skill(generals_data.get(my_seat, {}), "trac_lac") and _is_black_card(info))
+		if is_tl_rescue:
+			rescue_confirm_btn.text = "🍶 TỰ CỨU (TRÁC LẠC) [%s %s]" % [suit_sym, c_name.to_upper()]
+		else:
+			rescue_confirm_btn.text = "🍲 DÙNG [%s %s %s]" % [suit_sym, rank_str, c_name.to_upper()]
 		rescue_confirm_btn.disabled = false
 		var req_msg = _get_rescue_requirement_text(rescue_victim_seat)
 		rescue_desc_lbl.text = "%s\n👉 Đã chọn lá [%s %s %s]. Bấm nút CỨU để xác nhận!" % [req_msg, suit_sym, rank_str, c_name]
@@ -2794,8 +2949,8 @@ func _on_general_avatar_clicked(seat_num: int) -> void:
 		if current_server_phase == "AWAIT_THU_PHUC":
 			var my_hp = int(generals_data[my_seat].get("hp", 0))
 			var tgt_hp = int(g.get("hp", 0))
-			if tgt_hp <= my_hp:
-				desc_text.text = "⚠️ [THU PHỤC] mục tiêu phải có số Máu (%d) lớn hơn bạn (%d)!" % [tgt_hp, my_hp]
+			if tgt_hp < my_hp:
+				desc_text.text = "⚠️ [THU PHỤC] mục tiêu phải có số Máu (%d) không ít hơn bạn (%d)!" % [tgt_hp, my_hp]
 				return
 		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
@@ -3118,7 +3273,7 @@ func _get_card_info_from_ui(ui_node: Control) -> Dictionary:
 		"desc": desc,
 		"cat": cat,
 		"subType": ui_node.card_data.sub_type if ui_node.get("card_data") and ui_node.card_data != null else -1,
-		"is_equipped": ui_node.has_meta("hung_suc_equipped_preview") or ui_node.has_meta("song_cung_equipped_preview"),
+		"is_equipped": ui_node.has_meta("hung_suc_equipped_preview") or ui_node.has_meta("song_cung_equipped_preview") or ui_node.has_meta("trao_bao_equipped_preview"),
 		"card_node": ui_node
 	}
 
@@ -3271,10 +3426,18 @@ func _update_action_btn() -> void:
 	if is_targeting_trao_bao:
 		var tb_target_valid = selected_target_seat > 0 and selected_target_seat != my_seat and generals_data.has(selected_target_seat) and generals_data[selected_target_seat].get("is_alive", false)
 		var tb_card_info = _get_card_info_from_ui(selected_card_ui) if selected_card_ui != null and is_instance_valid(selected_card_ui) else {}
-		var tb_card_valid = not tb_card_info.is_empty() and (int(tb_card_info.get("cat", tb_card_info.get("category", -1))) == 1 or (selected_card_ui != null and selected_card_ui.has_meta("hung_suc_equipped_preview")))
+		var tb_card_valid = not tb_card_info.is_empty() and (int(tb_card_info.get("cat", tb_card_info.get("category", -1))) == 1 or (selected_card_ui != null and (selected_card_ui.has_meta("trao_bao_equipped_preview") or selected_card_ui.has_meta("hung_suc_equipped_preview"))))
 		card_play_btn.visible = true
 		card_play_btn.disabled = not (tb_target_valid and tb_card_valid)
-		card_play_btn.text = "👑 TRAO BÀO → %s" % generals_data[selected_target_seat]["name"] if tb_target_valid and tb_card_valid else "👑 TRAO BÀO: CHỌN TRANG BỊ VÀ MỤC TIÊU"
+		var card_name_str = str(tb_card_info.get("name", "TRANG BỊ"))
+		if tb_target_valid and tb_card_valid:
+			card_play_btn.text = "👑 TRAO [%s] → %s" % [card_name_str.to_upper(), generals_data[selected_target_seat]["name"].to_upper()]
+		elif tb_card_valid:
+			card_play_btn.text = "👑 TRAO BÀO: CHỌN NGƯỜI NHẬN..."
+		elif tb_target_valid:
+			card_play_btn.text = "👑 TRAO BÀO: CHỌN TRANG BỊ..."
+		else:
+			card_play_btn.text = "👑 TRAO BÀO: CHỌN TRANG BỊ VÀ MỤC TIÊU"
 		return
 	if is_targeting_ho_phu_skill:
 		var ho_phu_target_valid = selected_target_seat > 0 and selected_target_seat != my_seat and generals_data.has(selected_target_seat) and generals_data[selected_target_seat].get("is_alive", false)
@@ -3310,8 +3473,28 @@ func _update_action_btn() -> void:
 	var c_name = c_info.get("name", "")
 	card_play_btn.disabled = false
 
+	var p_gen_tl = generals_data.get(my_seat, {})
+	var is_trac_lac_hero = _hero_has_skill(p_gen_tl, "trac_lac") and int(p_gen_tl.get("hp", 4)) <= 2
+	var card_is_black = _is_black_card(c_info)
+
+	if is_using_trac_lac:
+		hich_recast_btn.visible = false
+		if card_is_black:
+			card_play_btn.disabled = false
+			card_play_btn.text = "🍶 UỐNG RƯỢU [TRÁC LẠC]"
+			card_play_btn.visible = true
+			desc_text.text = "🍶 Dùng lá Đen [%s] như Hủ Rượu (+1 sát thương cho đòn Trảm kế tiếp)." % c_name
+		else:
+			card_play_btn.disabled = true
+			card_play_btn.text = "⚠️ CHỌN LÁ MÀU ĐEN (BÍCH/TÉP)"
+			card_play_btn.visible = true
+			desc_text.text = "⚠️ [TRÁC LẠC] chỉ dùng cho lá bài màu Đen (Bích hoặc Tép)!"
+		return
+
 	if "Trảm" in c_name:
-		var slash_limit_reached := slashes_used_this_turn >= 1 and not _has_no_than(generals_data.get(my_seat, {})) and int(generals_data.get(my_seat, {}).get("suc_soi_turns_remaining", 0)) <= 0
+		var p_gen = generals_data.get(my_seat, {})
+		var max_slashes = _get_max_slashes_allowed(p_gen)
+		var slash_limit_reached: bool = slashes_used_this_turn >= max_slashes
 		if slash_limit_reached:
 			card_play_btn.visible = false
 			card_play_btn.disabled = true
@@ -3339,13 +3522,20 @@ func _update_action_btn() -> void:
 			card_play_btn.text = "MÁU ĐÃ ĐẦY (KHÔNG THỂ DÙNG)"
 			card_play_btn.visible = true
 	elif c_name == "Hủ Rượu":
-		card_play_btn.disabled = wine_used_this_turn
-		card_play_btn.text = "🍶 ĐÃ UỐNG RƯỢU TRONG LƯỢT" if wine_used_this_turn else "🍶 UỐNG RƯỢU (+1 SÁT THƯƠNG)"
+		var can_unlimited_wine = _hero_has_skill(generals_data.get(my_seat, {}), "bao_no")
+		card_play_btn.disabled = wine_used_this_turn and not can_unlimited_wine
+		card_play_btn.text = "🍶 ĐÃ UỐNG RƯỢU TRONG LƯỢT" if (wine_used_this_turn and not can_unlimited_wine) else "🍶 UỐNG RƯỢU (+1 SÁT THƯƠNG)"
 		card_play_btn.visible = true
 	elif c_name == "Đỡ":
-		# Đỡ chỉ hợp lệ trong pha phản ứng; trong lượt thường không có hành động để dùng.
-		card_play_btn.visible = false
-		desc_text.text = "🛡️ Lá Đỡ chỉ dùng khi bạn đang bị yêu cầu phản ứng."
+		if is_trac_lac_hero and card_is_black:
+			card_play_btn.disabled = false
+			card_play_btn.text = "🍶 UỐNG RƯỢU [TRÁC LẠC]"
+			card_play_btn.visible = true
+			desc_text.text = "🍶 [TRÁC LẠC] Dùng lá Đỡ màu Đen [%s] như Hủ Rượu (+1 sát thương cho đòn Trảm kế tiếp)." % c_name
+		else:
+			# Đỡ chỉ hợp lệ trong pha phản ứng; trong lượt thường không có hành động để dùng.
+			card_play_btn.visible = false
+			desc_text.text = "🛡️ Lá Đỡ chỉ dùng khi bạn đang bị yêu cầu phản ứng."
 		return
 	elif c_name in ["Kiếm Thuận Thiên", "Song Cung Mường Nhạ", "Nỏ Thần Kim Quy", "Trường Đao Nam Sơn", "Thương Ngâu Lãng Bạc", "Súng Thần Công Hồ Triều"]:
 		card_play_btn.text = "🗡️ TRANG BỊ VŨ KHÍ [%s]" % c_name
@@ -3479,9 +3669,12 @@ func _on_hich_recast_btn_clicked() -> void:
 	if not is_player_turn or not selected_card_ui or not is_instance_valid(selected_card_ui):
 		return
 	var c_info = _get_card_info_from_ui(selected_card_ui)
+	var c_name = c_info.get("name", "")
+	var c_id = str(c_info.get("id", ""))
+	if c_id.is_empty(): c_id = c_name
+
 	if c_info.get("name", "") != "Hịch Tướng Sĩ":
 		return
-	var c_id = str(c_info.get("id", ""))
 	if c_id.is_empty():
 		desc_text.text = "⚠️ Không xác định được lá Hịch Tướng Sĩ để đổi."
 		return
@@ -3715,7 +3908,7 @@ func _on_card_play_btn_clicked() -> void:
 		return
 	if current_server_phase == "AWAIT_THU_PHUC" and current_waiting_seat == my_seat:
 		if selected_target_seat <= 0 or selected_target_seat == my_seat:
-			desc_text.text = "⚠️ [THU PHỤC] hãy chọn 1 người chơi có nhiều máu hơn bạn."
+			desc_text.text = "⚠️ [THU PHỤC] hãy chọn 1 người chơi có số Máu không ít hơn bạn."
 			return
 		NetworkClient.send_respond_action(true, "", "", [], selected_target_seat)
 		card_play_btn.disabled = true
@@ -3812,13 +4005,21 @@ func _on_card_play_btn_clicked() -> void:
 			desc_text.text = "⚠️ [TRAO BÀO] cần chọn 1 trang bị và 1 mục tiêu."
 			return
 		var tb_card = _get_card_info_from_ui(selected_card_ui)
-		var is_tb_eq = int(tb_card.get("cat", tb_card.get("category", -1))) == 1 or selected_card_ui.has_meta("hung_suc_equipped_preview")
+		var is_tb_eq = int(tb_card.get("cat", tb_card.get("category", -1))) == 1 or selected_card_ui.has_meta("trao_bao_equipped_preview") or selected_card_ui.has_meta("hung_suc_equipped_preview")
 		if not is_tb_eq:
 			desc_text.text = "⚠️ [TRAO BÀO] chỉ trao được lá Trang Bị trên tay hoặc đang đeo."
 			return
-		NetworkClient.send_use_skill("Trao Bào", selected_target_seat, str(tb_card.get("id", "")))
+		var card_id_to_send := str(tb_card.get("id", ""))
+		if is_network_mode:
+			NetworkClient.send_use_skill("Trao Bào", selected_target_seat, card_id_to_send)
+		else:
+			_execute_local_trao_bao(selected_target_seat, selected_card_ui, tb_card)
 		is_targeting_trao_bao = false
-		_clear_hung_suc_equipped_weapon_previews()
+		_clear_trao_bao_equipped_previews()
+		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
+			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
+		selected_target_seat = -1
+		selected_card_ui = null
 		_refresh_local_skill_buttons(my_seat)
 		card_play_btn.disabled = true
 		return
@@ -3975,6 +4176,25 @@ func _on_card_play_btn_clicked() -> void:
 	if c_id.is_empty(): c_id = c_name
 	last_played_card_info = c_info.duplicate()
 
+	var p_gen_play = generals_data.get(my_seat, {})
+	var is_trac_lac_hero_play = _hero_has_skill(p_gen_play, "trac_lac") and int(p_gen_play.get("hp", 4)) <= 2
+	var card_is_black_play = _is_black_card(c_info)
+	var is_trac_lac_play = is_using_trac_lac or (is_trac_lac_hero_play and card_is_black_play and (c_name == "Đỡ" or card_play_btn.text.begins_with("🍶 UỐNG RƯỢU")))
+
+	if is_trac_lac_play:
+		if not card_is_black_play:
+			desc_text.text = "⚠️ [TRÁC LẠC] chỉ dùng cho lá bài màu Đen (Bích hoặc Tép)!"
+			return
+		is_using_trac_lac = false
+		if is_network_mode and NetworkClient and NetworkClient.is_connected_to_server:
+			NetworkClient.send_use_skill("Trác Lạc", 0, c_id)
+		else:
+			_execute_local_trac_lac(c_id, selected_card_ui, c_info)
+		_clear_normal_hand_selection()
+		_update_action_btn()
+		_refresh_local_skill_buttons(my_seat)
+		return
+
 	if "Trảm" in c_name:
 		if selected_target_seat <= 0 or not generals_data.has(selected_target_seat):
 			desc_text.text = "⚠️ Vui lòng nhấp chọn 1 Tướng còn sống trên bàn để Trảm!"
@@ -4002,11 +4222,10 @@ func _on_card_play_btn_clicked() -> void:
 				desc_text.text = "🌙 [DẠ TRẠCH] %s không thể trở thành mục tiêu của Trảm khi không có bài trên tay." % tgt["name"]
 			return
 
-		var has_no_than = _has_no_than(p_gen)
-		var has_suc_soi = int(p_gen.get("suc_soi_turns_remaining", 0)) > 0
+		var max_slashes = _get_max_slashes_allowed(p_gen)
 		# Network server owns the Slash limit; local cached counters must not block Bát Nạ follow-ups.
-		if not is_network_mode and slashes_used_this_turn >= 1 and not has_no_than and not has_suc_soi:
-			desc_text.text = "⚠️ Mỗi lượt chỉ được Trảm 1 lần (trừ Nỏ Thần hoặc Sục Sôi)!"
+		if not is_network_mode and slashes_used_this_turn >= max_slashes:
+			desc_text.text = "⚠️ Bạn đã hết số lần Trảm trong lượt này!"
 			return
 		if _offer_lien_chau_after_first_target():
 			return
@@ -4117,7 +4336,8 @@ func _on_card_play_btn_clicked() -> void:
 			DailyQuestSystem.record_progress("heal", 1)
 
 	elif c_name == "Hủ Rượu":
-		if wine_used_this_turn:
+		var can_unlimited_wine = _hero_has_skill(generals_data.get(my_seat, {}), "bao_no")
+		if wine_used_this_turn and not can_unlimited_wine:
 			desc_text.text = "⚠️ Mỗi lượt chỉ được dùng 1 Hủ Rượu để tăng sát thương."
 			return
 		is_wine_buff_active = true
@@ -4762,7 +4982,7 @@ func _sync_player_hand_from_server(server_hand: Array) -> void:
 	# khỏi UI và người chơi không thể chọn để bỏ tiếp.
 	if server_hand.is_empty():
 		for child in hand_container.get_children():
-			if child == exit_battle_btn or child.has_meta("song_cung_equipped_preview"):
+			if child == exit_battle_btn or child.has_meta("song_cung_equipped_preview") or child.has_meta("trao_bao_equipped_preview"):
 				continue
 			selected_song_cung_card_nodes.erase(child)
 			hand_container.remove_child(child)
@@ -4795,7 +5015,7 @@ func _sync_player_hand_from_server(server_hand: Array) -> void:
 
 	var current_cards: Array = []
 	for child in hand_container.get_children():
-		if child == exit_battle_btn or child.has_meta("hung_suc_equipped_preview") or child.has_meta("song_cung_equipped_preview"):
+		if child == exit_battle_btn or child.has_meta("hung_suc_equipped_preview") or child.has_meta("song_cung_equipped_preview") or child.has_meta("trao_bao_equipped_preview"):
 			continue
 		var info = _get_card_info_from_ui(child)
 		current_cards.append([str(info.get("id", "")), str(info.get("name", "")), int(info.get("subType", -1))])
@@ -4820,7 +5040,7 @@ func _sync_player_hand_from_server(server_hand: Array) -> void:
 	# Thu thập các thẻ bài hiện có theo id để tái sử dụng, tránh hủy và tạo lại gây giật/nháy hình
 	var existing_nodes_by_id: Dictionary = {}
 	for child in hand_container.get_children():
-		if child == exit_battle_btn or child.has_meta("hung_suc_equipped_preview") or child.has_meta("song_cung_equipped_preview"):
+		if child == exit_battle_btn or child.has_meta("hung_suc_equipped_preview") or child.has_meta("song_cung_equipped_preview") or child.has_meta("trao_bao_equipped_preview"):
 			continue
 		var cid = str(_get_card_info_from_ui(child).get("id", ""))
 		if not cid.is_empty() and not existing_nodes_by_id.has(cid):
@@ -5110,6 +5330,8 @@ func _sync_player_equipments_from_server(seat: int, equips: Array) -> void:
 	_refresh_local_skill_buttons(seat)
 	if seat == my_seat and (is_targeting_hung_suc or is_targeting_cai_cach):
 		_refresh_hung_suc_equipped_weapon_previews()
+	if seat == my_seat and is_targeting_trao_bao:
+		_refresh_trao_bao_equipped_previews()
 	if seat == my_seat and is_waiting_song_cung:
 		_refresh_song_cung_equipped_previews()
 		_update_song_cung_ui()
@@ -5279,6 +5501,9 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		var server_is_alive = bool(p.get("isAlive", g.get("is_alive", true)))
 		var was_alive = bool(g.get("is_alive", true))
 		g["suc_soi_turns_remaining"] = max(0, int(p.get("sucSoiTurnsRemaining", g.get("suc_soi_turns_remaining", 0))))
+		g["extra_slash_limit"] = max(0, int(p.get("extraSlashLimit", g.get("extra_slash_limit", 0))))
+		if seat == my_seat and g["extra_slash_limit"] > 0:
+			g["than_chinh_slash_bonus"] = true
 		g["is_wine_buff_active"] = bool(p.get("isWineBuffActive", g.get("is_wine_buff_active", false)))
 		g["wine_used_this_turn"] = bool(p.get("wineUsedThisTurn", g.get("wine_used_this_turn", false)))
 		g["an_tich_count"] = int(p.get("anTichCount", 1 if bool(p.get("hasAnTich", false)) else 0))
@@ -5438,6 +5663,10 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		_hide_harvest_modal()
 	if server_phase != "AWAIT_NEAR_DEATH" and is_waiting_rescue:
 		_close_rescue_modal()
+	if server_phase != "AWAIT_MUU_DINH_CHOICE" and muu_dinh_modal and muu_dinh_modal.visible:
+		_close_muu_dinh_modal()
+	if server_phase != "PLAY" and doi_do_modal and doi_do_modal.visible:
+		doi_do_modal.visible = false
 	# Cứu Hấp Hối và Mượn Gươm là các phản ứng độc quyền. Nếu state vừa đổi
 	# pha, không để modal Đỡ/Trảm cũ chiếm lần bấm đầu tiên trên bài trên tay.
 	if server_waiting_seat != my_seat:
@@ -5538,6 +5767,9 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		if server_turn_seat == my_seat:
 			if not is_player_turn:
 				slashes_used_this_turn = int(state.get("slashesUsedThisTurn", 0))
+				doi_do_used_this_turn = false
+				muu_dinh_used_this_turn = false
+				is_using_trac_lac = false
 			is_player_turn = true
 			is_discard_phase = false
 			current_turn_timer = float(server_turn_timer)
@@ -5797,7 +6029,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			elif server_phase == "AWAIT_THU_PHUC":
 				card_play_btn.text = "👑 CHỌN MỤC TIÊU THU PHỤC"
 				turn_indicator.text = "👑 THU PHỤC: LẤY 1 LÁ BÀI TỪ TAY (%ds)" % server_waiting_timer
-				desc_text.text = "Chọn 1 người chơi có nhiều Máu hơn bạn để lấy 1 lá bài ngẫu nhiên từ tay họ."
+				desc_text.text = "Chọn 1 người chơi có số Máu không ít hơn bạn để lấy 1 lá bài ngẫu nhiên từ tay họ."
 			elif server_phase == "AWAIT_PHO_TA":
 				card_play_btn.text = "📜 CHỌN NGƯỜI NHẬN BÀI"
 				turn_indicator.text = "📜 PHÒ TÁ: CHO NGƯỜI KHÁC RÚT 2 LÁ (%ds)" % server_waiting_timer
@@ -5889,6 +6121,26 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		elif server_waiting_seat != my_seat:
 			card_play_btn.visible = false
 			end_turn_btn.visible = false
+
+	elif server_phase == "AWAIT_MUU_DINH_CHOICE":
+		is_player_turn = false
+		card_play_btn.visible = false
+		end_turn_btn.visible = false
+		if server_waiting_seat == my_seat:
+			var cards_to_show = []
+			if state.has("muuDinhCards") and state["muuDinhCards"] is Array and not state["muuDinhCards"].is_empty():
+				cards_to_show = state["muuDinhCards"]
+			elif state.has("pendingMuuDinh") and state["pendingMuuDinh"] is Dictionary and state["pendingMuuDinh"].has("cards"):
+				cards_to_show = state["pendingMuuDinh"]["cards"]
+			_show_muu_dinh_modal(cards_to_show)
+			turn_indicator.text = "📜 MƯU ĐỊNH: CHỌN 1 LÁ & 1 NGƯỜI (%ds)" % server_waiting_timer
+			desc_text.text = "📜 Đang xem 2 lá đầu xấp bài. Hãy chọn 1 lá để trao cho 1 người chơi!"
+		else:
+			_close_muu_dinh_modal()
+			var wait_gen = generals_data.get(server_waiting_seat, {})
+			var wait_name = wait_gen.get("name", "Ghế %d" % server_waiting_seat) if wait_gen is Dictionary else "Ghế %d" % server_waiting_seat
+			turn_indicator.text = "📜 ĐANG CHỜ %s CHỌN MƯU ĐỊNH (%ds)..." % [wait_name, server_waiting_timer]
+			desc_text.text = "📜 %s đang xem 2 lá đầu xấp bài để chọn Mưu Định..." % wait_name
 
 	elif server_phase == "AWAIT_JUDGEMENT":
 		current_waiting_seat = 0
@@ -7218,6 +7470,22 @@ func _on_network_action_received(delta: Dictionary) -> void:
 	elif act_type == "SONG_CUNG_PASSED":
 		var p_desc = str(delta.get("description", "Không kích hoạt Song Cung."))
 		_add_log(p_desc)
+	elif act_type == "TRAO_BAO_OFFERED":
+		if caster_seat == my_seat:
+			is_targeting_trao_bao = false
+			_clear_trao_bao_equipped_previews()
+			if selected_target_seat > 0 and generals_data.has(selected_target_seat):
+				generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
+			selected_target_seat = -1
+			selected_card_ui = null
+			_refresh_local_skill_buttons(my_seat)
+			card_play_btn.visible = false
+		_play_smart_card_rays("Trao Bào", caster_seat, [target_seat])
+		_animate_showcase_card("Trao Bào", str(delta.get("description", "Trao Bào được kích hoạt.")), played_card if not played_card.is_empty() else _get_showcase_card_info(card_name))
+		AudioManager.play_skill()
+	elif act_type == "TRAO_BAO_RESOLVED":
+		_animate_showcase_card("Trao Bào", str(delta.get("description", "Trao Bào đã được hoàn tất.")))
+		AudioManager.play_skill()
 	elif act_type == "HUNG_SUC_TRIGGERED":
 		hung_suc_submission_pending = false
 		is_targeting_hung_suc = false
@@ -7236,6 +7504,34 @@ func _on_network_action_received(delta: Dictionary) -> void:
 	elif act_type == "LAP_LANG_DRAW":
 		_animate_showcase_card("Lập Làng", str(delta.get("description", "Lập Làng rút 2 lá bài.")))
 		AudioManager.play_skill()
+	elif act_type == "MUU_DINH_PROMPT":
+		_animate_showcase_card("Mưu Định", str(delta.get("description", "Đang xem 2 lá đầu xấp bài...")))
+		AudioManager.play_skill()
+	elif act_type == "MUU_DINH_TRIGGERED":
+		_close_muu_dinh_modal()
+		if caster_seat == my_seat:
+			muu_dinh_used_this_turn = true
+			_refresh_local_skill_buttons(my_seat)
+		_play_smart_card_rays("Mưu Định", caster_seat, [target_seat])
+		_animate_showcase_card("Mưu Định", str(delta.get("description", "Mưu Định được kích hoạt.")), played_card if not played_card.is_empty() else _get_showcase_card_info(card_name))
+		AudioManager.play_skill()
+	elif act_type == "THAN_CHINH_BONUS_SLASH":
+		var c_seat = int(delta.get("casterSeat", 0))
+		if generals_data.has(c_seat):
+			generals_data[c_seat]["extra_slash_limit"] = int(generals_data[c_seat].get("extra_slash_limit", 0)) + 1
+			generals_data[c_seat]["than_chinh_slash_bonus"] = true
+		_animate_showcase_card("Thân Chinh", str(delta.get("description", "Được đánh thêm 1 lá Trảm lượt này!")))
+		AudioManager.play_skill()
+		if c_seat == my_seat:
+			_update_action_btn()
+	elif act_type == "TRAC_LAC_WINE":
+		_animate_showcase_card("Trác Lạc", str(delta.get("description", "Trác Lạc dùng lá Đen như Hủ Rượu!")), played_card if not played_card.is_empty() else _get_showcase_card_info(card_name))
+		AudioManager.play_voice("Hủ Rượu")
+		AudioManager.play_skill()
+		if caster_seat == my_seat:
+			is_using_trac_lac = false
+			_update_action_btn()
+			_refresh_local_skill_buttons(my_seat)
 	elif act_type == "UU_THIEP_NO_EQUIPMENT":
 		AudioManager.play_skill()
 		var c_name = generals_data.get(caster_seat, {}).get("name", "Lã Đường")
@@ -7321,6 +7617,8 @@ func _show_activated_skills(activations: Array[Dictionary]) -> void:
 		var owner_seat := int(activation.get("seat", 0))
 		if skill_name.is_empty() or owner_seat <= 0 or not generals_data.has(owner_seat):
 			continue
+		if skill_name == "Thái Bình":
+			generals_data[owner_seat]["thai_binh_buff"] = 2
 		var avatar = generals_data[owner_seat].get("avatar_node")
 		if is_instance_valid(avatar) and avatar.has_method("show_skill_banner"):
 			avatar.show_skill_banner(skill_name.to_upper(), 2.0, true)
@@ -7725,6 +8023,7 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 		_animate_showcase_card("Không Thể Đỡ", "Đòn Trảm không thể bị hóa giải!")
 		_apply_damage_to_general(target_seat, damage_amount, attacker_seat, damage_element)
 		if not is_network_mode:
+			_trigger_local_than_chinh_if_applicable(attacker_seat)
 			_trigger_local_uu_thiep_if_applicable(attacker_seat, target_seat)
 			_restore_turn_timer_to_attacker(attacker_seat, target_seat)
 		return
@@ -7797,6 +8096,7 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 	else:
 		_apply_damage_to_general(target_seat, damage_amount, attacker_seat, damage_element)
 		if not is_network_mode:
+			_trigger_local_than_chinh_if_applicable(attacker_seat)
 			_trigger_local_uu_thiep_if_applicable(attacker_seat, target_seat)
 		_restore_turn_timer_to_attacker(attacker_seat, target_seat)
 
@@ -7874,8 +8174,8 @@ func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_e
 			dodge_khien_may_btn.visible = true
 			dodge_khien_may_btn.disabled = false
 			dodge_khien_may_btn.text = "🎲 LẬT KHIÊN MÂY (ĐỎ = ĐỠ)"
-			if has_sung and forbidden_color != "":
-				dodge_desc_lbl.text = "⚠️ [Trảm] của %s đang tác động lên %s.\nSúng Thần Công không cho phép bạn dùng Đỡ màu %s cho lượt Trảm này.\nBạn có thể [🎲 LẬT KHIÊN MÂY], chọn lá [ĐỠ] hợp lệ trên tay hoặc [💥 CHỊU ĐÒN]:" % [atk["name"], defender_name, forbidden_color]
+			if has_sung:
+				dodge_desc_lbl.text = "⚠️ [Trảm] của %s đang tác động lên %s.\nSúng Thần Công chỉ cho phép dùng lá Đỡ từ 7 trở lên.\nBạn có thể [🎲 LẬT KHIÊN MÂY], chọn lá [ĐỠ] hợp lệ trên tay hoặc [💥 CHỊU ĐÒN]:" % [atk["name"], defender_name]
 			else:
 				dodge_desc_lbl.text = "[Trảm] của %s đang tác động lên %s.\nBạn có thể [🎲 LẬT KHIÊN MÂY], chọn lá [ĐỠ] trên tay hoặc [💥 CHỊU ĐÒN]:" % [atk["name"], defender_name]
 		else:
@@ -7897,8 +8197,8 @@ func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_e
 		_select_dodge_card(null)
 		if has_khien_may and not atk_has_thuan_thien:
 			desc_text.text = "🛡️ Bị Trảm! Bạn có thể bấm [🎲 LẬT KHIÊN MÂY] để phán xét né đòn, hoặc bấm [💥 CHỊU ĐÒN]."
-		elif has_sung and forbidden_color != "":
-			desc_text.text = "⚠️ Bị Trảm bởi Súng Thần Công (cấm Đỡ màu %s) và không có lá Đỡ hợp lệ!" % forbidden_color
+		elif has_sung:
+			desc_text.text = "⚠️ Bị Trảm bởi Súng Thần Công (chỉ nhận Đỡ từ 7 trở lên) và không có lá Đỡ hợp lệ!"
 		else:
 			desc_text.text = "⚠️ Bị Trảm nhưng không có sẵn lá Đỡ! Bạn hãy bấm [💥 CHỊU ĐÒN] hoặc dùng kỹ năng tướng đổi bài."
 
@@ -7971,6 +8271,10 @@ func _is_card_valid_for_reaction(card_ui: Control, required_type: String, attack
 			return true
 		if (c_sub_type == 5 or "hủ rượu" in c_name) and rescue_victim_seat == my_seat:
 			return true
+		if rescue_victim_seat == my_seat and _hero_has_skill(generals_data.get(my_seat, {}), "trac_lac") and int(generals_data.get(my_seat, {}).get("hp", 0)) <= 2:
+			var s_col = _get_card_color(str(info.get("suit", "")))
+			if s_col in ["BLACK", "YELLOW", "BLACK_SPADE", "BLACK_CLUB"] or str(info.get("suit", "")).to_lower() in ["spade", "club", "bich", "chuon", "tep"]:
+				return true
 		return false
 	return false
 
@@ -8368,6 +8672,7 @@ func _on_dodge_passed() -> void:
 	_broadcast_player_battle_action("DODGE_RESPONSE", "pass", dodge_attacker_seat)
 	if not is_network_mode:
 		_apply_damage_to_general(my_seat, incoming_slash_damage, dodge_attacker_seat, incoming_slash_element)
+		_trigger_local_than_chinh_if_applicable(dodge_attacker_seat)
 		_trigger_local_uu_thiep_if_applicable(dodge_attacker_seat, my_seat)
 	else:
 		_add_log("💥 Bạn chấp nhận Chịu Đòn! Đang chờ Server tính sát thương...")
@@ -8498,6 +8803,13 @@ func _get_card_color(suit: String) -> String:
 	if s in ["club", "chuon", "chuồn", "tep", "tép", "vàng", "vang", "yellow", "♣"]: return "YELLOW"
 	if s in ["spade", "bich", "bích", "đen", "den", "black", "♠"]: return "BLACK"
 	return ""
+
+func _is_black_card(info: Dictionary) -> bool:
+	var s = str(info.get("suit", "")).to_lower().strip_edges()
+	var col = _get_card_color(s)
+	if col in ["BLACK", "YELLOW", "BLACK_SPADE", "BLACK_CLUB"]:
+		return true
+	return s in ["spade", "club", "bich", "bích", "chuon", "chuồn", "tep", "tép", "black", "yellow", "♠", "♣"]
 
 func _get_suit_name(suit: String) -> String:
 	var s = suit.to_lower()
@@ -8740,6 +9052,12 @@ func _advance_near_death_rescue() -> void:
 			rescue_idx = idx
 			rescue_name = card_name
 			break
+		if asker_seat == victim_seat and _hero_has_skill(asker, "trac_lac") and int(asker.get("hp", 0)) <= 2:
+			var s_col = _get_card_color(str(card.get("suit", "")))
+			if s_col in ["BLACK", "YELLOW", "BLACK_SPADE", "BLACK_CLUB"] or str(card.get("suit", "")).to_lower() in ["spade", "club", "bich", "chuon", "tep"]:
+				rescue_idx = idx
+				rescue_name = "Hủ Rượu (Trác Lạc)"
+				break
 
 	if rescue_idx >= 0:
 		var rescue_card = asker["hand_cards"].pop_at(rescue_idx)
@@ -8780,8 +9098,13 @@ func _on_rescue_confirmed() -> void:
 		reaction_submission_pending = true
 		reaction_submission_version = last_server_version
 	_broadcast_player_battle_action("RESCUE_RESPONSE", c_id, victim_seat)
-	_animate_showcase_card(c_name, "Bạn cứu sống %s (+1 Máu)!" % victim["name"], info)
-	_add_log("💮 Bạn dùng [%s] cứu sống %s!" % [c_name, victim["name"]])
+	var is_trac_lac_rescue = victim_seat == my_seat and _hero_has_skill(generals_data.get(my_seat, {}), "trac_lac") and int(generals_data.get(my_seat, {}).get("hp", 0)) <= 2 and c_name != "Bánh Chưng" and c_name != "Hủ Rượu"
+	if is_trac_lac_rescue:
+		_animate_showcase_card("Trác Lạc", "Bạn dùng lá Đen [%s] như Hủ Rượu tự cứu (+1 Máu)!" % c_name, info)
+		_add_log("🍶 [TRÁC LẠC] Bạn dùng lá Đen [%s] như Hủ Rượu tự cứu thoát Cận Tử!" % c_name)
+	else:
+		_animate_showcase_card(c_name, "Bạn cứu sống %s (+1 Máu)!" % victim["name"], info)
+		_add_log("💮 Bạn dùng [%s] cứu sống %s!" % [c_name, victim["name"]])
 	if c_name == "Bánh Chưng" and DailyQuestSystem:
 		DailyQuestSystem.record_progress("heal", 1)
 	AudioManager.play_voice(c_name)
@@ -9402,6 +9725,13 @@ func _start_turn(seat_num: int) -> void:
 	lap_lang_triggered_this_turn = false
 	slashes_used_this_turn = 0
 	local_van_an_uses = 0
+	doi_do_used_this_turn = false
+	muu_dinh_used_this_turn = false
+	g["than_chinh_bonus_used"] = false
+	g["extra_slash_limit"] = 0
+	g["than_chinh_slash_bonus"] = false
+	is_using_trac_lac = false
+	g["thai_binh_buff"] = 0
 	g["is_wine_buff_active"] = false
 	g["wine_used_this_turn"] = false
 	if seat_num == my_seat:
@@ -9444,8 +9774,26 @@ func _start_turn(seat_num: int) -> void:
 			return
 
 	# Draw Phase
+	var extra_thai_binh = 0
+	if not skip_draw_phase and (_hero_has_skill(g, "thai_binh") or _hero_has_skill(g, "thai_binh_ly_cong_uan")):
+		var no_one_lost_2_hp = true
+		for s in range(1, battle_seat_count + 1):
+			if generals_data.has(s) and generals_data[s].get("is_alive", false):
+				var p_hp = int(generals_data[s].get("hp", 0))
+				var p_max = int(generals_data[s].get("max_hp", 4))
+				if p_max - p_hp >= 2:
+					no_one_lost_2_hp = false
+					break
+		if no_one_lost_2_hp:
+			extra_thai_binh = 2
+			g["thai_binh_buff"] = 2
+			if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
+				g["avatar_node"].show_skill_banner("THÁI BÌNH", 2.0, true)
+			_add_log("🕊️ %s kích hoạt [Thái Bình], không ai mất từ 2 Máu trở lên nên rút thêm 2 lá và giới hạn giữ bài +2 lượt này." % g["name"])
+
 	if not skip_draw_phase:
-		for k in range(2):
+		var draw_cards_count = 2 + extra_thai_binh
+		for k in range(draw_cards_count):
 			var card_info = _draw_card_from_pile()
 			if g["isPlayer"]:
 				_add_card_to_player_hand(card_info)
@@ -10234,6 +10582,8 @@ func _wait_for_ai_card_play() -> void:
 
 func _get_general_hand_limit(general: Dictionary) -> int:
 	var limit = int(general.get("hp", 0))
+	if general.get("thai_binh_buff", 0) > 0:
+		limit += int(general.get("thai_binh_buff", 0))
 	if _hero_has_skill(general, "xung_de") and int(general.get("hp", 0)) == int(general.get("max_hp", 0)):
 		limit += 2
 	var has_horse_or_armor = not str(general.get("equipped_armor", "")).is_empty() \
@@ -10247,7 +10597,7 @@ func _get_general_hand_limit(general: Dictionary) -> int:
 			if not str(general.get(equipment_key, "")).is_empty():
 				equipment_count += 1
 		var x = int(ceil(float(equipment_count) / 2.0))
-		limit += x + 1
+		limit += x
 	return limit
 
 func _on_end_turn_btn_clicked() -> void:
@@ -10284,7 +10634,8 @@ func _on_end_turn_btn_clicked() -> void:
 		NetworkClient.send_respond_action(true, str(_get_card_info_from_ui(selected_card_ui).get("id", "")))
 		card_play_btn.disabled = true
 		return
-	if current_server_phase in ["AWAIT_AN_DAN", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_TRUNG_KIEN", "AWAIT_VAN_SACH", "AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_TRAO_BAO_EQUIP"] and current_waiting_seat == my_seat:
+	if current_server_phase in ["AWAIT_AN_DAN", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_TRUNG_KIEN", "AWAIT_VAN_SACH", "AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_MUU_DINH_CHOICE"] and current_waiting_seat == my_seat:
+		_close_muu_dinh_modal()
 		NetworkClient.send_respond_action(false, "")
 		end_turn_btn.disabled = true
 		return
@@ -10321,6 +10672,10 @@ func _on_end_turn_btn_clicked() -> void:
 		return
 
 	# 2. Nếu có bài thừa so với máu: chuyển sang pha bỏ bài bắt buộc
+	if is_targeting_trao_bao:
+		is_targeting_trao_bao = false
+		_clear_trao_bao_equipped_previews()
+		_refresh_local_skill_buttons(my_seat)
 	if excess > 0:
 		_enter_discard_phase(excess)
 		if is_network_mode:
@@ -10337,6 +10692,9 @@ func _on_end_turn_btn_clicked() -> void:
 	_finish_player_end_turn()
 
 func _on_player_turn_timeout() -> void:
+	if is_targeting_trao_bao:
+		is_targeting_trao_bao = false
+		_clear_trao_bao_equipped_previews()
 	var p_gen = generals_data[my_seat]
 	var hand_limit = _get_general_hand_limit(p_gen)
 	var auto_discard_ids: Array = []
@@ -10381,8 +10739,10 @@ func _finish_player_end_turn(send_network_end_turn: bool = true) -> void:
 	is_targeting_thien_cam = false
 	is_targeting_dinh_quoc = false
 	is_targeting_trao_bao = false
+	is_using_trac_lac = false
 	hung_suc_submission_pending = false
 	_clear_hung_suc_equipped_weapon_previews()
+	_clear_trao_bao_equipped_previews()
 	selected_two_card_skill_nodes.clear()
 	_refresh_local_skill_buttons(my_seat)
 	slashes_used_this_turn = 0
@@ -10392,6 +10752,9 @@ func _finish_player_end_turn(send_network_end_turn: bool = true) -> void:
 	if generals_data.has(my_seat):
 		generals_data[my_seat]["is_wine_buff_active"] = false
 		generals_data[my_seat]["wine_used_this_turn"] = false
+		generals_data[my_seat]["than_chinh_bonus_used"] = false
+		generals_data[my_seat]["extra_slash_limit"] = 0
+		generals_data[my_seat]["than_chinh_slash_bonus"] = false
 	selected_discard_nodes.clear()
 	end_turn_btn.visible = false
 	card_play_btn.visible = false
@@ -13399,3 +13762,811 @@ func _trigger_local_uu_thiep_if_applicable(attacker_seat: int, target_seat: int)
 		AudioManager.play_skill()
 		_animate_showcase_card(item_name, "%s dùng Ưu Thiếp cướp [%s] từ %s!" % [atk.get("name", "Lã Đường"), item_name, owner_gen.get("name", "Ghế %d" % owner_seat)], stolen_card)
 		_add_log("🐎 [ƯU THIẾP] <b>%s</b> cướp trang bị [%s] của <b>%s</b>!" % [atk.get("name", "Lã Đường"), item_name, owner_gen.get("name", "Ghế %d" % owner_seat)])
+
+
+# ==========================================================
+# 🏯 DỜI ĐÔ (LÝ CÔNG UẨN): CHỌN NGƯỜI CHƠI NHẬN BÀI HOẶC TỪ CHỐI
+# ==========================================================
+func _ensure_doi_do_modal() -> void:
+	if doi_do_modal != null and is_instance_valid(doi_do_modal):
+		return
+
+	doi_do_modal = Control.new()
+	doi_do_modal.name = "DoiDoModal"
+	doi_do_modal.set_anchors_preset(Control.PRESET_FULL_RECT)
+	doi_do_modal.mouse_filter = Control.MOUSE_FILTER_STOP
+	doi_do_modal.z_index = 250
+	add_child(doi_do_modal)
+
+	var dim = ColorRect.new()
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.color = Color(0, 0, 0, 0.75)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	doi_do_modal.add_child(dim)
+
+	var center = CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.add_child(center)
+
+	var panel = PanelContainer.new()
+	panel.custom_minimum_size = Vector2(820, 360)
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.08, 0.12, 0.20, 0.98)
+	style.border_width_left = 3
+	style.border_width_top = 3
+	style.border_width_right = 3
+	style.border_width_bottom = 3
+	style.border_color = Color(0.92, 0.75, 0.28, 1.0)
+	style.corner_radius_top_left = 16
+	style.corner_radius_top_right = 16
+	style.corner_radius_bottom_left = 16
+	style.corner_radius_bottom_right = 16
+	style.shadow_color = Color(0, 0, 0, 0.6)
+	style.shadow_size = 12
+	style.shadow_offset = Vector2(0, 6)
+	panel.add_theme_stylebox_override("panel", style)
+	center.add_child(panel)
+
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	panel.add_child(margin)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	margin.add_child(vbox)
+
+	var title_lbl = Label.new()
+	title_lbl.text = "🏯 DỜI ĐÔ - LÝ CÔNG UẨN"
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.add_theme_font_size_override("font_size", 20)
+	title_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.35, 1.0))
+	vbox.add_child(title_lbl)
+
+	var desc_lbl = Label.new()
+	desc_lbl.text = "Bạn sẽ bỏ toàn bộ bài trên tay để rút lại số lượng tương đương + 1 lá.\nSau đó, bạn có thể chọn tối đa 4 người chơi để mỗi người rút 1 lá bài:"
+	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	desc_lbl.add_theme_font_size_override("font_size", 12)
+	desc_lbl.add_theme_color_override("font_color", Color(0.85, 0.9, 0.98, 1.0))
+	vbox.add_child(desc_lbl)
+
+	var scroll = ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(760, 140)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vbox.add_child(scroll)
+
+	doi_do_grid = HBoxContainer.new()
+	doi_do_grid.alignment = BoxContainer.ALIGNMENT_CENTER
+	doi_do_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	doi_do_grid.add_theme_constant_override("separation", 14)
+	scroll.add_child(doi_do_grid)
+
+	doi_do_status_lbl = Label.new()
+	doi_do_status_lbl.text = "👉 Đã chọn: 0/4 người chơi."
+	doi_do_status_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	doi_do_status_lbl.add_theme_font_size_override("font_size", 12)
+	doi_do_status_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.55, 1.0))
+	vbox.add_child(doi_do_status_lbl)
+
+	var btn_hbox = HBoxContainer.new()
+	btn_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	btn_hbox.add_theme_constant_override("separation", 16)
+	vbox.add_child(btn_hbox)
+
+	doi_do_confirm_btn = Button.new()
+	doi_do_confirm_btn.text = "✅ XÁC NHẬN CHO BÀI (0 NGƯỜI)"
+	doi_do_confirm_btn.custom_minimum_size = Vector2(230, 42)
+	doi_do_confirm_btn.focus_mode = Control.FOCUS_NONE
+	var confirm_style = StyleBoxFlat.new()
+	confirm_style.bg_color = Color(0.18, 0.40, 0.22, 0.95)
+	confirm_style.border_width_left = 2
+	confirm_style.border_width_top = 2
+	confirm_style.border_width_right = 2
+	confirm_style.border_width_bottom = 2
+	confirm_style.border_color = Color(0.85, 0.75, 0.3, 1.0)
+	confirm_style.corner_radius_top_left = 8
+	confirm_style.corner_radius_top_right = 8
+	confirm_style.corner_radius_bottom_right = 8
+	confirm_style.corner_radius_bottom_left = 8
+	doi_do_confirm_btn.add_theme_stylebox_override("normal", confirm_style)
+	doi_do_confirm_btn.add_theme_font_size_override("font_size", 13)
+	doi_do_confirm_btn.add_theme_color_override("font_color", Color.WHITE)
+	doi_do_confirm_btn.pressed.connect(_on_doi_do_confirmed)
+	btn_hbox.add_child(doi_do_confirm_btn)
+
+	doi_do_decline_btn = Button.new()
+	doi_do_decline_btn.text = "❌ TỪ CHỐI CHO BÀI (CHỈ RÚT BẢN THÂN)"
+	doi_do_decline_btn.custom_minimum_size = Vector2(280, 42)
+	doi_do_decline_btn.focus_mode = Control.FOCUS_NONE
+	var decline_style = StyleBoxFlat.new()
+	decline_style.bg_color = Color(0.40, 0.20, 0.20, 0.95)
+	decline_style.border_width_left = 2
+	decline_style.border_width_top = 2
+	decline_style.border_width_right = 2
+	decline_style.border_width_bottom = 2
+	decline_style.border_color = Color(0.85, 0.4, 0.4, 1.0)
+	decline_style.corner_radius_top_left = 8
+	decline_style.corner_radius_top_right = 8
+	decline_style.corner_radius_bottom_right = 8
+	decline_style.corner_radius_bottom_left = 8
+	doi_do_decline_btn.add_theme_stylebox_override("normal", decline_style)
+	doi_do_decline_btn.add_theme_font_size_override("font_size", 13)
+	doi_do_decline_btn.add_theme_color_override("font_color", Color(1.0, 0.9, 0.9, 1.0))
+	doi_do_decline_btn.pressed.connect(_on_doi_do_declined)
+	btn_hbox.add_child(doi_do_decline_btn)
+
+	doi_do_cancel_btn = Button.new()
+	doi_do_cancel_btn.text = "🔙 HỦY BỎ"
+	doi_do_cancel_btn.custom_minimum_size = Vector2(120, 42)
+	doi_do_cancel_btn.focus_mode = Control.FOCUS_NONE
+	var cancel_style = StyleBoxFlat.new()
+	cancel_style.bg_color = Color(0.18, 0.22, 0.28, 0.95)
+	cancel_style.border_width_left = 1
+	cancel_style.border_width_top = 1
+	cancel_style.border_width_right = 1
+	cancel_style.border_width_bottom = 1
+	cancel_style.border_color = Color(0.5, 0.55, 0.65, 0.8)
+	cancel_style.corner_radius_top_left = 8
+	cancel_style.corner_radius_top_right = 8
+	cancel_style.corner_radius_bottom_right = 8
+	cancel_style.corner_radius_bottom_left = 8
+	doi_do_cancel_btn.add_theme_stylebox_override("normal", cancel_style)
+	doi_do_cancel_btn.add_theme_font_size_override("font_size", 13)
+	doi_do_cancel_btn.add_theme_color_override("font_color", Color(0.8, 0.85, 0.9, 1.0))
+	doi_do_cancel_btn.pressed.connect(func():
+		if doi_do_modal and is_instance_valid(doi_do_modal):
+			doi_do_modal.visible = false
+	)
+	btn_hbox.add_child(doi_do_cancel_btn)
+
+	doi_do_modal.visible = false
+
+func _show_doi_do_modal() -> void:
+	_ensure_doi_do_modal()
+	selected_doi_do_seats.clear()
+	for child in doi_do_grid.get_children():
+		child.queue_free()
+
+	for s in range(1, battle_seat_count + 1):
+		if not generals_data.has(s):
+			continue
+		var g = generals_data[s]
+		if not g.get("is_alive", false):
+			continue
+
+		var item_box = PanelContainer.new()
+		item_box.custom_minimum_size = Vector2(150, 115)
+		var style = StyleBoxFlat.new()
+		style.bg_color = Color(0.1, 0.14, 0.22, 0.95)
+		style.border_width_left = 2
+		style.border_width_top = 2
+		style.border_width_right = 2
+		style.border_width_bottom = 2
+		style.border_color = Color(0.83, 0.68, 0.22, 0.8)
+		style.corner_radius_top_left = 8
+		style.corner_radius_top_right = 8
+		style.corner_radius_bottom_right = 8
+		style.corner_radius_bottom_left = 8
+		item_box.add_theme_stylebox_override("panel", style)
+
+		var margin = MarginContainer.new()
+		margin.add_theme_constant_override("margin_left", 8)
+		margin.add_theme_constant_override("margin_top", 8)
+		margin.add_theme_constant_override("margin_right", 8)
+		margin.add_theme_constant_override("margin_bottom", 8)
+		item_box.add_child(margin)
+
+		var vbox = VBoxContainer.new()
+		vbox.add_theme_constant_override("separation", 3)
+		margin.add_child(vbox)
+
+		var is_ally = g.get("isDragon", false) == my_team_is_dragon
+		var role_tag = "(Bạn)" if s == my_seat else ("(Đồng Đội)" if is_ally else "(Đối Thủ)")
+		var name_lbl = Label.new()
+		name_lbl.text = "[%d] %s" % [s, g.get("name", "Ghế %d" % s)]
+		name_lbl.add_theme_font_size_override("font_size", 12)
+		name_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5, 1.0))
+		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(name_lbl)
+
+		var role_lbl = Label.new()
+		role_lbl.text = role_tag
+		role_lbl.add_theme_font_size_override("font_size", 10)
+		role_lbl.add_theme_color_override("font_color", Color(0.4, 0.8, 1.0, 1.0) if (s == my_seat or is_ally) else Color(1.0, 0.5, 0.5, 1.0))
+		role_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(role_lbl)
+
+		var hp_lbl = Label.new()
+		hp_lbl.text = "❤️ %d/%d Máu" % [int(g.get("hp", 0)), int(g.get("max_hp", 4))]
+		hp_lbl.add_theme_font_size_override("font_size", 10)
+		hp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(hp_lbl)
+
+		var check_btn = Button.new()
+		check_btn.text = "☐ CHỌN"
+		check_btn.custom_minimum_size = Vector2(0, 26)
+		check_btn.add_theme_font_size_override("font_size", 11)
+		check_btn.focus_mode = Control.FOCUS_NONE
+		vbox.add_child(check_btn)
+
+		var s_target = s
+		check_btn.pressed.connect(func(): _toggle_doi_do_selection(s_target))
+		doi_do_grid.add_child(item_box)
+
+	_update_doi_do_ui()
+	doi_do_modal.visible = true
+
+func _toggle_doi_do_selection(s: int) -> void:
+	if s in selected_doi_do_seats:
+		selected_doi_do_seats.erase(s)
+	else:
+		if selected_doi_do_seats.size() >= 4:
+			desc_text.text = "⚠️ [DỜI ĐÔ] chỉ được chọn tối đa 4 người chơi!"
+			return
+		selected_doi_do_seats.append(s)
+
+	AudioManager.play_card_select()
+	_update_doi_do_ui()
+
+func _update_doi_do_ui() -> void:
+	var count = selected_doi_do_seats.size()
+	doi_do_status_lbl.text = "👉 Đã chọn: %d/4 người chơi." % count if count > 0 else "👉 Chưa chọn ai (có thể nhấn Xác nhận nếu chỉ muốn cho %d người, hoặc Từ chối)." % count
+	doi_do_confirm_btn.text = "✅ XÁC NHẬN CHO BÀI (%d NGƯỜI)" % count if count > 0 else "✅ XÁC NHẬN (0 NGƯỜI)"
+
+	var child_idx = 0
+	for s in range(1, battle_seat_count + 1):
+		if not generals_data.has(s) or not generals_data[s].get("is_alive", false):
+			continue
+		if child_idx < doi_do_grid.get_child_count():
+			var item_box = doi_do_grid.get_child(child_idx) as PanelContainer
+			var vbox = item_box.get_child(0).get_child(0) as VBoxContainer
+			var check_btn = vbox.get_child(3) as Button
+			var is_sel = (s in selected_doi_do_seats)
+			var style = item_box.get_theme_stylebox("panel") as StyleBoxFlat
+			if is_sel:
+				style.bg_color = Color(0.18, 0.35, 0.22, 0.98)
+				style.border_color = Color(1.0, 0.9, 0.35, 1.0)
+				check_btn.text = "☑ ĐÃ CHỌN"
+				check_btn.modulate = Color(1.0, 0.95, 0.4)
+			else:
+				style.bg_color = Color(0.1, 0.14, 0.22, 0.95)
+				style.border_color = Color(0.83, 0.68, 0.22, 0.8)
+				check_btn.text = "☐ CHỌN"
+				check_btn.modulate = Color(1, 1, 1)
+		child_idx += 1
+
+func _on_doi_do_confirmed() -> void:
+	if doi_do_modal and is_instance_valid(doi_do_modal):
+		doi_do_modal.visible = false
+	doi_do_used_this_turn = true
+	var chosen = selected_doi_do_seats.duplicate()
+	if is_network_mode and NetworkClient and NetworkClient.is_connected_to_server:
+		var targets_str = ""
+		for i in range(chosen.size()):
+			targets_str += str(chosen[i]) if i == 0 else ("," + str(chosen[i]))
+		NetworkClient.send_use_skill("Dời Đô", 0, targets_str if not targets_str.is_empty() else "NONE")
+	else:
+		_execute_local_doi_do(chosen)
+	_refresh_local_skill_buttons(my_seat)
+
+func _on_doi_do_declined() -> void:
+	if doi_do_modal and is_instance_valid(doi_do_modal):
+		doi_do_modal.visible = false
+	doi_do_used_this_turn = true
+	if is_network_mode and NetworkClient and NetworkClient.is_connected_to_server:
+		NetworkClient.send_use_skill("Dời Đô", 0, "DECLINE")
+	else:
+		_execute_local_doi_do([])
+	_refresh_local_skill_buttons(my_seat)
+
+func _execute_local_trao_bao(target_seat: int, card_ui_node: Control, card_info: Dictionary) -> void:
+	if not generals_data.has(target_seat) or not generals_data.has(my_seat):
+		return
+	var card_id = str(card_info.get("id", ""))
+	var is_preview = card_ui_node != null and is_instance_valid(card_ui_node) and card_ui_node.has_meta("trao_bao_equipped_preview")
+	if is_preview or card_id.begins_with("LOCAL_EQUIP_") or card_info.get("is_equipped", false):
+		_remove_local_equipment_for_song_cung(card_id)
+	else:
+		if card_ui_node != null and is_instance_valid(card_ui_node):
+			_discard_player_card(card_ui_node)
+	var target = generals_data[target_seat]
+	var max_hp = int(target.get("max_hp", 3))
+	target["hp"] = min(max_hp, int(target.get("hp", 1)) + 1)
+	if target.has("avatar_node") and is_instance_valid(target["avatar_node"]):
+		target["avatar_node"].update_hp(target["hp"], max_hp)
+	var drawn_card = _draw_card_from_pile()
+	_add_card_to_player_hand(drawn_card)
+	_animate_showcase_card("Trao Bào", "Trao trang bị [%s] cho %s!" % [card_info.get("name", "Trang Bị"), target.get("name", "Đồng đội")])
+	_add_log("👑 [TRAO BÀO] %s trao trang bị [%s] cho %s: %s hồi 1 máu, %s rút 1 lá." % [
+		generals_data[my_seat]["name"],
+		card_info.get("name", "Trang Bị"),
+		target["name"],
+		target["name"],
+		generals_data[my_seat]["name"]
+	])
+	AudioManager.play_skill()
+
+func _execute_local_doi_do(chosen_seats: Array) -> void:
+	var g = generals_data.get(my_seat, {})
+	if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
+		g["avatar_node"].show_skill_banner("DỜI ĐÔ", 2.0, true)
+
+	# Bỏ toàn bộ bài trên tay
+	var discarded_count = hand_container.get_child_count()
+	for child in hand_container.get_children():
+		child.queue_free()
+	# Rút lại số lượng tương đương + 1
+	for k in range(discarded_count + 1):
+		_add_card_to_player_hand(_draw_card_from_pile())
+	g["hand_count"] = hand_container.get_child_count()
+	if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
+		g["avatar_node"].update_hand_count(g["hand_count"])
+
+	# Cho những người được chọn rút 1 lá
+	for s in chosen_seats:
+		var s_num = int(s)
+		if generals_data.has(s_num) and generals_data[s_num].get("is_alive", false):
+			var card_drawn = _draw_card_from_pile()
+			if s_num == my_seat:
+				_add_card_to_player_hand(card_drawn)
+			else:
+				generals_data[s_num]["hand_cards"].append(card_drawn)
+				generals_data[s_num]["hand_count"] = generals_data[s_num]["hand_cards"].size()
+				if generals_data[s_num].has("avatar_node") and is_instance_valid(generals_data[s_num]["avatar_node"]):
+					generals_data[s_num]["avatar_node"].update_hand_count(generals_data[s_num]["hand_count"])
+
+	if chosen_seats.is_empty():
+		_add_log("🏯 %s kích hoạt [Dời Đô], bỏ %d lá rút %d lá (từ chối cho bài người khác)." % [g["name"], discarded_count, discarded_count + 1])
+	else:
+		var names_list: Array = []
+		for s in chosen_seats:
+			if generals_data.has(int(s)):
+				names_list.append(generals_data[int(s)]["name"])
+		_add_log("🏯 %s kích hoạt [Dời Đô], bỏ %d lá rút %d lá, và cho %s mỗi người rút 1 lá." % [g["name"], discarded_count, discarded_count + 1, ", ".join(names_list)])
+	_update_action_btn()
+
+# ==========================================================
+# 📜 MƯU ĐỊNH - ĐÀO CAM MỘC MODAL
+# ==========================================================
+func _ensure_muu_dinh_modal() -> void:
+	if muu_dinh_modal != null and is_instance_valid(muu_dinh_modal):
+		return
+
+	muu_dinh_modal = Control.new()
+	muu_dinh_modal.name = "MuuDinhModal"
+	muu_dinh_modal.set_anchors_preset(Control.PRESET_FULL_RECT)
+	muu_dinh_modal.mouse_filter = Control.MOUSE_FILTER_STOP
+	muu_dinh_modal.z_index = 250
+	add_child(muu_dinh_modal)
+
+	var dim = ColorRect.new()
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.color = Color(0, 0, 0, 0.75)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	muu_dinh_modal.add_child(dim)
+
+	var center = CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.add_child(center)
+
+	var panel = PanelContainer.new()
+	panel.custom_minimum_size = Vector2(860, 520)
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.08, 0.12, 0.20, 0.98)
+	style.border_width_left = 3
+	style.border_width_top = 3
+	style.border_width_right = 3
+	style.border_width_bottom = 3
+	style.border_color = Color(0.92, 0.75, 0.28, 1.0)
+	style.corner_radius_top_left = 16
+	style.corner_radius_top_right = 16
+	style.corner_radius_bottom_left = 16
+	style.corner_radius_bottom_right = 16
+	style.shadow_color = Color(0, 0, 0, 0.6)
+	style.shadow_size = 12
+	style.shadow_offset = Vector2(0, 6)
+	panel.add_theme_stylebox_override("panel", style)
+	center.add_child(panel)
+
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_top", 18)
+	margin.add_theme_constant_override("margin_bottom", 18)
+	panel.add_child(margin)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	margin.add_child(vbox)
+
+	var title_lbl = Label.new()
+	title_lbl.text = "📜 MƯU ĐỊNH - ĐÀO CAM MỘC"
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.add_theme_font_size_override("font_size", 20)
+	title_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.35, 1.0))
+	vbox.add_child(title_lbl)
+
+	var desc_lbl = Label.new()
+	desc_lbl.text = "Xem 2 lá trên cùng xấp rút: Chọn 1 lá để trao cho 1 người chơi, lá còn lại sẽ đặt về đầu xấp rút."
+	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	desc_lbl.add_theme_font_size_override("font_size", 12)
+	desc_lbl.add_theme_color_override("font_color", Color(0.85, 0.9, 0.98, 1.0))
+	vbox.add_child(desc_lbl)
+
+	var step1_lbl = Label.new()
+	step1_lbl.text = "Bước 1: Chọn 1 trong 2 lá để TRAO ĐI (lá còn lại sẽ trả về đầu xấp bài)"
+	step1_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	step1_lbl.add_theme_font_size_override("font_size", 13)
+	step1_lbl.add_theme_color_override("font_color", Color(0.4, 0.9, 1.0, 1.0))
+	vbox.add_child(step1_lbl)
+
+	muu_dinh_cards_container = HBoxContainer.new()
+	muu_dinh_cards_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	muu_dinh_cards_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	muu_dinh_cards_container.add_theme_constant_override("separation", 24)
+	vbox.add_child(muu_dinh_cards_container)
+
+	var step2_lbl = Label.new()
+	step2_lbl.text = "Bước 2: Chọn 1 người chơi để NHẬN LÁ BÀI ĐÃ CHỌN"
+	step2_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	step2_lbl.add_theme_font_size_override("font_size", 13)
+	step2_lbl.add_theme_color_override("font_color", Color(0.4, 0.9, 1.0, 1.0))
+	vbox.add_child(step2_lbl)
+
+	var scroll = ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(800, 110)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vbox.add_child(scroll)
+
+	muu_dinh_targets_container = HBoxContainer.new()
+	muu_dinh_targets_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	muu_dinh_targets_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	muu_dinh_targets_container.add_theme_constant_override("separation", 12)
+	scroll.add_child(muu_dinh_targets_container)
+
+	muu_dinh_status_lbl = Label.new()
+	muu_dinh_status_lbl.text = "👉 Hãy chọn 1 lá bài và 1 người chơi nhận bài."
+	muu_dinh_status_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	muu_dinh_status_lbl.add_theme_font_size_override("font_size", 13)
+	muu_dinh_status_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.55, 1.0))
+	vbox.add_child(muu_dinh_status_lbl)
+
+	var btn_hbox = HBoxContainer.new()
+	btn_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	btn_hbox.add_theme_constant_override("separation", 16)
+	vbox.add_child(btn_hbox)
+
+	muu_dinh_confirm_btn = Button.new()
+	muu_dinh_confirm_btn.text = "✅ XÁC NHẬN MƯU ĐỊNH"
+	muu_dinh_confirm_btn.custom_minimum_size = Vector2(220, 36)
+	muu_dinh_confirm_btn.disabled = true
+	muu_dinh_confirm_btn.pressed.connect(_on_muu_dinh_confirmed)
+	btn_hbox.add_child(muu_dinh_confirm_btn)
+
+	muu_dinh_cancel_btn = Button.new()
+	muu_dinh_cancel_btn.text = "❌ ĐÓNG"
+	muu_dinh_cancel_btn.custom_minimum_size = Vector2(120, 36)
+	muu_dinh_cancel_btn.pressed.connect(_on_muu_dinh_cancelled)
+	btn_hbox.add_child(muu_dinh_cancel_btn)
+
+	muu_dinh_modal.visible = false
+
+func _show_muu_dinh_modal(cards: Array) -> void:
+	_ensure_muu_dinh_modal()
+	muu_dinh_peeked_cards = cards.duplicate()
+	selected_muu_dinh_card_idx = 0 if not cards.is_empty() else -1
+	selected_muu_dinh_target_seat = -1
+
+	for child in muu_dinh_cards_container.get_children():
+		child.queue_free()
+
+	for child in muu_dinh_targets_container.get_children():
+		child.queue_free()
+
+	for i in range(cards.size()):
+		var c = cards[i]
+		if not (c is Dictionary):
+			continue
+		var c_id = str(c.get("id", "c_%d" % i))
+		var c_name = str(c.get("name", "Bài"))
+		var c_rank = int(c.get("rank", 1))
+		var c_suit = str(c.get("suit", "SPADE"))
+		var c_cat = int(c.get("category", 1))
+		var c_desc = str(c.get("desc", ""))
+		var c_sub = int(c.get("subType", 0))
+
+		if CardDatabase and (c_desc.is_empty() or c_sub == 0):
+			var db_info = CardDatabase.get_card_info(c_id)
+			if not db_info.is_empty():
+				if c_sub == 0 and db_info.has("subType"):
+					c_sub = int(db_info["subType"])
+				if c_desc.is_empty() and db_info.has("desc"):
+					c_desc = str(db_info["desc"])
+
+		var card_wrapper = PanelContainer.new()
+		card_wrapper.custom_minimum_size = Vector2(170, 200)
+		var wrap_style = StyleBoxFlat.new()
+		wrap_style.bg_color = Color(0.1, 0.14, 0.22, 0.95)
+		wrap_style.border_width_left = 2
+		wrap_style.border_width_top = 2
+		wrap_style.border_width_right = 2
+		wrap_style.border_width_bottom = 2
+		wrap_style.border_color = Color(0.83, 0.68, 0.22, 0.8)
+		wrap_style.corner_radius_top_left = 8
+		wrap_style.corner_radius_top_right = 8
+		wrap_style.corner_radius_bottom_right = 8
+		wrap_style.corner_radius_bottom_left = 8
+		card_wrapper.add_theme_stylebox_override("panel", wrap_style)
+
+		var card_vbox = VBoxContainer.new()
+		card_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		card_vbox.add_theme_constant_override("separation", 6)
+		card_wrapper.add_child(card_vbox)
+
+		var card_ui = CardUIScene.instantiate()
+		card_ui.custom_minimum_size = Vector2(120, 160)
+		card_vbox.add_child(card_ui)
+		card_ui.setup_card_data(c_id, c_name, c_rank, c_suit, c_cat, c_desc, c_sub)
+
+		var action_btn = Button.new()
+		action_btn.text = "☐ CHỌN TRAO ĐI"
+		action_btn.custom_minimum_size = Vector2(150, 26)
+		action_btn.add_theme_font_size_override("font_size", 11)
+		action_btn.focus_mode = Control.FOCUS_NONE
+		card_vbox.add_child(action_btn)
+
+		var idx = i
+		card_ui.card_clicked.connect(func(_node): _select_muu_dinh_card(idx))
+		action_btn.pressed.connect(func(): _select_muu_dinh_card(idx))
+
+		muu_dinh_cards_container.add_child(card_wrapper)
+
+	var my_team_is_dragon = generals_data.get(my_seat, {}).get("isDragon", false) if generals_data.has(my_seat) else false
+	for s in range(1, battle_seat_count + 1):
+		if not generals_data.has(s) or not generals_data[s].get("is_alive", false):
+			continue
+		var g = generals_data[s]
+		var item_box = PanelContainer.new()
+		item_box.custom_minimum_size = Vector2(150, 95)
+		var style = StyleBoxFlat.new()
+		style.bg_color = Color(0.1, 0.14, 0.22, 0.95)
+		style.border_width_left = 2
+		style.border_width_top = 2
+		style.border_width_right = 2
+		style.border_width_bottom = 2
+		style.border_color = Color(0.83, 0.68, 0.22, 0.8)
+		style.corner_radius_top_left = 8
+		style.corner_radius_top_right = 8
+		style.corner_radius_bottom_right = 8
+		style.corner_radius_bottom_left = 8
+		item_box.add_theme_stylebox_override("panel", style)
+
+		var margin = MarginContainer.new()
+		margin.add_theme_constant_override("margin_left", 6)
+		margin.add_theme_constant_override("margin_top", 4)
+		margin.add_theme_constant_override("margin_right", 6)
+		margin.add_theme_constant_override("margin_bottom", 4)
+		item_box.add_child(margin)
+
+		var vbox = VBoxContainer.new()
+		vbox.add_theme_constant_override("separation", 2)
+		margin.add_child(vbox)
+
+		var is_ally = g.get("isDragon", false) == my_team_is_dragon
+		var role_tag = "(Bạn)" if s == my_seat else ("(Đồng Đội)" if is_ally else "(Đối Thủ)")
+		var name_lbl = Label.new()
+		name_lbl.text = "[%d] %s" % [s, g.get("name", "Ghế %d" % s)]
+		name_lbl.add_theme_font_size_override("font_size", 12)
+		name_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5, 1.0))
+		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(name_lbl)
+
+		var role_lbl = Label.new()
+		role_lbl.text = role_tag
+		role_lbl.add_theme_font_size_override("font_size", 10)
+		role_lbl.add_theme_color_override("font_color", Color(0.4, 0.8, 1.0, 1.0) if (s == my_seat or is_ally) else Color(1.0, 0.5, 0.5, 1.0))
+		role_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(role_lbl)
+
+		var hp_lbl = Label.new()
+		hp_lbl.text = "❤️ %d/%d Máu" % [int(g.get("hp", 0)), int(g.get("max_hp", 4))]
+		hp_lbl.add_theme_font_size_override("font_size", 10)
+		hp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(hp_lbl)
+
+		var pick_btn = Button.new()
+		pick_btn.text = "☐ CHỌN"
+		pick_btn.custom_minimum_size = Vector2(0, 24)
+		pick_btn.add_theme_font_size_override("font_size", 11)
+		pick_btn.focus_mode = Control.FOCUS_NONE
+		vbox.add_child(pick_btn)
+
+		var s_target = s
+		pick_btn.pressed.connect(func(): _select_muu_dinh_target(s_target))
+		muu_dinh_targets_container.add_child(item_box)
+
+	muu_dinh_cancel_btn.visible = not is_network_mode
+	_update_muu_dinh_ui()
+	muu_dinh_modal.visible = true
+
+func _select_muu_dinh_card(idx: int) -> void:
+	selected_muu_dinh_card_idx = idx
+	AudioManager.play_card_select()
+	_update_muu_dinh_ui()
+
+func _select_muu_dinh_target(s: int) -> void:
+	selected_muu_dinh_target_seat = s
+	AudioManager.play_card_select()
+	_update_muu_dinh_ui()
+
+func _update_muu_dinh_ui() -> void:
+	for i in range(muu_dinh_cards_container.get_child_count()):
+		var wrapper = muu_dinh_cards_container.get_child(i) as PanelContainer
+		if not wrapper:
+			continue
+		var vbox = wrapper.get_child(0) as VBoxContainer
+		var card_ui = vbox.get_child(0)
+		var btn = vbox.get_child(1) as Button
+		var is_selected = (i == selected_muu_dinh_card_idx)
+		var style = wrapper.get_theme_stylebox("panel") as StyleBoxFlat
+		if card_ui.has_method("set_selected"):
+			card_ui.set_selected(is_selected)
+		if is_selected:
+			style.bg_color = Color(0.18, 0.35, 0.22, 0.98)
+			style.border_color = Color(0.3, 1.0, 0.4, 1.0)
+			btn.text = "🎁 SẼ TRAO ĐI"
+			btn.modulate = Color(0.4, 1.0, 0.5)
+		else:
+			style.bg_color = Color(0.12, 0.18, 0.28, 0.95)
+			style.border_color = Color(0.4, 0.7, 1.0, 0.8)
+			btn.text = "📚 ĐẶT VỀ ĐẦU XẤP"
+			btn.modulate = Color(0.7, 0.85, 1.0)
+
+	var target_child_idx = 0
+	for s in range(1, battle_seat_count + 1):
+		if not generals_data.has(s) or not generals_data[s].get("is_alive", false):
+			continue
+		if target_child_idx < muu_dinh_targets_container.get_child_count():
+			var item_box = muu_dinh_targets_container.get_child(target_child_idx) as PanelContainer
+			var vbox = item_box.get_child(0).get_child(0) as VBoxContainer
+			var pick_btn = vbox.get_child(3) as Button
+			var is_sel = (s == selected_muu_dinh_target_seat)
+			var style = item_box.get_theme_stylebox("panel") as StyleBoxFlat
+			if is_sel:
+				style.bg_color = Color(0.18, 0.35, 0.22, 0.98)
+				style.border_color = Color(1.0, 0.9, 0.35, 1.0)
+				pick_btn.text = "☑ ĐÃ CHỌN"
+				pick_btn.modulate = Color(1.0, 0.95, 0.4)
+			else:
+				style.bg_color = Color(0.1, 0.14, 0.22, 0.95)
+				style.border_color = Color(0.83, 0.68, 0.22, 0.8)
+				pick_btn.text = "☐ CHỌN"
+				pick_btn.modulate = Color(1, 1, 1)
+		target_child_idx += 1
+
+	var ready = selected_muu_dinh_card_idx >= 0 and selected_muu_dinh_card_idx < muu_dinh_peeked_cards.size() and selected_muu_dinh_target_seat > 0
+	muu_dinh_confirm_btn.disabled = not ready
+
+	if not ready:
+		if selected_muu_dinh_target_seat <= 0 and selected_muu_dinh_card_idx >= 0:
+			var card_name = muu_dinh_peeked_cards[selected_muu_dinh_card_idx].get("name", "Bài")
+			muu_dinh_status_lbl.text = "👉 Đã chọn trao lá [%s]. Hãy chọn 1 người nhận ở Bước 2." % card_name
+		else:
+			muu_dinh_status_lbl.text = "👉 Hãy chọn 1 lá bài và 1 người chơi nhận bài."
+	else:
+		var chosen_card = muu_dinh_peeked_cards[selected_muu_dinh_card_idx]
+		var remaining_card = muu_dinh_peeked_cards[1 - selected_muu_dinh_card_idx] if muu_dinh_peeked_cards.size() > 1 else {}
+		var t_name = generals_data.get(selected_muu_dinh_target_seat, {}).get("name", "Ghế %d" % selected_muu_dinh_target_seat)
+		muu_dinh_status_lbl.text = "👉 Trao [%s] cho %s. Lá [%s] sẽ đặt lại lên đầu xấp bài." % [
+			chosen_card.get("name", "Bài"),
+		t_name,
+			remaining_card.get("name", "Bài") if not remaining_card.is_empty() else "không còn"
+		]
+
+func _on_muu_dinh_confirmed() -> void:
+	if selected_muu_dinh_card_idx < 0 or selected_muu_dinh_card_idx >= muu_dinh_peeked_cards.size() or selected_muu_dinh_target_seat <= 0:
+		return
+	var chosen_card = muu_dinh_peeked_cards[selected_muu_dinh_card_idx]
+	var remaining_card = muu_dinh_peeked_cards[1 - selected_muu_dinh_card_idx] if muu_dinh_peeked_cards.size() > 1 else {}
+	var target_seat = selected_muu_dinh_target_seat
+	_close_muu_dinh_modal()
+
+	muu_dinh_used_this_turn = true
+
+	if is_network_mode and NetworkClient and NetworkClient.is_connected_to_server:
+		var card_id = str(chosen_card.get("id", ""))
+		NetworkClient.send_respond_action(true, card_id, "", [], target_seat)
+	else:
+		_execute_local_muu_dinh_confirm(chosen_card, remaining_card, target_seat)
+	_refresh_local_skill_buttons(my_seat)
+
+func _on_muu_dinh_cancelled() -> void:
+	if not is_network_mode and not muu_dinh_peeked_cards.is_empty():
+		for k in range(muu_dinh_peeked_cards.size() - 1, -1, -1):
+			card_deck_pile.push_back(muu_dinh_peeked_cards[k])
+			deck_count += 1
+		_update_deck_hud()
+	_close_muu_dinh_modal()
+
+func _close_muu_dinh_modal() -> void:
+	if muu_dinh_modal and is_instance_valid(muu_dinh_modal):
+		muu_dinh_modal.visible = false
+	muu_dinh_peeked_cards.clear()
+	selected_muu_dinh_card_idx = -1
+	selected_muu_dinh_target_seat = -1
+
+func _execute_local_muu_dinh_start() -> void:
+	if card_deck_pile.size() < 2:
+		_init_deck()
+	var card_a = _draw_card_from_pile()
+	var card_b = _draw_card_from_pile()
+	_show_muu_dinh_modal([card_a, card_b])
+
+func _execute_local_muu_dinh_confirm(chosen_card: Dictionary, remaining_card: Dictionary, target_seat: int) -> void:
+	var g = generals_data.get(my_seat, {})
+	if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
+		g["avatar_node"].show_skill_banner("MƯU ĐỊNH", 2.0, true)
+
+	if not remaining_card.is_empty():
+		card_deck_pile.push_back(remaining_card)
+		deck_count += 1
+		_update_deck_hud()
+
+	if target_seat == my_seat:
+		_add_card_to_player_hand(chosen_card)
+	elif generals_data.has(target_seat) and generals_data[target_seat].get("is_alive", false):
+		generals_data[target_seat]["hand_cards"].append(chosen_card)
+		generals_data[target_seat]["hand_count"] = generals_data[target_seat]["hand_cards"].size()
+		if generals_data[target_seat].has("avatar_node") and is_instance_valid(generals_data[target_seat]["avatar_node"]):
+			generals_data[target_seat]["avatar_node"].update_hand_count(generals_data[target_seat]["hand_count"])
+
+	var target_name = generals_data.get(target_seat, {}).get("name", "Ghế %d" % target_seat)
+	_play_smart_card_rays("Mưu Định", my_seat, [target_seat])
+	_animate_showcase_card("Mưu Định", "Trao [%s] cho %s, đặt [%s] về đầu xấp bài." % [
+		chosen_card.get("name", "Bài"),
+		target_name,
+		remaining_card.get("name", "Bài") if not remaining_card.is_empty() else "không còn"
+	])
+	_add_log("📜 %s kích hoạt [Mưu Định], trao [%s] cho %s và đặt lá còn lại về đầu xấp bài." % [g["name"], chosen_card.get("name", "Bài"), target_name])
+	AudioManager.play_skill()
+	_update_action_btn()
+
+func _get_max_slashes_allowed(g: Dictionary) -> int:
+	if _has_no_than(g) or int(g.get("suc_soi_turns_remaining", 0)) > 0:
+		return 999
+	var extra = int(g.get("extra_slash_limit", 0))
+	if bool(g.get("than_chinh_slash_bonus", false)):
+		extra = max(extra, 1)
+	return 1 + extra
+
+func _trigger_local_than_chinh_if_applicable(attacker_seat: int) -> void:
+	if is_network_mode or attacker_seat <= 0 or not generals_data.has(attacker_seat):
+		return
+	var atk = generals_data[attacker_seat]
+	if _hero_has_skill(atk, "than_chinh_ly_phat_ma") and not bool(atk.get("than_chinh_bonus_used", false)):
+		atk["than_chinh_bonus_used"] = true
+		atk["extra_slash_limit"] = int(atk.get("extra_slash_limit", 0)) + 1
+		atk["than_chinh_slash_bonus"] = true
+		_animate_showcase_card("Thân Chinh", "%s gây sát thương thành công, được đánh thêm 1 lá Trảm lượt này!" % atk["name"])
+		_add_log("🗡️ [THÂN CHINH] %s dùng Trảm gây sát thương thành công, được đánh thêm 1 lá Trảm lượt này!" % atk["name"])
+		AudioManager.play_skill()
+		if attacker_seat == my_seat:
+			_update_action_btn()
+
+func _execute_local_trac_lac(card_id: String, card_ui_node: Control, card_info: Dictionary) -> void:
+	var g = generals_data.get(my_seat, {})
+	if card_ui_node != null and is_instance_valid(card_ui_node):
+		_discard_player_card(card_ui_node)
+	is_wine_buff_active = true
+	wine_used_this_turn = true
+	g["is_wine_buff_active"] = true
+	g["wine_used_this_turn"] = true
+	_animate_showcase_card("Trác Lạc", "Uống lá Đen [%s] như Hủ Rượu: Đòn Trảm kế tiếp được +1 Sát thương!" % card_info.get("name", "Bài"), card_info)
+	_add_log("🍶 [TRÁC LẠC] %s dùng lá Đen [%s] như Hủ Rượu: Đòn Trảm kế tiếp được +1 Sát thương!" % [g["name"], card_info.get("name", "Bài")])
+	AudioManager.play_voice("Hủ Rượu")
+	AudioManager.play_skill()
+	_update_action_btn()

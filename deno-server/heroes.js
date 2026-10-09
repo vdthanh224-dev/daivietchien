@@ -42,7 +42,7 @@ export const HEROES = {
   HERO_34: { id: 'HERO_34', name: 'Phạm Hạp', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['BAO_LAM', 'TRAN_THU'] },
   HERO_35: { id: 'HERO_35', name: 'Lê Hoàn', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['PHA_TONG', 'THAN_CHINH_LE_HOAN'] },
   HERO_36: { id: 'HERO_36', name: 'Dương Vân Nga', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['TRAO_BAO', 'NHIEP_CHINH'] },
-  HERO_37: { id: 'HERO_37', name: 'Lê Long Đĩnh', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['BAO_NO', 'NGOA_TRIEU'] },
+  HERO_37: { id: 'HERO_37', name: 'Lê Long Đĩnh', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['BAO_NO', 'TRAC_LAC', 'NGOA_TRIEU'] },
   HERO_38: { id: 'HERO_38', name: 'Đào Cam Mộc', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['PHO_TA', 'MUU_DINH'] },
   HERO_39: { id: 'HERO_39', name: 'Lý Công Uẩn', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['DOI_DO', 'THAI_BINH_LY_CONG_UAN'] },
   HERO_40: { id: 'HERO_40', name: 'Lý Phật Mã', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['THAN_CHINH_LY_PHAT_MA', 'PHAT_CHAM'] },
@@ -151,7 +151,7 @@ export const SKILLS = {
   HUNG_SUC: { id: 'HUNG_SUC', name: 'Hùng Sức', type: 'ACTIVE', description: 'Trong Giai đoạn Ra bài, bạn có thể bỏ 1 lá Vũ Khí để gây 1 sát thương lên 1 mục tiêu trong Tầm đánh 1, sau đó rút 1 lá.' },
   VAN_AN: { id: 'VAN_AN', name: 'Vạn An', type: 'ACTIVE', description: 'Giới hạn mỗi lượt 2 lần, bạn có thể dùng 2 lá bài bất kỳ trên tay để xem như sử dụng lá Cẩm Nang Bãi Cọc Bạch Đằng. Lần đầu sử dụng trong lượt, rút 1 lá bài.' },
   DE_NGHIEP: { id: 'DE_NGHIEP', name: 'Đế Nghiệp', type: 'TRIGGERED', description: 'Mỗi khi bạn gây sát thương đơn mục tiêu bằng Cẩm Nang, bạn rút 1 lá bài.' },
-  KHOAN_GIAN: { id: 'KHOAN_GIAN', name: 'Khoan Giản', type: 'TRIGGERED', description: 'Sau giai đoạn Bỏ bài, bạn được rút X+1 lá, giới hạn trữ bài +(X+1) (X là một nửa số trang bị bạn đang mang, làm tròn lên).' },
+  KHOAN_GIAN: { id: 'KHOAN_GIAN', name: 'Khoan Giản', type: 'TRIGGERED', description: 'Sau giai đoạn Bỏ bài, bạn được rút X lá, giới hạn trữ bài +X (X là một nửa số trang bị bạn đang mang, làm tròn lên).' },
   CHINH_THONG: { id: 'CHINH_THONG', name: 'Chính Thống', type: 'OPTIONAL', description: 'Đầu lượt của bạn, bạn có thể chọn 1 người chơi khác; người đó phải chuyển 1 lá bài trên tay cho bạn hoặc lộ diện toàn bộ bài trên tay.' },
   KHOAN_HOA: { id: 'KHOAN_HOA', name: 'Khoan Hòa', type: 'OPTIONAL', description: 'Cuối lượt của bạn, bạn rút 1 lá bài, sau đó bạn chọn tối đa 2 người chơi khác, mỗi người trong số họ rút 1 lá bài.' },
   CAI_CACH: { id: 'CAI_CACH', name: 'Cải Cách', type: 'ACTIVE', description: 'Trong Giai đoạn Ra bài, giới hạn 1 lần, bạn có thể đổi 2 lá bài lấy 2 lá bài mới.' },
@@ -267,7 +267,7 @@ export const SKILLS = {
     id: 'THU_PHUC',
     name: 'Thu Phục',
     type: 'OPTIONAL',
-    description: 'Khi bạn sử dụng lá bài Cẩm Nang thành công, bạn có thể chỉ định 1 người chơi có số Máu cao hơn bạn phải đưa cho bạn 1 lá bài ngẫu nhiên trên tay.'
+    description: 'Hai lần mỗi lượt, Khi bạn sử dụng lá bài Cẩm Nang thành công, bạn có thể chỉ định 1 người chơi có số Máu không ít hơn bạn phải đưa cho bạn 1 lá bài ngẫu nhiên trên tay.'
   },
   DINH_QUOC: {
     id: 'DINH_QUOC',

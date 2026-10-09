@@ -34,7 +34,9 @@ func has_hero_skill(hero_id: int, skill_id: String) -> bool:
 		if skill is Dictionary:
 			var s_id = str(skill.get("id", "")).to_lower().strip_edges()
 			var s_name = str(skill.get("name", "")).to_lower().strip_edges()
-			if s_id == target or s_name == target:
+			if s_id == target or s_name == target or s_id.begins_with(target + "_") or target.begins_with(s_id + "_"):
+				return true
+			if s_id.trim_suffix("_ly_cong_uan").trim_suffix("_ly_phat_ma") == target:
 				return true
 	return false
 
@@ -184,7 +186,7 @@ func _init_all_heroes() -> void:
 	_add_hero(15, "Phùng Hưng", "Hồng Bàng", 4, "Phục Hổ", "Khi bạn sử dụng lá Huyết Chiến hoặc bị người khác chỉ định bởi Huyết Chiến, đối phương phải ra 2 lá Trảm cho mỗi lần đáp trả.", "res://assets/ui/phung_hung.png", "phung_hung")
 	_add_hero(16, "Phùng Hải", "Hồng Bàng", 4, "Lực Địch", "Bạn có thể trang bị tối đa 2 lá Vũ Khí cùng lúc trên vùng trang bị của mình, tầm đánh và kỹ năng trang bị được cộng dồn.", "res://assets/ui/phung_hai.png", "phung_hai")
 	_add_hero(17, "Mai Thúc Loan", "Hồng Bàng", 4, "Vạn An", "Giới hạn mỗi lượt 2 lần, bạn có thể dùng 2 lá bài bất kỳ trên tay để xem như sử dụng lá Cẩm Nang Bãi Cọc Bạch Đằng. Lần đầu sử dụng trong lượt, rút 1 lá bài.", "res://assets/ui/mai_thuc_loan.png", "mai_thuc_loan")
-	_add_hero(18, "Khúc Thừa Dụ", "Hồng Bàng", 3, "Khoan Giản", "Sau giai đoạn Bỏ bài, bạn được rút X+1 lá, giới hạn trữ bài +(X+1) (X là một nửa số trang bị bạn đang mang, làm tròn lên).", "res://assets/ui/khuc_thua_du.png", "khuc_thua_du")
+	_add_hero(18, "Khúc Thừa Dụ", "Hồng Bàng", 3, "Khoan Giản", "Sau giai đoạn Bỏ bài, bạn được rút X lá, giới hạn trữ bài +X (X là một nửa số trang bị bạn đang mang, làm tròn lên).", "res://assets/ui/khuc_thua_du.png", "khuc_thua_du")
 	_add_hero(19, "Khúc Hạo", "Hồng Bàng", 3, "Khoan Hòa", "Cuối lượt của bạn, bạn rút 1 lá bài, sau đó bạn chọn tối đa 2 người chơi khác, mỗi người trong số họ rút 1 lá bài.", "res://assets/ui/khuc_hao.png", "khuc_hao")
 	_add_hero(20, "Dương Đình Nghệ", "Hồng Bàng", 4, "Nghĩa Tử", "Khi một người chơi khác bị nhận sát thương, bạn có thể bỏ 1 lá bài trên tay để chịu thay 1 sát thương cho họ.", "res://assets/ui/duong_dinh_nghe.png", "duong_dinh_nghe")
 	_add_hero(21, "Kiều Công Tiễn", "Hồng Bàng", 3, "Nghịch Ý", "Khi trở thành mục tiêu của đòn Trảm, bạn có thể bỏ 1 lá bài trên tay để chuyển mục tiêu của đòn Trảm đó sang 1 người chơi khác trong tầm đánh của bạn.", "res://assets/ui/kieu_cong_tien.png", "kieu_cong_tien")
@@ -196,7 +198,7 @@ func _init_all_heroes() -> void:
 	_add_hero(27, "Kiều Thuận", "Thăng Long", 4, "Hồi Hồ", "Nếu trong lượt của mình bạn không sử dụng lá Trảm nào, sát thương đầu tiên bạn nhận cho tới lượt kế tiếp của bạn được giảm đi 1 điểm.", "res://assets/ui/kieu_thuan.png", "kieu_thuan")
 	_add_hero(28, "Nguyễn Siêu", "Thăng Long", 4, "Liệt Chiến", "Khi tham gia vào lá Huyết Chiến, nếu bạn là người chiến thắng, hồi 1 Máu.", "res://assets/ui/nguyen_sieu.png", "nguyen_sieu")
 	_add_hero(29, "Lã Đường", "Thăng Long", 4, "Tế Giang", "Khi dùng Trảm nhắm vào mục tiêu không trang bị lá Chiến Mã, Tầm đánh của bạn tính là không giới hạn khoảng cách.", "res://assets/ui/la_duong.png", "la_duong")
-	_add_hero(30, "Đinh Bộ Lĩnh", "Thăng Long", 4, "Thu Phục", "Khi bạn sử dụng lá bài Cẩm Nang thành công, bạn có thể chỉ định 1 người chơi có số Máu cao hơn bạn phải đưa cho bạn 1 lá bài ngẫu nhiên trên tay.", "res://assets/ui/dinh_bo_linh.png", "dinh_bo_linh")
+	_add_hero(30, "Đinh Bộ Lĩnh", "Thăng Long", 4, "Thu Phục", "Hai lần mỗi lượt, Khi bạn sử dụng lá bài Cẩm Nang thành công, bạn có thể chỉ định 1 người chơi có số Máu không ít hơn bạn phải đưa cho bạn 1 lá bài ngẫu nhiên trên tay.", "res://assets/ui/dinh_bo_linh.png", "dinh_bo_linh")
 	_add_hero(31, "Đinh Liễn", "Thăng Long", 4, "Trữ Quân", "Đầu Giai đoạn Rút bài, bạn có thể tự giảm 1 Máu để được rút thêm 2 lá bài.", "res://assets/ui/dinh_lien.png", "dinh_lien")
 	_add_hero(32, "Đinh Điền", "Thăng Long", 4, "Trung Tiết", "Khi có người vào trạng thái Cận Tử mà không phải bạn, bạn có thể tự mất 1 Máu để rút 3 lá, nếu người Cận Tử sống sót, bạn rút thêm 1 lá.", "res://assets/ui/dinh_dien.png", "dinh_dien")
 	_add_hero(33, "Nguyễn Bặc", "Thăng Long", 4, "Định Quốc", "Bạn có thể dùng bất kỳ lá bài màu đen như lá Huyết Chiến.", "res://assets/ui/nguyen_bac.png", "nguyen_bac")
@@ -357,7 +359,7 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 		]
 	elif id == 18:
 		skills = [
-			{"id": "khoan_gian", "name": "Khoan Giản", "desc": "Sau giai đoạn Bỏ bài, bạn được rút X+1 lá, giới hạn trữ bài +(X+1) (X là một nửa số trang bị bạn đang mang, làm tròn lên)."},
+			{"id": "khoan_gian", "name": "Khoan Giản", "desc": "Sau giai đoạn Bỏ bài, bạn được rút X lá, giới hạn trữ bài +X (X là một nửa số trang bị bạn đang mang, làm tròn lên)."},
 			{"id": "chinh_thong", "name": "Chính Thống", "desc": "Đầu lượt của bạn, bạn có thể chọn 1 người chơi khác; người đó phải chuyển 1 lá bài trên tay cho bạn hoặc lộ diện toàn bộ bài trên tay."}
 		]
 	elif id == 19:
@@ -417,7 +419,7 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 		]
 	elif id == 30:
 		skills = [
-			{"id": "thu_phuc", "name": "Thu Phục", "desc": "Khi bạn sử dụng lá bài Cẩm Nang thành công, bạn có thể chỉ định 1 người chơi có số Máu cao hơn bạn phải đưa cho bạn 1 lá bài ngẫu nhiên trên tay."},
+			{"id": "thu_phuc", "name": "Thu Phục", "desc": "Hai lần mỗi lượt, Khi bạn sử dụng lá bài Cẩm Nang thành công, bạn có thể chỉ định 1 người chơi có số Máu không ít hơn bạn phải đưa cho bạn 1 lá bài ngẫu nhiên trên tay."},
 			{"id": "van_thang", "name": "Vạn Thắng", "desc": "Khi bạn tiêu diệt thành công 1 người, bạn rút 2 lá. Nếu đó là một trong 12 Sứ Quân, bạn hồi 1 máu."}
 		]
 	elif id == 31:
@@ -453,6 +455,7 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 	elif id == 37:
 		skills = [
 			{"id": "bao_no", "name": "Bạo Nộ", "desc": "Bạn có thể sử dụng lá Hủ Rượu không giới hạn số lần trong một lượt, sát thương được cộng dồn; cuối lượt nếu không gây sát thương cho ai và số máu của bạn không phải là một trong những người ít máu nhất, bạn phải tự mất 1 Máu."},
+			{"id": "trac_lac", "name": "Trác Lạc", "desc": "Khi bạn có <= 2 Máu, mọi lá bài màu Đen trên tay bạn có thể xem như lá Hủ Rượu."},
 			{"id": "ngoa_trieu", "name": "Ngọa Triều", "desc": "Khi bạn ở mức 1 Máu, bạn không thể bị chỉ định bởi các lá Cẩm Nang thông thường không gây sát thương."}
 		]
 	elif id == 38:

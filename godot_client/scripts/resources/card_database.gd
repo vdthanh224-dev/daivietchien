@@ -12,6 +12,22 @@ static func get_card(id: String) -> Resource:
 	_cards_cache[id] = c
 	return c
 
+static func get_card_info(id: String) -> Dictionary:
+	var c = get_card(id)
+	if c:
+		return {
+			"id": c.id,
+			"name": c.card_name,
+			"suit": c.suit,
+			"rank": c.rank,
+			"category": c.category,
+			"subType": c.sub_type,
+			"desc": c.description,
+			"description": c.description,
+			"range": c.attack_range
+		}
+	return {}
+
 static func create_card_from_dict(data: Dictionary) -> Resource:
 	var c = CardResourceScript.new()
 	c.id = data.get("id", "")

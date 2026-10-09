@@ -13,13 +13,12 @@ import {
   handleAIStep,
   handleAIReaction,
   tickGameState,
-  fastForwardMatchForDeadPlayer,
   sanitizeGameStateForClient,
   hydrateGameState,
   ensureMutationVersion,
-} from "./gameEngine.js";
-import { HERO_MAX_HP, HEROES } from "./heroes.js";
-import { getModeRules } from "./modeRegistry.js";
+} from "./functions/game-engine/src/gameEngine.js";
+import { HERO_MAX_HP, HEROES } from "./functions/game-engine/src/heroes.js";
+import { getModeRules } from "./functions/game-engine/src/modeRegistry.js";
 
 const rooms = new Map();
 const startTime = Date.now();
@@ -61,21 +60,20 @@ if (clusterChannel) {
         const incomingLockedCount = (msg.draft.slots || []).filter((slot) => slot.isLocked && slot.heroId > 0).length;
         const currentLockedCount = (room.draft.slots || []).filter((slot) => slot.isLocked && slot.heroId > 0).length;
         if (incomingRev >= currentRev || incomingLockedCount > currentLockedCount || msg.draft.isCompleted) {
+          // Keep every draft field authoritative across Deno isolates.
           const incomingSlots = Array.isArray(msg.draft.slots) ? msg.draft.slots : [];
           const currentBySeat = new Map((room.draft.slots || []).map((slot) => [slot.seat, slot]));
-          room.draft.slots = incomingSlots.map((slot) => {
-            const current = currentBySeat.get(slot.seat);
-            if (current?.isLocked && !slot.isLocked) return { ...slot, ...current };
-            return slot;
-          });
-          room.draft.currentPickerIndex = msg.draft.currentPickerIndex;
-          room.draft.activeSeats = Array.isArray(msg.draft.activeSeats) ? msg.draft.activeSeats : room.draft.activeSeats;
-          room.draft.round = msg.draft.round || room.draft.round || 1;
-          room.draft.timer = msg.draft.timer;
-          room.draft.timerStartAt = msg.draft.timerStartAt;
-          room.draft.revision = incomingRev;
-          room.draft.isCompleted = msg.draft.isCompleted;
-          if (msg.draft.leader) room.draft.leader = msg.draft.leader;
+          room.draft = {
+            ...room.draft,
+            ...msg.draft,
+            slots: incomingSlots.map((slot) => {
+              const current = currentBySeat.get(slot.seat);
+              return current?.isLocked && !slot.isLocked ? { ...slot, ...current } : slot;
+            }),
+            activeSeats: Array.isArray(msg.draft.activeSeats) ? msg.draft.activeSeats : room.draft.activeSeats,
+            round: msg.draft.round || room.draft.round || 1,
+            revision: incomingRev,
+          };
         }
         room.lastLeaderHeartbeat = Date.now();
       }
@@ -111,7 +109,7 @@ if (clusterChannel) {
           if (msg.slots) room.draft.slots = msg.slots;
         }
         if (!room.state && Array.isArray(msg.battlePlayers)) {
-          room.state = initGame(roomId, msg.battlePlayers);
+          room.state = initGame(roomId, msg.battlePlayers, msg.modeId || room.draft?.modeId || "2v2");
         }
         room.lastActivity = Date.now();
         broadcastRoom(room, {
@@ -139,7 +137,7 @@ const MAX_ACTIONS_PER_SECOND = 30;
 const ALLOWED_WS_ACTIONS = new Set([
   "JOIN_ROOM", "INIT_GAME", "JOIN_DRAFT", "PICK_HERO", "HOVER_HERO", "GET_STATE", "PING",
   "USE_SKILL", "TOGGLE_SKILL", "PLAY_CARD", "RESPOND_ACTION", "END_TURN",
-  "DISCARD_CARDS", "AI_STEP", "AI_REACTION", "FAST_FORWARD_MATCH"
+  "DISCARD_CARDS", "AI_STEP", "AI_REACTION"
 ]);
 
 function validateClientPayload(payload, rawBytes) {
@@ -306,7 +304,7 @@ function applyActionToState(state, seat, payload) {
   if (!hasSeat(state, seat)) return { error: "Ghế không thuộc phòng đấu" };
 
   if (payload.action === "USE_SKILL") {
-    return handleUseSkill(state, seat, payload.skillId, payload.targetSeat, payload.cardId);
+    return handleUseSkill(state, seat, payload.skillId, payload.targetSeat, payload.cardId, payload);
   }
   if (payload.action === "TOGGLE_SKILL") {
     return handleToggleSkill(state, seat, payload.skillId);
@@ -337,9 +335,6 @@ function applyActionToState(state, seat, payload) {
   }
   if (payload.action === "AI_REACTION") {
     return handleAIReaction(state, seat);
-  }
-  if (payload.action === "FAST_FORWARD_MATCH") {
-    return fastForwardMatchForDeadPlayer(state, seat);
   }
   return { error: "Hành động không hợp lệ" };
 }
@@ -426,14 +421,14 @@ function broadcastRoom(room, messageObj) {
           };
           ws.send(JSON.stringify(personalized));
         } else if (messageObj.type === "DRAFT_STATE_UPDATE") {
-          const safe = { ...messageObj, activeSeats: messageObj.activeSeats, round: messageObj.round, slots: (messageObj.slots || []).map((slot) => { const { role, heroId, heroName, hoverHeroId, hoverHeroName, candidateHeroIds, availableHeroIds, ...publicSlot } = slot; const own = slot.seat === seat; const locked = Boolean(slot.isLocked && heroId > 0); return { ...publicSlot, role: own ? (role || "") : undefined, heroId: own || locked ? heroId : 0, heroName: own || locked ? heroName : "", hoverHeroId: own ? (hoverHeroId || 0) : 0, hoverHeroName: own ? (hoverHeroName || "") : "", candidateHeroIds: own ? (candidateHeroIds || []) : [] }; }) };
+          const safe = { ...messageObj, activeSeats: messageObj.activeSeats, round: messageObj.round, slots: (messageObj.slots || []).map((slot) => { const { role, heroId, heroName, hoverHeroId, hoverHeroName, candidateHeroIds, availableHeroIds, ...publicSlot } = slot; const own = slot.seat === seat; const locked = Boolean(slot.isLocked && heroId > 0); return { ...publicSlot, role: own || role === "KING" ? (role || "") : undefined, heroId: own || locked ? heroId : 0, heroName: own || locked ? heroName : "", hoverHeroId: own ? (hoverHeroId || 0) : 0, hoverHeroName: own ? (hoverHeroName || "") : "", candidateHeroIds: own ? (candidateHeroIds || []) : [] }; }) };
           if (String(room.draft?.modeId || "").startsWith("dynasty_")) {
             const own = safe.slots.find((slot) => slot.seat === seat);
             safe.selectedHeroIds = own && own.heroId > 0 ? [own.heroId] : [];
           }
           ws.send(JSON.stringify(safe));
         } else if (messageObj.type === "DRAFT_COMPLETED") {
-          const safe = { ...messageObj, activeSeats: messageObj.activeSeats, round: messageObj.round, slots: (messageObj.slots || []).map((slot) => { const { role, ...publicSlot } = slot; return { ...publicSlot, role: slot.seat === seat ? (role || "") : undefined }; }) };
+          const safe = { ...messageObj, slots: (messageObj.slots || []).map((slot) => { const { role, ...publicSlot } = slot; return { ...publicSlot, role: slot.seat === seat || role === "KING" ? (role || "") : undefined }; }) };
           ws.send(JSON.stringify(safe));
         } else {
           ws.send(JSON.stringify(messageObj));
@@ -559,28 +554,28 @@ function resolveDraftSeat(room, requestedSeat, payload, socket) {
 }
 
 
-function generate2v2RoundPools(draft, round) {
+function generate2v2RoundPools(draft, _round) {
   if (isDynastyDraft(draft)) return;
-  const requestedIds = draft.slots.flatMap((slot) => slot.availableHeroIds || []);
+  const activeSeats = draft.activeSeats || [draft.slots.find((slot) => !slot.isLocked)?.seat || draft.slots[0]?.seat || 1];
+  const locked = new Set(draft.slots.filter((slot) => slot.isLocked).map((slot) => Number(slot.heroId)));
+  const requestedIds = [
+    ...(draft.availableHeroIds || []),
+    ...draft.slots.flatMap((slot) => slot.availableHeroIds || []),
+  ];
   const allIds = Array.from(new Set(requestedIds.length > 0 ? requestedIds : Array.from({ length: 40 }, (_, i) => i + 1)))
-    .filter((id) => Number.isInteger(Number(id)) && Number(id) > 0).map(Number);
+    .map(Number)
+    .filter((id) => Number.isInteger(id) && id >= 1 && id <= 40);
   for (let i = allIds.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [allIds[i], allIds[j]] = [allIds[j], allIds[i]];
   }
-  const used = new Set(draft.slots.filter(s => s.isLocked).map(s => s.heroId));
-  const active = round === 1 ? [draft.slots[0], draft.slots[1]] : [draft.slots[2], draft.slots[3]];
-  const assigned = new Set(used);
-  for (const slot of active) {
-    if (!slot) continue;
-    if (Array.isArray(slot.candidateHeroIds) && slot.candidateHeroIds.length > 0) {
-      slot.candidateHeroIds.forEach((id) => assigned.add(Number(id)));
-      continue;
-    }
+  for (const slot of draft.slots) {
+    if (!slot || !activeSeats.includes(slot.seat) || slot.isLocked) continue;
+    if (Array.isArray(slot.candidateHeroIds) && slot.candidateHeroIds.length > 0) continue;
     const own = new Set((slot.availableHeroIds || []).map(Number));
-    const pool = allIds.filter((id) => !assigned.has(id) && (own.size === 0 || own.has(id))).slice(0, 8);
-    slot.candidateHeroIds = pool;
-    pool.forEach((id) => assigned.add(id));
+    slot.candidateHeroIds = allIds
+      .filter((id) => !locked.has(id) && (own.size === 0 || own.has(id)))
+      .slice(0, 8);
   }
 }
 
@@ -690,13 +685,17 @@ function finishDraftAndStartBattle(roomId, room) {
   const draft = room?.draft;
   if (!draft || draft.isCompleted || !draft.slots.every((slot) => slot.isLocked && slot.heroId > 0)) return;
 
+  for (const slot of draft.slots) {
+    const baseHp = HERO_MAX_HP[slot.heroId] || 4;
+    slot.maxHp = baseHp + (slot.role === "KING" ? 1 : 0);
+  }
   const battlePlayers = draft.slots.map((slot) => ({
     seat: slot.seat,
     userId: slot.userId,
     heroId: `HERO_${slot.heroId}`,
     generalName: slot.heroName || getHeroName(slot.heroId),
-    maxHp: HERO_MAX_HP[slot.heroId] || 4,
-    hp: HERO_MAX_HP[slot.heroId] || 4,
+    maxHp: slot.maxHp,
+    hp: slot.maxHp,
     isAlly: slot.isDragon,
     isAI: slot.isAI,
     role: slot.role || "",
@@ -709,6 +708,7 @@ function finishDraftAndStartBattle(roomId, room) {
   clusterBroadcast({
     type: "DRAFT_COMPLETED_SYNC",
     roomId,
+    modeId: draft.modeId || "2v2",
     slots: draft.slots,
     battlePlayers,
   });
@@ -750,7 +750,7 @@ async function tickDraftRoom(roomId, room) {
       if (draft.round === 1) {
         draft.round = 2;
         draft.activeSeats = [draft.slots.find((slot) => !slot.isLocked)?.seat || draft.slots[2]?.seat || 3];
-        generate2v2RoundPools(draft, 2);
+        generate2v2RoundPools(draft, draft.round);
         draft.timer = 40;
         draft.timerStartAt = Date.now();
         draft.lastBroadcastTimer = 40;
@@ -761,7 +761,7 @@ async function tickDraftRoom(roomId, room) {
         return;
       } else {
         const next = draft.slots.find((slot) => !slot.isLocked);
-        if (next) { draft.activeSeats = [next.seat]; draft.timer = 40; draft.timerStartAt = Date.now(); draft.lastBroadcastTimer = 40; draft.revision = (draft.revision || 0) + 1; broadcastRoom(room, draftMessage(roomId, draft)); clusterBroadcast({ type: "DRAFT_SYNC", roomId, draft }); }
+        if (next) { draft.activeSeats = [next.seat]; generate2v2RoundPools(draft, draft.round); draft.timer = 40; draft.timerStartAt = Date.now(); draft.lastBroadcastTimer = 40; draft.revision = (draft.revision || 0) + 1; broadcastRoom(room, draftMessage(roomId, draft)); clusterBroadcast({ type: "DRAFT_SYNC", roomId, draft }); }
         else finishDraftAndStartBattle(roomId, room);
         return;
       }
@@ -809,9 +809,7 @@ async function tickDraftRoom(roomId, room) {
       const used = new Set(draft.slots.filter((slot) => slot.isLocked).map((slot) => slot.heroId));
       let heroId = currentSlot.hoverHeroId > 0 && !used.has(currentSlot.hoverHeroId) ? currentSlot.hoverHeroId : 0;
       if (!heroId) {
-        const candidates = (currentSlot.candidateHeroIds && currentSlot.candidateHeroIds.length > 0)
-          ? currentSlot.candidateHeroIds.filter((id) => !used.has(id))
-          : Array.from({ length: 40 }, (_, i) => i + 1).filter((id) => !used.has(id));
+        const candidates = (currentSlot.candidateHeroIds || []).filter((id) => !used.has(id));
         heroId = candidates.length > 0
           ? candidates[Math.floor(Math.random() * candidates.length)]
           : 1;
@@ -833,7 +831,7 @@ async function tickDraftRoom(roomId, room) {
       if (allActiveLocked && draft.round === 1) {
         draft.round = 2;
         draft.activeSeats = [draft.slots.find((slot) => !slot.isLocked)?.seat || draft.slots[2]?.seat || 3];
-        generate2v2RoundPools(draft, 2);
+        generate2v2RoundPools(draft, draft.round);
         draft.timerStartAt = Date.now();
         draft.timer = 40;
         draft.lastBroadcastTimer = 40;
@@ -1083,7 +1081,8 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
               const nextIndex = room.draft.slots.findIndex((slot) => slot.seat === boundSeat) + 1;
               if (nextIndex >= 0 && nextIndex < room.draft.slots.length) {
                 room.draft.activeSeats = [room.draft.slots[nextIndex].seat];
-                if (room.draft.round === 1 && nextIndex >= 2) { room.draft.round = 2; generate2v2RoundPools(room.draft, 2); }
+                if (room.draft.round === 1 && nextIndex >= 2) room.draft.round = 2;
+                generate2v2RoundPools(room.draft, room.draft.round);
                 room.draft.timer = 40; room.draft.timerStartAt = Date.now(); room.draft.lastBroadcastTimer = 40;
               }
             }
@@ -1376,7 +1375,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
   const uptimeSec = Math.floor((Date.now() - startTime) / 1000);
   return new Response(JSON.stringify({
     status: "online",
-    server: "Dai Viet Chien Unified Engine (Deno Deploy)",
+    server: "Dai Viet Chien Unified Engine (Render Cloud)",
     uptime: `${uptimeSec}s`,
     activeRooms: rooms.size,
     activeConnections: totalConnections,

@@ -7,8 +7,8 @@ import {
   handleToggleSkill,
   initGame,
   sanitizeGameStateForClient,
-} from "../deploy_deno/functions/game-engine/src/gameEngine.js";
-import { CARD_CATEGORIES, CARD_SUBTYPES } from "../deploy_deno/functions/game-engine/src/deck.js";
+} from "../server/functions/game-engine/src/gameEngine.js";
+import { CARD_CATEGORIES, CARD_SUBTYPES } from "../server/functions/game-engine/src/deck.js";
 
 const slash = (id, suit = "Spade") => ({ id, name: "Trảm", suit, rank: 7, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL });
 const weapon = (id) => ({ id, name: id, suit: "Spade", rank: 5, category: CARD_CATEGORIES.EQUIPMENT, subType: CARD_SUBTYPES.WEAPON, range: 1 });

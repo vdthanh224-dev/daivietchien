@@ -8,9 +8,9 @@ import {
   initGame,
   sanitizeGameStateForClient,
   tickGameState,
-} from "../deploy_deno/functions/game-engine/src/gameEngine.js";
-import { CARD_CATEGORIES, CARD_SUBTYPES } from "../deploy_deno/functions/game-engine/src/deck.js";
-import { getHeroById } from "../deploy_deno/functions/game-engine/src/heroes.js";
+} from "../server/functions/game-engine/src/gameEngine.js";
+import { CARD_CATEGORIES, CARD_SUBTYPES } from "../server/functions/game-engine/src/deck.js";
+import { getHeroById } from "../server/functions/game-engine/src/heroes.js";
 
 const card = (id, suit = "Heart") => ({
   id,
@@ -74,7 +74,8 @@ for (const [id, skills] of [
 {
   const state = game(["HERO_17", "HERO_1", "HERO_2", "HERO_3"]);
   state.players[0].hand = [card("black", "Spade"), card("red", "Heart")];
-  assert.match(handleUseSkill(state, 1, "Vạn An", 2, "black|red").error, /cùng màu/);
+  const mixedColorResult = handleUseSkill(state, 1, "Vạn An", 2, "black|red");
+  assert.equal(mixedColorResult.success, true, "Vạn An cho phép dùng 2 lá bất kỳ");
 }
 
 {
@@ -94,9 +95,9 @@ for (const [id, skills] of [
 
 {
   const state = game(["HERO_18", "HERO_1", "HERO_2", "HERO_3"]);
-  state.players[0].hand = Array.from({ length: 4 }, (_, index) => card(`minimum-${index}`));
+  state.players[0].hand = Array.from({ length: 3 }, (_, index) => card(`minimum-${index}`));
   handleEndTurn(state, 1);
-  assert.equal(state.players[0].hand.length, 5, "Không có Trang bị vẫn phải cho X tối thiểu bằng 1");
+  assert.equal(state.players[0].hand.length, 3, "Không có Trang bị thì X = 0, không được rút thêm");
   assert.equal(state.turnSeat, 2);
 }
 

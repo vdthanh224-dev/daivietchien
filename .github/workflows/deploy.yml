@@ -1,4 +1,4 @@
-name: Deploy Deno Game Server
+name: Test Game Server
 
 on:
   push:
@@ -6,18 +6,17 @@ on:
       - master
 
 jobs:
-  deploy:
+  test:
+    name: Run Server Tests
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     steps:
-      - name: Clone repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Deploy to Deno Deploy
-        uses: denoland/deployctl@v1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          project: dai-viet-chien-server
-          entrypoint: server.js
-          root: server
+          node-version: 20
+
+      - name: Run Hero Skill Tests
+        run: node server/test_heroes_29_40.mjs

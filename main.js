@@ -1,1 +1,1 @@
-import "./deno-server/server.js";
+import "./server/server.js";
