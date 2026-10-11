@@ -153,12 +153,7 @@ func get_suit_symbol() -> String:
 	return ""
 
 func get_rank_string() -> String:
-	match rank:
-		1: return "A"
-		11: return "J"
-		12: return "Q"
-		13: return "K"
-		_: return str(rank)
+	return str(rank)
 
 func get_suit_name() -> String:
 	var s = suit.to_lower()

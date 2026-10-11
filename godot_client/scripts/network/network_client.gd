@@ -348,7 +348,8 @@ func send_join_draft(target_room: String, seat: int, user_id: String, user_name:
 		"userId": user_id,
 		"userName": user_name,
 		"modeId": mode_id,
-		"availableHeroIds": available_hero_ids
+		"availableHeroIds": available_hero_ids,
+		"isAdmin": AuthManager != null and AuthManager.is_admin()
 	}
 	if not slots_data.is_empty():
 		payload["slots"] = slots_data

@@ -252,6 +252,8 @@ var borrow_sword_target_seat: int = -1
 var is_game_over: bool = false
 var exit_battle_btn: Button = null
 var match_result_recorded: bool = false
+var match_entry_stake_recorded: bool = false
+var match_entry_star_amount: int = 0
 var doi_do_used_this_turn: bool = false
 var doi_do_modal: Control = null
 var doi_do_grid: HBoxContainer = null
@@ -292,6 +294,7 @@ var pending_local_uu_thiep: Dictionary = {}
 var card_pick_submission_pending: bool = false
 var card_pick_submitted_selection_id: String = ""
 var card_pick_current_selection: Dictionary = {}
+var is_targeting_tau_vi: bool = false
 
 # Remote Player State (Real Human Player on other machine)
 var is_remote_turn_active: bool = false
@@ -462,7 +465,7 @@ func _show_no_server_modal(message: String = "") -> void:
 	vbox.add_child(title_lbl)
 
 	var desc_lbl = Label.new()
-	desc_lbl.text = message if message != "" else "Không thể kết nối Máy Chủ Trận Đấu (Render Cloud hoặc Local 8080).\nTrận đấu đã bị dừng do không có máy chủ điều phối."
+	desc_lbl.text = message if message != "" else "Không thể kết nối Máy Chủ Trận Đấu (Render Cloud).\nTrận đấu đã bị dừng do không có máy chủ điều phối."
 	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc_lbl.add_theme_font_size_override("font_size", 13)
@@ -579,6 +582,8 @@ func _ready() -> void:
 		if a.begins_with("--screenshot"):
 			is_screenshot_test = true
 			break
+	if not is_screenshot_test:
+		_apply_match_entry_stake()
 
 	# Kết nối WebSocket Realtime Local Server
 	if NetworkClient and not is_screenshot_test:
@@ -1261,7 +1266,7 @@ func _ready() -> void:
 			AuthManager.disable_session_save = true
 			AuthManager.current_2v2_rank_index = 1 # Hương Dũng
 			AuthManager.current_2v2_stars = 3 # 3 sao -> giảm xuống 2 sao (-1 sao)
-			AuthManager.current_2v2_accumulation_points = 20 # 20 -> 30đ (+10đ an ủi)
+			AuthManager.current_2v2_accumulation_points = 20 # 20 -> 32đ (+12đ an ủi)
 		_show_victory_defeat_modal(false)
 		await get_tree().create_timer(3.5).timeout
 		_save_viewport_screenshot("res://battle_2v2_defeat_screenshot.png")
@@ -1936,10 +1941,6 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 		buttons.append({"id": "dinh_quoc", "text": "⚔️ ĐỊNH QUỐC", "description": "Dùng bất kỳ lá bài Đen nào như Huyết Chiến.", "selected": is_targeting_dinh_quoc})
 	if seat == my_seat and _hero_has_skill(g, "trao_bao"):
 		buttons.append({"id": "trao_bao", "text": "👑 TRAO BÀO", "description": "Chuyển 1 trang bị cho người khác: hồi 1 máu, bạn rút 1 lá.", "selected": is_targeting_trao_bao})
-	if seat == my_seat and _hero_has_skill(g, "tran_thu") and current_server_phase == "AWAIT_SLASH_DEFENSE" and current_waiting_seat == my_seat:
-		var has_eq = not str(g.get("equipped_weapon", "")).is_empty() or not str(g.get("equipped_armor", "")).is_empty() or not str(g.get("equipped_def_horse", "")).is_empty() or not str(g.get("equipped_off_horse", "")).is_empty() or not str(g.get("equipped_treasure", "")).is_empty()
-		if has_eq:
-			buttons.append({"id": "tran_thu", "text": "🛡️ TRẤN THỦ", "description": "Bỏ 1 trang bị đang đeo để Đỡ đòn Trảm."})
 	if seat == my_seat and _hero_has_skill(g, "muu_dinh"):
 		if muu_dinh_used_this_turn:
 			buttons.append({"id": "muu_dinh", "text": "📜 ĐÃ DÙNG MƯU ĐỊNH", "description": "Mưu Định chỉ dùng 1 lần mỗi lượt.", "disabled": true})
@@ -1952,7 +1953,7 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 			buttons.append({"id": "doi_do", "text": "🏯 DỜI ĐÔ", "description": "Bỏ toàn bộ bài trên tay: rút lại + 1 lá, chọn tối đa 4 người mỗi người rút 1 lá."})
 	var treasure = str(g.get("equipped_treasure", ""))
 	if seat == my_seat and treasure == "Trống Đồng Đông Sơn":
-		var drum_used := bool(g.get("diem_trong_used", false))
+		var drum_used := bool(g.get("diem_trong_used", false)) or ("DiemTrong" in (g.get("used_skills_keys", []) as Array))
 		if not drum_used:
 			buttons.append({"id": "treasure_drum", "text": "🥁 ĐIỂM TRỐNG"})
 	elif seat == my_seat and treasure == "Hổ Phù Trần Triều":
@@ -2233,21 +2234,6 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 		_refresh_local_skill_buttons(s_num)
 		_update_action_btn()
 		return
-	if s_num == my_seat and skill_key == "tran_thu":
-		if current_server_phase != "AWAIT_SLASH_DEFENSE" or current_waiting_seat != my_seat:
-			desc_text.text = "⚠️ [TRẤN THỦ] chỉ dùng khi bạn bị Trảm."
-			return
-		var eq_name := ""
-		for k in ["equipped_weapon", "equipped_armor", "equipped_def_horse", "equipped_off_horse", "equipped_treasure"]:
-			if not str(g.get(k, "")).is_empty():
-				eq_name = str(g.get(k, ""))
-				break
-		if eq_name != "":
-			NetworkClient.send_respond_action(true, eq_name)
-			desc_text.text = "🛡️ [TRẤN THỦ] Bỏ [%s] để Đỡ đòn Trảm!" % eq_name
-		else:
-			desc_text.text = "⚠️ Bạn không có trang bị nào để bỏ cho [TRẤN THỦ]!"
-		return
 	if s_num == my_seat and "hổ phù" in str(g.get("equipped_treasure", "")).to_lower():
 		if is_targeting_ho_phu_skill:
 			_clear_treasure_targeting()
@@ -2407,6 +2393,86 @@ func _clear_song_cung_equipped_previews() -> void:
 				selected_card_ui = null
 			hand_container.remove_child(child)
 			child.queue_free()
+	_relayout_hand_cards()
+
+func _clear_tran_thu_equipped_previews() -> void:
+	for child in hand_container.get_children():
+		if child.has_meta("tran_thu_equipped_preview"):
+			if selected_dodge_card_ui == child:
+				selected_dodge_card_ui = null
+			hand_container.remove_child(child)
+			child.queue_free()
+	_relayout_hand_cards()
+
+func _clear_tau_vi_equipped_previews() -> void:
+	for child in hand_container.get_children():
+		if child.has_meta("tau_vi_equipped_preview"):
+			if selected_card_ui == child:
+				selected_card_ui = null
+			hand_container.remove_child(child)
+			child.queue_free()
+	_relayout_hand_cards()
+
+func _refresh_tau_vi_equipped_previews() -> void:
+	if not is_targeting_tau_vi or not generals_data.has(my_seat):
+		_clear_tau_vi_equipped_previews()
+		return
+	var desired: Dictionary = {}
+	for equipment in _get_local_equipment_cards_for_song_cung(generals_data[my_seat]):
+		if equipment is Dictionary:
+			desired[str(equipment.get("id", ""))] = equipment
+	for child in hand_container.get_children():
+		if not child.has_meta("tau_vi_equipped_preview"):
+			continue
+		var preview_id := str(child.get_meta("tau_vi_equipped_preview"))
+		if desired.has(preview_id):
+			desired.erase(preview_id)
+		else:
+			if selected_card_ui == child:
+				selected_card_ui = null
+			hand_container.remove_child(child)
+			child.queue_free()
+	for equipment_id in desired:
+		var equipment: Dictionary = desired[equipment_id]
+		var card_ui = CardUIScene.instantiate()
+		hand_container.add_child(card_ui)
+		card_ui.setup_card_data(str(equipment.get("id", "")), _get_card_display_name(equipment), equipment.get("rank", 1), str(equipment.get("suit", "Spade")), int(equipment.get("category", 1)), str(equipment.get("desc", "")), int(equipment.get("subType", -1)))
+		card_ui.set_meta("tau_vi_equipped_preview", equipment_id)
+		if card_ui.has_method("set_equipped_badge"):
+			card_ui.set_equipped_badge(true)
+		var c_info = {"id": equipment_id, "name": _get_card_display_name(equipment), "rank": equipment.get("rank", 1), "suit": str(equipment.get("suit", "Spade")), "cat": int(equipment.get("category", 1)), "desc": str(equipment.get("desc", "")), "subType": int(equipment.get("subType", -1)), "is_equipped": true, "card_node": card_ui}
+		card_ui.card_clicked.connect(func(_c): _on_player_hand_card_clicked(card_ui, c_info))
+	_relayout_hand_cards()
+
+func _refresh_tran_thu_equipped_previews() -> void:
+	if not is_waiting_dodge or current_server_phase != "AWAIT_SLASH_DEFENSE" or not generals_data.has(my_seat):
+		_clear_tran_thu_equipped_previews()
+		return
+	var desired: Dictionary = {}
+	var equipment_cards = _get_local_equipment_cards_for_song_cung(generals_data[my_seat])
+	if equipment_cards is Array:
+		for equipment in equipment_cards:
+			if equipment is Dictionary:
+				desired[str(equipment.get("id", ""))] = equipment
+	for child in hand_container.get_children():
+		if not child.has_meta("tran_thu_equipped_preview"):
+			continue
+		var preview_id := str(child.get_meta("tran_thu_equipped_preview"))
+		if desired.has(preview_id):
+			desired.erase(preview_id)
+		else:
+			hand_container.remove_child(child)
+			child.queue_free()
+	for equipment_id in desired:
+		var equipment: Dictionary = desired[equipment_id]
+		var card_ui = CardUIScene.instantiate()
+		hand_container.add_child(card_ui)
+		card_ui.setup_card_data(str(equipment.get("id", "")), _get_card_display_name(equipment), equipment.get("rank", 1), str(equipment.get("suit", "Spade")), int(equipment.get("category", 1)), str(equipment.get("desc", "")), int(equipment.get("subType", -1)))
+		card_ui.set_meta("tran_thu_equipped_preview", equipment_id)
+		if card_ui.has_method("set_equipped_badge"):
+			card_ui.set_equipped_badge(true)
+		var c_info = {"id": equipment_id, "name": _get_card_display_name(equipment), "rank": equipment.get("rank", 1), "suit": str(equipment.get("suit", "Spade")), "cat": int(equipment.get("category", 1)), "desc": str(equipment.get("desc", "")), "subType": int(equipment.get("subType", -1)), "is_equipped": true, "card_node": card_ui}
+		card_ui.card_clicked.connect(func(_c): _on_player_hand_card_clicked(card_ui, c_info))
 	_relayout_hand_cards()
 
 func _refresh_song_cung_equipped_previews() -> void:
@@ -2616,6 +2682,16 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 	if is_waiting_song_cung:
 		_handle_song_cung_card_selection(card_node)
 		return
+	if is_targeting_tau_vi:
+		if selected_card_ui and is_instance_valid(selected_card_ui):
+			selected_card_ui.set_selected(false)
+		if selected_card_ui == card_node:
+			selected_card_ui = null
+		else:
+			selected_card_ui = card_node
+			card_node.set_selected(true)
+		_update_action_btn()
+		return
 	if is_waiting_thuy_trieu_rut_give:
 		_select_dodge_card(card_node)
 		return
@@ -2625,12 +2701,12 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 	if is_waiting_dodge:
 		_handle_dodge_hand_card_selection(card_node, c_info)
 		return
-	if is_network_mode and current_server_phase not in ["PLAY", "AWAIT_HUYNH_TRUONG", "AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_NGHICH_Y", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_THAN_CHINH_LE_HOAN"] and not is_discard_phase:
+	if is_network_mode and current_server_phase not in ["PLAY", "AWAIT_HUYNH_TRUONG", "AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_NGHICH_Y", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_TARGET_CARD"] and not is_discard_phase:
 		card_play_btn.visible = false
 		_clear_normal_hand_selection()
 		return
 	if not is_player_turn and not is_discard_phase:
-		if current_server_phase not in ["AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_NGHICH_Y", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_THAN_CHINH_LE_HOAN"] or current_waiting_seat != my_seat:
+		if current_server_phase not in ["AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_NGHICH_Y", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_TARGET_CARD"] or current_waiting_seat != my_seat:
 			return
 	if current_server_phase in ["AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_THAN_CHINH_LE_HOAN"] and current_waiting_seat == my_seat:
 		if selected_card_ui and is_instance_valid(selected_card_ui) and selected_card_ui != card_node:
@@ -3104,6 +3180,9 @@ func _on_general_avatar_clicked(seat_num: int) -> void:
 		return
 
 	if is_targeting_drum_skill:
+		if bool(g.get("diem_trong_used", false)) or ("DiemTrong" in (g.get("used_skills_keys", []) as Array)):
+			desc_text.text = "⚠️ [ĐIỂM TRỐNG] chỉ dùng 1 lần mỗi lượt."
+			return
 		if seat_num == my_seat:
 			desc_text.text = "⚠️ Không thể tự dùng Điểm Trống lên chính mình!"
 			AudioManager.play_skill()
@@ -3378,6 +3457,12 @@ func _update_action_btn() -> void:
 		card_play_btn.visible = true
 		card_play_btn.disabled = not tay_phu_ready
 		card_play_btn.text = "⚔️ DÙNG TÂY PHU" if tay_phu_ready else "⚔️ TÂY PHU: CHỌN 2 LÁ VÀ MỤC TIÊU"
+		return
+	if is_targeting_tau_vi:
+		var tau_vi_ready := selected_card_ui != null and is_instance_valid(selected_card_ui)
+		card_play_btn.visible = true
+		card_play_btn.disabled = not tau_vi_ready
+		card_play_btn.text = "🏃 BỎ TRANG BỊ VÀ RÚT 2 LÁ" if tau_vi_ready else "🏃 TẨU VI: CHỌN TRANG BỊ"
 		return
 	if is_targeting_cai_cach:
 		var cai_cach_ready := selected_two_card_skill_nodes.size() == 2
@@ -3791,6 +3876,53 @@ func _on_card_play_btn_clicked() -> void:
 		_refresh_local_skill_buttons(my_seat)
 		card_play_btn.disabled = true
 		return
+	if is_targeting_tau_vi:
+		if selected_card_ui == null or not is_instance_valid(selected_card_ui):
+			desc_text.text = "⚠️ [TẨU VI] hãy chọn 1 trang bị trên tay hoặc đang mang để bỏ."
+			return
+		var tau_vi_card = _get_card_info_from_ui(selected_card_ui)
+		if int(tau_vi_card.get("cat", tau_vi_card.get("category", -1))) != 1:
+			desc_text.text = "⚠️ [TẨU VI] chỉ được chọn trang bị."
+			return
+		var tau_vi_token := "EQUIPMENT:%s" % str(tau_vi_card.get("id", ""))
+		if not selected_card_ui.has_meta("tau_vi_equipped_preview"):
+			var hand_index := 0
+			for child in hand_container.get_children():
+				if child == selected_card_ui:
+					break
+				if child != exit_battle_btn and not child.has_meta("song_cung_equipped_preview") and not child.has_meta("hung_suc_equipped_preview") and not child.has_meta("trao_bao_equipped_preview") and not child.has_meta("tran_thu_equipped_preview") and not child.has_meta("tau_vi_equipped_preview"):
+					hand_index += 1
+			tau_vi_token = "HAND:%d" % hand_index
+		if not is_network_mode:
+			var local_owner = generals_data.get(my_seat, {})
+			if selected_card_ui.has_meta("tau_vi_equipped_preview"):
+				var removed_name := str(tau_vi_card.get("name", ""))
+				for slot in ["equipped_weapon", "equipped_armor", "equipped_def_horse", "equipped_off_horse", "equipped_treasure"]:
+					if str(local_owner.get(slot, "")) == removed_name:
+						local_owner[slot] = ""
+						var slot_type := "treasure" if slot == "equipped_treasure" else ("armor" if slot == "equipped_armor" else ("def_horse" if slot == "equipped_def_horse" else ("off_horse" if slot == "equipped_off_horse" else "weapon")))
+						local_owner["avatar_node"].set_equipment(slot_type, "", "")
+						if slot == "equipped_treasure": local_owner["avatar_node"].set_skill("")
+						break
+				_clear_tau_vi_equipped_previews()
+			else:
+				_discard_player_card(selected_card_ui)
+			for _i in range(2):
+				_add_card_to_player_hand(_draw_card_from_pile())
+			is_targeting_tau_vi = false
+			selected_card_ui = null
+			card_play_btn.visible = false
+			_animate_showcase_card("Tẩu Vi Thượng Sách", "Bỏ 1 Trang bị của mình để rút 2 lá.")
+			return
+		NetworkClient.send_respond_action(true, "", tau_vi_token)
+		is_targeting_tau_vi = false
+		if selected_card_ui.has_meta("tau_vi_equipped_preview"):
+			_clear_tau_vi_equipped_previews()
+		else:
+			_discard_player_card(selected_card_ui)
+		selected_card_ui = null
+		card_play_btn.visible = false
+		return
 	if is_targeting_tay_phu:
 		if selected_two_card_skill_nodes.size() != 2 or selected_target_seat <= 0:
 			desc_text.text = "⚠️ [TÂY PHU] cần chọn đúng 2 lá trên tay và 1 mục tiêu."
@@ -4157,6 +4289,11 @@ func _on_card_play_btn_clicked() -> void:
 		return
 
 	if is_targeting_drum_skill:
+		var drum_owner = generals_data.get(my_seat, {})
+		if bool(drum_owner.get("diem_trong_used", false)) or ("DiemTrong" in (drum_owner.get("used_skills_keys", []) as Array)):
+			desc_text.text = "⚠️ [ĐIỂM TRỐNG] chỉ dùng 1 lần mỗi lượt."
+			_clear_treasure_targeting()
+			return
 		if selected_target_seat <= 0 or not generals_data.has(selected_target_seat):
 			desc_text.text = "🥁 Vui lòng chọn 1 Tướng trên bàn để phát động Điểm Trống!"
 			return
@@ -4616,17 +4753,33 @@ func _on_card_play_btn_clicked() -> void:
 				_add_card_to_player_hand(_draw_card_from_pile())
 
 	elif c_name == "Tẩu Vi Thượng Sách":
-		if str(generals_data[my_seat].get("equipped_weapon", "")).is_empty() and str(generals_data[my_seat].get("equipped_armor", "")).is_empty() and str(generals_data[my_seat].get("equipped_off_horse", "")).is_empty() and str(generals_data[my_seat].get("equipped_def_horse", "")).is_empty() and str(generals_data[my_seat].get("equipped_treasure", "")).is_empty():
+		var has_hand_equipment := false
+		for hand_card in hand_container.get_children():
+			var hand_info = _get_card_info_from_ui(hand_card)
+			if int(hand_info.get("cat", hand_info.get("category", -1))) == 1:
+				has_hand_equipment = true
+				break
+		if str(generals_data[my_seat].get("equipped_weapon", "")).is_empty() and str(generals_data[my_seat].get("equipped_armor", "")).is_empty() and str(generals_data[my_seat].get("equipped_off_horse", "")).is_empty() and str(generals_data[my_seat].get("equipped_def_horse", "")).is_empty() and str(generals_data[my_seat].get("equipped_treasure", "")).is_empty() and not has_hand_equipment:
 			desc_text.text = "⚠️ Cần có ít nhất 1 Trang bị để dùng Tẩu Vi Thượng Sách!"
+			return
+		if is_network_mode:
+			is_targeting_tau_vi = true
+			_discard_player_card(selected_card_ui)
+			selected_card_ui = null
+			card_play_btn.visible = true
+			_reset_player_turn_timer()
+			_broadcast_player_battle_action("PLAY_CARD", c_id, 0)
+			_refresh_tau_vi_equipped_previews()
+			_update_action_btn()
 			return
 		_discard_player_card(selected_card_ui)
 		selected_card_ui = null
-		card_play_btn.visible = false
+		is_targeting_tau_vi = true
+		card_play_btn.visible = true
 		_reset_player_turn_timer()
 		_broadcast_player_battle_action("PLAY_CARD", c_id, 0)
-		_animate_showcase_card(c_name, "Bỏ 1 Trang bị của mình để rút 2 lá.", c_info)
-		if not is_network_mode:
-			_show_card_pick_modal(false, my_seat, {"effectType": "TAU_VI"})
+		_refresh_tau_vi_equipped_previews()
+		_update_action_btn()
 
 	elif c_name == "Phủ Để Trừu Tân":
 		if selected_target_seat <= 0 or selected_target_seat == my_seat or not generals_data.has(selected_target_seat):
@@ -4982,7 +5135,7 @@ func _sync_player_hand_from_server(server_hand: Array) -> void:
 	# khỏi UI và người chơi không thể chọn để bỏ tiếp.
 	if server_hand.is_empty():
 		for child in hand_container.get_children():
-			if child == exit_battle_btn or child.has_meta("song_cung_equipped_preview") or child.has_meta("trao_bao_equipped_preview"):
+			if child == exit_battle_btn or child.has_meta("song_cung_equipped_preview") or child.has_meta("trao_bao_equipped_preview") or child.has_meta("tran_thu_equipped_preview") or child.has_meta("tau_vi_equipped_preview"):
 				continue
 			selected_song_cung_card_nodes.erase(child)
 			hand_container.remove_child(child)
@@ -5015,7 +5168,7 @@ func _sync_player_hand_from_server(server_hand: Array) -> void:
 
 	var current_cards: Array = []
 	for child in hand_container.get_children():
-		if child == exit_battle_btn or child.has_meta("hung_suc_equipped_preview") or child.has_meta("song_cung_equipped_preview") or child.has_meta("trao_bao_equipped_preview"):
+		if child == exit_battle_btn or child.has_meta("hung_suc_equipped_preview") or child.has_meta("song_cung_equipped_preview") or child.has_meta("trao_bao_equipped_preview") or child.has_meta("tran_thu_equipped_preview") or child.has_meta("tau_vi_equipped_preview"):
 			continue
 		var info = _get_card_info_from_ui(child)
 		current_cards.append([str(info.get("id", "")), str(info.get("name", "")), int(info.get("subType", -1))])
@@ -5040,7 +5193,7 @@ func _sync_player_hand_from_server(server_hand: Array) -> void:
 	# Thu thập các thẻ bài hiện có theo id để tái sử dụng, tránh hủy và tạo lại gây giật/nháy hình
 	var existing_nodes_by_id: Dictionary = {}
 	for child in hand_container.get_children():
-		if child == exit_battle_btn or child.has_meta("hung_suc_equipped_preview") or child.has_meta("song_cung_equipped_preview") or child.has_meta("trao_bao_equipped_preview"):
+		if child == exit_battle_btn or child.has_meta("hung_suc_equipped_preview") or child.has_meta("song_cung_equipped_preview") or child.has_meta("trao_bao_equipped_preview") or child.has_meta("tran_thu_equipped_preview") or child.has_meta("tau_vi_equipped_preview"):
 			continue
 		var cid = str(_get_card_info_from_ui(child).get("id", ""))
 		if not cid.is_empty() and not existing_nodes_by_id.has(cid):
@@ -5335,6 +5488,10 @@ func _sync_player_equipments_from_server(seat: int, equips: Array) -> void:
 	if seat == my_seat and is_waiting_song_cung:
 		_refresh_song_cung_equipped_previews()
 		_update_song_cung_ui()
+	if seat == my_seat and is_targeting_tau_vi:
+		_refresh_tau_vi_equipped_previews()
+	if seat == my_seat and is_waiting_dodge and current_server_phase == "AWAIT_SLASH_DEFENSE":
+		_refresh_tran_thu_equipped_previews()
 
 func _has_equipped_weapon_name(general: Dictionary, weapon_name: String) -> bool:
 	return weapon_name in str(general.get("equipped_weapon", ""))
@@ -5506,6 +5663,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			g["than_chinh_slash_bonus"] = true
 		g["is_wine_buff_active"] = bool(p.get("isWineBuffActive", g.get("is_wine_buff_active", false)))
 		g["wine_used_this_turn"] = bool(p.get("wineUsedThisTurn", g.get("wine_used_this_turn", false)))
+		g["used_skills_keys"] = p.get("usedSkillsKeys", []) if p.get("usedSkillsKeys", []) is Array else []
 		g["an_tich_count"] = int(p.get("anTichCount", 1 if bool(p.get("hasAnTich", false)) else 0))
 		g["an_tich_cards"] = p.get("anTichCards", []) if p.get("anTichCards", []) is Array else []
 		if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
@@ -5513,6 +5671,8 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		if seat == my_seat:
 			is_wine_buff_active = g["is_wine_buff_active"]
 			wine_used_this_turn = g["wine_used_this_turn"]
+			if current_server_phase == "PLAY" and current_turn_seat == my_seat:
+				g["diem_trong_used"] = "DiemTrong" in (g.get("used_skills_keys", []) as Array)
 		if g.get("is_alive", true) and not server_is_alive:
 			g["is_alive"] = false
 			if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
@@ -5646,6 +5806,9 @@ func _apply_network_game_state(state: Dictionary) -> void:
 	current_turn_seat = server_turn_seat
 	current_waiting_seat = server_waiting_seat
 	current_waiting_timer = float(server_waiting_timer)
+	if server_phase != "AWAIT_TARGET_CARD" and is_targeting_tau_vi:
+		is_targeting_tau_vi = false
+		_clear_tau_vi_equipped_previews()
 	if previous_server_phase == "AWAIT_NGHICH_Y" and server_phase != "AWAIT_NGHICH_Y":
 		is_targeting_nghich_y = false
 		selected_nghich_y_card_id = ""
@@ -5769,6 +5932,8 @@ func _apply_network_game_state(state: Dictionary) -> void:
 				slashes_used_this_turn = int(state.get("slashesUsedThisTurn", 0))
 				doi_do_used_this_turn = false
 				muu_dinh_used_this_turn = false
+				if generals_data.has(my_seat):
+					generals_data[my_seat]["diem_trong_used"] = false
 				is_using_trac_lac = false
 			is_player_turn = true
 			is_discard_phase = false
@@ -6132,13 +6297,13 @@ func _apply_network_game_state(state: Dictionary) -> void:
 				cards_to_show = state["muuDinhCards"]
 			elif state.has("pendingMuuDinh") and state["pendingMuuDinh"] is Dictionary and state["pendingMuuDinh"].has("cards"):
 				cards_to_show = state["pendingMuuDinh"]["cards"]
-			_show_muu_dinh_modal(cards_to_show)
+			_show_muu_dinh_modal(cards_to_show, "ĐANG CHỜ DỮ LIỆU 2 LÁ BÀI...")
 			turn_indicator.text = "📜 MƯU ĐỊNH: CHỌN 1 LÁ & 1 NGƯỜI (%ds)" % server_waiting_timer
 			desc_text.text = "📜 Đang xem 2 lá đầu xấp bài. Hãy chọn 1 lá để trao cho 1 người chơi!"
 		else:
-			_close_muu_dinh_modal()
 			var wait_gen = generals_data.get(server_waiting_seat, {})
 			var wait_name = wait_gen.get("name", "Ghế %d" % server_waiting_seat) if wait_gen is Dictionary else "Ghế %d" % server_waiting_seat
+			_show_muu_dinh_modal([], "ĐANG CHỜ %s CHỌN MƯU ĐỊNH..." % wait_name.to_upper())
 			turn_indicator.text = "📜 ĐANG CHỜ %s CHỌN MƯU ĐỊNH (%ds)..." % [wait_name, server_waiting_timer]
 			desc_text.text = "📜 %s đang xem 2 lá đầu xấp bài để chọn Mưu Định..." % wait_name
 
@@ -6225,10 +6390,19 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		var active_c = state.get("activeCard", {})
 		if not (active_c is Dictionary):
 			active_c = {}
-		var aoe_name = str(active_c.get("cardName", active_c.get("name", "Cẩm Nang Diện Rộng")))
-		var req_name = str(active_c.get("reqName", "Trảm"))
-		var req_type = str(active_c.get("reqType", "SLASH"))
+		var aoe_name = str(active_c.get("cardName", active_c.get("name", "")))
+		var req_name = str(active_c.get("reqName", ""))
+		var req_type = str(active_c.get("reqType", ""))
+		var wait_rx = str(state.get("waitingReactionType", ""))
+		if req_type.is_empty():
+			req_type = "DODGE" if wait_rx == "DODGE" else "SLASH"
+		if req_name.is_empty():
+			req_name = "Đỡ" if req_type == "DODGE" else "Trảm"
+		if aoe_name.is_empty() or aoe_name == "Cẩm Nang Diện Rộng":
+			aoe_name = "Mưa Tên Liên Châu" if req_type == "DODGE" else "Giặc Tới"
 		var atk_s = int(active_c.get("casterSeat", 0))
+		if atk_s <= 0 and server_turn_seat > 0:
+			atk_s = server_turn_seat
 		var atk_gen = generals_data.get(atk_s, {})
 		if not (atk_gen is Dictionary):
 			atk_gen = {}
@@ -6393,7 +6567,12 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			if current_sel_id != card_pick_submitted_selection_id:
 				card_pick_submission_pending = false
 
-			if not card_pick_modal.visible and not sel.is_empty() and not card_pick_submission_pending:
+			if effect_type == "TAU_VI":
+				if not is_targeting_tau_vi:
+					is_targeting_tau_vi = true
+					_refresh_tau_vi_equipped_previews()
+					_update_action_btn()
+			elif not card_pick_modal.visible and not sel.is_empty() and not card_pick_submission_pending:
 				_show_card_pick_modal(is_steal, tgt_s, sel)
 			if effect_type == "COT_KINH_DISCARD":
 				turn_indicator.text = "🏛️ CỘT KINH: BỎ 1 LÁ TRÊN TAY (%ds)!" % server_waiting_timer
@@ -6715,6 +6894,7 @@ func _prompt_rescue_reaction(victim_seat: int) -> void:
 	rescue_modal.visible = true
 
 func _close_dodge_reaction_state() -> void:
+	_clear_tran_thu_equipped_previews()
 	for card_node in selected_oai_nhuoc_card_nodes:
 		if is_instance_valid(card_node) and card_node.has_method("set_selected"):
 			card_node.set_selected(false)
@@ -8188,6 +8368,7 @@ func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_e
 		dodge_card_selector_scroll.visible = false
 	_build_dodge_card_selector_buttons([])
 
+	_refresh_tran_thu_equipped_previews()
 	var valid_cards = _get_valid_dodge_cards(attacker_seat, true)
 	_set_reaction_hand_focus(true, "Đỡ", attacker_seat, false, true)
 	if valid_cards.size() > 0:
@@ -8235,6 +8416,8 @@ func _is_card_valid_for_dodge(card_ui: Control, attacker_seat: int, is_slash_att
 
 	# Cơ bản: Lá bài "Đỡ"
 	if "đỡ" in c_name.to_lower():
+		return true
+	if _hero_has_skill(my_gen, "tran_thu") and (card_ui.has_meta("tran_thu_equipped_preview") or int(info.get("cat", info.get("category", -1))) == 1):
 		return true
 
 	# Hero 47: Lý Thường Kiệt ("Tiến Thoái"): Dùng Trảm như Đỡ
@@ -8826,12 +9009,7 @@ func _is_same_card_color(first_suit: String, second_suit: String) -> bool:
 
 func _format_rank(r: Variant) -> String:
 	var val = int(r)
-	match val:
-		1: return "A"
-		11: return "J"
-		12: return "Q"
-		13: return "K"
-		_: return str(val)
+	return str(val)
 
 var _damage_vignette: ColorRect = null
 var _battlefield_shake_tween: Tween = null
@@ -9243,6 +9421,38 @@ func _check_victory_condition() -> void:
 		pending_local_uu_thiep.clear()
 		_trigger_local_uu_thiep_if_applicable(u_atk, u_tgt)
 
+func _apply_match_entry_stake() -> void:
+	# Trừ ngầm tối đa 1 sao ngay khi trận xếp hạng bắt đầu.
+	if match_entry_stake_recorded or not AuthManager or not RankSystem:
+		return
+	var mode_id := "2v2"
+	var room_id := ""
+	if AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary:
+		mode_id = str(AppwriteMatchmaking.current_room.get("modeId", "2v2"))
+		room_id = str(AppwriteMatchmaking.current_room.get("roomId", ""))
+	if mode_id != "2v2":
+		return
+	if not room_id.is_empty() and AuthManager.current_2v2_entry_stake_room_id == room_id:
+		match_entry_stake_recorded = true
+		match_entry_star_amount = int(AuthManager.current_2v2_entry_stake_amount)
+		return
+
+	var cur_rank_idx := int(AuthManager.current_2v2_rank_index)
+	var cur_stars := int(AuthManager.current_2v2_stars)
+	var cur_acc := int(AuthManager.current_2v2_accumulation_points)
+	match_entry_star_amount = 1 if cur_stars > 0 or cur_rank_idx > 0 else 0
+	var stake_res = RankSystem.process_match_result_adjusted(false, cur_rank_idx, cur_stars, cur_acc, -match_entry_star_amount, 0)
+	AuthManager.current_2v2_rank_index = stake_res["rank_index"]
+	AuthManager.current_2v2_stars = stake_res["stars"]
+	AuthManager.current_2v2_accumulation_points = stake_res["accumulation_points"]
+	if not room_id.is_empty():
+		AuthManager.current_2v2_entry_stake_room_id = room_id
+		AuthManager.current_2v2_entry_stake_amount = match_entry_star_amount
+	match_entry_stake_recorded = true
+	if AuthManager.has_method("save_profile_to_appwrite"):
+		AuthManager.save_profile_to_appwrite()
+
+
 func _show_victory_defeat_modal(is_win: bool) -> void:
 	if not victory_defeat_modal:
 		return
@@ -9262,8 +9472,16 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 		cur_stars = AuthManager.current_2v2_stars
 		cur_acc = AuthManager.current_2v2_accumulation_points
 
-	# 2. Xử lý tăng giảm sao và điểm tích lũy theo RankSystem
-	var res = RankSystem.process_match_result(is_win, cur_rank_idx, cur_stars, cur_acc)
+	# 2. Xử lý tăng giảm sao và điểm tích lũy theo RankSystem. Sao cược đã
+	# được trừ lúc vào trận nên không trừ lần hai khi thua; thắng hoàn cược và
+	# nhận thêm 1 sao thắng.
+	var result_star_delta := RankSystem.WIN_STARS if is_win else RankSystem.LOSE_STARS
+	var result_acc_delta := RankSystem.WIN_ACCUMULATION_POINTS if is_win else RankSystem.LOSE_ACCUMULATION_POINTS
+	if match_entry_stake_recorded:
+		result_star_delta = (RankSystem.WIN_STARS + match_entry_star_amount) if is_win else 0
+	var res = RankSystem.process_match_result_adjusted(
+		is_win, cur_rank_idx, cur_stars, cur_acc, result_star_delta, result_acc_delta
+	)
 
 	# 3. Cập nhật và lưu ngay lập tức vào AuthManager
 	if DailyQuestSystem:
@@ -9287,6 +9505,8 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 			AuthManager.current_exp += exp_gain
 		AuthManager.current_silver += 300 if is_win else 100
 		AuthManager.save_profile_to_appwrite()
+		AuthManager.current_2v2_entry_stake_room_id = ""
+		AuthManager.current_2v2_entry_stake_amount = 0
 
 	# 4. Tái cấu trúc Box hiển thị Thông báo cuối trận
 	var box = victory_defeat_modal.get_node_or_null("Dim/Box") as PanelContainer
@@ -9424,7 +9644,8 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 	star_header.add_child(star_title)
 
 	var star_tag = Label.new()
-	star_tag.text = " +1 ⭐" if is_win else " -1 ⭐"
+	# Chỉ hiển thị sao thắng thực tế; sao hoàn lại từ khoản cược được xử lý ẩn.
+	star_tag.text = " +1 ⭐" if is_win else (" Không trừ ⭐" if match_entry_stake_recorded else " -1 ⭐")
 	star_tag.add_theme_font_size_override("font_size", 13)
 	star_tag.add_theme_color_override("font_color", Color(0.35, 0.95, 0.45) if is_win else Color(1.0, 0.35, 0.35))
 	star_header.add_child(star_tag)
@@ -9467,7 +9688,7 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 	acc_header.add_child(acc_title)
 
 	var acc_delta_lbl = Label.new()
-	acc_delta_lbl.text = " +25đ" if is_win else " +10đ"
+	acc_delta_lbl.text = " +%dđ" % result_acc_delta
 	acc_delta_lbl.add_theme_font_size_override("font_size", 13)
 	acc_delta_lbl.add_theme_color_override("font_color", Color(0.3, 0.85, 1.0) if is_win else Color(0.95, 0.75, 0.2))
 	acc_header.add_child(acc_delta_lbl)
@@ -9600,7 +9821,7 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 			AudioManager.play_card_draw()
 			await s_tw.finished
 	else:
-		if res["old_stars"] > 0:
+		if result_star_delta < 0 and res["old_stars"] > 0:
 			var target_star_idx = res["old_stars"] - 1
 			if target_star_idx < star_nodes.size():
 				var s_node = star_nodes[target_star_idx] as Label
@@ -13089,6 +13310,11 @@ func _activate_ho_phu_skill() -> void:
 
 func _activate_drum_skill(target_seat: int) -> void:
 	var tgt = generals_data.get(target_seat, {})
+	var owner_data = generals_data.get(my_seat, {})
+	if bool(owner_data.get("diem_trong_used", false)) or ("DiemTrong" in (owner_data.get("used_skills_keys", []) as Array)):
+		desc_text.text = "⚠️ [ĐIỂM TRỐNG] chỉ dùng 1 lần mỗi lượt."
+		_clear_treasure_targeting()
+		return
 	if target_seat == my_seat or tgt.is_empty() or not tgt.get("is_alive", false):
 		desc_text.text = "⚠️ Điểm Trống cần chọn 1 tướng khác còn sống."
 		return
@@ -13109,8 +13335,10 @@ func _activate_drum_skill(target_seat: int) -> void:
 	_add_log("🥁 <b>%s</b> phát động [Điểm Trống] lên <b>%s</b>!" % [my_name, tgt_name])
 
 	if is_network_mode and NetworkClient and NetworkClient.is_connected_to_server:
+		owner_data["diem_trong_used"] = true
 		NetworkClient.send_use_skill("Điểm Trống", target_seat)
 	else:
+		owner_data["diem_trong_used"] = true
 		_execute_local_drum_skill(my_seat, target_seat)
 
 func _execute_local_drum_skill(caster_seat: int, target_seat: int) -> void:
@@ -14255,11 +14483,32 @@ func _ensure_muu_dinh_modal() -> void:
 
 	muu_dinh_modal.visible = false
 
-func _show_muu_dinh_modal(cards: Array) -> void:
+func _show_muu_dinh_modal(cards: Array, empty_status: String = "ĐANG CHỜ DỮ LIỆU 2 LÁ BÀI...") -> void:
 	_ensure_muu_dinh_modal()
+	var same_cards = muu_dinh_peeked_cards.size() == cards.size()
+	if same_cards:
+		for i in range(cards.size()):
+			if not (cards[i] is Dictionary) or not (muu_dinh_peeked_cards[i] is Dictionary) or str(cards[i].get("id", "")) != str(muu_dinh_peeked_cards[i].get("id", "")):
+				same_cards = false
+				break
+	if muu_dinh_modal.visible and same_cards:
+		if cards.is_empty():
+			muu_dinh_status_lbl.text = empty_status
+		return
 	muu_dinh_peeked_cards = cards.duplicate()
 	selected_muu_dinh_card_idx = 0 if not cards.is_empty() else -1
 	selected_muu_dinh_target_seat = -1
+	if cards.is_empty():
+		muu_dinh_status_lbl.text = empty_status
+		muu_dinh_status_lbl.add_theme_font_size_override("font_size", 22)
+		muu_dinh_targets_container.get_parent().visible = false
+		muu_dinh_confirm_btn.visible = false
+		muu_dinh_cancel_btn.visible = false
+	else:
+		muu_dinh_status_lbl.add_theme_font_size_override("font_size", 13)
+		muu_dinh_targets_container.get_parent().visible = true
+		muu_dinh_confirm_btn.visible = true
+		muu_dinh_cancel_btn.visible = not is_network_mode
 
 	for child in muu_dinh_cards_container.get_children():
 		child.queue_free()
@@ -14271,7 +14520,7 @@ func _show_muu_dinh_modal(cards: Array) -> void:
 		var c = cards[i]
 		if not (c is Dictionary):
 			continue
-		var c_id = str(c.get("id", "c_%d" % i))
+		var muu_card_id = str(c.get("id", "c_%d" % i))
 		var c_name = str(c.get("name", "Bài"))
 		var c_rank = int(c.get("rank", 1))
 		var c_suit = str(c.get("suit", "SPADE"))
@@ -14280,7 +14529,7 @@ func _show_muu_dinh_modal(cards: Array) -> void:
 		var c_sub = int(c.get("subType", 0))
 
 		if CardDatabase and (c_desc.is_empty() or c_sub == 0):
-			var db_info = CardDatabase.get_card_info(c_id)
+			var db_info = CardDatabase.get_card_info(muu_card_id)
 			if not db_info.is_empty():
 				if c_sub == 0 and db_info.has("subType"):
 					c_sub = int(db_info["subType"])
@@ -14310,7 +14559,7 @@ func _show_muu_dinh_modal(cards: Array) -> void:
 		var card_ui = CardUIScene.instantiate()
 		card_ui.custom_minimum_size = Vector2(120, 160)
 		card_vbox.add_child(card_ui)
-		card_ui.setup_card_data(c_id, c_name, c_rank, c_suit, c_cat, c_desc, c_sub)
+		card_ui.setup_card_data(muu_card_id, c_name, c_rank, c_suit, c_cat, c_desc, c_sub)
 
 		var action_btn = Button.new()
 		action_btn.text = "☐ CHỌN TRAO ĐI"
@@ -14389,7 +14638,8 @@ func _show_muu_dinh_modal(cards: Array) -> void:
 		pick_btn.pressed.connect(func(): _select_muu_dinh_target(s_target))
 		muu_dinh_targets_container.add_child(item_box)
 
-	muu_dinh_cancel_btn.visible = not is_network_mode
+	if not cards.is_empty():
+		muu_dinh_cancel_btn.visible = not is_network_mode
 	_update_muu_dinh_ui()
 	muu_dinh_modal.visible = true
 

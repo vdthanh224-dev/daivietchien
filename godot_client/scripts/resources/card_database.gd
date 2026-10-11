@@ -33,7 +33,7 @@ static func create_card_from_dict(data: Dictionary) -> Resource:
 	c.id = data.get("id", "")
 	c.card_name = data.get("name", data.get("cardName", "Lá Bài"))
 	c.suit = data.get("suit", "Spade")
-	c.rank = int(data.get("rank", 1))
+	c.rank = _normalize_rank(data.get("rank", 1))
 	c.category = int(data.get("category", data.get("cat", 0))) as CardResourceScript.CardCategory
 	c.sub_type = int(data.get("subType", 0)) as CardResourceScript.CardSubType
 	c.description = data.get("desc", data.get("description", ""))
@@ -50,6 +50,15 @@ static func create_card_from_dict(data: Dictionary) -> Resource:
 		c.card_name = "Hịch Tướng Sĩ"
 		c.description = "Bạn và 1 người khác bạn chọn, bỏ 1 lá để nhận Sục Sôi: 1 vòng không giới hạn Trảm, tầm đánh +1. Có thể đổi lá để rút lá khác."
 	return c
+
+static func _normalize_rank(value: Variant) -> int:
+	var raw = str(value).strip_edges().to_upper()
+	match raw:
+		"A": return 1
+		"J": return 11
+		"Q": return 12
+		"K": return 13
+		_: return clampi(int(value), 1, 13)
 
 static func _make_card_dict(id: String, name: String, suit: String, rank: int, cat: int, sub: int, desc: String, range_val: int = 1, dist_mod: int = 0) -> Dictionary:
 	if cat == 0 and sub == 0:

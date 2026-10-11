@@ -1240,9 +1240,14 @@ for (const [subType, name] of [
   assert.equal(state.players[1].hand.length, 1);
   assert.equal(state.players[1].hand[0].id, "TARGET_HAND_2");
 
-  // 3. Dùng Điểm Trống lần 2 và Ghế 2 chọn LỘ BÀI (accepted = false)
+  // 3. Điểm Trống chỉ được dùng một lần trong lượt hiện tại.
   const useRes2 = handleUseSkill(state, 1, "Điểm Trống", 2);
-  assert.equal(useRes2.success, true);
+  assert.match(useRes2.error, /1 lần mỗi lượt/);
+
+  // Sang lượt mới rồi kiểm tra lựa chọn LỘ BÀI (accepted = false).
+  state.players[0].usedSkills = {};
+  const useRes3 = handleUseSkill(state, 1, "Điểm Trống", 2);
+  assert.equal(useRes3.success, true);
   assert.equal(state.phase, "AWAIT_DRUM_CHOICE");
   const revealRes = handleRespondAction(state, 2, false, null);
   assert.equal(revealRes.success, true);

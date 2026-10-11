@@ -6401,8 +6401,8 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	if (my_user_name == "" or my_user_name == "Đại Tướng Quân") and AuthManager and AuthManager.current_user_email != "":
 		my_user_name = AuthManager.current_user_email.split("@")[0].to_upper()
 	var my_rank_points = (AuthManager.current_2v2_rank_index * 6 + AuthManager.current_2v2_stars) if AuthManager else 0
-	var is_debug_match = OS.is_debug_build() or OS.has_feature("editor")
-	var rank_diff = 999999 if is_debug_match else 12
+	# Đã bỏ giới hạn tìm trận theo rank: Tất cả người chơi ở mọi bậc rank đều có thể tìm thấy nhau
+	var rank_diff = 999999
 
 	if AppwriteMatchmaking:
 		AppwriteMatchmaking.my_session_user_id = my_user_id
@@ -6475,7 +6475,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 				mm_is_host = false
 				_sync_my_seat_from_room(mm_current_room, my_user_id, my_user_name)
 				if old_room_id != mm_active_room_id:
-					AppwriteMatchmaking.retire_merged_room(old_room_id)
+					await AppwriteMatchmaking.retire_merged_room(old_room_id)
 				if AppwriteMatchmaking:
 					AppwriteMatchmaking.is_host = false
 			else:
@@ -6598,14 +6598,14 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		# which made a 15s wait visibly become 22-23s on a slow network.
 		var wait_remaining := bot_fill_timeout - bot_fill_timer
 		if last_real_player_count < target_player_count and wait_remaining <= 0.0:
-			if not mm_is_host:
-				print("[Matchmaking] Hết đúng %.0fs kể từ người cuối cùng, chuyển quyền chủ phòng để bổ sung AI." % bot_fill_timeout)
-				mm_is_host = true
-				AppwriteMatchmaking.is_host = true
-			break
+			# Khách không được tự tách phòng chỉ vì đã chờ đủ 15 giây. Các nick
+			# vào cùng lúc có thể đọc Appwrite lệch nhịp; chỉ chuyển quyền khi
+			# heartbeat của chủ phòng đã mất thực sự.
+			if mm_is_host:
+				break
 		if last_real_player_count >= target_player_count:
 			break
-		if last_real_player_count < target_player_count and wait_remaining < 0.75 and not is_fast_test:
+		if last_real_player_count < target_player_count and wait_remaining > 0.0 and wait_remaining < 0.75 and not is_fast_test:
 			await get_tree().create_timer(0.1).timeout
 			continue
 
@@ -6636,7 +6636,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 						AppwriteMatchmaking.is_host = false
 						_sync_my_seat_from_room(mm_current_room, my_user_id, my_user_name)
 						if previous_room_id != mm_active_room_id:
-							AppwriteMatchmaking.retire_merged_room(previous_room_id)
+							await AppwriteMatchmaking.retire_merged_room(previous_room_id)
 							last_real_player_at_ms = Time.get_ticks_msec()
 							guest_wait_timer = 0.0
 							last_real_player_count = candidate_count + 1
@@ -6722,12 +6722,17 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 								_update_matchmaking_slots_visual(mm_current_room, my_user_id, slot_nodes)
 								_update_matchmaking_status_count(status_lbl, mm_current_room, bot_fill_timeout)
 
-					# Trường hợp chủ phòng mất kết nối cũng dùng chung mốc 15 giây.
+					# Chỉ thăng cấp khi heartbeat của chủ phòng mất. Mốc chờ đủ 15s
+					# không đủ để kết luận phòng hỏng vì các nick có thể đang join
+					# đồng thời và Appwrite có độ trễ đọc/ghi.
 					if guest_wait_timer >= bot_fill_timeout:
-						print("[Matchmaking] Hết 15s và chủ phòng không phản hồi, tự động thăng cấp thành chủ phòng để bổ sung AI và vào chọn tướng.")
-						mm_is_host = true
-						AppwriteMatchmaking.is_host = true
-						break
+						var room_update_ms := int(mm_current_room.get("updateTimestamp", 0))
+						var room_stale_ms := AppwriteMatchmaking.get_now_ms() - room_update_ms if room_update_ms > 0 else 0
+						if room_stale_ms > 15000:
+							print("[Matchmaking] Chủ phòng mất heartbeat %dms, chuyển quyền để bổ sung AI." % room_stale_ms)
+							mm_is_host = true
+							AppwriteMatchmaking.is_host = true
+							break
 
 				if guest_wait_timer > 120.0:
 					if is_instance_valid(status_lbl):
@@ -6745,6 +6750,49 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 
 	if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
 		return
+
+	if mm_is_host:
+		# Bầu lại một lần cuối trước khi chèn bot. Các nick vào cùng lúc có
+		# thể chưa nhìn thấy đủ tài liệu Appwrite ở vòng poll trước; nếu còn
+		# room WAITING khác thì tất cả phải hội tụ về room có mã nhỏ nhất.
+		for election_round in range(4):
+			var final_candidate = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, rank_diff, my_user_name, mm_active_room_id, mode_id)
+			if final_candidate.is_empty() or str(final_candidate.get("roomId", "")) == mm_active_room_id:
+				break
+			var final_joined = await AppwriteMatchmaking.join_room_slot(final_candidate, my_user_id, my_user_name, my_rank_points, inst_idx)
+			if final_joined.is_empty():
+				await get_tree().create_timer(0.35).timeout
+				continue
+			var previous_final_room_id := mm_active_room_id
+			mm_current_room = final_joined
+			mm_active_room_id = str(final_joined.get("roomId", ""))
+			mm_is_host = false
+			AppwriteMatchmaking.is_host = false
+			_sync_my_seat_from_room(mm_current_room, my_user_id, my_user_name)
+			if previous_final_room_id != mm_active_room_id:
+				await AppwriteMatchmaking.retire_merged_room(previous_final_room_id)
+			break
+
+	if not mm_is_host:
+		# Khách chỉ rời hàng chờ khi chủ phòng đã ghi STARTED. Nếu vào scene
+		# sớm ở đây, 4 nick vẫn có thể nhìn thấy cùng room nhưng chạy draft ở
+		# các trạng thái khác nhau.
+		var room_started := false
+		for _started_poll in range(240):
+			var started_state = await AppwriteMatchmaking.poll_room_state(mm_active_room_id)
+			if not started_state.is_empty():
+				mm_current_room = started_state
+			if str(mm_current_room.get("status", "")) == "STARTED":
+				room_started = true
+				break
+			var update_ms := int(mm_current_room.get("updateTimestamp", 0))
+			if update_ms > 0 and AppwriteMatchmaking.get_now_ms() - update_ms > 15000:
+				mm_is_host = true
+				AppwriteMatchmaking.is_host = true
+				break
+			await get_tree().create_timer(0.5).timeout
+		if not room_started and not mm_is_host:
+			return
 
 	if mm_is_host:
 		var fresh = await AppwriteMatchmaking.poll_room_state(mm_active_room_id)

@@ -833,7 +833,7 @@ Deno.serve({ port, hostname }, async (req) => {
       } else if (action === "PLAY_CARD") {
         result = handlePlayCard(room.state, requestSeat, cardId, targetSeat, payload);
       } else if (action === "RESPOND_ACTION") {
-        result = handleRespondAction(room.state, requestSeat, accepted, cardId, targetCardId, cardIds);
+        result = handleRespondAction(room.state, requestSeat, accepted, cardId, targetCardId, cardIds, targetSeat, payload);
       } else if (action === "END_TURN") {
         result = handleEndTurn(room.state, requestSeat);
       } else if (action === "DISCARD_CARDS") {

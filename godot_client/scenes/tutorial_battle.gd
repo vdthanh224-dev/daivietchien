@@ -171,7 +171,7 @@ func _ready() -> void:
 	elif "--screenshot-showcase" in OS.get_cmdline_user_args():
 		_on_close_health_spotlight()
 		_start_step_3_slash()
-		_show_center_card("Trảm", "Lý Thường Kiệt", "A", "Spade", 0, "Tấn công gây 1 sát thương.")
+		_show_center_card("Trảm", "Lý Thường Kiệt", "1", "Spade", 0, "Tấn công gây 1 sát thương.")
 		await get_tree().create_timer(0.35).timeout
 		await get_tree().process_frame
 		var img = get_viewport().get_texture().get_image()
@@ -290,7 +290,7 @@ func _ready() -> void:
 		_on_close_health_spotlight()
 		player_avatar.set_equipment("armor", "Khiên Mây Bện", "K Trắng")
 		await get_tree().process_frame
-		_execute_khien_may_judgement(player_avatar, "Lý Thường Kiệt", "Thủ Lĩnh Sơn Tặc", {"name": "Khiên Mây Bện", "rank": "K", "suit": "Diamond"})
+		_execute_khien_may_judgement(player_avatar, "Lý Thường Kiệt", "Thủ Lĩnh Sơn Tặc", {"name": "Khiên Mây Bện", "rank": "13", "suit": "Diamond"})
 		await get_tree().create_timer(0.6).timeout
 		await get_tree().process_frame
 		var img = get_viewport().get_texture().get_image()
@@ -393,11 +393,11 @@ func _spawn_initial_cards() -> void:
 		c.queue_free()
 
 	var cards_data = [
-		{"name": "Trảm", "rank": "A", "suit": "Spade", "cat": 0, "sub": 0, "desc": "Tấn công gây 1 sát thương."},
+		{"name": "Trảm", "rank": "1", "suit": "Spade", "cat": 0, "sub": 0, "desc": "Tấn công gây 1 sát thương."},
 		{"name": "Trảm", "rank": "2", "suit": "Spade", "cat": 0, "sub": 0, "desc": "Tấn công gây 1 sát thương."},
 		{"name": "Đỡ", "rank": "3", "suit": "Diamond", "cat": 0, "sub": 3, "desc": "Hóa giải 1 đòn Trảm."},
 		{"name": "Bánh Chưng", "rank": "4", "suit": "Heart", "cat": 0, "sub": 4, "desc": "Hồi phục 1 Máu."},
-		{"name": "Khiên Mây Bện", "rank": "K", "suit": "Diamond", "cat": 1, "sub": 7, "desc": "Phán xét Đỏ tự động Đỡ."}
+		{"name": "Khiên Mây Bện", "rank": "13", "suit": "Diamond", "cat": 1, "sub": 7, "desc": "Phán xét Đỏ tự động Đỡ."}
 	]
 
 	for data in cards_data:
@@ -638,7 +638,7 @@ func _execute_slash() -> void:
 	boss_hp -= 1
 	boss_avatar.update_hp(boss_hp, 3)
 
-	_show_center_card("Trảm", "Lý Thường Kiệt", "A", "Spade", 0, "Tấn công gây 1 sát thương.")
+	_show_center_card("Trảm", "Lý Thường Kiệt", "1", "Spade", 0, "Tấn công gây 1 sát thương.")
 	_add_log("⚔️ Bạn đã dùng TRẢM! Thủ Lĩnh Sơn Tặc trúng đòn mất 1 máu (%d/3)." % boss_hp)
 
 	current_step = 4
@@ -902,7 +902,7 @@ func _execute_free_card_play() -> void:
 		var eq_sr = "%s%s" % [selected_card_ui.card_data.get_suit_symbol(), selected_card_ui.card_data.get_rank_string()] if selected_card_ui and selected_card_ui.card_data else ""
 		AudioManager.play_voice("Khiên Mây Bện")
 		AudioManager.play_parry()
-		_show_center_card(c_name, "Lý Thường Kiệt", "K", "Diamond", 1, "Phán xét Đỏ tự động Đỡ.")
+		_show_center_card(c_name, "Lý Thường Kiệt", "13", "Diamond", 1, "Phán xét Đỏ tự động Đỡ.")
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
 		player_avatar.set_equipment("armor", c_name, eq_sr)
@@ -911,7 +911,7 @@ func _execute_free_card_play() -> void:
 	elif "Kiếm" in c_name or "Đao" in c_name or "Cung" in c_name or "Nỏ" in c_name:
 		var eq_sr = "%s%s" % [selected_card_ui.card_data.get_suit_symbol(), selected_card_ui.card_data.get_rank_string()] if selected_card_ui and selected_card_ui.card_data else ""
 		AudioManager.play_parry()
-		_show_center_card(c_name, "Lý Thường Kiệt", "A", "Diamond", 1, "Vũ khí trang bị.")
+		_show_center_card(c_name, "Lý Thường Kiệt", "1", "Diamond", 1, "Vũ khí trang bị.")
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
 		player_avatar.set_equipment("weapon", c_name, eq_sr)
@@ -919,7 +919,7 @@ func _execute_free_card_play() -> void:
 
 	elif "Voi" in c_name or "Tuyệt Ảnh" in c_name or "+1" in c_name:
 		var eq_sr = "%s%s" % [selected_card_ui.card_data.get_suit_symbol(), selected_card_ui.card_data.get_rank_string()] if selected_card_ui and selected_card_ui.card_data else ""
-		_show_center_card(c_name, "Lý Thường Kiệt", "K", "Heart", 1, "Ngựa phòng thủ (+1).")
+		_show_center_card(c_name, "Lý Thường Kiệt", "13", "Heart", 1, "Ngựa phòng thủ (+1).")
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
 		player_avatar.set_equipment("defensive_mount", c_name, eq_sr)
@@ -935,7 +935,7 @@ func _execute_free_card_play() -> void:
 
 	elif "Bảo Vật" in c_name or "Ngọc" in c_name:
 		var eq_sr = "%s%s" % [selected_card_ui.card_data.get_suit_symbol(), selected_card_ui.card_data.get_rank_string()] if selected_card_ui and selected_card_ui.card_data else ""
-		_show_center_card(c_name, "Lý Thường Kiệt", "Q", "Heart", 1, "Bảo vật hoàng gia.")
+		_show_center_card(c_name, "Lý Thường Kiệt", "12", "Heart", 1, "Bảo vật hoàng gia.")
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
 		player_avatar.set_equipment("treasure", c_name, eq_sr)
@@ -1657,7 +1657,7 @@ func _show_arrow(pos: Vector2, text: String) -> void:
 	arrow_node.visible = true
 	arrow_time = 0.0
 
-func _show_center_card(c_name: String, source: String, c_rank: String = "A", c_suit: String = "Spade", c_cat: int = 0, c_desc: String = "") -> void:
+func _show_center_card(c_name: String, source: String, c_rank: String = "1", c_suit: String = "Spade", c_cat: int = 0, c_desc: String = "") -> void:
 	if showcase_tween and showcase_tween.is_valid():
 		showcase_tween.kill()
 
@@ -1708,7 +1708,7 @@ func _execute_khien_may_judgement(defender_avatar: Control, defender_name: Strin
 	else:
 		# Lấy ngẫu nhiên lá bài từ kho bài
 		var possible_suits = ["Heart", "Diamond", "Spade", "Club"]
-		var possible_ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
+		var possible_ranks = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"]
 		var possible_names = ["Trảm", "Đỡ", "Bánh Chưng", "Khiên Mây Bện", "Kiếm Thuận Thiên", "Voi Chiến", "Ngựa Trắng"]
 		var s = possible_suits[randi() % possible_suits.size()]
 		var r = possible_ranks[randi() % possible_ranks.size()]

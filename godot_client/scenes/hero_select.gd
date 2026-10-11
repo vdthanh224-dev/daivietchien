@@ -357,6 +357,21 @@ func _setup_local_disjoint_hero_pools(round_num: int) -> void:
 		for c in half4: cids3.append(int(c.get("id", 0)))
 		slot3["candidateHeroIds"] = cids3
 
+	# Admin được chọn toàn bộ tướng khả dụng ở ghế của mình.
+	if AuthManager and AuthManager.is_admin():
+		var admin_seat := NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 else 1
+		var admin_slot_idx := _find_draft_slot_index(admin_seat)
+		if admin_slot_idx >= 0:
+			var admin_pool: Array[Dictionary] = []
+			var admin_ids: Array[int] = []
+			for hero in full_available_heroes_pool:
+				var hero_id := int(hero.get("id", 0))
+				if not selected_hero_ids.has(hero_id):
+					admin_pool.append(hero)
+					admin_ids.append(hero_id)
+			draft_slots[admin_slot_idx]["candidateHeroes"] = admin_pool
+			draft_slots[admin_slot_idx]["candidateHeroIds"] = admin_ids
+
 func _rebuild_hero_grid(heroes_to_show: Array[Dictionary]) -> void:
 	available_heroes = heroes_to_show
 	if hero_wait_lbl and is_instance_valid(hero_wait_lbl):
@@ -380,13 +395,14 @@ func _rebuild_hero_grid(heroes_to_show: Array[Dictionary]) -> void:
 
 func _show_fallback_candidate_pool() -> void:
 	var fallback: Array[Dictionary] = []
+	var is_user_admin := AuthManager != null and AuthManager.is_admin()
 	var source: Array[Dictionary] = full_available_heroes_pool.duplicate()
 	source.shuffle()
 	for hero in source:
 		var hid := int(hero.get("id", 0))
-		if hid >= 1 and hid <= 40 and not selected_hero_ids.has(hid):
+		if hid >= 1 and (is_user_admin or hid <= 40) and not selected_hero_ids.has(hid):
 			fallback.append(hero)
-			if fallback.size() >= 8:
+			if not is_user_admin and fallback.size() >= 8:
 				break
 	if not fallback.is_empty():
 		_rebuild_hero_grid(fallback)
@@ -1191,7 +1207,7 @@ func _show_no_server_modal(message: String = "") -> void:
 	vbox.add_child(title_lbl)
 
 	var desc_lbl = Label.new()
-	desc_lbl.text = message if message != "" else "Không thể kết nối đến Máy Chủ Render Cloud (hoặc Local 8080).\nTrận đấu không thể tiếp tục khi không có máy chủ."
+	desc_lbl.text = message if message != "" else "Không thể kết nối đến Máy Chủ Render Cloud.\nTrận đấu không thể tiếp tục khi không có máy chủ."
 	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc_lbl.add_theme_font_size_override("font_size", 13)
@@ -1425,12 +1441,12 @@ func _choose_bot_hero(slot: Dictionary = {}) -> Dictionary:
 	return HeroDatabase.get_hero(randi_range(1, 40)) if HeroDatabase else {}
 
 func _get_first_available_candidate() -> Dictionary:
+	var is_user_admin := AuthManager != null and AuthManager.is_admin()
 	for h in available_heroes:
 		var hid = int(h.get("id", 0))
-		if not hid in selected_hero_ids and hid >= 1 and hid <= 40:
+		if not hid in selected_hero_ids and hid >= 1 and (is_user_admin or hid <= 40):
 			return h
 	if HeroDatabase:
-		var is_user_admin = AuthManager and AuthManager.is_admin()
 		for h in HeroDatabase.all_heroes:
 			var hid = int(h.get("id", 0))
 			if not is_user_admin and (hid < 1 or hid > 40):

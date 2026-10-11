@@ -473,6 +473,57 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 			{"id": "than_chinh_ly_phat_ma", "name": "Thân Chinh", "desc": "Khi bạn lần đầu dùng Trảm gây sát thương thành công cho mục tiêu trong lượt, bạn được quyền đánh thêm 1 lá Trảm nữa trong lượt đó."},
 			{"id": "phat_cham", "name": "Phạt Chăm", "desc": "Một lần mỗi lượt, nếu bạn gây ít nhất 2 sát thương trong giai đoạn ra bài, bạn được hồi 1 Máu."}
 		]
+	elif id == 41:
+		skills = [
+			{"id": "dai_viet", "name": "Đại Việt", "desc": "Đầu lượt, bạn chọn 1 màu bài; trong lượt đó, mỗi khi bạn đánh ra 1 lá bài có màu đã chọn, bạn lập tức được rút 1 lá bài."},
+			{"id": "thu_phap", "name": "Thủ Pháp", "desc": "Cuối lượt, nếu bạn đã đánh ra ít nhất 3 màu bài, rút 3 lá sau đó bỏ 1 lá."}
+		]
+	elif id == 42:
+		skills = [
+			{"id": "can_gian", "name": "Can Gián", "desc": "Khi bất kỳ người chơi nào bị đặt Cẩm Nang Trì Hoãn, bạn có thể ngay lập tức bỏ 1 lá bài màu Đỏ trên tay để hủy bỏ hoàn toàn lá Cẩm Nang đó."},
+			{"id": "dinh_trieu", "name": "Định Triều", "desc": "Mỗi lượt 1 lần, trong giai đoạn ra bài, bạn có thể đưa 1 lá Bài Cẩm Nang trên tay cho 1 người khác, sau đó rút 1 lá."}
+		]
+	elif id == 43:
+		skills = [
+			{"id": "nhiep_chinh_y_lan", "name": "Nhiếp Chính", "desc": "Giai đoạn Rút bài, số lá rút của bạn +1. Trong lượt, bạn có thể tặng 1 lá bài trên tay cho người khác."},
+			{"id": "khuyen_nong", "name": "Khuyến Nông", "desc": "Mỗi khi có người hồi máu, bạn có thể cho người đó cùng bạn, mỗi người rút 1 lá bài."}
+		]
+	elif id == 44:
+		skills = [
+			{"id": "tho_binh", "name": "Thổ Binh", "desc": "Khi tấn công mục tiêu ở Khoảng cách <=2, đòn Trảm của bạn không thể bị vô hiệu hóa bởi các lá Đỡ có giá trị từ 2->7."},
+			{"id": "son_chien", "name": "Sơn Chiến", "desc": "Bạn có thể dùng lá Chiến Mã trên tay như một lá Trảm Hỏa."}
+		]
+	elif id == 45:
+		skills = [
+			{"id": "dong_phuc", "name": "Động Phục", "desc": "Mỗi khi bạn chịu sát thương từ các lá Cẩm Nang, rút 2 lá bài."},
+			{"id": "pho_vuong", "name": "Phò Vương", "desc": "Bạn xem như đang mang ngựa (+) và (-) khi số lượng trang bị của bạn là một trong những người nhiều nhất bàn."}
+		]
+	elif id == 46:
+		skills = [
+			{"id": "thiet_dien", "name": "Thiết Diện", "desc": "Bạn miễn nhiễm hoàn toàn với Vườn Không Nhà Trống và Đột Kích Trộm Lương."},
+			{"id": "thang_moc", "name": "Thang Mộc", "desc": "Cuối lượt của mỗi người chơi khác, bạn có thể rút 2 lá bài, sau đó xem như tự sử dụng 1 lá Cẩm Nang Trì Hoãn tùy chọn chưa có trên bản thân lên chính bản thân."},
+			{"id": "giai_ach", "name": "Giải Ách", "desc": "Mỗi khi bạn thoát khỏi 1 lá Cẩm Nang Trì Hoãn, bạn được rút 1 lá bài."}
+		]
+	elif id == 47:
+		skills = [
+			{"id": "tien_thoai", "name": "Tiến Thoái", "desc": "Bạn có thể sử dụng lá Trảm như lá Đỡ, và sử dụng lá Đỡ như lá Trảm."},
+			{"id": "nam_quoc_son_ha", "name": "Nam Quốc Sơn Hà", "desc": "Khi bạn Trảm gây sát thương, bạn có thể chọn tùy ý số lượng người, họ tăng 1 tầm đánh trong vòng 1 lượt."}
+		]
+	elif id == 48:
+		skills = [
+			{"id": "khai_sang", "name": "Khai Sáng", "desc": "Mỗi lần 1 lượt, khi bạn lắp một lá bài Vũ Khí hoặc Áo Giáp vào vùng trang bị của mình, bạn được hồi ngay 1 Máu."},
+			{"id": "cuong_ky", "name": "Cương Kỷ", "desc": "Khi bạn đang trang bị cả Vũ Khí và Áo Giáp, Giai đoạn Rút bài, bạn được rút +1 lá."}
+		]
+	elif id == 49:
+		skills = [
+			{"id": "chuyen_che", "name": "Chuyên Chế", "desc": "Trong Giai đoạn Ra bài, bạn có thể bỏ 1 lá bài trên tay để chỉ định hủy 1 lá trang bị của người khác đang đeo trang bị; người đó phải ra 1 lá Trảm hoặc tự mất 1 Máu."},
+			{"id": "doat_quyen", "name": "Đoạt Quyền", "desc": "Mỗi khi một người chơi bị hạ gục, bạn được thu lấy 1 lá trang bị của người đó đặt vào vùng trang bị của mình."}
+		]
+	elif id == 50:
+		skills = [
+			{"id": "ap_phu", "name": "Ấp Phụ", "desc": "Khi bạn bị mất Máu do hành động của người chơi khác, bạn rút 1 lá và lấy 1 lá Trảm từ xấp bài bỏ vào tay (nếu có)."},
+			{"id": "bon_phan", "name": "Bổn Phận", "desc": "Cuối lượt của bạn, bạn có thể chọn trao 1 lá Trảm trên tay cho 1 người."}
+		]
 	var h = {
 		"id": id,
 		"name": name,

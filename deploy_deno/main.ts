@@ -31,6 +31,7 @@ export interface DraftSlot {
   heroName: string;
   maxHp: number;
   isLocked: boolean;
+  isAdmin?: boolean;
   availableHeroIds?: number[];
   candidateHeroIds?: number[];
   role?: string;
@@ -221,17 +222,20 @@ function cleanupMatchmakingRooms() {
   }
 }
 
-function findMatchmakingRoom(userId: string, rankPoints: number, maxRankDiff: number) {
+function findMatchmakingRoom(userId: string, rankPoints: number, maxRankDiff: number = Number.MAX_SAFE_INTEGER) {
   cleanupMatchmakingRooms();
   let best: MatchmakingRoom | null = null;
   let bestDiff = Number.MAX_SAFE_INTEGER;
+  let bestRealCount = -1;
   for (const room of matchmakingRooms.values()) {
     if (room.status !== "WAITING") continue;
     if (room.slots.some((slot) => !slot.isEmpty && slot.userId === userId)) continue;
     if (!room.slots.some((slot) => slot.isEmpty)) continue;
+    const realCount = room.slots.filter((slot) => !slot.isEmpty && !slot.isAI).length;
     const diff = Math.abs(Number(room.hostRankPoints) - rankPoints);
-    if (diff <= maxRankDiff && diff < bestDiff) {
+    if (realCount > bestRealCount || (realCount === bestRealCount && diff < bestDiff)) {
       best = room;
+      bestRealCount = realCount;
       bestDiff = diff;
     }
   }
@@ -379,6 +383,11 @@ const DEFAULT_HERO_POOL = Array.from({ length: 40 }, (_, i) => i + 1);
 function generate2v2CandidatePool(draft: DraftState, slot: any) {
   if (isDynastyDraft(draft) || !slot || slot.isLocked) return;
   const locked = new Set(draft.slots.filter((s) => s.isLocked).map((s) => Number(s.heroId)));
+  if (slot.isAdmin) {
+    slot.candidateHeroIds = Array.from(new Set<number>(slot.availableHeroIds || []))
+      .map(Number).filter((id) => Number.isInteger(id) && id > 0 && !locked.has(id));
+    return;
+  }
   const requested = [...(draft.availableHeroIds || []), ...(slot.availableHeroIds || [])];
   const own = new Set((slot.availableHeroIds || []).map(Number));
   const source = Array.from(new Set(requested.length > 0 ? requested : DEFAULT_HERO_POOL))
@@ -842,7 +851,8 @@ Deno.serve({ port, hostname }, async (req) => {
             if (slot) {
               if (payload.userId) slot.userId = String(payload.userId);
               if (payload.userName) slot.userName = String(payload.userName);
-              if (Array.isArray(payload.availableHeroIds)) slot.availableHeroIds = payload.availableHeroIds.map(Number).filter((id: number) => Number.isInteger(id) && id >= 1 && id <= 40);
+              slot.isAdmin = payload.isAdmin === true;
+              if (Array.isArray(payload.availableHeroIds)) slot.availableHeroIds = payload.availableHeroIds.map(Number).filter((id: number) => Number.isInteger(id) && id >= 1 && (slot.isAdmin || id <= 40));
               if (!room.draft.availableHeroIds?.length && slot.availableHeroIds?.length) room.draft.availableHeroIds = slot.availableHeroIds.slice();
               generate2v2CandidateForCurrent(room.draft!);
               slot.isAI = false; // Người thật đã vào ghế
@@ -911,6 +921,7 @@ Deno.serve({ port, hostname }, async (req) => {
           pickedSlot.isLocked = true;
 
           if (!dynastyReady) draft.currentPickerIndex++;
+          if (!dynastyReady) generate2v2CandidateForCurrent(draft);
           if (!dynastyReady) {
             draft.timer = 40;
             draft.timerStartAt = Date.now();
@@ -1288,7 +1299,7 @@ Deno.serve({ port, hostname }, async (req) => {
     const url = new URL(req.url);
     const userId = url.searchParams.get("userId") || "";
     const rankPoints = Number(url.searchParams.get("rankPoints") || 0);
-    const maxRankDiff = Number(url.searchParams.get("maxRankDiff") || 500);
+    const maxRankDiff = Number(url.searchParams.get("maxRankDiff") || Number.MAX_SAFE_INTEGER);
     if (!userId) return matchmakingJson({ success: false, error: "Thiếu userId" }, 400);
     const room = findMatchmakingRoom(userId, rankPoints, maxRankDiff);
     return matchmakingJson({ success: true, room });

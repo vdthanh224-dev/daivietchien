@@ -7,7 +7,7 @@ const STARS_PER_TIER := 5
 const WIN_STARS := 1
 const LOSE_STARS := -1
 const WIN_ACCUMULATION_POINTS := 25
-const LOSE_ACCUMULATION_POINTS := 10
+const LOSE_ACCUMULATION_POINTS := 12
 const MAX_ACCUMULATION_POINTS := 100
 
 const RANK_DATA := [
@@ -166,6 +166,25 @@ func process_match_result(
 	current_stars: int,
 	current_acc_points: int
 ) -> Dictionary:
+	return process_match_result_adjusted(
+		is_win,
+		current_rank_idx,
+		current_stars,
+		current_acc_points,
+		WIN_STARS if is_win else LOSE_STARS,
+		WIN_ACCUMULATION_POINTS if is_win else LOSE_ACCUMULATION_POINTS
+	)
+
+# Xử lý kết quả với số sao/điểm tích lũy tùy chỉnh. Dùng cho trận đã trừ
+# sao đặt cược ngay khi vào trận, để kết quả cuối không trừ sao lần nữa.
+func process_match_result_adjusted(
+	is_win: bool,
+	current_rank_idx: int,
+	current_stars: int,
+	current_acc_points: int,
+	star_delta: int,
+	accumulation_delta: int
+) -> Dictionary:
 	var old_rank_idx: int = clampi(current_rank_idx, 0, 11)
 	var old_stars: int = maxi(0, current_stars)
 	var old_acc: int = clampi(current_acc_points, 0, MAX_ACCUMULATION_POINTS)
@@ -177,15 +196,11 @@ func process_match_result(
 	var demoted := false
 	var star_bonus := false
 
-	if is_win:
-		stars += WIN_STARS
-		acc_points += WIN_ACCUMULATION_POINTS
-	else:
-		stars += LOSE_STARS
-		acc_points += LOSE_ACCUMULATION_POINTS
+	stars += star_delta
+	acc_points += accumulation_delta
 
 	# Đủ 100 điểm tích lũy: tiêu thụ 100 điểm và cộng thêm 1 sao
-	if acc_points >= MAX_ACCUMULATION_POINTS:
+	if accumulation_delta > 0 and acc_points >= MAX_ACCUMULATION_POINTS:
 		acc_points -= MAX_ACCUMULATION_POINTS
 		stars += 1
 		star_bonus = true
@@ -215,7 +230,7 @@ func process_match_result(
 		"stars": stars,
 		"accumulation_points": acc_points,
 		"stars_delta": (stars - old_stars) if not (promoted or demoted) else (1 if is_win else -1),
-		"acc_points_delta": (WIN_ACCUMULATION_POINTS if is_win else LOSE_ACCUMULATION_POINTS),
+		"acc_points_delta": accumulation_delta,
 		"tier_changed": promoted or demoted,
 		"promoted": promoted,
 		"demoted": demoted,

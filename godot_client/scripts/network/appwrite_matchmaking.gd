@@ -209,7 +209,7 @@ func _send_http_request(url: String, method: int, body_json: String = "") -> Dic
 	}
 
 # --- 1. Find Best Waiting Room ---
-func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_diff: int = 12, my_user_name: String = "", include_room_id: String = "", mode_id: String = "") -> Dictionary:
+func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_diff: int = 999999, my_user_name: String = "", include_room_id: String = "", mode_id: String = "") -> Dictionary:
 	var q_equal = "{\"method\":\"equal\",\"attribute\":\"userId\",\"values\":[\"ROOM_WAITING\"]}".uri_encode()
 	var q_order = "{\"method\":\"orderDesc\",\"attribute\":\"$createdAt\"}".uri_encode()
 	var q_limit = "{\"method\":\"limit\",\"values\":[100]}".uri_encode()
@@ -220,6 +220,7 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 	var now = get_now_ms()
 	var best_room: Dictionary = {}
 	var best_real_count = -1
+	var best_diff = 999999
 	for doc in res["data"].get("documents", []):
 		if not (doc is Dictionary):
 			continue
@@ -256,11 +257,12 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 		var diff = abs(int(room.get("hostRankPoints", 0)) - my_rank_points)
 		var room_id = str(room.get("roomId", ""))
 		var best_room_id = str(best_room.get("roomId", "~"))
-		var rank_ok = (OS.is_debug_build() or OS.has_feature("editor") or max_rank_diff >= 9999 or diff <= max_rank_diff)
-		if rank_ok:
-			if real_count > best_real_count or (real_count == best_real_count and (best_room.is_empty() or room_id < best_room_id)):
-				best_real_count = real_count
-				best_room = room
+		# Đã bỏ giới hạn tìm trận theo rank: Ai cũng có thể ghép phòng với nhau.
+		# Ưu tiên gom vào phòng có đông người chơi thật nhất; nếu bằng nhau thì ưu tiên phòng có mức rank gần nhất.
+		if real_count > best_real_count or (real_count == best_real_count and (best_room.is_empty() or diff < best_diff or (diff == best_diff and room_id < best_room_id))):
+			best_real_count = real_count
+			best_diff = diff
+			best_room = room
 	return best_room
 
 func cleanup_user_waiting_rooms(my_user_id: String) -> void:
@@ -453,15 +455,27 @@ func delete_room(room_id: String) -> void:
 func retire_merged_room(room_id: String) -> void:
 	if room_id.is_empty():
 		return
-	var room = await poll_room_state(room_id)
-	if room.is_empty():
-		return
-	var doc_id = get_deterministic_doc_id("r_", room_id)
-	var patch_url = "%s/databases/%s/collections/%s/documents/%s" % [ENDPOINT, DATABASE_ID, COLLECTION_ID, doc_id]
-	room["status"] = "MERGED"
-	room["updateTimestamp"] = get_now_ms()
-	var payload = {"data": {"userId": "ROOM_MERGED", "userName": encode_room_string(room), "rankPoints": int(room.get("hostRankPoints", 0)), "timestamp": room["updateTimestamp"]}, "permissions": PUBLIC_DOC_PERMISSIONS}
-	_send_http_request(patch_url, HTTPClient.METHOD_PATCH, JSON.stringify(payload))
+	# Dùng cùng khóa với join_room_slot để không ghi đè một lượt tham gia
+	# đang diễn ra và làm sống lại phòng cũ sau khi đã gộp. Nếu đúng lúc có
+	# người đang join, đợi lượt đó xong rồi thử lại thay vì bỏ sót phòng cũ.
+	for attempt in range(6):
+		if not await _acquire_room_lock(room_id, "merge_retire"):
+			await get_tree().create_timer(0.12 + attempt * 0.08).timeout
+			continue
+		var room = await poll_room_state(room_id)
+		if room.is_empty() or room.get("status", "") != "WAITING":
+			await _release_room_lock(room_id)
+			return
+		var doc_id = get_deterministic_doc_id("r_", room_id)
+		var patch_url = "%s/databases/%s/collections/%s/documents/%s" % [ENDPOINT, DATABASE_ID, COLLECTION_ID, doc_id]
+		room["status"] = "MERGED"
+		room["updateTimestamp"] = get_now_ms()
+		var payload = {"data": {"userId": "ROOM_MERGED", "userName": encode_room_string(room), "rankPoints": int(room.get("hostRankPoints", 0)), "timestamp": room["updateTimestamp"]}, "permissions": PUBLIC_DOC_PERMISSIONS}
+		var result = await _send_http_request(patch_url, HTTPClient.METHOD_PATCH, JSON.stringify(payload))
+		await _release_room_lock(room_id)
+		if int(result.get("code", 0)) == 200:
+			return
+		await get_tree().create_timer(0.12 + attempt * 0.08).timeout
 
 func _delete_document_async(doc_id: String) -> void:
 	var delete_url = "%s/databases/%s/collections/%s/documents/%s" % [ENDPOINT, DATABASE_ID, COLLECTION_ID, doc_id]

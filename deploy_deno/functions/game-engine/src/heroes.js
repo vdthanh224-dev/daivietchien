@@ -45,7 +45,17 @@ export const HEROES = {
   HERO_37: { id: 'HERO_37', name: 'Lê Long Đĩnh', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['BAO_NO', 'TRAC_LAC', 'NGOA_TRIEU'] },
   HERO_38: { id: 'HERO_38', name: 'Đào Cam Mộc', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['PHO_TA', 'MUU_DINH'] },
   HERO_39: { id: 'HERO_39', name: 'Lý Công Uẩn', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['DOI_DO', 'THAI_BINH_LY_CONG_UAN'] },
-  HERO_40: { id: 'HERO_40', name: 'Lý Phật Mã', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['THAN_CHINH_LY_PHAT_MA', 'PHAT_CHAM'] },
+    HERO_40: { id: 'HERO_40', name: 'Lý Phật Mã', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['THAN_CHINH_LY_PHAT_MA', 'PHAT_CHAM'] },
+  HERO_41: { id: 'HERO_41', name: 'Lý Nhật Tôn', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['DAI_VIET', 'THU_PHAP'] },
+  HERO_42: { id: 'HERO_42', name: 'Lý Đạo Thành', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['CAN_GIAN', 'DINH_TRIEU'] },
+  HERO_43: { id: 'HERO_43', name: 'Ỷ Lan', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['NHIEP_CHINH_Y_LAN', 'KHUYEN_NONG'] },
+  HERO_44: { id: 'HERO_44', name: 'Tông Đản', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['THO_BINH', 'SON_CHIEN'] },
+  HERO_45: { id: 'HERO_45', name: 'Thân Cảnh Phúc', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['DONG_PHUC', 'PHO_VUONG'] },
+  HERO_46: { id: 'HERO_46', name: 'Tô Hiến Thành', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['THIET_DIEN', 'THANG_MOC', 'GIAI_ACH'] },
+  HERO_47: { id: 'HERO_47', name: 'Lý Thường Kiệt', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['TIEN_THOAI', 'NAM_QUOC_SON_HA'] },
+  HERO_48: { id: 'HERO_48', name: 'Trần Cảnh', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['KHAI_SANG', 'CUONG_KY'] },
+  HERO_49: { id: 'HERO_49', name: 'Trần Thủ Độ', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['CHUYEN_CHE', 'DOAT_QUYEN'] },
+  HERO_50: { id: 'HERO_50', name: 'Trần Liễu', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['AP_PHU', 'BON_PHAN'] },
   TRAN_HUNG_DAO: {
     id: 'TRAN_HUNG_DAO',
     name: 'Trần Hưng Đạo',
@@ -53,12 +63,12 @@ export const HEROES = {
     maxHp: 4,
     skills: ['KIEP_BACH', 'DAN_TRAN']
   },
-  LY_THUONG_KIET: {
+    LY_THUONG_KIET: {
     id: 'LY_THUONG_KIET',
     name: 'Lý Thường Kiệt',
     faction: FACTIONS.DAI_VIET,
     maxHp: 4,
-    skills: ['THAN_TOAN']
+    skills: ['TIEN_THOAI', 'NAM_QUOC_SON_HA']
   },
   NGUYEN_HUE: {
     id: 'NGUYEN_HUE',
@@ -95,7 +105,7 @@ export const HERO_MAX_HP = [
   4, 3, 4, 4, 4, 4, 4, 3, 3, 4,
   3, 3, 4, 3, 4, 4, 4, 4, 4, 4,
   4, 4, 4, 4, 4, 3, 4, 3, 4, 4,
-  4, 3, 3, 4, 4, 3, 4, 4, 4, 4,
+  4, 3, 3, 4, 4, 3, 4, 4, 3, 4,
   4, 4, 4, 4, 3, 4, 4, 4, 4, 4,
   4, 3, 4, 4, 4, 3, 3, 3, 3, 3,
   4, 4, 4, 4, 4, 4, 4, 3, 4, 4,
@@ -381,7 +391,8 @@ export function normalizeHeroId(heroId, generalName = "") {
     DAO_HAN: "HERO_2",
     THI_SACH: "HERO_3",
     LE_CHAN: "HERO_4",
-    "47": "LY_THUONG_KIET",
+    "47": "HERO_47",
+    LY_THUONG_KIET: "HERO_47",
     "53": "TRAN_HUNG_DAO",
     "56": "TRAN_QUOC_TOAN",
     "86": "LE_LOI",
@@ -399,7 +410,17 @@ export function normalizeHeroId(heroId, generalName = "") {
     LE_LONG_DINH: "HERO_37",
     DAO_CAM_MOC: "HERO_38",
     LY_CONG_UAN: "HERO_39",
-    LY_PHAT_MA: "HERO_40",
+        LY_PHAT_MA: "HERO_40",
+    LY_NHAT_TON: "HERO_41",
+    LY_DAO_THANH: "HERO_42",
+    Y_LAN: "HERO_43",
+    TONG_DAN: "HERO_44",
+    THAN_CANH_PHUC: "HERO_45",
+    TO_HIEN_THANH: "HERO_46",
+    TRAN_CANH: "HERO_48",
+    TRAN_THAI_TONG: "HERO_48",
+    TRAN_THU_DO: "HERO_49",
+    TRAN_LIEU: "HERO_50",
   };
   const rawUpper = rawId.toUpperCase();
   const numericWireId = rawUpper.match(/^HERO_(\d+)$/)?.[1] || "";
@@ -453,9 +474,18 @@ export function normalizeHeroId(heroId, generalName = "") {
   if (key.includes("LE LONG DINH")) return "HERO_37";
   if (key.includes("DAO CAM MOC")) return "HERO_38";
   if (key.includes("LY CONG UAN")) return "HERO_39";
-  if (key.includes("LY PHAT MA")) return "HERO_40";
+    if (key.includes("LY PHAT MA")) return "HERO_40";
+  if (key.includes("LY NHAT TON")) return "HERO_41";
+  if (key.includes("LY DAO THANH")) return "HERO_42";
+  if (key.includes("Y LAN")) return "HERO_43";
+  if (key.includes("TONG DAN")) return "HERO_44";
+  if (key.includes("THAN CANH PHUC")) return "HERO_45";
+  if (key.includes("TO HIEN THANH")) return "HERO_46";
+  if (key.includes("TRAN CANH") || key.includes("TRAN THAI TONG")) return "HERO_48";
+  if (key.includes("TRAN THU DO")) return "HERO_49";
+  if (key.includes("TRAN LIEU")) return "HERO_50";
   if (key.includes("TRAN HUNG DAO") || key.includes("TRAN QUOC TUAN")) return "TRAN_HUNG_DAO";
-  if (key.includes("LY THUONG KIET")) return "LY_THUONG_KIET";
+  if (key.includes("LY THUONG KIET")) return "HERO_47";
   if (key.includes("TRAN QUOC TOAN")) return "TRAN_QUOC_TOAN";
   if (key.includes("LE LOI")) return "LE_LOI";
   if (key.includes("NGUYEN TRAI")) return "NGUYEN_TRAI";

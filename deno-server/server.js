@@ -571,6 +571,11 @@ function generate2v2RoundPools(draft, _round) {
   }
   for (const slot of draft.slots) {
     if (!slot || !activeSeats.includes(slot.seat) || slot.isLocked) continue;
+    if (slot.isAdmin) {
+      slot.candidateHeroIds = Array.from(new Set(slot.availableHeroIds || []))
+        .map(Number).filter((id) => Number.isInteger(id) && id > 0 && !locked.has(id));
+      continue;
+    }
     if (Array.isArray(slot.candidateHeroIds) && slot.candidateHeroIds.length > 0) continue;
     const own = new Set((slot.availableHeroIds || []).map(Number));
     slot.candidateHeroIds = allIds
@@ -1006,6 +1011,9 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           }
           if (payload.userId) slot.userId = String(payload.userId);
           if (payload.userName) slot.userName = String(payload.userName);
+          const wasAdmin = slot.isAdmin === true;
+          slot.isAdmin = payload.isAdmin === true;
+          if (wasAdmin !== slot.isAdmin && !slot.isLocked) slot.candidateHeroIds = [];
           if (Array.isArray(payload.availableHeroIds)) {
             slot.availableHeroIds = Array.from(new Set(payload.availableHeroIds.map(Number).filter((id) => Number.isInteger(id) && id > 0)));
             if (room.draft.availableHeroIds.length === 0) room.draft.availableHeroIds = slot.availableHeroIds.slice();

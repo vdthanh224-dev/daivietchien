@@ -125,6 +125,68 @@ console.log("=== Testing Heroes 29-40 Skills ===");
   console.log("✅ Nhiếp Chính OK");
 }
 
+// 3b. Test Nhiếp Chính during AOE Giặc Tới (Regression test for activeCard preservation)
+{
+  const state = initGame("test-nc-aoe-decline", [
+    { seat: 1, heroId: "HERO_36", generalName: "Dương Vân Nga" },
+    { seat: 2, heroId: "HERO_1", generalName: "Tướng 2" },
+    { seat: 3, heroId: "HERO_2", generalName: "Tướng 3" },
+    { seat: 4, heroId: "HERO_3", generalName: "Tướng 4" }
+  ]);
+  const p1 = state.players[0];
+  const p2 = state.players[1];
+  const p3 = state.players[2];
+  const p4 = state.players[3];
+  p1.hand = [
+    { id: "c_gt", name: "Giặc Tới", category: CARD_CATEGORIES.TRICK, subType: CARD_SUBTYPES.BARBARIAN_INVASION, reqType: "SLASH", reqName: "Trảm" },
+    { id: "c_dvn", name: "Bài DVN", rank: 9, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }
+  ];
+  p2.hand = [{ id: "c_slash2", name: "Trảm", category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }];
+  p3.hand = [{ id: "c_other3", name: "Đỡ", category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE }];
+  p4.hand = [{ id: "c_slash4", name: "Trảm", category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }];
+  state.turnSeat = 1;
+  state.phase = "PLAY";
+
+  // Seat 1 plays Giặc Tới
+  handlePlayCard(state, 1, "c_gt");
+  assert.equal(state.phase, "AWAIT_AOE");
+  assert.equal(state.waitingTargetSeat, 2);
+
+  // Seat 2 defends with Trảm
+  const res2 = handleRespondAction(state, 2, true, "c_slash2");
+  assert.ok(res2.success);
+  assert.equal(state.phase, "AWAIT_AOE");
+  assert.equal(state.waitingTargetSeat, 3);
+
+  // Seat 3 does not defend (takes 1 dmg)
+  const res3 = handleRespondAction(state, 3, false, null);
+  assert.ok(res3.success);
+  assert.equal(p3.hp, 3);
+  // Nhiếp Chính prompt triggered for DVN (Seat 1)
+  assert.equal(state.phase, "AWAIT_NHIEP_CHINH");
+  assert.equal(state.waitingTargetSeat, 1);
+
+  // DVN declines Nhiếp Chính
+  const resDecline = handleRespondAction(state, 1, false, null);
+  assert.ok(resDecline.success);
+
+  // AOE must advance to Seat 4 with activeCard preserved!
+  assert.equal(state.phase, "AWAIT_AOE", "Phase should resume to AWAIT_AOE");
+  assert.equal(state.waitingTargetSeat, 4, "Next victim must be Seat 4");
+  assert.equal(state.waitingReactionType, "SLASH", "Reaction must remain SLASH, not DODGE");
+  assert.ok(state.activeCard, "activeCard must not be null");
+  assert.equal(state.activeCard.cardName, "Giặc Tới");
+  assert.equal(state.activeCard.casterSeat, 1, "casterSeat must be 1, not 0");
+  assert.equal(state.activeCard.reqType, "SLASH");
+
+  // Seat 4 defends with Trảm successfully
+  const res4 = handleRespondAction(state, 4, true, "c_slash4");
+  assert.ok(res4.success, "Seat 4 must be able to use Trảm");
+  assert.equal(state.phase, "PLAY", "Turn returns to PLAY after AOE finishes");
+  assert.equal(state.activeCard, null, "activeCard cleared after entire AOE finished");
+  console.log("✅ Nhiếp Chính AOE Giặc Tới Regression OK");
+}
+
 // 4. Test Phá Tống (Lê Hoàn - HERO_35)
 {
   const state = initGame("test-pt-slash", [
