@@ -55,3 +55,5 @@ godot_client/.godot/
 .dvc-kv*
 godot_client/tmp_match_test.gd
 
+build_web/
+godot_client/build_web/

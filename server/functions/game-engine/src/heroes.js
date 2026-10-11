@@ -56,12 +56,22 @@ export const HEROES = {
   HERO_48: { id: 'HERO_48', name: 'Trần Cảnh', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['KHAI_SANG', 'CUONG_KY'] },
   HERO_49: { id: 'HERO_49', name: 'Trần Thủ Độ', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['CHUYEN_CHE', 'DOAT_QUYEN'] },
   HERO_50: { id: 'HERO_50', name: 'Trần Liễu', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['AP_PHU', 'BON_PHAN'] },
+  HERO_51: { id: 'HERO_51', name: 'Trần Hoảng', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['HOI_NGHI', 'DIEN_HONG'] },
+  HERO_52: { id: 'HERO_52', name: 'Trần Khâm', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['THIEN_TAM', 'TRUC_LAM'] },
+  HERO_53: { id: 'HERO_53', name: 'Trần Quốc Tuấn', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['HICH_TUONG', 'VAN_KIEP'] },
+  HERO_54: { id: 'HERO_54', name: 'Trần Quang Khải', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['THAI_BINH_TRAN_QUANG_KHAI', 'THUONG_TUONG'] },
+  HERO_55: { id: 'HERO_55', name: 'Trần Nhật Duật', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['DONG_HOA', 'BON_TOC'] },
+  HERO_56: { id: 'HERO_56', name: 'Trần Quốc Toản', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['PHA_CUONG_DICH', 'CAM_LAC'] },
+  HERO_57: { id: 'HERO_57', name: 'Trần Bình Trọng', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['BAO_QUOC', 'QUY_NAM'] },
+  HERO_58: { id: 'HERO_58', name: 'Trần Khánh Dư', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['DOAT_LUONG', 'VAN_DON'] },
+  HERO_59: { id: 'HERO_59', name: 'Phạm Ngũ Lão', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['PHUC_KICH', 'DAN_PHU'] },
+  HERO_60: { id: 'HERO_60', name: 'Yết Kiêu', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['THAU_THUY', 'TRUC_THUYEN'] },
   TRAN_HUNG_DAO: {
     id: 'TRAN_HUNG_DAO',
     name: 'Trần Hưng Đạo',
     faction: FACTIONS.DAI_VIET,
     maxHp: 4,
-    skills: ['KIEP_BACH', 'DAN_TRAN']
+    skills: ['HICH_TUONG', 'VAN_KIEP']
   },
     LY_THUONG_KIET: {
     id: 'LY_THUONG_KIET',
@@ -82,7 +92,7 @@ export const HEROES = {
     name: 'Trần Quốc Toản',
     faction: FACTIONS.DAI_VIET,
     maxHp: 4,
-    skills: ['THIEU_NIEN']
+    skills: ['PHA_CUONG_DICH', 'CAM_LAC']
   },
   LE_LOI: {
     id: 'LE_LOI',
@@ -374,7 +384,27 @@ export const SKILLS = {
     name: 'Phạt Chăm',
     type: 'TRIGGERED',
     description: 'Một lần mỗi lượt, nếu bạn gây ít nhất 2 sát thương trong giai đoạn ra bài, bạn được hồi 1 Máu.'
-  }
+  },
+  HOI_NGHI: { id: 'HOI_NGHI', name: 'Hội Nghị', type: 'TRIGGERED', description: 'Khi bạn hoặc người chơi khác sử dụng lá Mở Kho Cứu Tế, bạn được chỉ định tùy ý số người, bạn và họ rút thêm 1 lá bài.' },
+  DIEN_HONG: { id: 'DIEN_HONG', name: 'Diên Hồng', type: 'ACTIVE', description: 'Trong Giai đoạn Ra bài, bạn có thể bỏ 1 lá Cẩm Nang để tăng +1 sát thương cho đòn Trảm kế tiếp của một người khác bạn chỉ định.' },
+  THIEN_TAM: { id: 'THIEN_TAM', name: 'Thiền Tâm', type: 'TRIGGERED', description: 'Khi rơi vào trạng thái Cận Tử, bạn có thể bỏ 2 lá bài trên tay để tự hồi phục 1 Máu.' },
+  TRUC_LAM: { id: 'TRUC_LAM', name: 'Trúc Lâm', type: 'TRIGGERED', description: 'Cuối lượt của bạn, nếu trên tay bạn không có lá bài nào gây được sát thương, bạn được rút 1 lá bài.' },
+  HICH_TUONG: { id: 'HICH_TUONG', name: 'Hịch Tướng', type: 'ACTIVE', description: 'Một lần mỗi lượt, bạn có thể chọn phát động lệnh tập kích: Từng người chơi, bao gồm cả bạn, có thể tự nguyện bỏ số lượng lá Trảm tùy ý, bạn rút 1 lá bài với mỗi lá Trảm được bỏ đi.' },
+  VAN_KIEP: { id: 'VAN_KIEP', name: 'Vạn Kiếp', type: 'PASSIVE', description: 'Đòn Trảm của bạn đánh ra có thể chỉ định tối đa 2 mục tiêu cùng lúc nếu bạn có trang bị Vũ Khí.' },
+  THAI_BINH_TRAN_QUANG_KHAI: { id: 'THAI_BINH_TRAN_QUANG_KHAI', name: 'Thái Bình', type: 'TRIGGERED', description: 'Cuối lượt của bạn, nếu bạn không sử dụng bất kỳ lá Trảm nào trong lượt đó, bạn có thể lấy 1 lá Áo Giáp hoặc Chiến Mã từ xấp bài bỏ gắn trực tiếp vào vùng trang bị của mình.' },
+  THUONG_TUONG: { id: 'THUONG_TUONG', name: 'Thượng Tướng', type: 'PASSIVE', description: 'Khi bạn mang đầy đủ 2 loại Ngựa (Công và Thủ), tầm đánh của bạn trở thành vô hạn.' },
+  DONG_HOA: { id: 'DONG_HOA', name: 'Đồng Hóa', type: 'TRIGGERED', description: 'Khi trở thành mục tiêu của Huyết Chiến hoặc Đột Kích Trộm Lương, bạn có thể đổi 1 lá bài trên tay của mình với 1 lá bài ngẫu nhiên trên tay kẻ phát động trước khi giải quyết hiệu ứng, sau đó rút 1 lá.' },
+  BON_TOC: { id: 'BON_TOC', name: 'Bổn Tộc', type: 'ACTIVE', description: 'Trong Giai đoạn Ra bài, bạn có thể xem bài trên tay của 1 mục tiêu ở Tầm đánh 1.' },
+  PHA_CUONG_DICH: { id: 'PHA_CUONG_DICH', name: 'Phá Cường Địch', type: 'TRIGGERED', description: 'Trong lượt, nếu vùng trang bị của bạn chưa gắn Vũ Khí, đòn Trảm đầu tiên bạn đánh ra sẽ gây thêm +1 sát thương nếu trúng đích.' },
+  CAM_LAC: { id: 'CAM_LAC', name: 'Cam Lạc', type: 'TRIGGERED', description: 'Khi bạn bị hủy lá bài trên tay bởi người khác, bạn được rút 1 lá.' },
+  BAO_QUOC: { id: 'BAO_QUOC', name: 'Bảo Quốc', type: 'TRIGGERED', description: 'Khi bạn bị hạ gục, bạn có thể chỉ định kẻ tiêu diệt mình phải hủy toàn bộ bài trong vùng trang bị và bỏ 2 lá bài trên tay.' },
+  QUY_NAM: { id: 'QUY_NAM', name: 'Quỷ Nam', type: 'PASSIVE', description: 'Sát thương bạn gây ra bằng đòn Trảm không thể bị giảm trừ.' },
+  DOAT_LUONG: { id: 'DOAT_LUONG', name: 'Đoạt Lương', type: 'TRIGGERED', description: 'Khi bạn sử dụng thành công lá Cắt Đường Lương lên mục tiêu bất kỳ, bạn lập tức được rút 2 lá bài từ xấp rút.' },
+  VAN_DON: { id: 'VAN_DON', name: 'Vân Đồn', type: 'ACTIVE', description: 'Bạn có thể dùng bất kỳ lá Trang bị nào như một lá Cẩm Nang Cắt Đường Lương.' },
+  PHUC_KICH: { id: 'PHUC_KICH', name: 'Phục Kích', type: 'ACTIVE', description: 'Mỗi lượt 1 lần, bạn có thể dùng bất kỳ lá bài màu Đen nào trên tay như một lá Cẩm Nang Đột Kích Trộm Lương.' },
+  DAN_PHU: { id: 'DAN_PHU', name: 'Đan Phụ', type: 'TRIGGERED', description: 'Khi bạn đâm Trảm thành công sau khi sử dụng Đột Kích Trộm Lương trong cùng 1 lượt, đòn Trảm đó gây thêm +1 sát thương.' },
+  THAU_THUY: { id: 'THAU_THUY', name: 'Thấu Thủy', type: 'PASSIVE', description: 'Bạn miễn nhiễm hoàn toàn với sát thương từ lá Bãi Cọc Bạch Đằng. Bạn có thể dùng bất kỳ lá Trảm nào như một lá Trảm - Thủy.' },
+  TRUC_THUYEN: { id: 'TRUC_THUYEN', name: 'Trực Thuyền', type: 'TRIGGERED', description: 'Mỗi khi đánh ra lá Trảm - Thủy trúng đích, bạn có thể phá hủy 1 lá trang bị của nạn nhân.' }
 };
 
 export function getHeroById(heroId) {
@@ -421,6 +451,25 @@ export function normalizeHeroId(heroId, generalName = "") {
     TRAN_THAI_TONG: "HERO_48",
     TRAN_THU_DO: "HERO_49",
     TRAN_LIEU: "HERO_50",
+    "51": "HERO_51",
+    "52": "HERO_52",
+    "53": "HERO_53",
+    "54": "HERO_54",
+    "55": "HERO_55",
+    "56": "HERO_56",
+    "57": "HERO_57",
+    "58": "HERO_58",
+    "59": "HERO_59",
+    "60": "HERO_60",
+    TRAN_HOANG: "HERO_51",
+    TRAN_KHAM: "HERO_52",
+    TRAN_QUOC_TUAN: "HERO_53",
+    TRAN_QUANG_KHAI: "HERO_54",
+    TRAN_NHAT_DUAT: "HERO_55",
+    TRAN_BINH_TRONG: "HERO_57",
+    TRAN_KHANH_DU: "HERO_58",
+    PHAM_NGU_LAO: "HERO_59",
+    YET_KIEU: "HERO_60",
   };
   const rawUpper = rawId.toUpperCase();
   const numericWireId = rawUpper.match(/^HERO_(\d+)$/)?.[1] || "";
@@ -484,6 +533,16 @@ export function normalizeHeroId(heroId, generalName = "") {
   if (key.includes("TRAN CANH") || key.includes("TRAN THAI TONG")) return "HERO_48";
   if (key.includes("TRAN THU DO")) return "HERO_49";
   if (key.includes("TRAN LIEU")) return "HERO_50";
+  if (key.includes("TRAN HOANG")) return "HERO_51";
+  if (key.includes("TRAN KHAM")) return "HERO_52";
+  if (key.includes("TRAN QUOC TUAN") || key.includes("TRAN HUNG DAO")) return "HERO_53";
+  if (key.includes("TRAN QUANG KHAI")) return "HERO_54";
+  if (key.includes("TRAN NHAT DUAT")) return "HERO_55";
+  if (key.includes("TRAN QUOC TOAN")) return "HERO_56";
+  if (key.includes("TRAN BINH TRONG")) return "HERO_57";
+  if (key.includes("TRAN KHANH DU")) return "HERO_58";
+  if (key.includes("PHAM NGU LAO")) return "HERO_59";
+  if (key.includes("YET KIEU")) return "HERO_60";
   if (key.includes("TRAN HUNG DAO") || key.includes("TRAN QUOC TUAN")) return "TRAN_HUNG_DAO";
   if (key.includes("LY THUONG KIET")) return "HERO_47";
   if (key.includes("TRAN QUOC TOAN")) return "TRAN_QUOC_TOAN";

@@ -217,18 +217,18 @@ func _init_all_heroes() -> void:
 	_add_hero(46, "Tô Hiến Thành", "Thăng Long", 3, "Thiết Diện", "Bạn miễn nhiễm hoàn toàn với các hiệu ứng ép bỏ bài hoặc cướp bài từ Vườn Không Nhà Trống và Đột Kích Trộm Lương.", "res://assets/ui/to_hien_thanh.png", "to_hien_thanh")
 	_add_hero(47, "Lý Thường Kiệt", "Thăng Long", 4, "Tiến Thoái", "Bạn có thể sử dụng lá Trảm như lá Đỡ, và sử dụng lá Đỡ như lá Trảm.", "res://assets/ui/ly_thuong_kiet.png", "ly_thuong_kiet")
 	_add_hero(48, "Trần Cảnh", "Đông A", 4, "Khai Sáng", "Mỗi khi bạn lắp một lá bài Vũ Khí hoặc Áo Giáp vào vùng trang bị của mình, bạn được hồi ngay 1 Máu.", "res://assets/ui/tran_canh.png", "tran_canh")
-	_add_hero(49, "Trần Thủ Độ", "Đông A", 4, "Chuyên Chế", "Trong Giai đoạn Ra bài, bạn có thể bỏ 1 lá bài trên tay để chỉ định hủy 1 lá trang bị của người khác đang đeo trang bị; người đó phải ra 1 lá Trảm hoặc mất 1 Máu.", "res://assets/ui/tran_thu_do.png", "tran_thu_do")
-	_add_hero(50, "Trần Liễu", "Đông A", 4, "Ấp Phụ", "Khi bạn bị mất Máu do hành động của người chơi khác, bạn được rút 1 lá bài từ xấp rút và lấy 1 lá Trảm từ xấp bài bỏ vào tay (nếu có).", "res://assets/ui/tran_lieu.png", "tran_lieu")
-	_add_hero(51, "Trần Hoảng", "Đông A", 4, "Hội Nghị", "Khi bạn hoặc người chơi khác sử dụng lá Mở Kho Cứu Tế, bạn được chỉ định thêm người, bạn và họ rút thêm 1 lá bài từ xấp bài rút.", "res://assets/ui/tran_hoang.png", "tran_hoang")
-	_add_hero(52, "Trần Khâm", "Đông A", 4, "Thiền Tâm", "Khi rơi vào trạng thái Cận Tử (0 Máu), bạn có thể bỏ 2 lá bài trên tay để tự hồi phục 1 Máu mà không cần dùng Bánh Chưng hay Hủ Rượu.", "res://assets/ui/tran_kham.png", "tran_kham")
-	_add_hero(53, "Trần Quốc Tuấn", "Đông A", 4, "Hịch Tướng", "Trong Giai đoạn Ra bài, bạn có thể chọn phát động lệnh tập kích: Từng người chơi có thể tự nguyện bỏ 1 lá Trảm để giúp bạn rút 1 lá bài.", "res://assets/ui/tran_hung_dao.png", "tran_hung_dao")
+	_add_hero(49, "Trần Thủ Độ", "Đông A", 3, "Chuyên Chế", "Trong Giai đoạn Ra bài, bạn có thể bỏ 1 lá bài trên tay để chỉ định hủy 1 lá trang bị của người khác đang đeo trang bị; người đó phải ra 1 lá Trảm hoặc tự mất 1 Máu.", "res://assets/ui/tran_thu_do.png", "tran_thu_do")
+	_add_hero(50, "Trần Liễu", "Đông A", 4, "Ấp Phụ", "Khi bạn bị mất Máu do hành động của người chơi khác, bạn rút 1 lá và lấy 1 lá Trảm từ xấp bài bỏ vào tay (nếu có).", "res://assets/ui/tran_lieu.png", "tran_lieu")
+	_add_hero(51, "Trần Hoảng", "Đông A", 4, "Hội Nghị", "Khi bạn hoặc người chơi khác sử dụng lá Mở Kho Cứu Tế, bạn được chỉ định tùy ý số người, bạn và họ rút thêm 1 lá bài.", "res://assets/ui/tran_hoang.png", "tran_hoang")
+	_add_hero(52, "Trần Khâm", "Đông A", 4, "Thiền Tâm", "Khi rơi vào trạng thái Cận Tử, bạn có thể bỏ 2 lá bài trên tay để tự hồi phục 1 Máu.", "res://assets/ui/tran_kham.png", "tran_kham")
+	_add_hero(53, "Trần Quốc Tuấn", "Đông A", 4, "Hịch Tướng", "Một lần mỗi lượt, bạn có thể chọn phát động lệnh tập kích: Từng người chơi, bao gồm cả bạn, có thể tự nguyện bỏ số lượng lá Trảm tùy ý, bạn rút 1 lá bài với mỗi lá Trảm được bỏ đi.", "res://assets/ui/tran_hung_dao.png", "tran_hung_dao")
 	_add_hero(54, "Trần Quang Khải", "Đông A", 4, "Thái Bình", "Cuối lượt của bạn, nếu bạn không sử dụng bất kỳ lá Trảm nào trong lượt đó, bạn có thể lấy 1 lá Áo Giáp hoặc Chiến Mã từ xấp bài bỏ gắn trực tiếp vào vùng trang bị của mình.", "res://assets/ui/tran_quang_khai.png", "tran_quang_khai")
-	_add_hero(55, "Trần Nhật Duật", "Đông A", 3, "Đồng Hóa", "Khi trở thành mục tiêu của Huyết Chiến hoặc Đột Kích Trộm Lương, bạn có thể đổi 1 lá bài trên tay của mình với 1 lá bài ngẫu nhiên trên tay kẻ phát động trước khi giải quyết hiệu ứng.", "res://assets/ui/tran_nhat_duat.png", "tran_nhat_duat")
+	_add_hero(55, "Trần Nhật Duật", "Đông A", 3, "Đồng Hóa", "Khi trở thành mục tiêu của Huyết Chiến hoặc Đột Kích Trộm Lương, bạn có thể đổi 1 lá bài trên tay của mình với 1 lá bài ngẫu nhiên trên tay kẻ phát động trước khi giải quyết hiệu ứng, sau đó rút 1 lá.", "res://assets/ui/tran_nhat_duat.png", "tran_nhat_duat")
 	_add_hero(56, "Trần Quốc Toản", "Đông A", 4, "Phá Cường Địch", "Trong lượt, nếu vùng trang bị của bạn chưa gắn Vũ Khí, đòn Trảm đầu tiên bạn đánh ra sẽ gây thêm +1 sát thương nếu trúng đích.", "res://assets/ui/tran_quoc_toan.png", "tran_quoc_toan")
 	_add_hero(57, "Trần Bình Trọng", "Đông A", 4, "Bảo Quốc", "Khi bạn bị hạ gục, bạn có thể chỉ định kẻ tiêu diệt mình phải hủy toàn bộ bài trong vùng trang bị và bỏ 2 lá bài trên tay.", "res://assets/ui/tran_binh_trong.png", "tran_binh_trong")
 	_add_hero(58, "Trần Khánh Dư", "Đông A", 4, "Đoạt Lương", "Khi bạn sử dụng thành công lá Cắt Đường Lương lên mục tiêu bất kỳ, bạn lập tức được rút 2 lá bài từ xấp rút.", "res://assets/ui/tran_khanh_du.png", "tran_khanh_du")
-	_add_hero(59, "Phạm Ngũ Lão", "Đông A", 4, "Phục Kích", "Giới hạn 1 lượt 1 lần, bạn có thể dùng bất kỳ lá bài màu Đen nào trên tay như một lá Cẩm Nang Đột Kích Trộm Lương.", "res://assets/ui/pham_ngu_lao.png", "pham_ngu_lao")
-	_add_hero(60, "Yết Kiêu", "Đông A", 4, "Thấu Thủy", "Bạn miễn nhiễm hoàn toàn với sát thương từ lá Giặc Tới. Bạn có thể dùng bất kỳ lá Trảm nào như một lá Trảm - Thủy.", "res://assets/ui/yet_kieu.png", "yet_kieu")
+	_add_hero(59, "Phạm Ngũ Lão", "Đông A", 4, "Phục Kích", "Mỗi lượt 1 lần, bạn có thể dùng bất kỳ lá bài màu Đen nào trên tay như một lá Cẩm Nang Đột Kích Trộm Lương.", "res://assets/ui/pham_ngu_lao.png", "pham_ngu_lao")
+	_add_hero(60, "Yết Kiêu", "Đông A", 4, "Thấu Thủy", "Bạn miễn nhiễm hoàn toàn với sát thương từ lá Bãi Cọc Bạch Đằng. Bạn có thể dùng bất kỳ lá Trảm nào như một lá Trảm - Thủy.", "res://assets/ui/yet_kieu.png", "yet_kieu")
 	_add_hero(61, "Dã Tượng", "Đông A", 4, "Ngự Tượng", "Bạn mặc định sở hữu hiệu ứng tăng khoảng cách của Voi Chiến Đại Việt (+1 Khoảng cách) mà không cần phải trang bị lá bài này, nếu trang bị, khoảng cách phòng thủ của bạn trở thành +2.", "res://assets/ui/da_tuong.png", "da_tuong")
 	_add_hero(62, "Đỗ Khắc Chung", "Đông A", 3, "Thuyết Khách", "Khi trở thành mục tiêu của đòn Trảm, bạn có thể bỏ 1 lá Cẩm Nang bất kỳ trên tay để vô hiệu hóa hoàn toàn đòn đánh đó.", "res://assets/ui/do_khac_chung.png", "do_khac_chung")
 	_add_hero(63, "Hà Đặc", "Đông A", 4, "Tráng Khí", "Khi bạn đánh ra lá Trảm, nếu mục tiêu dùng lá Đỡ để triệt tiêu đòn đánh, bạn lập tức được rút 1 lá bài từ xấp bài rút.", "res://assets/ui/ha_dac.png", "ha_dac")
@@ -523,6 +523,56 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 		skills = [
 			{"id": "ap_phu", "name": "Ấp Phụ", "desc": "Khi bạn bị mất Máu do hành động của người chơi khác, bạn rút 1 lá và lấy 1 lá Trảm từ xấp bài bỏ vào tay (nếu có)."},
 			{"id": "bon_phan", "name": "Bổn Phận", "desc": "Cuối lượt của bạn, bạn có thể chọn trao 1 lá Trảm trên tay cho 1 người."}
+		]
+	elif id == 51:
+		skills = [
+			{"id": "hoi_nghi", "name": "Hội Nghị", "desc": "Khi bạn hoặc người chơi khác sử dụng lá Mở Kho Cứu Tế, bạn được chỉ định tùy ý số người, bạn và họ rút thêm 1 lá bài."},
+			{"id": "dien_hong", "name": "Diên Hồng", "desc": "Trong Giai đoạn Ra bài, bạn có thể bỏ 1 lá Cẩm Nang để tăng +1 sát thương cho đòn Trảm kế tiếp của một người khác bạn chỉ định."}
+		]
+	elif id == 52:
+		skills = [
+			{"id": "thien_tam", "name": "Thiền Tâm", "desc": "Khi rơi vào trạng thái Cận Tử, bạn có thể bỏ 2 lá bài trên tay để tự hồi phục 1 Máu."},
+			{"id": "truc_lam", "name": "Trúc Lâm", "desc": "Cuối lượt của bạn, nếu trên tay bạn không có lá bài nào gây được sát thương, bạn được rút 1 lá bài."}
+		]
+	elif id == 53:
+		skills = [
+			{"id": "hich_tuong", "name": "Hịch Tướng", "desc": "Một lần mỗi lượt, bạn có thể chọn phát động lệnh tập kích: Từng người chơi, bao gồm cả bạn, có thể tự nguyện bỏ số lượng lá Trảm tùy ý, bạn rút 1 lá bài với mỗi lá Trảm được bỏ đi."},
+			{"id": "van_kiep", "name": "Vạn Kiếp", "desc": "Đòn Trảm của bạn đánh ra có thể chỉ định tối đa 2 mục tiêu cùng lúc nếu bạn có trang bị Vũ Khí."}
+		]
+	elif id == 54:
+		skills = [
+			{"id": "thai_binh", "name": "Thái Bình", "desc": "Cuối lượt của bạn, nếu bạn không sử dụng bất kỳ lá Trảm nào trong lượt đó, bạn có thể lấy 1 lá Áo Giáp hoặc Chiến Mã từ xấp bài bỏ gắn trực tiếp vào vùng trang bị của mình."},
+			{"id": "thuong_tuong", "name": "Thượng Tướng", "desc": "Khi bạn mang đầy đủ 2 loại Ngựa (Công và Thủ), tầm đánh của bạn trở thành vô hạn."}
+		]
+	elif id == 55:
+		skills = [
+			{"id": "dong_hoa", "name": "Đồng Hóa", "desc": "Khi trở thành mục tiêu của Huyết Chiến hoặc Đột Kích Trộm Lương, bạn có thể đổi 1 lá bài trên tay của mình với 1 lá bài ngẫu nhiên trên tay kẻ phát động trước khi giải quyết hiệu ứng, sau đó rút 1 lá."},
+			{"id": "bon_toc", "name": "Bổn Tộc", "desc": "Trong Giai đoạn Ra bài, bạn có thể xem bài trên tay của 1 mục tiêu ở Tầm đánh 1."}
+		]
+	elif id == 56:
+		skills = [
+			{"id": "pha_cuong_dich", "name": "Phá Cường Địch", "desc": "Trong lượt, nếu vùng trang bị của bạn chưa gắn Vũ Khí, đòn Trảm đầu tiên bạn đánh ra sẽ gây thêm +1 sát thương nếu trúng đích."},
+			{"id": "cam_lac", "name": "Cam Lạc", "desc": "Khi bạn bị hủy lá bài trên tay bởi người khác, bạn được rút 1 lá."}
+		]
+	elif id == 57:
+		skills = [
+			{"id": "bao_quoc", "name": "Bảo Quốc", "desc": "Khi bạn bị hạ gục, bạn có thể chỉ định kẻ tiêu diệt mình phải hủy toàn bộ bài trong vùng trang bị và bỏ 2 lá bài trên tay."},
+			{"id": "quy_nam", "name": "Quỷ Nam", "desc": "Sát thương bạn gây ra bằng đòn Trảm không thể bị giảm trừ."}
+		]
+	elif id == 58:
+		skills = [
+			{"id": "doat_luong", "name": "Đoạt Lương", "desc": "Khi bạn sử dụng thành công lá Cắt Đường Lương lên mục tiêu bất kỳ, bạn lập tức được rút 2 lá bài từ xấp rút."},
+			{"id": "van_don", "name": "Vân Đồn", "desc": "Bạn có thể dùng bất kỳ lá Trang bị nào như một lá Cẩm Nang Cắt Đường Lương."}
+		]
+	elif id == 59:
+		skills = [
+			{"id": "phuc_kich", "name": "Phục Kích", "desc": "Mỗi lượt 1 lần, bạn có thể dùng bất kỳ lá bài màu Đen nào trên tay như một lá Cẩm Nang Đột Kích Trộm Lương."},
+			{"id": "dan_phu", "name": "Đan Phụ", "desc": "Khi bạn đâm Trảm thành công sau khi sử dụng Đột Kích Trộm Lương trong cùng 1 lượt, đòn Trảm đó gây thêm +1 sát thương."}
+		]
+	elif id == 60:
+		skills = [
+			{"id": "thau_thuy", "name": "Thấu Thủy", "desc": "Bạn miễn nhiễm hoàn toàn với sát thương từ lá Bãi Cọc Bạch Đằng. Bạn có thể dùng bất kỳ lá Trảm nào như một lá Trảm - Thủy."},
+			{"id": "truc_thuyen", "name": "Trực Thuyền", "desc": "Mỗi khi đánh ra lá Trảm - Thủy trúng đích, bạn có thể phá hủy 1 lá trang bị của nạn nhân."}
 		]
 	var h = {
 		"id": id,
