@@ -790,7 +790,9 @@ async function tickDraftRoom(roomId, room) {
     const currentSlot = draft.slots[index];
     if (!currentSlot || currentSlot.isLocked) continue;
     const isSocketOpen = room.sockets.has(currentSlot.seat) && room.sockets.get(currentSlot.seat)?.readyState === WebSocket.OPEN;
-    const isBot = Boolean(currentSlot.isAI) || !isSocketOpen;
+    // A missing socket can be a human client still joining the draft. Only
+    // slots explicitly marked as AI may use the fast automatic-pick path.
+    const isBot = Boolean(currentSlot.isAI);
 
     if (isBot && elapsedMs >= 800 && !currentSlot.hoverHeroId) {
       const used = new Set(draft.slots.filter((slot) => slot.isLocked).map((slot) => slot.heroId));
@@ -815,7 +817,7 @@ async function tickDraftRoom(roomId, room) {
       }
     }
 
-    const botThresholdSec = Boolean(currentSlot.isAI) ? 1.5 : (isSocketOpen ? 40.0 : 5.0);
+    const botThresholdSec = Boolean(currentSlot.isAI) ? 1.5 : 40.0;
     if (elapsedMs >= botThresholdSec * 1000 || elapsed >= 40) {
       const used = new Set(draft.slots.filter((slot) => slot.isLocked).map((slot) => slot.heroId));
       let heroId = currentSlot.hoverHeroId > 0 && !used.has(currentSlot.hoverHeroId) ? currentSlot.hoverHeroId : 0;
