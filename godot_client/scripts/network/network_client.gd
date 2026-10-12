@@ -29,9 +29,13 @@ var is_connected_to_server: bool = false
 var room_id: String = ""
 var my_seat: int = 1
 var seat_is_explicit: bool = false
+var active_mode_id: String = "2v2"
 var last_state: Dictionary = {}
 var last_heartbeat_time: float = 0.0
 var last_processed_action_seq: int = -1
+
+const ACTIVE_MATCH_FILE := "user://active_match.json"
+const ACTIVE_MATCH_TIMEOUT_SEC := 2700 # 45 phút
 
 var current_ping: int = -1
 var _ping_timer: float = 2.5
@@ -303,12 +307,17 @@ func _handle_server_message(raw_json: String) -> void:
 	if msg_type == "ERROR" or msg_type == "ACTION_REJECTED":
 		var err_msg = str(data.get("error", "Lỗi không xác định"))
 		print("[NetworkClient] Server phản hồi lỗi: ", err_msg)
+		if err_msg.contains("không tồn tại") or err_msg.contains("đã kết thúc"):
+			clear_active_match()
 		error_received.emit(err_msg)
 
 	var state_obj = data.get("state", data)
 	if msg_type in ["STATE_SYNC", "STATE_SNAPSHOT", "STATE_UPDATE"] or (data.has("state") and data["state"] != null):
 		if state_obj is Dictionary and not state_obj.is_empty():
 			last_state = state_obj
+			var st = str(state_obj.get("status", ""))
+			if st == "FINISHED":
+				clear_active_match()
 			game_state_updated.emit(state_obj)
 
 	var delta_obj = data.get("delta", null)
@@ -340,7 +349,9 @@ func send_json(dict: Dictionary) -> void:
 func send_join_draft(target_room: String, seat: int, user_id: String, user_name: String, slots_data: Array = [], mode_id: String = "2v2", available_hero_ids: Array = []) -> void:
 	room_id = target_room
 	my_seat = seat
+	active_mode_id = mode_id
 	last_processed_action_seq = -1
+	save_active_match(target_room, seat, mode_id, slots_data)
 	var payload = {
 		"action": "JOIN_DRAFT",
 		"roomId": target_room,
@@ -384,15 +395,73 @@ func update_debug_window_title(display_name: String = "") -> void:
 	var name_part = (" | " + display_name) if not display_name.is_empty() else ""
 	DisplayServer.window_set_title("Đại Việt Chiến - [CỬA SỔ %d - GHẾ %d%s]" % [auto_instance_index, my_seat, name_part])
 
+func save_active_match(target_room: String, seat: int, mode_id: String = "2v2", draft_slots: Array = []) -> void:
+	if target_room.is_empty() or seat < 1:
+		return
+	var slots_to_save: Array = draft_slots
+	if slots_to_save.is_empty() and AppwriteMatchmaking != null:
+		if AppwriteMatchmaking.draft_slots is Array and not AppwriteMatchmaking.draft_slots.is_empty():
+			slots_to_save = AppwriteMatchmaking.draft_slots
+		elif AppwriteMatchmaking.current_room is Dictionary and AppwriteMatchmaking.current_room.get("draft_slots", []) is Array:
+			slots_to_save = AppwriteMatchmaking.current_room.get("draft_slots", [])
+	var match_data := {
+		"roomId": target_room,
+		"seat": seat,
+		"modeId": mode_id,
+		"draftSlots": slots_to_save,
+		"timestamp": int(Time.get_unix_time_from_system())
+	}
+	var file = FileAccess.open(ACTIVE_MATCH_FILE, FileAccess.WRITE)
+	if file:
+		file.store_string(JSON.stringify(match_data))
+		file.close()
+		print("[NetworkClient] 💾 Đã lưu thông tin trận đấu: Phòng %s, Ghế %d (%s)" % [target_room, seat, mode_id])
+
+func get_active_match() -> Dictionary:
+	if not FileAccess.file_exists(ACTIVE_MATCH_FILE):
+		return {}
+	var file = FileAccess.open(ACTIVE_MATCH_FILE, FileAccess.READ)
+	if not file:
+		return {}
+	var content = file.get_as_text()
+	file.close()
+	if content.is_empty():
+		return {}
+	var json = JSON.new()
+	if json.parse(content) != OK:
+		return {}
+	var data = json.get_data()
+	if not (data is Dictionary):
+		return {}
+	var ts = int(data.get("timestamp", 0))
+	var now = int(Time.get_unix_time_from_system())
+	if now - ts > ACTIVE_MATCH_TIMEOUT_SEC:
+		clear_active_match()
+		return {}
+	return data
+
+func has_active_match() -> bool:
+	return not get_active_match().is_empty()
+
+func clear_active_match() -> void:
+	if FileAccess.file_exists(ACTIVE_MATCH_FILE):
+		var da = DirAccess.open("user://")
+		if da:
+			da.remove("active_match.json")
+		print("[NetworkClient] 🗑️ Đã xóa bản lưu trận đấu.")
+
 func leave_room() -> void:
 	room_id = ""
 	last_processed_action_seq = -1
 	last_state = {}
+	clear_active_match()
 
 func send_join_room(target_room: String, seat: int, players_data: Array = [], mode_id: String = "2v2") -> void:
 	room_id = target_room
 	my_seat = seat
+	active_mode_id = mode_id
 	last_processed_action_seq = -1
+	save_active_match(target_room, seat, mode_id)
 	var payload = {
 		"action": "JOIN_ROOM",
 		"roomId": target_room,

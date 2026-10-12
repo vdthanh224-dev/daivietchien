@@ -3,6 +3,7 @@ extends Control
 const CardUIScene = preload("res://scenes/components/card_ui.tscn")
 const GeneralAvatarScene = preload("res://scenes/components/general_avatar_ui.tscn")
 const AI_CARD_PLAY_DELAY: float = 1.5
+const AI_TURN_WATCHDOG_TIMEOUT: float = 60.0
 const IRON_CHAIN_DESCRIPTION := "Chạm avatar để chọn tối đa 2 mục tiêu để đưa họ vào hoặc thoát trạng thái xích (cùng nhận sát thương nguyên tố), có thể đổi thành lá mới."
 const HERO_SKILL_ACTIONS := {
 	"LIEN_CHAU_TRIGGERED": {"name": "Liên Châu"},
@@ -160,8 +161,13 @@ var rescue_card_selector_scroll: ScrollContainer = null
 var my_seat: int = 1
 var my_team_is_dragon: bool = true
 var current_turn_seat: int = 1
+var turn_generation: int = 0
 var battle_seat_count: int = 4
 var battle_seat_nodes: Dictionary = {}
+var ai_turn_watchdog_seat: int = -1
+var ai_turn_watchdog_elapsed: float = 0.0
+var ai_turn_watchdog_active: bool = false
+var ai_turn_watchdog_recovering: bool = false
 
 func _build_battle_seat_avatar_map(seat_count: int) -> Dictionary:
 	var map: Dictionary = {}
@@ -301,6 +307,9 @@ var is_remote_turn_active: bool = false
 var remote_turn_timer: float = 40.0
 var remote_poll_timer: float = 0.0
 var is_network_mode: bool = false
+var reconnect_banner_panel: PanelContainer = null
+var reconnect_banner_label: Label = null
+var reconnect_banner_tween: Tween = null
 var pending_discard_card_ids: Array = []
 var reaction_submission_pending: bool = false
 var reaction_submission_version: int = -1
@@ -591,6 +600,8 @@ func _ready() -> void:
 			NetworkClient.action_received.connect(_on_network_action_received)
 		if not NetworkClient.connection_established.is_connected(_on_network_connected):
 			NetworkClient.connection_established.connect(_on_network_connected)
+		if not NetworkClient.connection_closed.is_connected(_on_network_connection_closed):
+			NetworkClient.connection_closed.connect(_on_network_connection_closed)
 		if not NetworkClient.player_joined.is_connected(_on_network_player_joined):
 			NetworkClient.player_joined.connect(_on_network_player_joined)
 		if not NetworkClient.game_state_updated.is_connected(_on_network_game_state_updated):
@@ -1491,6 +1502,7 @@ func _process(delta: float) -> void:
 
 	if is_game_over:
 		return
+	_process_ai_turn_watchdog(delta)
 
 	# Handle Reaction Timer (Đếm 40s trên đầu người bị trảm hoặc người đang phản hồi)
 	if current_waiting_seat > 0 and current_waiting_seat <= 4:
@@ -1659,10 +1671,15 @@ func _init_generals_from_draft() -> void:
 		my_name = AuthManager.current_user_name
 
 	my_seat = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 and NetworkClient.my_seat <= 8 else 1
-	var mode_id := str(AppwriteMatchmaking.current_room.get("modeId", "2v2")) if AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary else "2v2"
-	if mode_id.begins_with("dynasty_") and draft.size() > 4:
-		print("[Battle] Khởi tạo Vương Triều %d người với state %d ghế" % [draft.size(), draft.size()])
-	battle_seat_count = maxi(4, draft.size())
+	var mode_id := str(AppwriteMatchmaking.current_room.get("modeId", "2v2")) if AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary else (NetworkClient.active_mode_id if NetworkClient else "2v2")
+	if mode_id == "dynasty_5" and draft.size() < 5:
+		battle_seat_count = 5
+	elif mode_id == "dynasty_8" and draft.size() < 8:
+		battle_seat_count = 8
+	else:
+		battle_seat_count = maxi(4, draft.size())
+	if mode_id.begins_with("dynasty_") and battle_seat_count > 4:
+		print("[Battle] Khởi tạo Vương Triều %d người với state %d ghế" % [battle_seat_count, battle_seat_count])
 	var matching_seats: Array[int] = []
 	for slot in draft:
 		if not (slot is Dictionary):
@@ -5070,6 +5087,65 @@ func _build_initial_server_players() -> Array:
 		})
 	return players
 
+func _show_reconnect_banner(show: bool, text: String = "") -> void:
+	if show:
+		if not reconnect_banner_panel:
+			reconnect_banner_panel = PanelContainer.new()
+			reconnect_banner_panel.name = "ReconnectBanner"
+			reconnect_banner_panel.z_as_relative = false
+			reconnect_banner_panel.z_index = 350
+			reconnect_banner_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			reconnect_banner_panel.custom_minimum_size = Vector2(460, 38)
+			
+			var st = StyleBoxFlat.new()
+			st.bg_color = Color(0.85, 0.15, 0.15, 0.95)
+			st.border_width_left = 2
+			st.border_width_top = 2
+			st.border_width_right = 2
+			st.border_width_bottom = 2
+			st.border_color = Color(1.0, 0.85, 0.3, 1.0)
+			st.corner_radius_bottom_left = 8
+			st.corner_radius_bottom_right = 8
+			st.content_margin_left = 16
+			st.content_margin_right = 16
+			st.content_margin_top = 6
+			st.content_margin_bottom = 6
+			reconnect_banner_panel.add_theme_stylebox_override("panel", st)
+			
+			reconnect_banner_label = Label.new()
+			reconnect_banner_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			reconnect_banner_label.add_theme_font_size_override("font_size", 12)
+			reconnect_banner_label.add_theme_color_override("font_color", Color.WHITE)
+			reconnect_banner_panel.add_child(reconnect_banner_label)
+			add_child(reconnect_banner_panel)
+			
+		reconnect_banner_label.text = text if not text.is_empty() else "⚠️ MẤT KẾT NỐI MẠNG! Bot AI đang tự động đánh thay... Đang kết nối lại..."
+		reconnect_banner_panel.reset_size()
+		reconnect_banner_panel.position = Vector2((size.x - reconnect_banner_panel.size.x) * 0.5, 0)
+		reconnect_banner_panel.visible = true
+		
+		if reconnect_banner_tween and reconnect_banner_tween.is_valid():
+			reconnect_banner_tween.kill()
+		reconnect_banner_tween = create_tween().set_loops()
+		reconnect_banner_tween.tween_property(reconnect_banner_panel, "modulate:a", 0.65, 0.7)
+		reconnect_banner_tween.tween_property(reconnect_banner_panel, "modulate:a", 1.0, 0.7)
+	else:
+		if reconnect_banner_tween and reconnect_banner_tween.is_valid():
+			reconnect_banner_tween.kill()
+		if reconnect_banner_panel and is_instance_valid(reconnect_banner_panel):
+			reconnect_banner_panel.visible = false
+
+func _show_reconnect_success_toast(text: String = "⚡ ĐÃ KẾT NỐI LẠI THÀNH CÔNG! Đã lấy lại quyền điều khiển từ Bot AI.") -> void:
+	_show_reconnect_banner(false)
+	_add_log(text)
+	if desc_text and is_instance_valid(desc_text):
+		desc_text.text = text
+
+func _on_network_connection_closed() -> void:
+	if not is_game_over:
+		_show_reconnect_banner(true, "⚠️ MẤT KẾT NỐI MẠNG! Bot AI đang tự động đánh thay... Đang kết nối lại...")
+		_add_log("⚠️ [MẤT KẾT NỐI] Đã ngắt kết nối với máy chủ! Bot AI đang đánh thay tạm thời...")
+
 func _on_network_connected() -> void:
 	if not NetworkClient:
 		return
@@ -5081,12 +5157,14 @@ func _on_network_connected() -> void:
 			r_id = appwrite_r_id
 	elif NetworkClient and NetworkClient.room_id != "":
 		r_id = NetworkClient.room_id
-	var mode_id := str(AppwriteMatchmaking.current_room.get("modeId", "2v2")) if AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary else "2v2"
+	var mode_id := str(AppwriteMatchmaking.current_room.get("modeId", "2v2")) if AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary else (NetworkClient.active_mode_id if NetworkClient else "2v2")
 	var initial_players = _build_initial_server_players()
 	NetworkClient.send_join_room(r_id, my_seat, initial_players, mode_id)
 	var s_name = NetworkClient.active_server_name if ("active_server_name" in NetworkClient and not NetworkClient.active_server_name.is_empty()) else "Game Server"
 	var s_url = NetworkClient.active_server_url if ("active_server_url" in NetworkClient and not NetworkClient.active_server_url.is_empty()) else NetworkClient.server_url
 	_add_log("🌐 [ĐỒNG BỘ MẠNG] Ưu tiên: Đã kết nối %s (%s)! Phòng: %s, Ghế: %d" % [s_name, s_url, r_id, my_seat])
+	if reconnect_banner_panel and reconnect_banner_panel.visible:
+		_show_reconnect_success_toast()
 
 func _on_network_player_joined(joined_seat: int, active_seats: Array) -> void:
 	for s in active_seats:
@@ -5592,6 +5670,11 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			reaction_submission_pending = false
 			reaction_submission_version = -1
 
+	var match_status := str(state.get("status", ""))
+	if match_status == "FINISHED":
+		if NetworkClient:
+			NetworkClient.clear_active_match()
+
 	# 1. Đồng bộ người chơi (HP, MaxHP, Chained, Equipments, Hand)
 	var players = state.get("players", [])
 	if not (players is Array):
@@ -5642,6 +5725,12 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		if not generals_data.has(seat):
 			continue
 		var g = generals_data[seat]
+		var p_is_takeover = bool(p.get("isDisconnected", false)) or bool(p.get("isAiTakeover", false))
+		if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
+			if g["avatar_node"].has_method("set_ai_takeover"):
+				g["avatar_node"].set_ai_takeover(p_is_takeover)
+		if seat == my_seat and not p_is_takeover:
+			_show_reconnect_banner(false)
 		g["che_no_active"] = _is_server_skill_active(p, "Chế Nỏ")
 		var old_hand_count = int(g.get("hand_count", 0))
 		if p.has("isAlly"):
@@ -9456,6 +9545,8 @@ func _apply_match_entry_stake() -> void:
 func _show_victory_defeat_modal(is_win: bool) -> void:
 	if not victory_defeat_modal:
 		return
+	if NetworkClient:
+		NetworkClient.clear_active_match()
 	if match_result_recorded:
 		victory_defeat_modal.visible = true
 		return
@@ -9915,6 +10006,7 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 
 func _on_return_home_clicked() -> void:
 	if NetworkClient:
+		NetworkClient.clear_active_match()
 		NetworkClient.room_id = ""
 	get_tree().change_scene_to_file("res://scenes/home.tscn")
 
@@ -9934,6 +10026,8 @@ func _start_turn(seat_num: int) -> void:
 		return
 	if is_network_mode:
 		return
+	turn_generation += 1
+	_reset_ai_turn_watchdog()
 
 	# Skip dead generals
 	var g = generals_data[seat_num]
@@ -10055,6 +10149,7 @@ func _start_turn(seat_num: int) -> void:
 		end_turn_btn.visible = false
 		card_play_btn.visible = false
 		if _is_ai_controller():
+			_arm_ai_turn_watchdog(seat_num)
 			turn_indicator.text = "🤖 Lượt của %s (Máy)..." % g["name"]
 			desc_text.text = "🤖 Máy %s đang tính toán nước đi..." % g["name"]
 			_execute_ai_turn(seat_num)
@@ -10382,8 +10477,9 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 func _execute_ai_turn(ai_seat: int) -> void:
 	if is_network_mode:
 		return
+	var ai_turn_token := turn_generation
 	await get_tree().create_timer(AI_CARD_PLAY_DELAY).timeout
-	if is_game_over:
+	if is_game_over or ai_turn_token != turn_generation or ai_turn_watchdog_recovering:
 		return
 
 	var ai_gen = generals_data[ai_seat]
@@ -10793,13 +10889,64 @@ func _execute_ai_turn(ai_seat: int) -> void:
 		_animate_showcase_card("Lập Làng", "🏘️ %s đã bỏ bài xong và không gây sát thương, rút 2 lá bài." % ai_gen["name"])
 		_add_log("🏘️ [LẬP LÀNG] %s đã bỏ bài xong và không gây sát thương, rút 2 lá bài." % ai_gen["name"])
 
-	# End AI turn
+	# End AI turn. A watchdog recovery may have already advanced the match.
+	if ai_turn_token != turn_generation or ai_turn_watchdog_recovering:
+		return
+	_reset_ai_turn_watchdog()
 	_broadcast_player_battle_action("END_TURN", "", 0, ai_seat)
 	await get_tree().create_timer(AI_CARD_PLAY_DELAY).timeout
 	_next_turn()
 
 func _wait_for_ai_card_play() -> void:
 	await get_tree().create_timer(AI_CARD_PLAY_DELAY).timeout
+
+func _reset_ai_turn_watchdog() -> void:
+	ai_turn_watchdog_seat = -1
+	ai_turn_watchdog_elapsed = 0.0
+	ai_turn_watchdog_active = false
+	ai_turn_watchdog_recovering = false
+
+func _arm_ai_turn_watchdog(ai_seat: int) -> void:
+	ai_turn_watchdog_seat = ai_seat
+	ai_turn_watchdog_elapsed = 0.0
+	ai_turn_watchdog_active = true
+	ai_turn_watchdog_recovering = false
+
+func _process_ai_turn_watchdog(delta: float) -> void:
+	if not ai_turn_watchdog_active or ai_turn_watchdog_recovering or is_network_mode or is_game_over:
+		return
+	if ai_turn_watchdog_seat != current_turn_seat or not generals_data.has(ai_turn_watchdog_seat):
+		_reset_ai_turn_watchdog()
+		return
+	var ai_gen = generals_data[ai_turn_watchdog_seat]
+	if not ai_gen.get("isAI", false) or not ai_gen.get("is_alive", false) or not _is_ai_controller():
+		_reset_ai_turn_watchdog()
+		return
+	# Reaction timers own the flow while another seat is answering an AI attack.
+	# If a reaction flag survives after its timer expired, keep the watchdog active
+	# so a stale modal cannot freeze the match forever.
+	var reaction_active := current_waiting_timer > 0.0 and (current_waiting_seat > 0 or is_waiting_dodge or is_waiting_rescue or is_waiting_song_cung or is_waiting_thuy_trieu_rut_give)
+	if reaction_active:
+		ai_turn_watchdog_elapsed = 0.0
+		return
+	ai_turn_watchdog_elapsed += delta
+	if ai_turn_watchdog_elapsed < AI_TURN_WATCHDOG_TIMEOUT:
+		return
+	_recover_stuck_ai_turn(ai_turn_watchdog_seat)
+
+func _recover_stuck_ai_turn(ai_seat: int) -> void:
+	if ai_turn_watchdog_recovering or is_game_over or ai_seat != current_turn_seat:
+		return
+	ai_turn_watchdog_recovering = true
+	ai_turn_watchdog_active = false
+	ai_turn_watchdog_elapsed = 0.0
+	_add_log("⚠️ AI %s bị kẹt quá %.0fs, tự động bỏ lượt để tiếp tục trận đấu." % [generals_data.get(ai_seat, {}).get("name", "Ghế %d" % ai_seat), AI_TURN_WATCHDOG_TIMEOUT])
+	turn_indicator.text = "⚠️ AI bị kẹt — đang tự khôi phục lượt..."
+	# Invalidate any stale async AI coroutine before advancing the turn.
+	turn_generation += 1
+	await get_tree().create_timer(0.2).timeout
+	if not is_game_over:
+		_next_turn()
 
 func _get_general_hand_limit(general: Dictionary) -> int:
 	var limit = int(general.get("hp", 0))

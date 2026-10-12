@@ -82,6 +82,8 @@ var depth_light_rim: Panel = null
 var depth_shade_rim: Panel = null
 var frame_rest_position: Vector2
 var frame_shake_tween: Tween = null
+var ai_takeover_badge: PanelContainer = null
+var is_ai_takeover: bool = false
 
 const DRAGON_TEAM_COLOR := Color(0.22, 0.82, 0.42, 1.0)
 const PHOENIX_TEAM_COLOR := Color(0.93, 0.24, 0.22, 1.0)
@@ -504,6 +506,45 @@ func set_defeated(defeated: bool) -> void:
 		if defeated_label:
 			defeated_label.visible = false
 		modulate = Color.WHITE
+
+func set_ai_takeover(active: bool) -> void:
+	if is_ai_takeover == active and (not active or ai_takeover_badge != null):
+		return
+	is_ai_takeover = active
+	if active:
+		if not ai_takeover_badge:
+			ai_takeover_badge = PanelContainer.new()
+			ai_takeover_badge.name = "AiTakeoverBadge"
+			var st = StyleBoxFlat.new()
+			st.bg_color = Color(0.85, 0.15, 0.15, 0.95)
+			st.border_width_left = 1
+			st.border_width_top = 1
+			st.border_width_right = 1
+			st.border_width_bottom = 1
+			st.border_color = Color(1.0, 0.8, 0.2, 0.9)
+			st.corner_radius_top_left = 4
+			st.corner_radius_top_right = 4
+			st.corner_radius_bottom_left = 4
+			st.corner_radius_bottom_right = 4
+			st.content_margin_left = 5
+			st.content_margin_right = 5
+			st.content_margin_top = 2
+			st.content_margin_bottom = 2
+			ai_takeover_badge.add_theme_stylebox_override("panel", st)
+			ai_takeover_badge.z_as_relative = false
+			ai_takeover_badge.z_index = 85
+			ai_takeover_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			var lbl = Label.new()
+			lbl.text = "🤖 BOT ĐÁNH THAY"
+			lbl.add_theme_font_size_override("font_size", 9)
+			lbl.add_theme_color_override("font_color", Color(1.0, 0.95, 0.8))
+			ai_takeover_badge.add_child(lbl)
+			add_child(ai_takeover_badge)
+			ai_takeover_badge.position = Vector2(6, 26)
+		ai_takeover_badge.visible = true
+	else:
+		if ai_takeover_badge:
+			ai_takeover_badge.visible = false
 
 func _update_delayed_tricks_position() -> void:
 	if delayed_tricks_container:

@@ -8794,6 +8794,61 @@ export function handleAIReaction(state, aiSeat) {
  * Nhịp đếm thời gian và tự động hành động trên Server (Authoritative Server Loop)
  * Chạy mỗi giây (1000ms) trên Server In-Memory
  */
+export function executeFallbackReactionForSeat(state, waitingSeat, waitingPlayer) {
+  if (state.phase === "AWAIT_SLASH_DEFENSE") {
+    return handleRespondAction(state, waitingSeat, false, null);
+  } else if (state.phase === "AWAIT_BORROW_SWORD") {
+    return handleRespondAction(state, waitingSeat, false, null);
+  } else if (state.phase === "AWAIT_NULLIFY") {
+    return handleRespondAction(state, waitingSeat, false, null);
+  } else if (state.phase === "AWAIT_TARGET_CARD") {
+    return handleRespondAction(state, waitingSeat, true, null, null);
+  } else if (state.phase === "AWAIT_DOAN_DAO_CHOICE") {
+    return handleRespondAction(state, waitingSeat, true, null);
+  } else if (state.phase === "AWAIT_HICH_CASTER_DISCARD" || state.phase === "AWAIT_HICH_TARGET_DISCARD"
+    || state.phase === "AWAIT_DRUM_CHOICE") {
+    return handleRespondAction(state, waitingSeat, false, null);
+  } else if (state.phase === "AWAIT_THUY_TRIEU_RUT_GIVE") {
+    const card = waitingPlayer?.hand?.[0];
+    if (card) return handleRespondAction(state, waitingSeat, true, card.id);
+    else {
+      state.thuyTrieuRutSelection = null;
+      resetWaitingState(state);
+      return { success: true, state };
+    }
+  } else if (state.phase === "AWAIT_AOE") {
+    return handleRespondAction(state, waitingSeat, false, null);
+  } else if (state.phase === "AWAIT_DUEL") {
+    return handleRespondAction(state, waitingSeat, false, null);
+  } else if (state.phase === "AWAIT_HARVEST") {
+    return handleRespondAction(state, waitingSeat, true, null);
+  } else if (state.phase === "AWAIT_NEAR_DEATH") {
+    return handleRespondAction(state, waitingSeat, false, null);
+  } else if (state.phase === "AWAIT_NAM_SON_FOLLOW_UP") {
+    return handleRespondAction(state, waitingSeat, false, null);
+  } else if (state.phase === "AWAIT_SONG_CUNG_FOLLOW_UP") {
+    return handleRespondAction(state, waitingSeat, false, null);
+  } else if (state.phase === "AWAIT_UAT_KHI") {
+    return handleUseSkill(state, waitingSeat, "Uất Khí", 0);
+  } else if (state.phase === "AWAIT_KHOI_BINH") {
+    return handleRespondAction(state, waitingSeat, false, null);
+  } else if (state.phase === "AWAIT_HUYNH_TRUONG") {
+    return handleUseSkill(state, waitingSeat, "Huynh Trưởng", 0);
+  } else if (state.phase === "AWAIT_THU_MUC") {
+    return handleRespondAction(state, waitingSeat, false, null);
+  } else if (["AWAIT_DAN_CAU", "AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_TRUNG_KIEN",
+    "AWAIT_CHINH_THONG_TARGET", "AWAIT_CHINH_THONG_GIVE", "AWAIT_KHOAN_HOA", "AWAIT_NGHIA_TU",
+    "AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_UAT_KHI_TARGET",
+    "AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_MUU_DINH_CHOICE", "AWAIT_NGHICH_Y"].includes(state.phase)) {
+    return handleRespondAction(state, waitingSeat, false, null);
+  } else if (state.phase === "DISCARD") {
+    const discardCount = Math.max(0, (waitingPlayer?.hand?.length || 0) - getHandLimit(waitingPlayer));
+    const discardIds = (waitingPlayer?.hand || []).slice(0, discardCount).map((card) => card.id);
+    return handleDiscardCards(state, waitingSeat, discardIds);
+  }
+  return { success: true, state };
+}
+
 export function tickGameState(state, connectedSeats = null) {
   if (!state || state.status === "FINISHED") return { changed: false, important: false };
   if (shouldFastForwardAiBattle(state)) return fastForwardAiBattle(state);
@@ -8896,20 +8951,29 @@ export function tickGameState(state, connectedSeats = null) {
       return { changed: true, important };
     }
 
-    const isAISlot = waitingPlayer && waitingPlayer.isAI === true;
+    const isDisconnectedOrAway = waitingPlayer && (
+      waitingPlayer.isDisconnected === true ||
+      waitingPlayer.isAiTakeover === true ||
+      (Array.isArray(connectedSeats) && !connectedSeats.includes(waitingSeat))
+    );
+    const isAISlot = waitingPlayer && (waitingPlayer.isAI === true || isDisconnectedOrAway);
     const canAIReact = !["AWAIT_UAT_KHI", "AWAIT_KHOI_BINH", "AWAIT_HUYNH_TRUONG"].includes(state.phase)
       && isAISlot
       && (waitingPlayer.hp > 0 || ["AWAIT_NEAR_DEATH", "AWAIT_UAT_KHI_TARGET"].includes(state.phase));
-    if (canAIReact && elapsedMs >= 1500 && elapsed < 40) {
-        const res = handleAIReaction(state, waitingSeat);
-        if (res && res.error) {
-            console.log("[AI ERROR]", res.error, state.phase, waitingSeat);
-            return { changed: false, important: false };
-        }
+    if (canAIReact && elapsedMs >= 1200 && elapsed < 40) {
+      const res = handleAIReaction(state, waitingSeat);
+      if (res && !res.error) {
         important = true;
         state.timerStartAt = Date.now();
         return { changed: true, important };
       }
+      if (isDisconnectedOrAway) {
+        executeFallbackReactionForSeat(state, waitingSeat, waitingPlayer);
+        important = true;
+        state.timerStartAt = Date.now();
+        return { changed: true, important };
+      }
+    }
   }
   else if (state.phase === "PLAY" && state.turnSeat > 0) {
     if (state.turnTimer !== newTimer) {
@@ -8939,8 +9003,13 @@ export function tickGameState(state, connectedSeats = null) {
       return { changed: true, important };
     }
 
-    const isAITurn = turnPlayer && (turnPlayer.isAI || (Array.isArray(connectedSeats) && !connectedSeats.includes(state.turnSeat)));
-    if (isAITurn && turnPlayer.hp > 0 && elapsedMs >= 1500 && elapsed < 40) {
+    const isDisconnectedTurn = turnPlayer && (
+      turnPlayer.isDisconnected === true ||
+      turnPlayer.isAiTakeover === true ||
+      (Array.isArray(connectedSeats) && !connectedSeats.includes(state.turnSeat))
+    );
+    const isAITurn = turnPlayer && (turnPlayer.isAI || isDisconnectedTurn);
+    if (isAITurn && turnPlayer.hp > 0 && elapsedMs >= 1200 && elapsed < 40) {
       const res = handleAIStep(state, state.turnSeat);
       if (res && res.error) {
         console.log("[AI STEP ERROR]", res.error, state.turnSeat);
@@ -9174,6 +9243,8 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
       isAlly: p.isAlly === true,
       role: viewerSeat === p.seat ? (p.role || "") : "",
       isAI: p.isAI,
+      isDisconnected: p.isDisconnected === true,
+      isAiTakeover: p.isAiTakeover === true,
       isAlive: p.isAlive !== false,
       sucSoiTurnsRemaining: Math.max(0, Number(p.sucSoiTurnsRemaining) || 0),
       isWineBuffActive: !!p.isWineBuffActive,

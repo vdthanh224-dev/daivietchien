@@ -220,7 +220,6 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 	var now = get_now_ms()
 	var best_room: Dictionary = {}
 	var best_real_count = -1
-	var best_diff = 999999
 	for doc in res["data"].get("documents", []):
 		if not (doc is Dictionary):
 			continue
@@ -258,10 +257,10 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 		var room_id = str(room.get("roomId", ""))
 		var best_room_id = str(best_room.get("roomId", "~"))
 		# Đã bỏ giới hạn tìm trận theo rank: Ai cũng có thể ghép phòng với nhau.
-		# Ưu tiên gom vào phòng có đông người chơi thật nhất; nếu bằng nhau thì ưu tiên phòng có mức rank gần nhất.
-		if real_count > best_real_count or (real_count == best_real_count and (best_room.is_empty() or diff < best_diff or (diff == best_diff and room_id < best_room_id))):
+		# Tất cả client phải bầu cùng một phòng: ưu tiên phòng đông người thật
+		# nhất, sau đó chỉ dùng roomId cố định làm tiêu chí phân xử.
+		if real_count > best_real_count or (real_count == best_real_count and (best_room.is_empty() or room_id < best_room_id)):
 			best_real_count = real_count
-			best_diff = diff
 			best_room = room
 	return best_room
 

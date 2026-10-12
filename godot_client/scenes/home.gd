@@ -119,6 +119,7 @@ func _ready() -> void:
 		_run_automated_screenshot_inventory()
 	else:
 		_check_pending_exp_gain()
+		_check_active_match_reconnect()
 
 func _build_ui() -> void:
 	# 1. Background
@@ -1136,7 +1137,7 @@ func _show_modal(title_text: String, content_node: Node) -> void:
 	if is_instance_valid(modal_overlay):
 		modal_overlay.visible = true
 	if is_instance_valid(modal_panel):
-		if title_text.begins_with("⚔️ TÌM TRẬN"):
+		if title_text.begins_with("⚔️ TÌM TRẬN") or title_text == "TRẬN ĐẤU ĐANG DIỄN RA":
 			modal_panel.custom_minimum_size = Vector2(580, 310)
 			if is_instance_valid(modal_scroll):
 				modal_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -1180,6 +1181,109 @@ func _hide_modal() -> void:
 	if is_instance_valid(modal_content_container):
 		for child in modal_content_container.get_children():
 			child.queue_free()
+
+func _check_active_match_reconnect() -> void:
+	if not NetworkClient:
+		return
+	if NetworkClient.has_active_match():
+		var match_data = NetworkClient.get_active_match()
+		if not match_data.is_empty():
+			await get_tree().create_timer(0.35).timeout
+			_show_modal("TRẬN ĐẤU ĐANG DIỄN RA", _build_reconnect_prompt_content(match_data))
+
+func _build_reconnect_prompt_content(match_data: Dictionary) -> Control:
+	var container = VBoxContainer.new()
+	container.add_theme_constant_override("separation", 18)
+	container.alignment = BoxContainer.ALIGNMENT_CENTER
+
+	var r_id = str(match_data.get("roomId", ""))
+	var seat = int(match_data.get("seat", 1))
+	var mode_id = str(match_data.get("modeId", "2v2"))
+	var mode_name = "Đấu Trường 2v2" if mode_id == "2v2" else ("Vương Triều 5 Người" if mode_id == "dynasty_5" else ("Vương Triều 8 Người" if mode_id == "dynasty_8" else mode_id))
+
+	var icon_lbl = Label.new()
+	icon_lbl.text = "⚡ ⚔️ 🤖"
+	icon_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	icon_lbl.add_theme_font_size_override("font_size", 32)
+	container.add_child(icon_lbl)
+
+	var msg_lbl = Label.new()
+	msg_lbl.text = "Bạn có một trận đấu đang diễn ra chưa kết thúc!\n\nPhòng: [ %s ] | Chế độ: %s | Ghế của bạn: %d\n\nHiện tại Bot AI đang tạm thời đánh thay bạn để trận đấu không bị gián đoạn.\nBạn có muốn vào lại để tiếp tục trận chiến?" % [r_id, mode_name, seat]
+	msg_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	msg_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	msg_lbl.add_theme_font_size_override("font_size", 14)
+	msg_lbl.add_theme_color_override("font_color", COLOR_TEXT_DARK)
+	container.add_child(msg_lbl)
+
+	var btn_hbox = HBoxContainer.new()
+	btn_hbox.add_theme_constant_override("separation", 24)
+	btn_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+
+	# Reconnect button
+	var rejoin_btn = Button.new()
+	rejoin_btn.text = "⚡ VÀO LẠI TRẬN"
+	rejoin_btn.custom_minimum_size = Vector2(200, 48)
+	var rejoin_style = StyleBoxFlat.new()
+	rejoin_style.bg_color = COLOR_GOLD_PRIMARY
+	rejoin_style.corner_radius_top_left = 8
+	rejoin_style.corner_radius_top_right = 8
+	rejoin_style.corner_radius_bottom_left = 8
+	rejoin_style.corner_radius_bottom_right = 8
+	rejoin_btn.add_theme_stylebox_override("normal", rejoin_style)
+	rejoin_btn.add_theme_color_override("font_color", Color(0.1, 0.08, 0.02, 1.0))
+	rejoin_btn.add_theme_font_size_override("font_size", 15)
+	rejoin_btn.pressed.connect(func():
+		_hide_modal()
+		_rejoin_active_match(match_data)
+	)
+	btn_hbox.add_child(rejoin_btn)
+
+	# Abandon button
+	var abandon_btn = Button.new()
+	abandon_btn.text = "✕ BỎ TRẬN"
+	abandon_btn.custom_minimum_size = Vector2(160, 48)
+	var abandon_style = StyleBoxFlat.new()
+	abandon_style.bg_color = Color(0.3, 0.12, 0.12, 0.9)
+	abandon_style.border_width_left = 1
+	abandon_style.border_width_top = 1
+	abandon_style.border_width_right = 1
+	abandon_style.border_width_bottom = 1
+	abandon_style.border_color = Color(0.8, 0.25, 0.25, 0.8)
+	abandon_style.corner_radius_top_left = 8
+	abandon_style.corner_radius_top_right = 8
+	abandon_style.corner_radius_bottom_left = 8
+	abandon_style.corner_radius_bottom_right = 8
+	abandon_btn.add_theme_stylebox_override("normal", abandon_style)
+	abandon_btn.add_theme_color_override("font_color", Color(0.95, 0.75, 0.75, 1.0))
+	abandon_btn.add_theme_font_size_override("font_size", 14)
+	abandon_btn.pressed.connect(func():
+		if NetworkClient:
+			NetworkClient.clear_active_match()
+		_hide_modal()
+	)
+	btn_hbox.add_child(abandon_btn)
+
+	container.add_child(btn_hbox)
+	return container
+
+func _rejoin_active_match(match_data: Dictionary) -> void:
+	var r_id = str(match_data.get("roomId", ""))
+	var seat = int(match_data.get("seat", 1))
+	var mode_id = str(match_data.get("modeId", "2v2"))
+	var draft_slots = match_data.get("draftSlots", [])
+	if NetworkClient:
+		NetworkClient.room_id = r_id
+		NetworkClient.my_seat = seat
+		NetworkClient.active_mode_id = mode_id
+	if AppwriteMatchmaking:
+		AppwriteMatchmaking.current_room = {
+			"roomId": r_id,
+			"modeId": mode_id,
+			"draft_slots": draft_slots
+		}
+		if draft_slots is Array and not draft_slots.is_empty():
+			AppwriteMatchmaking.draft_slots = draft_slots
+	get_tree().change_scene_to_file("res://scenes/battle_2v2.tscn")
 
 # --- EXP Animation & Level Up System ---
 func _check_pending_exp_gain() -> void:

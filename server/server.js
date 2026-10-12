@@ -16,6 +16,7 @@ import {
   sanitizeGameStateForClient,
   hydrateGameState,
   ensureMutationVersion,
+  recordAction,
 } from "./functions/game-engine/src/gameEngine.js";
 import { HERO_MAX_HP, HEROES } from "./functions/game-engine/src/heroes.js";
 import { getModeRules } from "./functions/game-engine/src/modeRegistry.js";
@@ -137,7 +138,7 @@ const MAX_ACTIONS_PER_SECOND = 30;
 const ALLOWED_WS_ACTIONS = new Set([
   "JOIN_ROOM", "INIT_GAME", "JOIN_DRAFT", "PICK_HERO", "HOVER_HERO", "GET_STATE", "PING",
   "USE_SKILL", "TOGGLE_SKILL", "PLAY_CARD", "RESPOND_ACTION", "END_TURN",
-  "DISCARD_CARDS", "AI_STEP", "AI_REACTION"
+  "DISCARD_CARDS", "AI_STEP", "AI_REACTION", "CHECK_ACTIVE_MATCH", "RECONNECT_GAME"
 ]);
 
 function validateClientPayload(payload, rawBytes) {
@@ -354,7 +355,7 @@ function mutateSharedState(roomId, seat, payload) {
   let result = null;
 
   if (payload.action === "SERVER_TICK") {
-    tickRes = tickGameState(state);
+    tickRes = tickGameState(state, payload.connectedSeats);
     result = { success: true, changed: tickRes.changed };
   } else {
     result = applyActionToState(state, seat, payload);
@@ -392,8 +393,13 @@ function broadcastStateUpdate(room, action = "STATE_UPDATE") {
 }
 
 function tickSharedRoom(roomId, room) {
+  const connectedSeats = Array.from(room.sockets.entries())
+    .filter(([seat, ws]) => ws && ws.readyState === WebSocket.OPEN)
+    .map(([seat]) => seat);
+
   const result = mutateSharedState(roomId, undefined, {
     action: "SERVER_TICK",
+    connectedSeats,
   });
   if (result.committed) {
     updateLocalRoom(roomId, result.state);
@@ -959,7 +965,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           return socket.send(JSON.stringify({ type: "ERROR", error: "Thiếu roomId" }));
         }
 
-        const isJoinAction = action === "JOIN_ROOM" || action === "INIT_GAME" || action === "JOIN_DRAFT";
+        const isJoinAction = action === "JOIN_ROOM" || action === "INIT_GAME" || action === "JOIN_DRAFT" || action === "RECONNECT_GAME" || action === "CHECK_ACTIVE_MATCH";
 
         if (isJoinAction) {
           if (requestSeat === 0) {
@@ -1164,17 +1170,44 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           bindSocket(room, currentSeat, socket);
           room.lastActivity = Date.now();
 
+          let wasDisconnected = false;
+          if (room.state && room.state.status === "PLAYING") {
+            const player = room.state.players.find((p) => p.seat === currentSeat);
+            if (player) {
+              wasDisconnected = Boolean(player.isDisconnected || player.isAiTakeover);
+              player.isDisconnected = false;
+              player.isAiTakeover = false;
+              if (wasDisconnected) {
+                recordAction(room.state, {
+                  type: "PLAYER_RECONNECTED",
+                  casterSeat: currentSeat,
+                  description: `⚡ <b>${player.generalName}</b> (Ghế ${currentSeat}) đã kết nối lại phòng đấu!`
+                });
+                room.lastActivity = Date.now();
+                broadcastStateUpdate(room, "PLAYER_RECONNECTED");
+                clusterBroadcast({
+                  type: "GAME_STATE_SYNC",
+                  roomId,
+                  state: room.state,
+                  action: "PLAYER_RECONNECTED",
+                });
+              }
+            }
+          }
+
           // Gửi Snapshot đầy đủ cho người vừa kết nối
           socket.send(JSON.stringify({
             type: "STATE_SNAPSHOT",
             state: sanitizeGameStateForClient(room.state, currentSeat),
             version: room.state.version,
+            isReconnected: wasDisconnected,
           }));
 
           broadcastRoom(room, {
             type: "PLAYER_JOINED",
             seat: currentSeat,
             activeSeats: Array.from(room.sockets.keys()),
+            isReconnected: wasDisconnected,
           });
           return;
         }
@@ -1271,6 +1304,29 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           // the old socket's close event remove the newer connection.
           if (closedSeat && room.sockets.get(closedSeat) === socket) {
             room.sockets.delete(closedSeat);
+            if (room.state && room.state.status === "PLAYING") {
+              const player = room.state.players.find((p) => p.seat === closedSeat);
+              if (player && !player.isAI) {
+                player.isDisconnected = true;
+                player.isAiTakeover = true;
+                recordAction(room.state, {
+                  type: "PLAYER_DISCONNECTED",
+                  casterSeat: closedSeat,
+                  description: `🔌 <b>${player.generalName}</b> (Ghế ${closedSeat}) đã ngắt kết nối! Bot AI tự động đánh thay.`
+                });
+                room.lastActivity = Date.now();
+                broadcastStateUpdate(room, "PLAYER_DISCONNECTED");
+                clusterBroadcast({
+                  type: "GAME_STATE_SYNC",
+                  roomId: closedRoomId,
+                  state: room.state,
+                  action: "PLAYER_DISCONNECTED",
+                });
+              }
+            } else if (room.draft && !room.draft.isCompleted) {
+              const slot = room.draft.slots?.find((s) => s.seat === closedSeat);
+              if (slot) slot.isDisconnected = true;
+            }
           }
           if (room.sockets.size === 0) {
             setTimeout(() => {
