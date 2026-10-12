@@ -22,6 +22,12 @@ import { HERO_MAX_HP, HEROES } from "./functions/game-engine/src/heroes.js";
 import { getModeRules } from "./functions/game-engine/src/modeRegistry.js";
 
 const rooms = new Map();
+// Social data is kept in the Render process so online players can search and
+// exchange friend requests without coupling the lobby to a match room.
+const socialProfiles = new Map();
+const socialFriends = new Map();
+const socialRequests = new Map();
+let nextSocialRequestId = 1;
 const startTime = Date.now();
 const instanceId = `node_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 const clusterChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("dvc_cluster_bus") : null;
@@ -138,15 +144,55 @@ const MAX_ACTIONS_PER_SECOND = 30;
 const ALLOWED_WS_ACTIONS = new Set([
   "JOIN_ROOM", "INIT_GAME", "JOIN_DRAFT", "PICK_HERO", "HOVER_HERO", "GET_STATE", "PING",
   "USE_SKILL", "TOGGLE_SKILL", "PLAY_CARD", "RESPOND_ACTION", "END_TURN",
-  "DISCARD_CARDS", "AI_STEP", "AI_REACTION", "CHECK_ACTIVE_MATCH", "RECONNECT_GAME"
+  "DISCARD_CARDS", "AI_STEP", "AI_REACTION", "CHECK_ACTIVE_MATCH", "RECONNECT_GAME",
+  "SOCIAL_REGISTER", "FRIEND_LIST", "FRIEND_SEARCH", "FRIEND_REQUEST", "FRIEND_RESPOND"
 ]);
+
+const SOCIAL_ACTIONS = new Set(["SOCIAL_REGISTER", "FRIEND_LIST", "FRIEND_SEARCH", "FRIEND_REQUEST", "FRIEND_RESPOND"]);
+
+function socialUserId(value) {
+  return String(value || "").trim().slice(0, 128);
+}
+
+function socialUserName(value) {
+  return String(value || "Đại Tướng Quân").trim().slice(0, 64) || "Đại Tướng Quân";
+}
+
+function socialProfile(userId) {
+  const profile = socialProfiles.get(userId);
+  return profile ? { userId: profile.userId, userName: profile.userName, online: profile.socket?.readyState === WebSocket.OPEN } : null;
+}
+
+function socialFriendSet(userId) {
+  if (!socialFriends.has(userId)) socialFriends.set(userId, new Set());
+  return socialFriends.get(userId);
+}
+
+function socialSnapshot(userId) {
+  const friends = Array.from(socialFriendSet(userId)).map(socialProfile).filter(Boolean);
+  const incoming = Array.from(socialRequests.values())
+    .filter((request) => request.toUserId === userId && request.status === "PENDING")
+    .map((request) => ({ requestId: request.requestId, fromUserId: request.fromUserId, fromUserName: request.fromUserName }));
+  return { friends, incoming };
+}
+
+function sendSocialSnapshot(userId) {
+  const profile = socialProfiles.get(userId);
+  if (profile?.socket?.readyState === WebSocket.OPEN) {
+    profile.socket.send(JSON.stringify({ type: "FRIEND_LIST_UPDATE", ...socialSnapshot(userId) }));
+  }
+}
+
+function sendSocialError(socket, error) {
+  socket.send(JSON.stringify({ type: "SOCIAL_ERROR", error }));
+}
 
 function validateClientPayload(payload, rawBytes) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return "Gói tin không hợp lệ";
   if (rawBytes > MAX_WS_MESSAGE_BYTES) return "Gói tin vượt giới hạn cho phép";
   if (typeof payload.action !== "string" || !ALLOWED_WS_ACTIONS.has(payload.action)) return "Hành động không hợp lệ";
   if (payload.roomId !== undefined && (typeof payload.roomId !== "string" || payload.roomId.length > 128)) return "Mã phòng không hợp lệ";
-  for (const key of ["cardId", "targetCardId", "skillId", "heroName", "userId", "userName"]) {
+  for (const key of ["cardId", "targetCardId", "skillId", "heroName", "userId", "userName", "targetUserId", "query", "requestId", "fromUserId", "fromUserName"]) {
     if (payload[key] !== undefined && (typeof payload[key] !== "string" || payload[key].length > 256)) return `${key} không hợp lệ`;
   }
   for (const key of ["seat", "targetSeat", "targetSeat2", "expectedVersion"]) {
@@ -960,8 +1006,65 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
             return socket.send(JSON.stringify({ type: "ERROR", error: "Gửi hành động quá nhanh, vui lòng chờ một chút" }));
           }
         }
-        const { action, roomId, cardId, targetCardId, targetSeat, targetSeat2, targetSeats, recast, skillId, accepted, cardIds, players, modeId, expectedVersion } = payload;
+        const { action, roomId, cardId, targetCardId, targetSeat, targetSeat2, targetSeats, recast, skillId, accepted, cardIds, players, modeId, expectedVersion, userId, userName, query, requestId, accept } = payload;
         const requestSeat = normalizeSeat(payload.seat);
+
+        if (SOCIAL_ACTIONS.has(action)) {
+          const socialId = socialUserId(userId || payload.fromUserId);
+          if (!socialId) return sendSocialError(socket, "Chưa đăng nhập tài khoản");
+          const name = socialUserName(userName || payload.fromUserName);
+          if (action === "SOCIAL_REGISTER") {
+            const previous = socialProfiles.get(socialId);
+            socialProfiles.set(socialId, { userId: socialId, userName: name, socket });
+            if (previous?.socket && previous.socket !== socket) previous.socket = null;
+            socket.socialUserId = socialId;
+            socket.send(JSON.stringify({ type: "SOCIAL_REGISTERED", ...socialSnapshot(socialId) }));
+            return;
+          }
+          if (action === "FRIEND_LIST") {
+            socket.send(JSON.stringify({ type: "FRIEND_LIST_UPDATE", ...socialSnapshot(socialId) }));
+            return;
+          }
+          if (action === "FRIEND_SEARCH") {
+            const needle = String(query || "").trim().toLowerCase();
+            const results = needle.length < 2 ? [] : Array.from(socialProfiles.values())
+              .filter((profile) => profile.userId !== socialId && (profile.userName.toLowerCase().includes(needle) || profile.userId.toLowerCase().includes(needle)))
+              .slice(0, 20).map((profile) => socialProfile(profile.userId));
+            socket.send(JSON.stringify({ type: "FRIEND_SEARCH_RESULT", results }));
+            return;
+          }
+          if (action === "FRIEND_REQUEST") {
+            const targetId = socialUserId(payload.targetUserId);
+            if (!targetId || targetId === socialId) return sendSocialError(socket, "Người chơi không hợp lệ");
+            if (!socialProfiles.has(targetId)) return sendSocialError(socket, "Không tìm thấy người chơi này");
+            if (socialFriendSet(socialId).has(targetId)) return sendSocialError(socket, "Hai người đã là bạn");
+            const duplicate = Array.from(socialRequests.values()).find((r) => r.status === "PENDING" && r.fromUserId === socialId && r.toUserId === targetId);
+            if (!duplicate) {
+              const reverse = Array.from(socialRequests.values()).find((r) => r.status === "PENDING" && r.fromUserId === targetId && r.toUserId === socialId);
+              if (reverse) {
+                reverse.status = "ACCEPTED";
+                socialFriendSet(socialId).add(targetId);
+                socialFriendSet(targetId).add(socialId);
+              } else {
+                const newRequest = { requestId: `fr_${nextSocialRequestId++}`, fromUserId: socialId, fromUserName: name, toUserId: targetId, status: "PENDING" };
+                socialRequests.set(newRequest.requestId, newRequest);
+              }
+            }
+            sendSocialSnapshot(socialId); sendSocialSnapshot(targetId);
+            return;
+          }
+          if (action === "FRIEND_RESPOND") {
+            const request = socialRequests.get(String(requestId || ""));
+            if (!request || request.toUserId !== socialId || request.status !== "PENDING") return sendSocialError(socket, "Lời mời không còn hiệu lực");
+            request.status = accept === true ? "ACCEPTED" : "DECLINED";
+            if (accept === true) {
+              socialFriendSet(socialId).add(request.fromUserId);
+              socialFriendSet(request.fromUserId).add(socialId);
+            }
+            sendSocialSnapshot(socialId); sendSocialSnapshot(request.fromUserId);
+            return;
+          }
+        }
 
         if (!roomId) {
           return socket.send(JSON.stringify({ type: "ERROR", error: "Thiếu roomId" }));
@@ -1295,6 +1398,11 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
     };
 
     socket.onclose = () => {
+      if (socket.socialUserId) {
+        const social = socialProfiles.get(socket.socialUserId);
+        if (social?.socket === socket) social.socket = null;
+        sendSocialSnapshot(socket.socialUserId);
+      }
       // Capture identity before delayed cleanup; reconnects can mutate these
       // handler variables before the timer fires.
       const closedRoomId = currentRoomId;

@@ -12,6 +12,9 @@ signal draft_completed(battle_data: Dictionary)
 signal draft_joined(assigned_seat: int)
 signal draft_hover_updated(seat: int, hero_id: int, hero_name: String)
 signal ping_updated(ping_ms: int)
+signal social_list_updated(friends: Array, incoming: Array)
+signal social_search_completed(results: Array)
+signal social_error(message: String)
 
 const CANDIDATE_SERVERS: Array[Dictionary] = [
 	# Draft and battle state must use one shared online authority. There is no
@@ -274,6 +277,16 @@ func _handle_server_message(raw_json: String) -> void:
 		ping_updated.emit(current_ping)
 		return
 
+	if msg_type == "FRIEND_LIST_UPDATE" or msg_type == "SOCIAL_REGISTERED":
+		social_list_updated.emit(data.get("friends", []), data.get("incoming", []))
+		return
+	if msg_type == "FRIEND_SEARCH_RESULT":
+		social_search_completed.emit(data.get("results", []))
+		return
+	if msg_type == "SOCIAL_ERROR":
+		social_error.emit(str(data.get("error", "Lỗi hệ thống bạn bè")))
+		return
+
 	if msg_type == "ERROR" and _ping_awaiting_pong:
 		var err_str = str(data.get("error", ""))
 		if err_str == "Thiếu roomId" or err_str == "Kết nối chưa tham gia phòng":
@@ -345,6 +358,27 @@ func send_json(dict: Dictionary) -> void:
 		socket.send_text(json_str)
 	else:
 		print("[NetworkClient] Cảnh báo: Socket chưa sẵn sàng để gửi!")
+
+func register_social_profile() -> void:
+	if not AuthManager or AuthManager.current_user_id.is_empty():
+		return
+	send_json({"action": "SOCIAL_REGISTER", "userId": AuthManager.current_user_id, "userName": AuthManager.current_user_name})
+
+func request_friend_list() -> void:
+	if AuthManager and not AuthManager.current_user_id.is_empty():
+		send_json({"action": "FRIEND_LIST", "userId": AuthManager.current_user_id})
+
+func search_friends(query: String) -> void:
+	if AuthManager and not AuthManager.current_user_id.is_empty():
+		send_json({"action": "FRIEND_SEARCH", "userId": AuthManager.current_user_id, "query": query})
+
+func send_friend_request(target_user_id: String) -> void:
+	if AuthManager and not AuthManager.current_user_id.is_empty():
+		send_json({"action": "FRIEND_REQUEST", "userId": AuthManager.current_user_id, "userName": AuthManager.current_user_name, "targetUserId": target_user_id})
+
+func respond_friend_request(request_id: String, accept: bool) -> void:
+	if AuthManager and not AuthManager.current_user_id.is_empty():
+		send_json({"action": "FRIEND_RESPOND", "userId": AuthManager.current_user_id, "requestId": request_id, "accept": accept})
 
 func send_join_draft(target_room: String, seat: int, user_id: String, user_name: String, slots_data: Array = [], mode_id: String = "2v2", available_hero_ids: Array = []) -> void:
 	room_id = target_room

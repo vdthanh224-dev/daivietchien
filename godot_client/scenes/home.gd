@@ -79,6 +79,10 @@ var mode_drawer_panel: PanelContainer = null
 var mode_title_lbl: Label = null
 var battle_cta_btn: Button = null
 var quest_nav_btn: Button = null
+var friend_nav_btn: Button = null
+var _social_friends: Array = []
+var _social_incoming: Array = []
+var _social_search_results: Array = []
 
 func _ready() -> void:
 	anchors_preset = PRESET_FULL_RECT
@@ -87,6 +91,17 @@ func _ready() -> void:
 	_load_user_data()
 	if AuthManager:
 		AuthManager.profile_updated.connect(_load_user_data)
+	if NetworkClient:
+		if not NetworkClient.social_list_updated.is_connected(_on_social_list_updated):
+			NetworkClient.social_list_updated.connect(_on_social_list_updated)
+		if not NetworkClient.social_search_completed.is_connected(_on_social_search_completed):
+			NetworkClient.social_search_completed.connect(_on_social_search_completed)
+		if not NetworkClient.social_error.is_connected(_on_social_error):
+			NetworkClient.social_error.connect(_on_social_error)
+		if not NetworkClient.connection_established.is_connected(_on_social_connection_established):
+			NetworkClient.connection_established.connect(_on_social_connection_established)
+		if NetworkClient.is_connected_to_server:
+			_on_social_connection_established()
 	if DailyQuestSystem:
 		if DailyQuestSystem.has_signal("quests_updated") and not DailyQuestSystem.quests_updated.is_connected(_update_quest_nav_indicator):
 			DailyQuestSystem.quests_updated.connect(_update_quest_nav_indicator)
@@ -799,6 +814,31 @@ func _build_bottom_nav_dock() -> void:
 	]
 
 	for item in nav_items:
+		if item.get("title", "") == "DANH TƯỚNG":
+			var hero_nav_box = VBoxContainer.new()
+			hero_nav_box.size_flags_horizontal = SIZE_EXPAND_FILL
+			hero_nav_box.custom_minimum_size = Vector2(180, 50)
+			hero_nav_box.add_theme_constant_override("separation", 3)
+			var friend_btn = Button.new()
+			friend_btn.custom_minimum_size = Vector2(180, 24)
+			friend_btn.text = "🤝  KẾT BẠN"
+			_style_white_gold_button(friend_btn, 6, 3, Vector2(0, 1))
+			friend_btn.add_theme_font_size_override("font_size", 11)
+			friend_btn.pressed.connect(_show_friends_modal)
+			friend_nav_btn = friend_btn
+			hero_nav_box.add_child(friend_btn)
+			var hero_btn = Button.new()
+			hero_btn.size_flags_horizontal = SIZE_EXPAND_FILL
+			hero_btn.custom_minimum_size = Vector2(180, 28)
+			hero_btn.text = "%s  %s" % [item["icon"], item["title"]]
+			_style_white_gold_button(hero_btn, 8, 5, Vector2(0, 3))
+			hero_btn.pressed.connect(func():
+				AudioManager.play_card_select()
+				item["action"].call()
+			)
+			hero_nav_box.add_child(hero_btn)
+			dock_hbox.add_child(hero_nav_box)
+			continue
 		var btn = Button.new()
 		btn.size_flags_horizontal = SIZE_EXPAND_FILL
 		btn.custom_minimum_size = Vector2(180, 44)
@@ -812,6 +852,170 @@ func _build_bottom_nav_dock() -> void:
 			quest_nav_btn = btn
 		dock_hbox.add_child(btn)
 	_update_quest_nav_indicator()
+
+func _on_social_connection_established() -> void:
+	NetworkClient.register_social_profile()
+	NetworkClient.request_friend_list()
+
+func _on_social_list_updated(friends: Array, incoming: Array) -> void:
+	_social_friends = friends
+	_social_incoming = incoming
+	_update_friend_nav_indicator()
+	if is_instance_valid(modal_title_label) and modal_title_label.text == "🤝 KẾT BẠN":
+		_refresh_friends_modal()
+
+func _on_social_search_completed(results: Array) -> void:
+	_social_search_results = results
+	if is_instance_valid(modal_title_label) and modal_title_label.text == "🤝 KẾT BẠN":
+		_refresh_friends_modal()
+
+func _on_social_error(message: String) -> void:
+	if is_instance_valid(modal_title_label) and modal_title_label.text == "🤝 KẾT BẠN":
+		_show_friends_modal(message)
+
+func _update_friend_nav_indicator() -> void:
+	if is_instance_valid(friend_nav_btn):
+		friend_nav_btn.text = "🤝  KẾT BẠN" if _social_incoming.is_empty() else "🤝  KẾT BẠN (%d)" % _social_incoming.size()
+
+func _show_friends_modal(status_text: String = "") -> void:
+	if NetworkClient and NetworkClient.is_connected_to_server:
+		NetworkClient.register_social_profile()
+		NetworkClient.request_friend_list()
+	_show_modal("🤝 KẾT BẠN", _build_friends_content(status_text))
+
+func _refresh_friends_modal() -> void:
+	if not is_instance_valid(modal_content_container):
+		return
+	for child in modal_content_container.get_children():
+		child.queue_free()
+	modal_content_container.add_child(_build_friends_content())
+
+func _build_friends_content(status_text: String = "") -> Control:
+	var root = VBoxContainer.new()
+	root.size_flags_horizontal = SIZE_EXPAND_FILL
+	root.add_theme_constant_override("separation", 12)
+
+	var intro = Label.new()
+	intro.text = "Tìm Chiến Tướng đang trực tuyến, gửi lời mời và quản lý bằng hữu của bạn."
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	intro.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+	root.add_child(intro)
+
+	var search_row = HBoxContainer.new()
+	search_row.add_theme_constant_override("separation", 8)
+	var search_input = LineEdit.new()
+	search_input.placeholder_text = "Nhập tên Chiến Tướng..."
+	search_input.size_flags_horizontal = SIZE_EXPAND_FILL
+	search_input.add_theme_font_size_override("font_size", 14)
+	search_row.add_child(search_input)
+	var search_btn = Button.new()
+	search_btn.text = "🔎 TÌM"
+	search_btn.custom_minimum_size = Vector2(108, 38)
+	_style_white_gold_button(search_btn, 7, 3, Vector2(0, 2))
+	search_btn.pressed.connect(func():
+		var query = search_input.text.strip_edges()
+		if query.length() >= 2 and NetworkClient and NetworkClient.is_connected_to_server:
+			NetworkClient.search_friends(query)
+	)
+	search_input.text_submitted.connect(func(query: String):
+		if query.strip_edges().length() >= 2 and NetworkClient and NetworkClient.is_connected_to_server:
+			NetworkClient.search_friends(query.strip_edges())
+	)
+	search_row.add_child(search_btn)
+	root.add_child(search_row)
+
+	if not status_text.is_empty():
+		var status = Label.new()
+		status.text = "⚠️ " + status_text
+		status.add_theme_color_override("font_color", Color(1.0, 0.65, 0.35, 1.0))
+		root.add_child(status)
+
+	if not _social_search_results.is_empty():
+		var result_title = Label.new()
+		result_title.text = "KẾT QUẢ TÌM KIẾM"
+		result_title.add_theme_font_size_override("font_size", 15)
+		result_title.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
+		root.add_child(result_title)
+		for player in _social_search_results:
+			root.add_child(_build_friend_row(player, false, false))
+
+	var pending_title = Label.new()
+	pending_title.text = "LỜI MỜI ĐẾN (%d)" % _social_incoming.size()
+	pending_title.add_theme_font_size_override("font_size", 15)
+	pending_title.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
+	root.add_child(pending_title)
+	if _social_incoming.is_empty():
+		var empty_pending = Label.new()
+		empty_pending.text = "Chưa có lời mời kết bạn."
+		empty_pending.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+		root.add_child(empty_pending)
+	else:
+		for request in _social_incoming:
+			root.add_child(_build_friend_row(request, true, false))
+
+	var friend_title = Label.new()
+	friend_title.text = "BẠN BÈ (%d)" % _social_friends.size()
+	friend_title.add_theme_font_size_override("font_size", 15)
+	friend_title.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
+	root.add_child(friend_title)
+	if _social_friends.is_empty():
+		var empty_friends = Label.new()
+		empty_friends.text = "Chưa có bạn bè. Hãy tìm tên Chiến Tướng để gửi lời mời."
+		empty_friends.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+		empty_friends.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		root.add_child(empty_friends)
+	else:
+		for player in _social_friends:
+			root.add_child(_build_friend_row(player, false, true))
+	return root
+
+func _build_friend_row(data: Dictionary, is_incoming: bool, is_friend: bool) -> PanelContainer:
+	var panel = PanelContainer.new()
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.12, 0.09, 0.16, 0.94)
+	style.border_width_left = 1
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.border_color = COLOR_GOLD_BORDER
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	panel.add_theme_stylebox_override("panel", style)
+	var row = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	panel.add_child(row)
+	var name = Label.new()
+	name.size_flags_horizontal = SIZE_EXPAND_FILL
+	var display_name = str(data.get("fromUserName", data.get("userName", "Chiến Tướng")))
+	name.text = "👤 %s" % display_name
+	name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name.add_theme_font_size_override("font_size", 14)
+	row.add_child(name)
+	if is_incoming:
+		var accept_btn = Button.new()
+		accept_btn.text = "ĐỒNG Ý"
+		_style_white_gold_button(accept_btn, 6, 2, Vector2(0, 1))
+		accept_btn.pressed.connect(func(): NetworkClient.respond_friend_request(str(data.get("requestId", "")), true))
+		row.add_child(accept_btn)
+		var decline_btn = Button.new()
+		decline_btn.text = "TỪ CHỐI"
+		_style_white_gold_button(decline_btn, 6, 2, Vector2(0, 1))
+		decline_btn.pressed.connect(func(): NetworkClient.respond_friend_request(str(data.get("requestId", "")), false))
+		row.add_child(decline_btn)
+	elif is_friend:
+		var online = Label.new()
+		online.text = "● ONLINE" if bool(data.get("online", false)) else "○ NGOẠI TUYẾN"
+		online.add_theme_color_override("font_color", Color(0.35, 0.95, 0.55, 1.0) if bool(data.get("online", false)) else COLOR_TEXT_MUTED)
+		row.add_child(online)
+	else:
+		var add_btn = Button.new()
+		add_btn.text = "KẾT BẠN"
+		_style_white_gold_button(add_btn, 6, 2, Vector2(0, 1))
+		add_btn.pressed.connect(func(): NetworkClient.send_friend_request(str(data.get("userId", ""))))
+		row.add_child(add_btn)
+	return panel
 
 func _build_modal_layer() -> void:
 	modal_overlay = ColorRect.new()
