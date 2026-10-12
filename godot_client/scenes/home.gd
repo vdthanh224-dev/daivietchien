@@ -83,6 +83,7 @@ var friend_nav_btn: Button = null
 var _social_friends: Array = []
 var _social_incoming: Array = []
 var _social_search_results: Array = []
+var _last_friend_search_query: String = ""
 
 func _ready() -> void:
 	anchors_preset = PRESET_FULL_RECT
@@ -433,6 +434,19 @@ func _build_top_header() -> void:
 
 	gold_btn.add_child(g_hbox)
 	header_hbox.add_child(gold_btn)
+
+	# Friends Button (🤝 BẠN BÈ)
+	var friend_btn = Button.new()
+	friend_btn.custom_minimum_size = Vector2(115, 44)
+	friend_btn.text = "🤝 BẠN BÈ"
+	friend_btn.add_theme_font_size_override("font_size", 12)
+	_style_white_gold_button(friend_btn, 8, 4, Vector2(0, 2))
+	friend_btn.pressed.connect(func():
+		AudioManager.play_card_select()
+		_show_friends_modal()
+	)
+	friend_nav_btn = friend_btn
+	header_hbox.add_child(friend_btn)
 
 	# Mail Button (✉️)
 	var mail_btn = Button.new()
@@ -814,31 +828,6 @@ func _build_bottom_nav_dock() -> void:
 	]
 
 	for item in nav_items:
-		if item.get("title", "") == "DANH TƯỚNG":
-			var hero_nav_box = VBoxContainer.new()
-			hero_nav_box.size_flags_horizontal = SIZE_EXPAND_FILL
-			hero_nav_box.custom_minimum_size = Vector2(180, 50)
-			hero_nav_box.add_theme_constant_override("separation", 3)
-			var friend_btn = Button.new()
-			friend_btn.custom_minimum_size = Vector2(180, 24)
-			friend_btn.text = "🤝  KẾT BẠN"
-			_style_white_gold_button(friend_btn, 6, 3, Vector2(0, 1))
-			friend_btn.add_theme_font_size_override("font_size", 11)
-			friend_btn.pressed.connect(_show_friends_modal)
-			friend_nav_btn = friend_btn
-			hero_nav_box.add_child(friend_btn)
-			var hero_btn = Button.new()
-			hero_btn.size_flags_horizontal = SIZE_EXPAND_FILL
-			hero_btn.custom_minimum_size = Vector2(180, 28)
-			hero_btn.text = "%s  %s" % [item["icon"], item["title"]]
-			_style_white_gold_button(hero_btn, 8, 5, Vector2(0, 3))
-			hero_btn.pressed.connect(func():
-				AudioManager.play_card_select()
-				item["action"].call()
-			)
-			hero_nav_box.add_child(hero_btn)
-			dock_hbox.add_child(hero_nav_box)
-			continue
 		var btn = Button.new()
 		btn.size_flags_horizontal = SIZE_EXPAND_FILL
 		btn.custom_minimum_size = Vector2(180, 44)
@@ -875,7 +864,38 @@ func _on_social_error(message: String) -> void:
 
 func _update_friend_nav_indicator() -> void:
 	if is_instance_valid(friend_nav_btn):
-		friend_nav_btn.text = "🤝  KẾT BẠN" if _social_incoming.is_empty() else "🤝  KẾT BẠN (%d)" % _social_incoming.size()
+		friend_nav_btn.text = "🤝 BẠN BÈ" if _social_incoming.is_empty() else "🤝 BẠN BÈ (%d)" % _social_incoming.size()
+
+func _normalize_vietnamese(text: String) -> String:
+	var s = text.to_lower().strip_edges()
+	var char_map := {
+		"a": ["à","á","ả","ã","ạ","ă","ằ","ắ","ẳ","ẵ","ặ","â","ầ","ấ","ẩ","ẫ","ậ"],
+		"d": ["đ", "Đ"],
+		"e": ["è","é","ẻ","ẽ","ẹ","ê","ề","ế","ể","ễ","ệ"],
+		"i": ["ì","í","ỉ","ĩ","ị"],
+		"o": ["ò","ó","ỏ","õ","ọ","ô","ồ","ố","ổ","ỗ","ộ","ơ","ờ","ớ","ở","ỡ","ợ"],
+		"u": ["ù","ú","ủ","ũ","ụ","ư","ừ","ứ","ử","ữ","ự"],
+		"y": ["ỳ","ý","ỷ","ỹ","ỵ"]
+	}
+	for target in char_map:
+		for ch in char_map[target]:
+			s = s.replace(ch, target)
+	return s
+
+func _matches_smart_query(target_text: String, query: String) -> bool:
+	var q = _normalize_vietnamese(query)
+	if q.is_empty():
+		return true
+	var t = _normalize_vietnamese(target_text)
+	if t.contains(q):
+		return true
+	var tokens = q.split(" ", false)
+	if tokens.size() > 1:
+		for token in tokens:
+			if not t.contains(token):
+				return false
+		return true
+	return false
 
 func _show_friends_modal(status_text: String = "") -> void:
 	if NetworkClient and NetworkClient.is_connected_to_server:
@@ -896,7 +916,7 @@ func _build_friends_content(status_text: String = "") -> Control:
 	root.add_theme_constant_override("separation", 12)
 
 	var intro = Label.new()
-	intro.text = "Tìm Chiến Tướng đang trực tuyến, gửi lời mời và quản lý bằng hữu của bạn."
+	intro.text = "Tìm Chiến Tướng trực tuyến, gửi lời mời và cùng kề vai chiến đấu."
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
 	root.add_child(intro)
@@ -904,25 +924,45 @@ func _build_friends_content(status_text: String = "") -> Control:
 	var search_row = HBoxContainer.new()
 	search_row.add_theme_constant_override("separation", 8)
 	var search_input = LineEdit.new()
-	search_input.placeholder_text = "Nhập tên Chiến Tướng..."
+	search_input.placeholder_text = "🔍 Nhập tên hoặc ID (vd: Trần Hưng Đạo, tran, kiet)..."
 	search_input.size_flags_horizontal = SIZE_EXPAND_FILL
-	search_input.add_theme_font_size_override("font_size", 14)
+	search_input.add_theme_font_size_override("font_size", 13)
+	search_input.clear_button_enabled = true
+	search_input.text = _last_friend_search_query
 	search_row.add_child(search_input)
+
 	var search_btn = Button.new()
 	search_btn.text = "🔎 TÌM"
-	search_btn.custom_minimum_size = Vector2(108, 38)
+	search_btn.custom_minimum_size = Vector2(96, 38)
 	_style_white_gold_button(search_btn, 7, 3, Vector2(0, 2))
-	search_btn.pressed.connect(func():
-		var query = search_input.text.strip_edges()
-		if query.length() >= 2 and NetworkClient and NetworkClient.is_connected_to_server:
-			NetworkClient.search_friends(query)
-	)
-	search_input.text_submitted.connect(func(query: String):
-		if query.strip_edges().length() >= 2 and NetworkClient and NetworkClient.is_connected_to_server:
-			NetworkClient.search_friends(query.strip_edges())
-	)
 	search_row.add_child(search_btn)
 	root.add_child(search_row)
+
+	var execute_search = func(query: String):
+		_last_friend_search_query = query.strip_edges()
+		if _last_friend_search_query.length() >= 1 and NetworkClient and NetworkClient.is_connected_to_server:
+			NetworkClient.search_friends(_last_friend_search_query)
+		elif _last_friend_search_query.is_empty():
+			_social_search_results.clear()
+			_refresh_friends_modal()
+
+	search_btn.pressed.connect(func():
+		execute_search.call(search_input.text)
+	)
+
+	search_input.text_submitted.connect(func(query: String):
+		execute_search.call(query)
+	)
+
+	search_input.text_changed.connect(func(new_text: String):
+		_last_friend_search_query = new_text.strip_edges()
+		if _last_friend_search_query.is_empty():
+			_social_search_results.clear()
+			_refresh_friends_modal()
+			return
+		if NetworkClient and NetworkClient.is_connected_to_server:
+			NetworkClient.search_friends(_last_friend_search_query)
+	)
 
 	if not status_text.is_empty():
 		var status = Label.new()
@@ -932,12 +972,18 @@ func _build_friends_content(status_text: String = "") -> Control:
 
 	if not _social_search_results.is_empty():
 		var result_title = Label.new()
-		result_title.text = "KẾT QUẢ TÌM KIẾM"
+		result_title.text = "🔍 KẾT QUẢ TÌM KIẾM (%d)" % _social_search_results.size()
 		result_title.add_theme_font_size_override("font_size", 15)
 		result_title.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
 		root.add_child(result_title)
 		for player in _social_search_results:
 			root.add_child(_build_friend_row(player, false, false))
+	elif not _last_friend_search_query.is_empty():
+		var no_res_lbl = Label.new()
+		no_res_lbl.text = "Không tìm thấy Chiến Tướng nào với từ khóa: '%s'" % _last_friend_search_query
+		no_res_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+		no_res_lbl.add_theme_font_size_override("font_size", 12)
+		root.add_child(no_res_lbl)
 
 	var pending_title = Label.new()
 	pending_title.text = "LỜI MỜI ĐẾN (%d)" % _social_incoming.size()
@@ -953,19 +999,39 @@ func _build_friends_content(status_text: String = "") -> Control:
 		for request in _social_incoming:
 			root.add_child(_build_friend_row(request, true, false))
 
+	# Filtered friends
+	var display_friends: Array = []
+	if _last_friend_search_query.is_empty():
+		display_friends = _social_friends
+	else:
+		for f in _social_friends:
+			var fname = str(f.get("userName", ""))
+			var fuid = str(f.get("userId", ""))
+			if _matches_smart_query(fname, _last_friend_search_query) or _matches_smart_query(fuid, _last_friend_search_query):
+				display_friends.append(f)
+
 	var friend_title = Label.new()
-	friend_title.text = "BẠN BÈ (%d)" % _social_friends.size()
+	if _last_friend_search_query.is_empty():
+		friend_title.text = "BẠN BÈ (%d)" % _social_friends.size()
+	else:
+		friend_title.text = "BẠN BÈ PHÙ HỢP (%d / %d)" % [display_friends.size(), _social_friends.size()]
 	friend_title.add_theme_font_size_override("font_size", 15)
 	friend_title.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
 	root.add_child(friend_title)
+
 	if _social_friends.is_empty():
 		var empty_friends = Label.new()
 		empty_friends.text = "Chưa có bạn bè. Hãy tìm tên Chiến Tướng để gửi lời mời."
 		empty_friends.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
 		empty_friends.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		root.add_child(empty_friends)
+	elif display_friends.is_empty():
+		var no_friends_match = Label.new()
+		no_friends_match.text = "Không có người bạn nào khớp với từ khóa tìm kiếm."
+		no_friends_match.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+		root.add_child(no_friends_match)
 	else:
-		for player in _social_friends:
+		for player in display_friends:
 			root.add_child(_build_friend_row(player, false, true))
 	return root
 
@@ -1993,6 +2059,41 @@ func _show_fullscreen_heroes() -> void:
 	spacer.size_flags_horizontal = SIZE_EXPAND_FILL
 	header_hbox.add_child(spacer)
 
+	# Smart Search Panel in Gallery Header
+	var search_panel = PanelContainer.new()
+	search_panel.custom_minimum_size = Vector2(340, 38)
+	var sp_search_style = StyleBoxFlat.new()
+	sp_search_style.bg_color = Color(0.12, 0.14, 0.20, 0.95)
+	sp_search_style.border_color = Color(0.85, 0.72, 0.32, 0.7)
+	sp_search_style.border_width_left = 1
+	sp_search_style.border_width_top = 1
+	sp_search_style.border_width_right = 1
+	sp_search_style.border_width_bottom = 1
+	sp_search_style.corner_radius_top_left = 8
+	sp_search_style.corner_radius_top_right = 8
+	sp_search_style.corner_radius_bottom_right = 8
+	sp_search_style.corner_radius_bottom_left = 8
+	sp_search_style.content_margin_left = 12
+	sp_search_style.content_margin_right = 12
+	sp_search_style.content_margin_top = 3
+	sp_search_style.content_margin_bottom = 3
+	search_panel.add_theme_stylebox_override("panel", sp_search_style)
+
+	var hero_search_input = LineEdit.new()
+	hero_search_input.placeholder_text = "🔍 Tìm danh tướng (tên, phe, kỹ năng)..."
+	hero_search_input.size_flags_horizontal = SIZE_EXPAND_FILL
+	hero_search_input.clear_button_enabled = true
+	hero_search_input.flat = true
+	hero_search_input.add_theme_font_size_override("font_size", 13)
+	hero_search_input.add_theme_color_override("font_color", Color(1.0, 0.95, 0.85, 1.0))
+	hero_search_input.add_theme_color_override("font_placeholder_color", Color(0.65, 0.68, 0.75, 0.7))
+	search_panel.add_child(hero_search_input)
+	header_hbox.add_child(search_panel)
+
+	var right_gap = Control.new()
+	right_gap.custom_minimum_size = Vector2(16, 0)
+	header_hbox.add_child(right_gap)
+
 	# Close Button on the far right
 	var close_btn = Button.new()
 	close_btn.text = "✕ ĐÓNG"
@@ -2047,12 +2148,27 @@ func _show_fullscreen_heroes() -> void:
 	scroll_margin.add_theme_constant_override("margin_bottom", 36)
 	scroll.add_child(scroll_margin)
 
+	var content_vbox = VBoxContainer.new()
+	content_vbox.size_flags_horizontal = SIZE_EXPAND_FILL
+	content_vbox.add_theme_constant_override("separation", 16)
+	scroll_margin.add_child(content_vbox)
+
 	var grid = GridContainer.new()
 	grid.columns = 6
 	grid.size_flags_horizontal = SIZE_EXPAND_FILL
 	grid.add_theme_constant_override("h_separation", 14)
 	grid.add_theme_constant_override("v_separation", 16)
-	scroll_margin.add_child(grid)
+	content_vbox.add_child(grid)
+
+	var no_hero_lbl = Label.new()
+	no_hero_lbl.text = "Không tìm thấy danh tướng nào phù hợp với từ khóa tìm kiếm."
+	no_hero_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	no_hero_lbl.add_theme_font_size_override("font_size", 16)
+	no_hero_lbl.add_theme_color_override("font_color", Color(0.70, 0.72, 0.78, 0.8))
+	no_hero_lbl.visible = false
+	content_vbox.add_child(no_hero_lbl)
+
+	var hero_card_records: Array = []
 
 	# Grayscale Shader Material for unowned heroes (Black & White)
 	var gray_shader = Shader.new()
@@ -2226,6 +2342,43 @@ void fragment() {
 		card.add_child(click_btn)
 
 		grid.add_child(card)
+
+		var skills_text = ""
+		var hero_skills = h.get("skills", [])
+		if hero_skills is Array:
+			for sk in hero_skills:
+				if sk is Dictionary:
+					skills_text += " " + str(sk.get("name", "")) + " " + str(sk.get("desc", ""))
+		hero_card_records.append({
+			"card": card,
+			"name": hname,
+			"faction": faction,
+			"skills": skills_text,
+			"id": str(hid),
+			"is_owned": is_owned
+		})
+
+	hero_search_input.text_changed.connect(func(query_text: String):
+		var q = query_text.strip_edges()
+		var matched_count = 0
+		var matched_owned = 0
+		for item in hero_card_records:
+			var match_name = _matches_smart_query(item["name"], q)
+			var match_faction = _matches_smart_query(item["faction"], q)
+			var match_skills = _matches_smart_query(item["skills"], q)
+			var match_id = _matches_smart_query(item["id"], q)
+			var is_match = (q.is_empty()) or match_name or match_faction or match_skills or match_id
+			item["card"].visible = is_match
+			if is_match:
+				matched_count += 1
+				if item["is_owned"]:
+					matched_owned += 1
+		no_hero_lbl.visible = (matched_count == 0)
+		if q.is_empty():
+			count_lbl.text = "Bách Tướng Đại Việt • Đã chiêu mộ: %d / %d danh tướng" % [owned_count, all_heroes.size()]
+		else:
+			count_lbl.text = "🔍 Tìm thấy: %d / %d danh tướng (Đã chiêu mộ: %d)" % [matched_count, all_heroes.size(), matched_owned]
+	)
 
 	# Fade in animation
 	fs.modulate.a = 0.0

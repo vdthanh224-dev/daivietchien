@@ -1996,7 +1996,7 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 func _set_local_che_no_hand(active: bool) -> void:
 	for card_ui in hand_container.get_children():
 		var info = _get_card_info_from_ui(card_ui)
-		if active and _get_card_color(str(info.get("suit", ""))) == "BLACK" and int(info.get("subType", -1)) != 6:
+		if active and _get_card_color(str(info.get("suit", ""))) == "BLACK" and not card_ui.has_meta("che_no_original"):
 			card_ui.set_meta("che_no_original", info.duplicate())
 			card_ui.setup_card_data(str(info.get("id", "")), "Nỏ Thần Kim Quy", info.get("rank", 1), str(info.get("suit", "Spade")), 1, "Tầm 1. Không giới hạn số Trảm trong lượt", 6)
 		elif not active and card_ui.has_meta("che_no_original"):

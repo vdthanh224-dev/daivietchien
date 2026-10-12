@@ -171,10 +171,20 @@ func decode_room_string(raw_str: String, doc_timestamp: int = 0, host_rp: int = 
 func _send_http_request(url: String, method: int, body_json: String = "") -> Dictionary:
 	var http = HTTPRequest.new()
 	add_child(http)
+	# Appwrite's CDN can cache identical GET URLs for a short period. Room
+	# discovery and slot polling must always read the latest queue state.
+	if method == HTTPClient.METHOD_GET:
+		var cache_buster = "mm_nonce=%d_%d" % [get_now_ms(), randi()]
+		url += ("&" if url.contains("?") else "?") + cache_buster
 
 	var headers = PackedStringArray([
 		"Content-Type: application/json",
-		"X-Appwrite-Project: " + PROJECT_ID
+		"X-Appwrite-Project: " + PROJECT_ID,
+		# Appwrite is served through a CDN. Matchmaking reads must never use a
+		# cached snapshot, otherwise simultaneous joins keep seeing empty slots.
+		"Cache-Control: no-cache, no-store, max-age=0",
+		"Pragma: no-cache",
+		"X-Appwrite-Response-Format: 1.0"
 	])
 	if AuthManager:
 		if AuthManager.session_secret != "":
@@ -194,7 +204,9 @@ func _send_http_request(url: String, method: int, body_json: String = "") -> Dic
 	var resp_body_bytes: PackedByteArray = resp[3]
 	var raw_text = resp_body_bytes.get_string_from_utf8()
 
-	print("[AppwriteMatchmaking] HTTP %d -> Code: %d (%s)" % [method, response_code, url.substr(0, 80)])
+	print("[AppwriteMatchmaking] HTTP %d -> Code: %d (%s)" % [method, response_code, url.substr(0, 120)])
+	if response_code < 200 or response_code >= 300:
+		print("[AppwriteMatchmaking] Error body: %s" % raw_text.substr(0, 500))
 
 	var data = null
 	if raw_text.length() > 0:
@@ -216,6 +228,7 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 	var get_url = "%s/databases/%s/collections/%s/documents?queries[0]=%s&queries[1]=%s&queries[2]=%s" % [ENDPOINT, DATABASE_ID, COLLECTION_ID, q_equal, q_order, q_limit]
 	var res = await _send_http_request(get_url, HTTPClient.METHOD_GET)
 	if res["code"] != 200 or res["data"] == null:
+		print("[AppwriteMatchmaking] FIND failed code=%d" % int(res.get("code", 0)))
 		return {}
 	var now = get_now_ms()
 	var best_room: Dictionary = {}
@@ -262,6 +275,7 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 		if real_count > best_real_count or (real_count == best_real_count and (best_room.is_empty() or room_id < best_room_id)):
 			best_real_count = real_count
 			best_room = room
+	print("[AppwriteMatchmaking] FIND user=%s mode=%s -> room=%s players=%d" % [my_user_id, mode_id, str(best_room.get("roomId", "")), best_real_count])
 	return best_room
 
 func cleanup_user_waiting_rooms(my_user_id: String) -> void:
@@ -295,7 +309,9 @@ func create_waiting_room(room: Dictionary) -> bool:
 	var res = await _send_http_request(docs_url, HTTPClient.METHOD_POST, JSON.stringify(payload))
 	if res["code"] == 409:
 		res = await _send_http_request(docs_url + "/" + doc_id, HTTPClient.METHOD_PATCH, JSON.stringify({"data": payload["data"], "permissions": PUBLIC_DOC_PERMISSIONS}))
-	return res["code"] == 201 or res["code"] == 200
+	var ok = res["code"] == 201 or res["code"] == 200
+	print("[AppwriteMatchmaking] CREATE room=%s code=%d ok=%s" % [str(room.get("roomId", "")), int(res.get("code", 0)), ok])
+	return ok
 
 func _match_lock_doc_id(room_id: String) -> String:
 	return get_deterministic_doc_id("lock_", room_id)
@@ -394,6 +410,7 @@ func poll_room_state(room_id: String) -> Dictionary:
 	if res["code"] == 200 and res["data"] != null:
 		var doc = res["data"]
 		return decode_room_string(str(doc.get("userName", "")), int(doc.get("timestamp", 0)), int(doc.get("rankPoints", 0)))
+	print("[AppwriteMatchmaking] POLL room=%s failed code=%d" % [room_id, int(res.get("code", 0))])
 	return {}
 
 # --- 5. Update Room State ---

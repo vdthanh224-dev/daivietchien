@@ -1300,7 +1300,9 @@ func _run_local_draft_loop() -> void:
 				turn_timer_lbl.text = "⏳ %ds" % maxi(0, int(ceilf(turn_timer)))
 
 				if not bool(active_slot.get("isLocked", false)):
-					var is_bot = bool(active_slot.get("isAI", false)) or (not bool(active_slot.get("isPlayer", false)) and int(active_slot.get("seatNumber", 0)) != my_seat_num)
+					# A remote human seat may not have joined this client yet; only an
+					# explicit AI flag is allowed to trigger an automatic pick.
+					var is_bot = bool(active_slot.get("isAI", false))
 					if is_bot and turn_timer <= 38.5:
 						_lock_hero_for_slot(active_slot, _choose_bot_hero(active_slot))
 
@@ -1330,7 +1332,7 @@ func _run_local_draft_loop() -> void:
 			while not bool(slot.get("isLocked", false)) and turn_timer > 0.0 and is_draft_active:
 				turn_timer = maxf(0.0, turn_timer - 0.5)
 				turn_timer_lbl.text = "⏳ %ds" % maxi(0, int(ceilf(turn_timer)))
-				if not is_player and turn_timer <= 38.5:
+				if bool(slot.get("isAI", false)) and turn_timer <= 38.5:
 					var bot_pick = _choose_bot_hero(slot)
 					_lock_hero_for_slot(slot, bot_pick)
 					break

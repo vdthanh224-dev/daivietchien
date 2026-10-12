@@ -150,6 +150,16 @@ const ALLOWED_WS_ACTIONS = new Set([
 
 const SOCIAL_ACTIONS = new Set(["SOCIAL_REGISTER", "FRIEND_LIST", "FRIEND_SEARCH", "FRIEND_REQUEST", "FRIEND_RESPOND"]);
 
+function foldVietnamese(text) {
+  if (!text) return "";
+  return String(text)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[đĐ]/g, "d")
+    .toLowerCase()
+    .trim();
+}
+
 function socialUserId(value) {
   return String(value || "").trim().slice(0, 128);
 }
@@ -605,6 +615,46 @@ function resolveDraftSeat(room, requestedSeat, payload, socket) {
   return slots.find(isAvailable)?.seat || 0;
 }
 
+function isRealDraftIdentity(userId, userName) {
+  const uid = String(userId || "").trim();
+  const name = String(userName || "").trim();
+  if (uid === "" || uid === "empty" || uid.startsWith("bot_")) return false;
+  if (/^user_\d+$/i.test(uid)) return false;
+  if (/^ghế\s*\d+$/i.test(name) || /^chiến tướng\s*\d+$/i.test(name)) return false;
+  return true;
+}
+
+function mergeRealDraftSlots(room, payload) {
+  const slots = room?.draft?.slots || [];
+  const incoming = Array.isArray(payload?.slots) ? payload.slots : [];
+  for (const raw of incoming) {
+    if (!raw || !isRealDraftIdentity(raw.userId, raw.userName)) continue;
+    const uid = String(raw.userId).trim();
+    const name = String(raw.userName || "").trim();
+    let target = slots.find((slot) => String(slot.userId || "").trim() === uid);
+    if (!target && name) target = slots.find((slot) => String(slot.userName || "").trim() === name);
+    if (!target) {
+      const seat = Number(raw.seatNumber || raw.seat);
+      const candidate = slots.find((slot) => slot.seat === seat);
+      if (candidate && (candidate.isAI || !isRealDraftIdentity(candidate.userId, candidate.userName))) target = candidate;
+    }
+    if (!target || target.isLocked) continue;
+    target.userId = uid;
+    target.userName = name || target.userName;
+    target.isAI = false;
+    target.isEmpty = false;
+  }
+}
+
+function slotIsActuallyAI(room, slot) {
+  if (!slot) return false;
+  const uid = String(slot.userId || "").trim();
+  if (isRealDraftIdentity(uid, slot.userName)) return false;
+  const socket = room?.sockets?.get(slot.seat);
+  if (socket?.readyState === WebSocket.OPEN) return false;
+  return Boolean(slot.isAI);
+}
+
 
 function generate2v2RoundPools(draft, _round) {
   if (isDynastyDraft(draft)) return;
@@ -838,7 +888,7 @@ async function tickDraftRoom(roomId, room) {
     const isSocketOpen = room.sockets.has(currentSlot.seat) && room.sockets.get(currentSlot.seat)?.readyState === WebSocket.OPEN;
     // A missing socket can be a human client still joining the draft. Only
     // slots explicitly marked as AI may use the fast automatic-pick path.
-    const isBot = Boolean(currentSlot.isAI);
+    const isBot = slotIsActuallyAI(room, currentSlot);
 
     if (isBot && elapsedMs >= 800 && !currentSlot.hoverHeroId) {
       const used = new Set(draft.slots.filter((slot) => slot.isLocked).map((slot) => slot.heroId));
@@ -863,7 +913,7 @@ async function tickDraftRoom(roomId, room) {
       }
     }
 
-    const botThresholdSec = Boolean(currentSlot.isAI) ? 1.5 : 40.0;
+    const botThresholdSec = isBot ? 1.5 : 40.0;
     if (elapsedMs >= botThresholdSec * 1000 || elapsed >= 40) {
       const used = new Set(draft.slots.filter((slot) => slot.isLocked).map((slot) => slot.heroId));
       let heroId = currentSlot.hoverHeroId > 0 && !used.has(currentSlot.hoverHeroId) ? currentSlot.hoverHeroId : 0;
@@ -1026,11 +1076,67 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
             return;
           }
           if (action === "FRIEND_SEARCH") {
-            const needle = String(query || "").trim().toLowerCase();
-            const results = needle.length < 2 ? [] : Array.from(socialProfiles.values())
-              .filter((profile) => profile.userId !== socialId && (profile.userName.toLowerCase().includes(needle) || profile.userId.toLowerCase().includes(needle)))
-              .slice(0, 20).map((profile) => socialProfile(profile.userId));
-            socket.send(JSON.stringify({ type: "FRIEND_SEARCH_RESULT", results }));
+            const rawQuery = String(query || "").trim();
+            const queryNorm = foldVietnamese(rawQuery);
+            if (!queryNorm) {
+              socket.send(JSON.stringify({ type: "FRIEND_SEARCH_RESULT", results: [], query: rawQuery }));
+              return;
+            }
+            const tokens = queryNorm.split(/\s+/).filter(Boolean);
+
+            const scored = [];
+            for (const profile of socialProfiles.values()) {
+              if (profile.userId === socialId) continue;
+              const name = String(profile.userName || "");
+              const uid = String(profile.userId || "");
+              const nameNorm = foldVietnamese(name);
+              const uidNorm = foldVietnamese(uid);
+              const isOnline = profile.socket?.readyState === WebSocket.OPEN;
+
+              let score = 0;
+              // 1. Exact matches
+              if (nameNorm === queryNorm) score += 1000;
+              else if (uidNorm === queryNorm) score += 950;
+              // 2. Starts with query
+              else if (nameNorm.startsWith(queryNorm)) score += 800;
+              else if (uidNorm.startsWith(queryNorm)) score += 750;
+              // 3. Substring full query
+              else if (nameNorm.includes(queryNorm)) score += 600;
+              else if (uidNorm.includes(queryNorm)) score += 550;
+              // 4. Any word starts with query
+              else {
+                const words = nameNorm.split(/\s+/);
+                if (words.some((w) => w.startsWith(queryNorm))) {
+                  score += 500;
+                }
+              }
+
+              // 5. Multi-token match (word order independent)
+              if (tokens.length > 1) {
+                const matchedTokens = tokens.filter((t) => nameNorm.includes(t) || uidNorm.includes(t));
+                if (matchedTokens.length === tokens.length) {
+                  score += 450;
+                } else if (matchedTokens.length > 0) {
+                  score += matchedTokens.length * 70;
+                }
+              }
+
+              // 6. Direct accented match bonus
+              const lowerRaw = rawQuery.toLowerCase();
+              if (name.toLowerCase().includes(lowerRaw)) {
+                score += 40;
+              }
+
+              if (score > 0) {
+                if (isOnline) score += 30; // Online bonus
+                score -= Math.min(25, Math.floor(name.length / 2));
+                scored.push({ profile, score });
+              }
+            }
+
+            scored.sort((a, b) => b.score - a.score);
+            const results = scored.slice(0, 25).map((item) => socialProfile(item.profile.userId));
+            socket.send(JSON.stringify({ type: "FRIEND_SEARCH_RESULT", results, query: rawQuery }));
             return;
           }
           if (action === "FRIEND_REQUEST") {
@@ -1112,6 +1218,8 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           if (!room?.draft) {
             return socket.send(JSON.stringify({ type: "ERROR", error: "Không thể khởi tạo phòng chọn tướng" }));
           }
+          // Promote real identities from late join payloads over temporary AI placeholders.
+          mergeRealDraftSlots(room, payload);
           const draftSeat = resolveDraftSeat(room, currentSeat || boundSeat || requestSeat, payload, socket);
           if (!draftSeat) {
             return socket.send(JSON.stringify({ type: "ERROR", error: "Phòng đã đủ 4 ghế" }));
