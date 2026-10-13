@@ -32,6 +32,180 @@ const startTime = Date.now();
 const instanceId = `node_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 const clusterChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("dvc_cluster_bus") : null;
 
+// Matchmaking documents are published directly by the Godot clients to
+// Appwrite.  Render still acts as the authority for the actual game room, so
+// keep a small server-side consolidator running as a safety net when two
+// clients publish at the same time and never observe each other's room.
+const APPWRITE_MATCHMAKING_ENDPOINT = "https://sgp.cloud.appwrite.io/v1";
+const APPWRITE_MATCHMAKING_PROJECT = "6a885457002da3f3d47e";
+const APPWRITE_MATCHMAKING_DATABASE = "game";
+const APPWRITE_MATCHMAKING_COLLECTION = "matchmaking_queue";
+const APPWRITE_MATCHMAKING_MAX_AGE_MS = 180000;
+const APPWRITE_MATCHMAKING_POLL_MS = 2000;
+let matchmakingSweepRunning = false;
+
+function matchmakingUrl(path) {
+  const separator = path.includes("?") ? "&" : "?";
+  return `${APPWRITE_MATCHMAKING_ENDPOINT}${path}${separator}mm_render_nonce=${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+async function appwriteMatchmakingRequest(path, options = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Appwrite-Project": APPWRITE_MATCHMAKING_PROJECT,
+    "Cache-Control": "no-cache, no-store, max-age=0",
+    "Pragma": "no-cache",
+    ...(options.headers || {}),
+  };
+  try {
+    return await fetch(matchmakingUrl(path), { ...options, headers });
+  } catch (error) {
+    console.error("[Render Matchmaking] Appwrite request failed:", error.message);
+    return null;
+  }
+}
+
+function decodeMatchmakingRoom(doc) {
+  const raw = String(doc?.userName || "");
+  const parts = raw.split("|");
+  if (parts.length < 8 || !["ROOMV2", "ROOM4"].includes(parts[0])) return null;
+  let modeId = "2v2";
+  let slotStart = 5;
+  let slotCount = 4;
+  if (parts[0] === "ROOMV2") {
+    modeId = parts[5] || "2v2";
+    slotCount = Math.max(4, Number(parts[6]) || 4);
+    slotStart = 7;
+  } else if (Number.isInteger(Number(parts[4]))) {
+    slotStart = 5;
+  }
+  const slots = [];
+  for (let index = slotStart; index < Math.min(parts.length, slotStart + slotCount); index += 1) {
+    const values = parts[index].split(",");
+    const userId = values[0] || "empty";
+    slots.push({
+      seatNumber: index - slotStart + 1,
+      userId,
+      userName: values[1] || "",
+      rankPoints: Number(values[2]) || 0,
+      isDragon: values[3] === "1",
+      isAI: values[4] === "1",
+      isEmpty: userId === "" || userId === "empty",
+    });
+  }
+  while (slots.length < slotCount) {
+    const seatNumber = slots.length + 1;
+    slots.push({ seatNumber, userId: "empty", userName: "", rankPoints: 0, isDragon: seatNumber === 1 || seatNumber === 3, isAI: false, isEmpty: true });
+  }
+  return {
+    roomId: parts[1] || "",
+    hostUserId: parts[2] || "",
+    status: parts[3] || "WAITING",
+    version: Number(parts[4]) || 1,
+    modeId,
+    slots,
+    documentId: String(doc?.$id || ""),
+    timestamp: Number(doc?.timestamp) || 0,
+    hostRankPoints: Number(doc?.rankPoints) || 0,
+  };
+}
+
+function encodeMatchmakingRoom(room) {
+  const clean = (value, max = 60) => String(value ?? "").replace(/[|:,]/g, "_").trim().slice(0, max);
+  const slots = Array.isArray(room.slots) ? room.slots : [];
+  const count = Math.max(4, slots.length);
+  const parts = ["ROOMV2", clean(room.roomId, 18), clean(room.hostUserId), clean(room.status || "WAITING", 10), String(Number(room.version) || 1), clean(room.modeId || "2v2", 16), String(count)];
+  for (let index = 0; index < count; index += 1) {
+    const slot = slots[index] || {};
+    const empty = slot.isEmpty === true || !slot.userId || slot.userId === "empty";
+    parts.push(empty
+      ? `empty,,0,${slot.isDragon ? 1 : (index === 0 || index === 2 ? 1 : 0)},0`
+      : `${clean(slot.userId)},${clean(slot.userName, 14)},${Number(slot.rankPoints) || 0},${slot.isDragon ? 1 : 0},${slot.isAI ? 1 : 0}`);
+  }
+  return parts.join("|");
+}
+
+function matchmakingRealPlayers(room) {
+  return (room?.slots || []).filter((slot) => !slot.isEmpty && !slot.isAI && slot.userId && slot.userId !== "empty");
+}
+
+function matchmakingRoomPayload(room, status = "ROOM_WAITING") {
+  const now = Date.now();
+  room.status = status === "ROOM_WAITING" ? "WAITING" : room.status;
+  room.version = (Number(room.version) || 1) + 1;
+  room.timestamp = now;
+  return {
+    data: {
+      userId: status,
+      userName: encodeMatchmakingRoom(room),
+      rankPoints: Number(room.hostRankPoints) || 0,
+      timestamp: now,
+    },
+    permissions: ["read(\"any\")", "update(\"any\")", "delete(\"any\")"],
+  };
+}
+
+async function sweepAppwriteMatchmaking() {
+  if (matchmakingSweepRunning) return;
+  matchmakingSweepRunning = true;
+  try {
+    const query = encodeURIComponent(JSON.stringify({ method: "equal", attribute: "userId", values: ["ROOM_WAITING"] }));
+    const limit = encodeURIComponent(JSON.stringify({ method: "limit", values: [100] }));
+    const response = await appwriteMatchmakingRequest(`/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents?queries[0]=${query}&queries[1]=${limit}`);
+    if (!response?.ok) return;
+    const body = await response.json();
+    const now = Date.now();
+    const roomsWaiting = [];
+    for (const document of Array.isArray(body?.documents) ? body.documents : []) {
+      const room = decodeMatchmakingRoom(document);
+      if (!room || room.status !== "WAITING" || !room.documentId) continue;
+      if (!room.timestamp || now - room.timestamp > APPWRITE_MATCHMAKING_MAX_AGE_MS) {
+        await appwriteMatchmakingRequest(`/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents/${encodeURIComponent(room.documentId)}`, { method: "DELETE" });
+        continue;
+      }
+      roomsWaiting.push(room);
+    }
+    const byMode = new Map();
+    for (const room of roomsWaiting) {
+      const mode = room.modeId || "2v2";
+      if (!byMode.has(mode)) byMode.set(mode, []);
+      byMode.get(mode).push(room);
+    }
+    for (const candidates of byMode.values()) {
+      candidates.sort((a, b) => matchmakingRealPlayers(b).length - matchmakingRealPlayers(a).length || a.roomId.localeCompare(b.roomId));
+      const anchor = candidates[0];
+      if (!anchor) continue;
+      const anchorPlayers = matchmakingRealPlayers(anchor);
+      const seen = new Set(anchorPlayers.map((player) => String(player.userId)));
+      for (const source of candidates.slice(1)) {
+        if (anchor.slots.every((slot) => !slot.isEmpty && !slot.isAI)) break;
+        let changed = false;
+        for (const player of matchmakingRealPlayers(source)) {
+          const uid = String(player.userId);
+          if (seen.has(uid)) continue;
+          const target = anchor.slots.find((slot) => slot.isEmpty || slot.userId === "empty");
+          if (!target) break;
+          Object.assign(target, { ...player, isEmpty: false, isAI: false });
+          seen.add(uid);
+          changed = true;
+        }
+        if (!changed) continue;
+        const anchorPath = `/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents/${encodeURIComponent(anchor.documentId)}`;
+        const updated = await appwriteMatchmakingRequest(anchorPath, { method: "PATCH", body: JSON.stringify(matchmakingRoomPayload(anchor)) });
+        if (!updated?.ok) continue;
+        const sourcePath = `/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents/${encodeURIComponent(source.documentId)}`;
+        source.status = "MERGED";
+        await appwriteMatchmakingRequest(sourcePath, { method: "PATCH", body: JSON.stringify(matchmakingRoomPayload(source, "ROOM_MERGED")) });
+        console.log(`[Render Matchmaking] Gộp phòng ${source.roomId} vào ${anchor.roomId} (${matchmakingRealPlayers(anchor).length} người thật).`);
+      }
+    }
+  } catch (error) {
+    console.error("[Render Matchmaking] Sweep error:", error.message);
+  } finally {
+    matchmakingSweepRunning = false;
+  }
+}
+
 function clusterBroadcast(data) {
   if (clusterChannel) {
     try {
@@ -328,6 +502,10 @@ function getHeroName(heroId) {
 }
 
 console.log("🎮 [Deno Server] Đại Việt Chiến 2v2 Unified Game Server (100% In-Memory) is running!");
+
+// Start after boot so an Appwrite outage cannot delay the WebSocket server.
+setInterval(() => { sweepAppwriteMatchmaking(); }, APPWRITE_MATCHMAKING_POLL_MS);
+sweepAppwriteMatchmaking();
 
 function ensureLocalRoom(roomId, players = null, forceReinit = false, modeId = "2v2") {
   let room = rooms.get(roomId);
