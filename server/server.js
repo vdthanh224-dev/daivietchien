@@ -43,6 +43,20 @@ const APPWRITE_MATCHMAKING_COLLECTION = "matchmaking_queue";
 const APPWRITE_MATCHMAKING_MAX_AGE_MS = 180000;
 const APPWRITE_MATCHMAKING_POLL_MS = 2000;
 let matchmakingSweepRunning = false;
+// A client can finish the Appwrite lobby flow with the id of a room that was
+// merged while it was polling. Keep the redirect in Render too, so its first
+// JOIN_DRAFT reaches the same in-memory room as every other player.
+const matchmakingRoomAliases = new Map();
+
+function resolveMatchmakingRoomId(roomId) {
+  let resolved = String(roomId || "");
+  const visited = new Set();
+  while (resolved && matchmakingRoomAliases.has(resolved) && !visited.has(resolved)) {
+    visited.add(resolved);
+    resolved = matchmakingRoomAliases.get(resolved);
+  }
+  return resolved;
+}
 
 function matchmakingUrl(path) {
   const separator = path.includes("?") ? "&" : "?";
@@ -63,6 +77,10 @@ async function appwriteMatchmakingRequest(path, options = {}) {
     console.error("[Render Matchmaking] Appwrite request failed:", error.message);
     return null;
   }
+}
+
+function matchmakingDocumentPath(documentId) {
+  return `/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents/${encodeURIComponent(documentId)}`;
 }
 
 function decodeMatchmakingRoom(doc) {
@@ -131,7 +149,10 @@ function matchmakingRealPlayers(room) {
 
 function matchmakingRoomPayload(room, status = "ROOM_WAITING") {
   const now = Date.now();
-  room.status = status === "ROOM_WAITING" ? "WAITING" : room.status;
+  if (status === "ROOM_WAITING") room.status = "WAITING";
+  if (status === "ROOM_STARTED") room.status = "STARTED";
+  if (status === "ROOM_FINISHED") room.status = "FINISHED";
+  if (status === "ROOM_MERGED") room.status = "MERGED";
   room.version = (Number(room.version) || 1) + 1;
   room.timestamp = now;
   return {
@@ -145,11 +166,90 @@ function matchmakingRoomPayload(room, status = "ROOM_WAITING") {
   };
 }
 
+async function reconcileMatchmakingAliases() {
+  for (const [sourceRoomId, targetRoomId] of matchmakingRoomAliases) {
+    const sourceResponse = await appwriteMatchmakingRequest(`/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents?queries[0]=${encodeURIComponent(JSON.stringify({ method: "limit", values: [100] }))}`);
+    if (!sourceResponse?.ok) continue;
+    const sourceBody = await sourceResponse.json();
+    const sourceDocument = (sourceBody?.documents || []).find((document) => String(document?.userName || "").split("|")[1] === sourceRoomId);
+    if (!sourceDocument) continue;
+    const targetResponse = sourceResponse;
+    if (!targetResponse?.ok) continue;
+    const targetBody = sourceBody;
+    const targetDocument = (targetBody?.documents || []).find((document) => String(document?.userName || "").split("|")[1] === targetRoomId);
+    const targetRoom = decodeMatchmakingRoom(targetDocument);
+    if (!targetRoom) continue;
+    const sourceRoom = decodeMatchmakingRoom(sourceDocument);
+    if (!sourceRoom) continue;
+    sourceRoom.slots = targetRoom.slots.map((slot) => ({ ...slot }));
+    sourceRoom.status = targetRoom.status;
+    sourceRoom.version = Math.max(sourceRoom.version, targetRoom.version);
+    await appwriteMatchmakingRequest(matchmakingDocumentPath(sourceRoom.documentId), {
+      method: "PATCH",
+      body: JSON.stringify(matchmakingRoomPayload(sourceRoom, targetRoom.status === "WAITING" ? "ROOM_WAITING" : targetRoom.status === "STARTED" ? "ROOM_STARTED" : "ROOM_FINISHED")),
+    });
+  }
+}
+
+function mergeMatchmakingDraftSlots(targetDraft, sourceDraft) {
+  if (!targetDraft || !sourceDraft || !Array.isArray(targetDraft.slots) || !Array.isArray(sourceDraft.slots)) return;
+  for (const sourceSlot of sourceDraft.slots) {
+    const sourceUid = String(sourceSlot?.userId || "").trim();
+    const sourceName = String(sourceSlot?.userName || "").trim();
+    const isReal = sourceUid && sourceUid !== "empty" && !sourceUid.startsWith("bot_") && !/^user_\d+$/i.test(sourceUid);
+    if (!isReal) continue;
+    let targetSlot = targetDraft.slots.find((slot) => String(slot?.userId || "").trim() === sourceUid);
+    if (!targetSlot && sourceName) targetSlot = targetDraft.slots.find((slot) => String(slot?.userName || "").trim() === sourceName);
+    if (!targetSlot) targetSlot = targetDraft.slots.find((slot) => slot.isAI || !slot.userId || slot.userId === "empty");
+    if (!targetSlot || targetSlot.isLocked) continue;
+    Object.assign(targetSlot, {
+      userId: sourceUid,
+      userName: sourceName,
+      isAI: false,
+      isEmpty: false,
+      isDragon: sourceSlot.isDragon === true,
+      rankPoints: Number(sourceSlot.rankPoints) || 0,
+    });
+  }
+  targetDraft.revision = Math.max(Number(targetDraft.revision) || 0, Number(sourceDraft.revision) || 0) + 1;
+}
+
+function mergeInMemoryMatchRooms(sourceRoomId, targetRoomId) {
+  const source = rooms.get(sourceRoomId);
+  const target = rooms.get(targetRoomId);
+  if (!source || source === target) return;
+  if (!target) {
+    source.roomId = targetRoomId;
+    rooms.set(targetRoomId, source);
+    rooms.delete(sourceRoomId);
+    if (source.draft) source.draft.roomId = targetRoomId;
+    return;
+  }
+  if (source.draft && target.draft) mergeMatchmakingDraftSlots(target.draft, source.draft);
+  else if (source.draft && !target.draft) target.draft = source.draft;
+  if (!target.state && source.state) target.state = source.state;
+  for (const [sourceSeat, socket] of source.sockets || []) {
+    const sourceSlot = source.draft?.slots?.find((slot) => slot.seat === sourceSeat);
+    const uid = String(sourceSlot?.userId || "").trim();
+    const name = String(sourceSlot?.userName || "").trim();
+    const targetSlot = target.draft?.slots?.find((slot) => (uid && String(slot.userId || "").trim() === uid) || (name && String(slot.userName || "").trim() === name));
+    const targetSeat = targetSlot?.seat || sourceSeat;
+    const previous = target.sockets.get(targetSeat);
+    if (!previous || previous === socket || previous.readyState !== WebSocket.OPEN) target.sockets.set(targetSeat, socket);
+    else {
+      try { socket.close(1000, "Merged into authoritative room"); } catch {}
+    }
+  }
+  target.lastActivity = Date.now();
+  rooms.delete(sourceRoomId);
+  if (target.draft && !target.draft.isCompleted) broadcastRoom(target, draftMessage(targetRoomId, target.draft));
+}
+
 async function sweepAppwriteMatchmaking() {
   if (matchmakingSweepRunning) return;
   matchmakingSweepRunning = true;
   try {
-    const query = encodeURIComponent(JSON.stringify({ method: "equal", attribute: "userId", values: ["ROOM_WAITING"] }));
+    const query = encodeURIComponent(JSON.stringify({ method: "limit", values: [100] }));
     const limit = encodeURIComponent(JSON.stringify({ method: "limit", values: [100] }));
     const response = await appwriteMatchmakingRequest(`/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents?queries[0]=${query}&queries[1]=${limit}`);
     if (!response?.ok) return;
@@ -158,12 +258,12 @@ async function sweepAppwriteMatchmaking() {
     const roomsWaiting = [];
     for (const document of Array.isArray(body?.documents) ? body.documents : []) {
       const room = decodeMatchmakingRoom(document);
-      if (!room || room.status !== "WAITING" || !room.documentId) continue;
+      if (!room || !room.documentId) continue;
       if (!room.timestamp || now - room.timestamp > APPWRITE_MATCHMAKING_MAX_AGE_MS) {
         await appwriteMatchmakingRequest(`/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents/${encodeURIComponent(room.documentId)}`, { method: "DELETE" });
         continue;
       }
-      roomsWaiting.push(room);
+      if (room.status === "WAITING" && String(document.userId || "") === "ROOM_WAITING") roomsWaiting.push(room);
     }
     const byMode = new Map();
     for (const room of roomsWaiting) {
@@ -194,11 +294,14 @@ async function sweepAppwriteMatchmaking() {
         const updated = await appwriteMatchmakingRequest(anchorPath, { method: "PATCH", body: JSON.stringify(matchmakingRoomPayload(anchor)) });
         if (!updated?.ok) continue;
         const sourcePath = `/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents/${encodeURIComponent(source.documentId)}`;
+        matchmakingRoomAliases.set(source.roomId, anchor.roomId);
+        mergeInMemoryMatchRooms(source.roomId, anchor.roomId);
         source.status = "MERGED";
         await appwriteMatchmakingRequest(sourcePath, { method: "PATCH", body: JSON.stringify(matchmakingRoomPayload(source, "ROOM_MERGED")) });
         console.log(`[Render Matchmaking] Gộp phòng ${source.roomId} vào ${anchor.roomId} (${matchmakingRealPlayers(anchor).length} người thật).`);
       }
     }
+    await reconcileMatchmakingAliases();
   } catch (error) {
     console.error("[Render Matchmaking] Sweep error:", error.message);
   } finally {
@@ -1234,7 +1337,9 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
             return socket.send(JSON.stringify({ type: "ERROR", error: "Gửi hành động quá nhanh, vui lòng chờ một chút" }));
           }
         }
-        const { action, roomId, cardId, targetCardId, targetSeat, targetSeat2, targetSeats, recast, skillId, accepted, cardIds, players, modeId, expectedVersion, userId, userName, query, requestId, accept } = payload;
+        const { action, cardId, targetCardId, targetSeat, targetSeat2, targetSeats, recast, skillId, accepted, cardIds, players, modeId, expectedVersion, userId, userName, query, requestId, accept } = payload;
+        const requestedRoomId = String(payload.roomId || "");
+        const roomId = resolveMatchmakingRoomId(requestedRoomId);
         const requestSeat = normalizeSeat(payload.seat);
 
         if (SOCIAL_ACTIONS.has(action)) {
@@ -1744,7 +1849,9 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
   if (req.method === "POST") {
     try {
       const payload = await req.json();
-      const { action, roomId, seat, cardId, targetCardId, targetSeat, targetSeat2, targetSeats, recast, skillId, accepted, cardIds, players, modeId, expectedVersion } = payload;
+      const { action, seat, cardId, targetCardId, targetSeat, targetSeat2, targetSeats, recast, skillId, accepted, cardIds, players, modeId, expectedVersion } = payload;
+      const requestedRoomId = String(payload.roomId || "");
+      const roomId = resolveMatchmakingRoomId(requestedRoomId);
       const requestSeat = normalizeSeat(seat);
 
       if (!roomId) {
