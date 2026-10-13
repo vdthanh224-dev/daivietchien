@@ -165,6 +165,30 @@ func add_silver(amount: int) -> void:
 	save_profile_to_appwrite()
 	profile_updated.emit()
 
+func consume_silver(amount: int) -> bool:
+	if current_silver < amount:
+		return false
+	current_silver -= amount
+	save_session()
+	save_profile_to_appwrite()
+	profile_updated.emit()
+	return true
+
+func add_gold(amount: int) -> void:
+	current_gold += amount
+	save_session()
+	save_profile_to_appwrite()
+	profile_updated.emit()
+
+func consume_gold(amount: int) -> bool:
+	if current_gold < amount:
+		return false
+	current_gold -= amount
+	save_session()
+	save_profile_to_appwrite()
+	profile_updated.emit()
+	return true
+
 func add_hero_tickets(amount: int) -> void:
 	current_hero_tickets += amount
 	save_session()

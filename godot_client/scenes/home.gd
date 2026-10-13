@@ -4108,15 +4108,28 @@ func _build_insufficient_tickets_content(needed: int) -> Control:
 	msg_l.add_theme_color_override("font_color", COLOR_TEXT_DARK)
 	container.add_child(msg_l)
 
+	var btn_hbox = HBoxContainer.new()
+	btn_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	btn_hbox.add_theme_constant_override("separation", 12)
+	container.add_child(btn_hbox)
+
+	var btn_shop = Button.new()
+	btn_shop.text = "🪙 MUA VÉ TẠI TRÂN BẢO CÁC (39K BẠC)"
+	btn_shop.custom_minimum_size = Vector2(280, 42)
+	_style_bronze_drum_cta(btn_shop)
+	btn_shop.pressed.connect(func():
+		_show_modal("TRÂN BẢO CÁC", _build_shop_content())
+	)
+	btn_hbox.add_child(btn_shop)
+
 	var btn_claim = Button.new()
-	btn_claim.text = "🎁 MỞ QUÀ 7 NGÀY ĐIỂM DANH"
-	btn_claim.custom_minimum_size = Vector2(240, 42)
-	btn_claim.size_flags_horizontal = SIZE_SHRINK_CENTER
-	_style_bronze_drum_cta(btn_claim)
+	btn_claim.text = "🎁 QUÀ 7 NGÀY"
+	btn_claim.custom_minimum_size = Vector2(160, 42)
+	_style_white_gold_button(btn_claim, 8, 4, Vector2(0, 2))
 	btn_claim.pressed.connect(func():
 		_show_modal("QUÀ ĐIỂM DANH 7 NGÀY", _build_7day_rewards_content())
 	)
-	container.add_child(btn_claim)
+	btn_hbox.add_child(btn_claim)
 
 	return container
 
@@ -5874,81 +5887,385 @@ func _build_inventory_content() -> Control:
 	return container
 
 func _build_shop_content() -> Control:
-	var container = VBoxContainer.new()
-	container.add_theme_constant_override("separation", 12)
+	var root = VBoxContainer.new()
+	root.custom_minimum_size = Vector2(800, 480)
+	root.add_theme_constant_override("separation", 10)
 
-	var grid = GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 14)
-	grid.add_theme_constant_override("v_separation", 14)
+	# 1. Top Balance & Treasury Bar
+	var balance_panel = PanelContainer.new()
+	var bp_style = StyleBoxFlat.new()
+	bp_style.bg_color = Color(0.12, 0.09, 0.16, 0.95)
+	bp_style.border_width_left = 1
+	bp_style.border_width_top = 1
+	bp_style.border_width_right = 1
+	bp_style.border_width_bottom = 1
+	bp_style.border_color = COLOR_GOLD_PRIMARY
+	bp_style.corner_radius_top_left = 8
+	bp_style.corner_radius_top_right = 8
+	bp_style.corner_radius_bottom_right = 8
+	bp_style.corner_radius_bottom_left = 8
+	bp_style.content_margin_left = 14
+	bp_style.content_margin_right = 14
+	bp_style.content_margin_top = 8
+	bp_style.content_margin_bottom = 8
+	balance_panel.add_theme_stylebox_override("panel", bp_style)
+	root.add_child(balance_panel)
 
-	var packs = [
-		{"name": "Túi Bạc Tân Thủ", "icon": "🪙", "val": "10,000 Bạc", "price": "💎 100 Vàng"},
-		{"name": "Rương Binh Khí Hiếm", "icon": "🎒", "val": "Khiên Mây + Nỏ Thần", "price": "💎 350 Vàng"},
-		{"name": "Gói Triệu Hồi Danh Tướng", "icon": "🎖️", "val": "Tướng 4 Sao Ngẫu Nhiên", "price": "💎 500 Vàng"},
+	var b_hbox = HBoxContainer.new()
+	b_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	b_hbox.add_theme_constant_override("separation", 24)
+	balance_panel.add_child(b_hbox)
+
+	var s_val_lbl = Label.new()
+	s_val_lbl.text = "🪙 Bạc: %s" % _format_number(AuthManager.current_silver if AuthManager else current_silver)
+	s_val_lbl.add_theme_font_size_override("font_size", 14)
+	s_val_lbl.add_theme_color_override("font_color", Color(0.95, 0.95, 0.95, 1.0))
+	b_hbox.add_child(s_val_lbl)
+
+	var t_val_lbl = Label.new()
+	t_val_lbl.text = "🎫 Vé Triệu Hồi: %s" % _format_number(AuthManager.current_hero_tickets if AuthManager else current_hero_tickets)
+	t_val_lbl.add_theme_font_size_override("font_size", 14)
+	t_val_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.40, 1.0))
+	b_hbox.add_child(t_val_lbl)
+
+	var g_val_lbl = Label.new()
+	g_val_lbl.text = "💎 Vàng: %s" % _format_number(AuthManager.current_gold if AuthManager else current_gold)
+	g_val_lbl.add_theme_font_size_override("font_size", 14)
+	g_val_lbl.add_theme_color_override("font_color", Color(0.95, 0.75, 0.25, 1.0))
+	b_hbox.add_child(g_val_lbl)
+
+	# Status feedback message
+	var status_lbl = Label.new()
+	status_lbl.text = "Trân Bảo Các Triều Đình: 1 Vé Triệu Hồi Danh Tướng giá 39.000 Bạc."
+	status_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	status_lbl.add_theme_font_size_override("font_size", 12)
+	status_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+	root.add_child(status_lbl)
+
+	var update_balances = func():
+		var sil = AuthManager.current_silver if AuthManager else current_silver
+		var tic = AuthManager.current_hero_tickets if AuthManager else current_hero_tickets
+		var gol = AuthManager.current_gold if AuthManager else current_gold
+		s_val_lbl.text = "🪙 Bạc: %s" % _format_number(sil)
+		t_val_lbl.text = "🎫 Vé Triệu Hồi: %s" % _format_number(tic)
+		g_val_lbl.text = "💎 Vàng: %s" % _format_number(gol)
+		current_silver = sil
+		current_hero_tickets = tic
+		current_gold = gol
+		if is_instance_valid(silver_label):
+			silver_label.text = _format_number(sil)
+		if is_instance_valid(gold_label):
+			gold_label.text = _format_number(gol)
+
+	# Scroll Container for Shop Items
+	var scroll = ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(800, 350)
+	scroll.size_flags_vertical = SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	root.add_child(scroll)
+
+	var scroll_vbox = VBoxContainer.new()
+	scroll_vbox.size_flags_horizontal = SIZE_EXPAND_FILL
+	scroll_vbox.add_theme_constant_override("separation", 16)
+	scroll.add_child(scroll_vbox)
+
+	# --- SECTION 1: LỆNH BÀI TRIỆU HỒI (VÉ QUAY TƯỚNG) ---
+	var sec1_lbl = Label.new()
+	sec1_lbl.text = "🎫 HIỆU LỆNH TRIỆU HỒI (ĐỔI BẠC LẤY VÉ)"
+	sec1_lbl.add_theme_font_size_override("font_size", 14)
+	sec1_lbl.add_theme_color_override("font_color", COLOR_GOLD_PRIMARY)
+	scroll_vbox.add_child(sec1_lbl)
+
+	var grid_tickets = GridContainer.new()
+	grid_tickets.columns = 3
+	grid_tickets.add_theme_constant_override("h_separation", 12)
+	grid_tickets.add_theme_constant_override("v_separation", 12)
+	scroll_vbox.add_child(grid_tickets)
+
+	var ticket_packs = [
+		{
+			"id": "ticket_1",
+			"name": "1 Vé Triệu Hồi",
+			"icon": "🎫",
+			"badge": "ĐƠN LỆNH",
+			"val": "+1 Lệnh Bài Chiêu Mộ",
+			"sub": "Chiêu mộ 1 tướng tại Thần Điện",
+			"cost_silver": 39000,
+			"tickets": 1,
+			"cost_desc": "🪙 39.000 Bạc"
+		},
+		{
+			"id": "ticket_5",
+			"name": "5 Vé Triệu Hồi",
+			"icon": "🎟️",
+			"badge": "NGŨ TƯỚNG",
+			"val": "+5 Lệnh Bài Chiêu Mộ",
+			"sub": "Đủ 1 lượt Quay 5 Tướng liên hoàn",
+			"cost_silver": 195000,
+			"tickets": 5,
+			"cost_desc": "🪙 195.000 Bạc"
+		},
+		{
+			"id": "ticket_10",
+			"name": "10 Vé Triệu Hồi",
+			"icon": "⛩️",
+			"badge": "THẬP TOÀN",
+			"val": "+10 Lệnh Bài Chiêu Mộ",
+			"sub": "Đại gói chiêu mộ Bách Tướng",
+			"cost_silver": 390000,
+			"tickets": 10,
+			"cost_desc": "🪙 390.000 Bạc"
+		}
 	]
 
-	for p in packs:
+	for tp in ticket_packs:
+		var card = PanelContainer.new()
+		card.custom_minimum_size = Vector2(250, 185)
+		var cs = StyleBoxFlat.new()
+		cs.bg_color = Color(0.96, 0.95, 0.91, 1.0)
+		cs.border_width_left = 2
+		cs.border_width_top = 2
+		cs.border_width_right = 2
+		cs.border_width_bottom = 2
+		cs.border_color = COLOR_GOLD_PRIMARY
+		cs.corner_radius_top_left = 10
+		cs.corner_radius_top_right = 10
+		cs.corner_radius_bottom_right = 10
+		cs.corner_radius_bottom_left = 10
+		cs.shadow_color = COLOR_SHADOW
+		cs.shadow_size = 5
+		cs.shadow_offset = Vector2(0, 3)
+		cs.content_margin_left = 12
+		cs.content_margin_right = 12
+		cs.content_margin_top = 10
+		cs.content_margin_bottom = 10
+		card.add_theme_stylebox_override("panel", cs)
+
+		var cv = VBoxContainer.new()
+		cv.alignment = BoxContainer.ALIGNMENT_CENTER
+		cv.add_theme_constant_override("separation", 4)
+		card.add_child(cv)
+
+		var top_row = HBoxContainer.new()
+		var badge = Label.new()
+		badge.text = "✦ %s" % tp["badge"]
+		badge.add_theme_font_size_override("font_size", 10)
+		badge.add_theme_color_override("font_color", Color(0.70, 0.48, 0.05, 1.0))
+		top_row.add_child(badge)
+		cv.add_child(top_row)
+
+		var icon = Label.new()
+		icon.text = tp["icon"]
+		icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		icon.add_theme_font_size_override("font_size", 34)
+		cv.add_child(icon)
+
+		var tname = Label.new()
+		tname.text = tp["name"]
+		tname.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tname.add_theme_font_size_override("font_size", 14)
+		tname.add_theme_color_override("font_color", COLOR_TEXT_DARK)
+		cv.add_child(tname)
+
+		var sub_l = Label.new()
+		sub_l.text = tp["sub"]
+		sub_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sub_l.add_theme_font_size_override("font_size", 11)
+		sub_l.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+		cv.add_child(sub_l)
+
+		var buy_btn = Button.new()
+		buy_btn.text = "MUA (%s)" % tp["cost_desc"]
+		buy_btn.custom_minimum_size = Vector2(0, 34)
+		_style_white_gold_button(buy_btn, 6, 2, Vector2(0, 2))
+
+		var item_silver_cost = int(tp["cost_silver"])
+		var item_tickets_gain = int(tp["tickets"])
+		var item_name = str(tp["name"])
+
+		buy_btn.pressed.connect(func():
+			var cur_s = AuthManager.current_silver if AuthManager else current_silver
+			if cur_s < item_silver_cost:
+				AudioManager.play_parry()
+				status_lbl.text = "⚠️ Không đủ Bạc! Cần %s Bạc để mua %s (Hiện có: %s Bạc)." % [
+					_format_number(item_silver_cost),
+					item_name,
+					_format_number(cur_s)
+				]
+				status_lbl.add_theme_color_override("font_color", Color(0.95, 0.45, 0.25, 1.0))
+				return
+
+			if AuthManager:
+				if AuthManager.consume_silver(item_silver_cost):
+					AuthManager.add_hero_tickets(item_tickets_gain)
+					AudioManager.play_card_draw()
+					update_balances.call()
+					status_lbl.text = "✅ Mua thành công %s! (+%d Vé Triệu Hồi)" % [item_name, item_tickets_gain]
+					status_lbl.add_theme_color_override("font_color", Color(0.25, 0.85, 0.45, 1.0))
+			else:
+				current_silver -= item_silver_cost
+				current_hero_tickets += item_tickets_gain
+				AudioManager.play_card_draw()
+				update_balances.call()
+				status_lbl.text = "✅ Mua thành công %s! (+%d Vé Triệu Hồi)" % [item_name, item_tickets_gain]
+				status_lbl.add_theme_color_override("font_color", Color(0.25, 0.85, 0.45, 1.0))
+		)
+		cv.add_child(buy_btn)
+		grid_tickets.add_child(card)
+
+	# --- SECTION 2: QUỐC KHỐ NGÂN LƯỢNG (ĐỔI VÀNG LẤY BẠC) ---
+	var sec2_lbl = Label.new()
+	sec2_lbl.text = "🪙 QUỐC KHỐ NGÂN LƯỢNG (ĐỔI VÀNG LẤY BẠC)"
+	sec2_lbl.add_theme_font_size_override("font_size", 14)
+	sec2_lbl.add_theme_color_override("font_color", COLOR_GOLD_PRIMARY)
+	scroll_vbox.add_child(sec2_lbl)
+
+	var grid_silver = GridContainer.new()
+	grid_silver.columns = 3
+	grid_silver.add_theme_constant_override("h_separation", 12)
+	grid_silver.add_theme_constant_override("v_separation", 12)
+	scroll_vbox.add_child(grid_silver)
+
+	var silver_packs = [
+		{
+			"name": "Túi Bạc Khởi Binh",
+			"icon": "💰",
+			"val": "+50,000 Bạc",
+			"sub": "Đủ đổi 1 Vé Triệu Hồi (dư 11k)",
+			"cost_gold": 100,
+			"silver_gain": 50000,
+			"price": "💎 100 Vàng"
+		},
+		{
+			"name": "Rương Bạc Hoàng Triều",
+			"icon": "📦",
+			"val": "+300,000 Bạc",
+			"sub": "Đủ đổi ~7 Vé Triệu Hồi Danh Tướng",
+			"cost_gold": 500,
+			"silver_gain": 300000,
+			"price": "💎 500 Vàng"
+		},
+		{
+			"name": "Đại Hòm Kim Ngân Quốc Khố",
+			"icon": "👑",
+			"val": "+700,000 Bạc",
+			"sub": "Đại ngân lượng chiêu binh mãi mã",
+			"cost_gold": 1000,
+			"silver_gain": 700000,
+			"price": "💎 1.000 Vàng"
+		}
+	]
+
+	for sp in silver_packs:
 		var panel = PanelContainer.new()
-		panel.custom_minimum_size = Vector2(230, 160)
+		panel.custom_minimum_size = Vector2(250, 185)
 		var ps = StyleBoxFlat.new()
 		ps.bg_color = Color(0.96, 0.95, 0.91, 1.0)
 		ps.border_width_left = 2
 		ps.border_width_top = 2
 		ps.border_width_right = 2
 		ps.border_width_bottom = 2
-		ps.border_color = COLOR_GOLD_PRIMARY
-		ps.corner_radius_top_left = 8
-		ps.corner_radius_top_right = 8
-		ps.corner_radius_bottom_right = 8
-		ps.corner_radius_bottom_left = 8
+		ps.border_color = Color(0.70, 0.48, 0.05, 0.7)
+		ps.corner_radius_top_left = 10
+		ps.corner_radius_top_right = 10
+		ps.corner_radius_bottom_right = 10
+		ps.corner_radius_bottom_left = 10
 		ps.shadow_color = COLOR_SHADOW
 		ps.shadow_size = 5
 		ps.shadow_offset = Vector2(0, 3)
+		ps.content_margin_left = 12
+		ps.content_margin_right = 12
+		ps.content_margin_top = 10
+		ps.content_margin_bottom = 10
 		panel.add_theme_stylebox_override("panel", ps)
 
 		var pv = VBoxContainer.new()
-		pv.offset_left = 10
-		pv.offset_right = -10
-		pv.offset_top = 10
-		pv.offset_bottom = -10
-		pv.add_theme_constant_override("separation", 6)
 		pv.alignment = BoxContainer.ALIGNMENT_CENTER
-
-		var ic = Label.new()
-		ic.text = p["icon"]
-		ic.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		ic.add_theme_font_size_override("font_size", 30)
-		pv.add_child(ic)
-
-		var pn = Label.new()
-		pn.text = p["name"]
-		pn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		pn.add_theme_font_size_override("font_size", 14)
-		pn.add_theme_color_override("font_color", COLOR_TEXT_DARK)
-		pv.add_child(pn)
-
-		var pv_lbl = Label.new()
-		pv_lbl.text = p["val"]
-		pv_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		pv_lbl.add_theme_font_size_override("font_size", 12)
-		pv_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
-		pv.add_child(pv_lbl)
-
-		var buy_btn = Button.new()
-		buy_btn.text = "MUA (%s)" % p["price"]
-		_style_white_gold_button(buy_btn, 6, 3, Vector2(0, 2))
-		buy_btn.pressed.connect(func():
-			AudioManager.play_parry()
-			buy_btn.text = "✔ THÀNH CÔNG"
-		)
-		pv.add_child(buy_btn)
-
+		pv.add_theme_constant_override("separation", 4)
 		panel.add_child(pv)
-		grid.add_child(panel)
 
-	container.add_child(grid)
-	return container
+		var sic = Label.new()
+		sic.text = sp["icon"]
+		sic.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sic.add_theme_font_size_override("font_size", 34)
+		pv.add_child(sic)
+
+		var sname = Label.new()
+		sname.text = sp["name"]
+		sname.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sname.add_theme_font_size_override("font_size", 14)
+		sname.add_theme_color_override("font_color", COLOR_TEXT_DARK)
+		pv.add_child(sname)
+
+		var sval = Label.new()
+		sval.text = sp["val"]
+		sval.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sval.add_theme_font_size_override("font_size", 12)
+		sval.add_theme_color_override("font_color", Color(0.70, 0.48, 0.05, 1.0))
+		pv.add_child(sval)
+
+		var ssub = Label.new()
+		ssub.text = sp["sub"]
+		ssub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		ssub.add_theme_font_size_override("font_size", 10)
+		ssub.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+		pv.add_child(ssub)
+
+		var buy_s_btn = Button.new()
+		buy_s_btn.text = "MUA (%s)" % sp["price"]
+		buy_s_btn.custom_minimum_size = Vector2(0, 34)
+		_style_white_gold_button(buy_s_btn, 6, 2, Vector2(0, 2))
+
+		var gold_cost = int(sp["cost_gold"])
+		var silver_reward = int(sp["silver_gain"])
+		var pack_name = str(sp["name"])
+
+		buy_s_btn.pressed.connect(func():
+			var cur_g = AuthManager.current_gold if AuthManager else current_gold
+			if cur_g < gold_cost:
+				AudioManager.play_parry()
+				status_lbl.text = "⚠️ Không đủ Vàng! Cần %d Vàng để đổi %s (Hiện có: %d Vàng)." % [
+					gold_cost, pack_name, cur_g
+				]
+				status_lbl.add_theme_color_override("font_color", Color(0.95, 0.45, 0.25, 1.0))
+				return
+
+			if AuthManager:
+				if AuthManager.consume_gold(gold_cost):
+					AuthManager.add_silver(silver_reward)
+					AudioManager.play_card_draw()
+					update_balances.call()
+					status_lbl.text = "✅ Đổi thành công %s! (+%s Bạc)" % [pack_name, _format_number(silver_reward)]
+					status_lbl.add_theme_color_override("font_color", Color(0.25, 0.85, 0.45, 1.0))
+			else:
+				current_gold -= gold_cost
+				current_silver += silver_reward
+				AudioManager.play_card_draw()
+				update_balances.call()
+				status_lbl.text = "✅ Đổi thành công %s! (+%s Bạc)" % [pack_name, _format_number(silver_reward)]
+				status_lbl.add_theme_color_override("font_color", Color(0.25, 0.85, 0.45, 1.0))
+		)
+		pv.add_child(buy_s_btn)
+		grid_silver.add_child(panel)
+
+	# 3. Bottom Action Bar: Shortcut to Thần Điện
+	var bottom_row = HBoxContainer.new()
+	bottom_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	bottom_row.add_theme_constant_override("separation", 16)
+	root.add_child(bottom_row)
+
+	var go_than_dien_btn = Button.new()
+	go_than_dien_btn.text = "⛩️ ĐẾN THẦN ĐIỆN CHIÊU MỘ TƯỚNG"
+	go_than_dien_btn.custom_minimum_size = Vector2(320, 42)
+	_style_bronze_drum_cta(go_than_dien_btn)
+	go_than_dien_btn.pressed.connect(func():
+		AudioManager.play_card_select()
+		_hide_modal()
+		_show_fullscreen_than_dien()
+	)
+	bottom_row.add_child(go_than_dien_btn)
+
+	return root
 
 func _build_mail_content() -> Control:
 	var container = VBoxContainer.new()
