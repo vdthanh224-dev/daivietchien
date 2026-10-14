@@ -299,7 +299,8 @@ export function hydrateGameState(rawState, roomId = "") {
       skipPlay: !!state.turnStart.skipPlay,
       drawCount: Math.max(0, Number(state.turnStart.drawCount) || 2),
       anDanResolved: !!state.turnStart.anDanResolved,
-      dungNuocResolved: !!state.turnStart.dungNuocResolved
+      dungNuocResolved: !!state.turnStart.dungNuocResolved,
+      daiVietResolved: !!state.turnStart.daiVietResolved
     }
     : null;
   state.pendingAfterNearDeath = state.pendingAfterNearDeath && typeof state.pendingAfterNearDeath === "object"
@@ -748,6 +749,7 @@ function buildStateDelta(state) {
       activeSkillsValues: p.activeSkills ? Object.values(p.activeSkills) : [],
       usedSkillsKeys: p.usedSkills ? Object.keys(p.usedSkills) : [],
       usedSkillsValues: p.usedSkills ? Object.values(p.usedSkills) : [],
+      daiVietColor: p.daiVietColor || "",
       thuPhucCountThisTurn: p.thuPhucCountThisTurn || 0
     }))
   };
@@ -1009,6 +1011,39 @@ function cardColor(suit) {
   if (s === "club" || s === "chuon" || s === "chuồn" || s === "tep" || s === "tép" || s === "vàng" || s === "vang" || s === "yellow" || s === "♣") return "YELLOW";
   if (s === "spade" || s === "bich" || s === "bích" || s === "đen" || s === "den" || s === "black" || s === "♠") return "BLACK";
   return "";
+}
+
+function daiVietColorChoices() {
+  return [["RED", "Đỏ", "Heart"], ["WHITE", "Trắng", "Diamond"],
+    ["YELLOW", "Vàng", "Club"], ["BLACK", "Đen", "Spade"]].map(([color, label, suit]) => ({
+    id: `DAI_VIET:${color}`, name: `Đại Việt: ${label}`, suit, rank: 1,
+    category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE,
+    desc: `Chọn màu ${label} cho Đại Việt trong lượt này.`
+  }));
+}
+
+function startDaiVietColorChoice(state, player) {
+  const options = daiVietColorChoices().map((card) => ({
+    token: card.id,
+    // Reuse the generic card-picker UI used by the client. The token still
+    // carries the selected color and is handled as a Đại Việt choice server-side.
+    zone: "EQUIPMENT",
+    label: card.name,
+    card
+  }));
+  state.targetCardSelection = {
+    chooserSeat: player.seat,
+    targetSeat: player.seat,
+    operation: "COLOR",
+    effectType: "DAI_VIET_COLOR",
+    cardName: "Đại Việt",
+    options
+  };
+  state.phase = "AWAIT_TARGET_CARD";
+  state.waitingTargetSeat = player.seat;
+  state.waitingReactionType = "TARGET_CARD";
+  state.waitingTimer = 40;
+  state.timerStartAt = Date.now();
 }
 
 function isRedCardSuit(suit) {
@@ -4632,18 +4667,33 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
 
   // HEROES_41_50_RESPOND_ACTIONS_REAL
   if (state.phase === "AWAIT_DAI_VIET_COLOR") {
-    if (state.waitingTargetSeat !== respondentSeat) return { error: "Không phải lượt chọn màu bài của bạn" };
-    const rawColor = String(cardId || payload?.color || "").trim().toUpperCase();
-    const chosenColor = ["RED", "WHITE", "YELLOW", "BLACK"].includes(rawColor) ? rawColor : "RED";
+    const rawColor = String(targetCardId || payload?.targetCardId || payload?.color || cardId || "").trim().toUpperCase();
+    const chosenColor = rawColor.replace(/^DAI_VIET:/, "");
+    if (!accepted || !["RED", "WHITE", "YELLOW", "BLACK"].includes(chosenColor)) {
+      return { error: "Đại Việt: hãy chọn màu Đỏ, Trắng, Vàng hoặc Đen" };
+    }
     respondent.daiVietColor = chosenColor;
     respondent.turnPlayedColors = new Set();
     recordAction(state, {
       type: "DAI_VIET_COLOR_CHOSEN",
       casterSeat: respondentSeat,
       color: chosenColor,
+      skillActivations: [{ name: "Đại Việt", seat: respondentSeat }],
       description: `👑 <b>${respondent.generalName}</b> chọn màu bài <b>${chosenColor}</b> cho [Đại Việt] trong lượt này.`
     });
     resetWaitingState(state);
+    return continueTurnStart(state);
+  }
+
+  if (state.phase === "AWAIT_TARGET_CARD" && state.targetCardSelection?.effectType === "DAI_VIET_COLOR") {
+    const token = targetCardId || cardId || payload?.targetCardId || "";
+    const color = String(token).replace(/^DAI_VIET:/, "").toUpperCase();
+    if (!accepted || !["RED", "WHITE", "YELLOW", "BLACK"].includes(color)) return { error: "Đại Việt: hãy chọn một màu bài" };
+    respondent.daiVietColor = color;
+    respondent.turnPlayedColors = new Set();
+    state.targetCardSelection = null;
+    resetWaitingState(state);
+    recordAction(state, { type: "DAI_VIET_COLOR_CHOSEN", casterSeat: respondentSeat, color, skillActivations: [{ name: "Đại Việt", seat: respondentSeat }], description: `👑 <b>${respondent.generalName}</b> chọn màu <b>${color}</b> cho [Đại Việt].` });
     return continueTurnStart(state);
   }
 
@@ -7823,24 +7873,15 @@ function continueTurnStart(state) {
 
   if (!turnStart.daiVietResolved && heroHasSkill(player, "DAI_VIET")) {
     turnStart.daiVietResolved = true;
-    const colorCounts = new Map();
-    for (const card of player.hand || []) {
-      const color = cardColor(card?.suit);
-      if (color) colorCounts.set(color, (colorCounts.get(color) || 0) + 1);
-    }
-    const preferredColors = ["RED", "WHITE", "YELLOW", "BLACK"];
-    const chosenColor = preferredColors
-      .slice()
-      .sort((left, right) => (colorCounts.get(right) || 0) - (colorCounts.get(left) || 0))[0];
-    player.daiVietColor = chosenColor;
+    player.daiVietColor = "";
     player.turnPlayedColors = new Set();
+    startDaiVietColorChoice(state, player);
     recordAction(state, {
-      type: "DAI_VIET_COLOR_CHOSEN",
+      type: "DAI_VIET_PROMPT",
       casterSeat: player.seat,
-      color: chosenColor,
-      skillActivations: [{ name: "Đại Việt", seat: player.seat }],
-      description: `👑 <b>${player.generalName}</b> kích hoạt [Đại Việt], chọn màu <b>${chosenColor}</b> cho lượt này.`
+      description: `👑 <b>${player.generalName}</b> chọn màu cho [Đại Việt]: Đỏ / Trắng / Vàng / Đen. Chọn một ô màu và xác nhận để bắt đầu lượt.`
     });
+    return { success: true, state };
   }
 
   if (!turnStart.chinhThongResolved && heroHasSkill(player, "CHINH_THONG")) {
@@ -8073,7 +8114,8 @@ function advanceTurn(state) {
     drawCount: 2,
     chinhThongResolved: false,
     anDanResolved: false,
-    dungNuocResolved: false
+    dungNuocResolved: false,
+    daiVietResolved: false
   };
   // Quét từng lá phán xét theo thứ tự ưu tiên; mỗi lá được gỡ khỏi judgements khi phán xét xong
   return continueTurnStart(state);
@@ -8408,6 +8450,12 @@ export function handleAIReaction(state, aiSeat) {
   aiSeat = Number(aiSeat);
   const ai = state.players.find(x => x.seat === aiSeat);
   if (!ai || (ai.hp <= 0 && !["AWAIT_NEAR_DEATH", "AWAIT_UAT_KHI_TARGET"].includes(state.phase))) return { error: "Người chơi không hợp lệ" };
+
+  if (state.phase === "AWAIT_DAI_VIET_COLOR" && state.waitingTargetSeat === aiSeat) {
+    const colors = ["RED", "WHITE", "YELLOW", "BLACK"];
+    colors.sort((left, right) => (ai.hand || []).filter((card) => cardColor(card.suit) === right).length - (ai.hand || []).filter((card) => cardColor(card.suit) === left).length);
+    return handleRespondAction(state, aiSeat, true, colors[0]);
+  }
 
   if (state.phase === "AWAIT_CAN_GIAN" && state.waitingTargetSeat === aiSeat) {
     const cost = (ai.hand || []).find((card) => ["RED", "WHITE"].includes(cardColor(card.suit)));
@@ -8752,6 +8800,11 @@ export function handleAIReaction(state, aiSeat) {
   if (state.phase === "AWAIT_TARGET_CARD" && state.waitingTargetSeat === aiSeat) {
     const selection = state.targetCardSelection;
     let chosenOption = selection?.options?.[0];
+    if (selection?.effectType === "DAI_VIET_COLOR") {
+      const colors = ["RED", "WHITE", "YELLOW", "BLACK"];
+      colors.sort((left, right) => (ai.hand || []).filter((card) => cardColor(card.suit) === right).length - (ai.hand || []).filter((card) => cardColor(card.suit) === left).length);
+      chosenOption = selection.options?.find((option) => option.token === `DAI_VIET:${colors[0]}`) || chosenOption;
+    }
     if (selection?.effectType === "DOAN_DAO") {
       chosenOption = selection.options?.find((option) => option.zone === "EQUIPMENT") || chosenOption;
     }
@@ -8810,12 +8863,16 @@ export function handleAIReaction(state, aiSeat) {
  * Chạy mỗi giây (1000ms) trên Server In-Memory
  */
 export function executeFallbackReactionForSeat(state, waitingSeat, waitingPlayer) {
-  if (state.phase === "AWAIT_SLASH_DEFENSE") {
+  if (state.phase === "AWAIT_DAI_VIET_COLOR") {
+    return handleAIReaction(state, waitingSeat);
+  } else if (state.phase === "AWAIT_SLASH_DEFENSE") {
     return handleRespondAction(state, waitingSeat, false, null);
   } else if (state.phase === "AWAIT_BORROW_SWORD") {
     return handleRespondAction(state, waitingSeat, false, null);
   } else if (state.phase === "AWAIT_NULLIFY") {
     return handleRespondAction(state, waitingSeat, false, null);
+  } else if (state.phase === "AWAIT_TARGET_CARD" && state.targetCardSelection?.effectType === "DAI_VIET_COLOR") {
+    return handleAIReaction(state, waitingSeat);
   } else if (state.phase === "AWAIT_TARGET_CARD") {
     return handleRespondAction(state, waitingSeat, true, null, null);
   } else if (state.phase === "AWAIT_DOAN_DAO_CHOICE") {
@@ -9214,6 +9271,11 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
     nullifyChain: sanitizeNullifyChainForClient(state.nullifyChain),
     pendingJudgement: state.pendingJudgement || null,
     targetCardSelection: sanitizeTargetCardSelection(state.targetCardSelection, requestingSeat),
+    daiVietColorChoices: (state.phase === "AWAIT_DAI_VIET_COLOR"
+      || (state.phase === "AWAIT_TARGET_CARD" && state.targetCardSelection?.effectType === "DAI_VIET_COLOR"))
+      && viewerSeat === state.waitingTargetSeat
+      ? daiVietColorChoices().map(cardSummary)
+      : [],
     hichSelection: state.hichSelection || null,
     thuyTrieuRutSelection: state.thuyTrieuRutSelection || null,
     uatKhiQueue: state.uatKhiQueue || [],
@@ -9287,6 +9349,7 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
         activeSkillsValues: p.activeSkills ? Object.values(p.activeSkills) : [],
         usedSkillsKeys: p.usedSkills ? Object.keys(p.usedSkills) : [],
         usedSkillsValues: p.usedSkills ? Object.values(p.usedSkills) : [],
+      daiVietColor: p.daiVietColor || "",
       handCount: p.hand ? p.hand.length : 0,
       hand: (viewerSeat > 0 && viewerSeat === p.seat)
         ? (p.hand || []).map(c => ({
