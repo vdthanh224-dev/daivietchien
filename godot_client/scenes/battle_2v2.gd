@@ -154,6 +154,7 @@ var rescue_card_selector_scroll: ScrollContainer = null
 @onready var card_pick_desc: Label = $CardPickModal/Dim/Box/Margin/VBox/Desc
 @onready var card_pick_options_hbox: HBoxContainer = $CardPickModal/Dim/Box/Margin/VBox/Scroll/OptionsHBox
 @onready var card_pick_equipment_hbox: HBoxContainer = $CardPickModal/Dim/Box/Margin/VBox/EquipmentScroll/OptionsHBox
+@onready var card_pick_equip_scroll: ScrollContainer = $CardPickModal/Dim/Box/Margin/VBox/EquipmentScroll
 @onready var card_pick_status_lbl: Label = $CardPickModal/Dim/Box/Margin/VBox/SelectedStatusLbl
 @onready var card_pick_confirm_btn: Button = $CardPickModal/Dim/Box/Margin/VBox/HBox/ConfirmBtn
 @onready var card_pick_cancel_btn: Button = $CardPickModal/Dim/Box/Margin/VBox/HBox/CancelBtn
@@ -317,6 +318,8 @@ var reaction_submission_pending: bool = false
 var reaction_submission_version: int = -1
 var last_server_version: int = -1
 var last_played_card_info: Dictionary = {}
+var latest_server_state: Dictionary = {}
+var last_played_scroll_card: Dictionary = {}
 var pending_damage_elements: Dictionary = {}
 var bai_coc_judgement_visual_until_msec: int = 0
 const BAI_COC_JUDGEMENT_VISUAL_MSEC := 4300
@@ -1221,6 +1224,77 @@ func _ready() -> void:
 		await get_tree().create_timer(3.0).timeout
 		get_tree().quit()
 
+	if "--test-van-sach-ui" in cmd_args:
+		is_network_mode = false
+		current_server_phase = "AWAIT_VAN_SACH"
+		current_waiting_seat = my_seat
+		current_waiting_timer = 40.0
+		generals_data[2] = {"name": "Đinh Bộ Lĩnh", "is_alive": true}
+		generals_data[3] = {"name": "Đinh Bộ Lĩnh", "is_alive": true}
+		latest_server_state = {
+			"phase": "AWAIT_VAN_SACH",
+			"waitingTargetSeat": my_seat,
+			"pendingVanSach": {
+				"seat": my_seat,
+				"lastScroll": {
+					"card": {
+						"id": "test_scroll_1",
+						"name": "Vô Trung Sinh Hữu",
+						"cat": 2
+					},
+					"targetSeat": 0
+				}
+			}
+		}
+		selected_card_ui = null
+		selected_target_seat = -1
+		_update_action_btn()
+		await get_tree().process_frame
+
+		var play_btn_visible = card_play_btn.visible
+		var play_btn_disabled = card_play_btn.disabled
+		var recast_btn_visible = hich_recast_btn.visible
+		var recast_btn_disabled = hich_recast_btn.disabled
+		var end_btn_visible = end_turn_btn.visible
+		var end_btn_disabled = end_turn_btn.disabled
+		var recast_text_initial = hich_recast_btn.text
+		var no_overlap = not card_play_btn.get_global_rect().intersects(hich_recast_btn.get_global_rect()) and not hich_recast_btn.get_global_rect().intersects(end_turn_btn.get_global_rect())
+
+		for hand_card in hand_container.get_children():
+			hand_card.queue_free()
+		await get_tree().process_frame
+
+		var test_card = CardUIScene.instantiate()
+		hand_container.add_child(test_card)
+		test_card.setup_card_data("test_discard", "Trảm", 7, "Heart", 0, "Đánh ra 1 lá Trảm", 1)
+		selected_card_ui = test_card
+		_update_action_btn()
+		await get_tree().process_frame
+
+		var play_btn_ready = card_play_btn.visible and not card_play_btn.disabled
+		var recast_btn_ready = hich_recast_btn.visible and not hich_recast_btn.disabled
+		var play_text_selected = card_play_btn.text
+
+		selected_target_seat = 2 if my_seat != 2 else 3
+		_update_action_btn()
+		await get_tree().process_frame
+		var recast_text_with_target = hich_recast_btn.text
+
+		var pass_initial = play_btn_visible and play_btn_disabled and recast_btn_visible and recast_btn_disabled and end_btn_visible and not end_btn_disabled
+		var pass_recast_name = "VÔ TRUNG SINH HỮU" in recast_text_initial
+		var pass_selected = play_btn_ready and recast_btn_ready and ("BỎ LÁ" in play_text_selected or "RÚT 1" in play_text_selected)
+		var pass_target = "→" in recast_text_with_target
+
+		if pass_initial and pass_recast_name and pass_selected and pass_target and no_overlap:
+			print("[Test Van Sach UI] PASS: Cả nút Rút lá và Dùng lại Cẩm Nang đều hiển thị rõ ràng, layout chuẩn không chồng nút.")
+		else:
+			push_error("[Test Van Sach UI] FAIL: initial=%s name=%s sel=%s tgt=%s no_overlap=%s" % [pass_initial, pass_recast_name, pass_selected, pass_target, no_overlap])
+
+		if is_instance_valid(test_card):
+			test_card.queue_free()
+		_apply_action_buttons_layout(false)
+		get_tree().quit()
+
 	if "--screenshot-battle-2v2" in cmd_args:
 		# Equip items and Đại Hồng Thủy badge to verify font size x1.4 and UI layout
 		if generals_data.has(1):
@@ -1972,6 +2046,14 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 			buttons.append({"id": "doi_do", "text": "🏯 ĐÃ DÙNG DỜI ĐÔ", "description": "Dời Đô chỉ dùng 1 lần mỗi lượt.", "disabled": true})
 		else:
 			buttons.append({"id": "doi_do", "text": "🏯 DỜI ĐÔ", "description": "Bỏ toàn bộ bài trên tay: rút lại + 1 lá, chọn tối đa 4 người mỗi người rút 1 lá."})
+	if seat == my_seat and _hero_has_skill(g, "thang_moc"):
+		var is_thang_moc_waiting = (current_server_phase == "AWAIT_THANG_MOC" and current_waiting_seat == my_seat)
+		buttons.append({
+			"id": "thang_moc",
+			"text": "📜 THANG MỘC",
+			"description": "Vào cuối lượt người khác: rút 2 lá bài và tự gài 1 Cẩm Nang Trì Hoãn.",
+			"selected": is_thang_moc_waiting
+		})
 	var treasure = str(g.get("equipped_treasure", ""))
 	if seat == my_seat and treasure == "Trống Đồng Đông Sơn":
 		var drum_used := bool(g.get("diem_trong_used", false)) or ("DiemTrong" in (g.get("used_skills_keys", []) as Array))
@@ -2021,6 +2103,20 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 		h_data = {}
 	var h_id = int(h_data.get("id", 0))
 	var h_name = g.get("name", "")
+	if s_num == my_seat and skill_key == "thang_moc":
+		if current_server_phase == "AWAIT_THANG_MOC" and current_waiting_seat == my_seat:
+			if not card_pick_modal.visible or card_pick_effect_type != "THANG_MOC":
+				var thang_moc_data = latest_server_state.get("pendingThangMoc", {}) if latest_server_state.get("pendingThangMoc") is Dictionary else {}
+				var caster_s = int(thang_moc_data.get("casterSeat", current_turn_seat))
+				var available_scrolls = thang_moc_data.get("availableScrolls", [])
+				_show_thang_moc_modal(caster_s, available_scrolls)
+			elif not selected_card_pick_option.is_empty():
+				_on_card_pick_confirmed()
+			else:
+				desc_text.text = "📜 Hãy chọn 1 Cẩm Nang Trì Hoãn trong bảng để kích hoạt Thang Mộc."
+		else:
+			desc_text.text = "📜 [THANG MỘC]: Vào cuối lượt của người chơi khác, bạn có thể rút 2 lá bài và tự gài 1 Cẩm Nang Trì Hoãn lên bản thân."
+		return
 	if s_num == my_seat and skill_key == "an_tich":
 		if current_server_phase != "AWAIT_SLASH_DEFENSE" or current_waiting_seat != my_seat or int(g.get("an_tich_count", 0)) <= 0:
 			desc_text.text = "⚠️ Không có lá Ẩn để dùng lúc này."
@@ -2136,14 +2232,7 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 		_update_action_btn()
 		return
 	if s_num == my_seat and skill_key == "van_sach":
-		if not is_player_turn or current_server_phase != "PLAY":
-			desc_text.text = "⚠️ [VĂN SÁCH] chỉ dùng trong Giai đoạn Ra bài."
-			return
-		is_targeting_van_sach = not is_targeting_van_sach
-		desc_text.text = "📚 [VĂN SÁCH] Chọn 1 lá Bài Cơ Bản trên tay để đổi."
-		turn_indicator.text = "📚 VĂN SÁCH: CHỌN 1 BÀI CƠ BẢN"
-		_refresh_local_skill_buttons(s_num)
-		_update_action_btn()
+		desc_text.text = "📚 [VĂN SÁCH] Tự kích hoạt sau khi bạn sử dụng lá Cẩm Nang thứ hai trong lượt để bỏ 1 lá rút 1 lá hoặc dùng lại cẩm nang."
 		return
 	if s_num == my_seat and skill_key == "hung_suc":
 		if not is_player_turn or current_server_phase != "PLAY":
@@ -2781,6 +2870,11 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 		_update_action_btn()
 		return
 	if current_server_phase == "AWAIT_VAN_SACH" and current_waiting_seat == my_seat:
+		if selected_card_ui == card_node:
+			selected_card_ui.set_selected(false)
+			selected_card_ui = null
+			_update_action_btn()
+			return
 		if selected_card_ui and is_instance_valid(selected_card_ui) and selected_card_ui != card_node:
 			selected_card_ui.set_selected(false)
 		selected_card_ui = card_node
@@ -3085,6 +3179,16 @@ func _on_general_avatar_clicked(seat_num: int) -> void:
 		var nghich_caster_seat = int(nghich_active_card.get("casterSeat", 0)) if nghich_active_card is Dictionary else 0
 		if seat_num == my_seat or seat_num == nghich_caster_seat or _calculate_distance(my_seat, seat_num) > _get_attack_range(my_seat):
 			desc_text.text = "⚠️ [NGHỊCH Ý] phải chọn người khác (không phải người ra Trảm) trong Tầm đánh."
+			return
+		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
+			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
+		selected_target_seat = seat_num
+		g["avatar_node"].set_target_highlight(true)
+		_update_action_btn()
+		return
+	if current_server_phase == "AWAIT_VAN_SACH" and current_waiting_seat == my_seat:
+		if seat_num == my_seat:
+			desc_text.text = "⚠️ Hãy chọn một người chơi khác."
 			return
 		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
@@ -3465,19 +3569,108 @@ func _get_card_description_for_display(card_node: Control, c_info: Dictionary) -
 		description = str(database_info.get("desc", database_info.get("description", "")))
 	return description if not description.is_empty() else card_name
 
+func _is_scroll_card_name(cname: String) -> bool:
+	var scrolls = [
+		"Mở Kho Cứu Tế", "Mở Yến Tiệc", "Dụng Binh Như Thần", "Diệu Kế Phá Mưu",
+		"Vô Trung Sinh Hữu", "Hoán Đổi Càn Khôn", "Đào Tẩu", "Giặc Tới",
+		"Mưa Tên Liên Châu", "Huyết Chiến", "Bãi Cọc Bạch Đằng", "Đột Kích Trộm Lương",
+		"Vườn Không Nhà Trống", "Cắt Đường Lương", "Trầm Ảo Sa Bẫy", "Thủy Triều Rút",
+		"Xích Tâm Tỏa", "Hỏa Công", "Đại Hồng Thủy", "Hịch Tướng Sĩ", "Mượn Kiếm Giết Người"
+	]
+	return cname in scrolls
+
+func _get_van_sach_last_scroll_name() -> String:
+	# 1. State from server pendingVanSach
+	var vs_state = latest_server_state if latest_server_state is Dictionary and not latest_server_state.is_empty() else (NetworkClient.last_state if NetworkClient else {})
+	if vs_state is Dictionary:
+		var p_vs = vs_state.get("pendingVanSach", {})
+		if p_vs is Dictionary:
+			var ls = p_vs.get("lastScroll", {})
+			if ls is Dictionary:
+				var c = ls.get("card", {})
+				if c is Dictionary and str(c.get("name", "")) != "":
+					return str(c.get("name", ""))
+	# 2. Locally recorded last played scroll
+	if last_played_scroll_card is Dictionary and not last_played_scroll_card.is_empty():
+		var cname = str(last_played_scroll_card.get("name", ""))
+		if cname != "":
+			return cname
+	# 3. Last played card info if it is a scroll
+	if last_played_card_info is Dictionary and not last_played_card_info.is_empty():
+		var cat = int(last_played_card_info.get("cat", -1))
+		var cname = str(last_played_card_info.get("name", ""))
+		if (cat in [2, 3] or _is_scroll_card_name(cname)) and cname != "":
+			return cname
+	# 4. Search actionHistory from latest server state
+	if vs_state is Dictionary and vs_state.has("actionHistory"):
+		var hist = vs_state.get("actionHistory", [])
+		if hist is Array:
+			for i in range(hist.size() - 1, -1, -1):
+				var item = hist[i]
+				if item is Dictionary and int(item.get("casterSeat", 0)) == my_seat:
+					var card_name = str(item.get("cardName", item.get("name", "")))
+					if card_name != "" and _is_scroll_card_name(card_name):
+						return card_name
+	return ""
+
+func _apply_action_buttons_layout(is_van_sach: bool = false) -> void:
+	if not is_instance_valid(card_play_btn) or not is_instance_valid(end_turn_btn) or not is_instance_valid(hich_recast_btn):
+		return
+	if is_van_sach:
+		card_play_btn.custom_minimum_size.x = 220.0
+		card_play_btn.position.x = 515.0
+		card_play_btn.size.x = 220.0
+		hich_recast_btn.custom_minimum_size.x = 230.0
+		hich_recast_btn.position.x = 745.0
+		hich_recast_btn.size.x = 230.0
+		end_turn_btn.custom_minimum_size.x = 110.0
+		end_turn_btn.position.x = 985.0
+		end_turn_btn.size.x = 110.0
+	else:
+		card_play_btn.custom_minimum_size.x = 240.0
+		card_play_btn.position.x = 525.0
+		card_play_btn.size.x = 240.0
+		end_turn_btn.custom_minimum_size.x = 145.0
+		end_turn_btn.position.x = 780.0
+		end_turn_btn.size.x = 145.0
+		hich_recast_btn.custom_minimum_size.x = 120.0
+		hich_recast_btn.position.x = 930.0
+		hich_recast_btn.size.x = 120.0
+
 func _update_action_btn() -> void:
-	hich_recast_btn.visible = false
+	var in_van_sach := (current_server_phase == "AWAIT_VAN_SACH" and current_waiting_seat == my_seat)
+	_apply_action_buttons_layout(in_van_sach)
+	hich_recast_btn.visible = in_van_sach
+	if not in_van_sach:
+		hich_recast_btn.tooltip_text = "Bỏ Hịch Tướng Sĩ để rút 1 lá bài khác."
 	if current_server_phase == "AWAIT_DA_TRACH_DISCARD" and current_waiting_seat == my_seat:
 		var da_trach_ready := selected_card_ui != null and is_instance_valid(selected_card_ui)
 		card_play_btn.visible = true
 		card_play_btn.disabled = not da_trach_ready
 		card_play_btn.text = "🌙 BỎ 1 LÁ" if da_trach_ready else "🌙 CHỌN 1 LÁ ĐỂ BỎ"
 		return
-	if current_server_phase == "AWAIT_VAN_SACH" and current_waiting_seat == my_seat:
+	if in_van_sach:
 		var van_sach_card_valid := selected_card_ui != null and is_instance_valid(selected_card_ui)
 		card_play_btn.visible = true
 		card_play_btn.disabled = not van_sach_card_valid
 		card_play_btn.text = "📚 BỎ LÁ ĐỂ RÚT 1 LÁ" if van_sach_card_valid else "📚 CHỌN 1 LÁ ĐỂ BỎ"
+		hich_recast_btn.visible = true
+		hich_recast_btn.disabled = not van_sach_card_valid
+		hich_recast_btn.tooltip_text = "Bỏ 1 lá trên tay để sử dụng lại lá Cẩm Nang gần nhất vừa dùng."
+		var last_name = _get_van_sach_last_scroll_name()
+		if last_name != "":
+			if selected_target_seat > 0 and generals_data.has(selected_target_seat):
+				hich_recast_btn.text = "📜 DÙNG LẠI [%s] → %s" % [last_name.to_upper(), generals_data[selected_target_seat]["name"].to_upper()]
+			else:
+				hich_recast_btn.text = "📜 DÙNG LẠI [%s]" % last_name.to_upper()
+		else:
+			if selected_target_seat > 0 and generals_data.has(selected_target_seat):
+				hich_recast_btn.text = "📜 DÙNG LẠI CẨM NANG → %s" % generals_data[selected_target_seat]["name"].to_upper()
+			else:
+				hich_recast_btn.text = "📜 DÙNG LẠI CẨM NANG"
+		end_turn_btn.visible = true
+		end_turn_btn.disabled = false
+		end_turn_btn.text = "BỎ QUA"
 		return
 	if current_server_phase == "AWAIT_CAN_GIAN" and current_waiting_seat == my_seat:
 		var can_gian_valid := selected_card_ui != null and is_instance_valid(selected_card_ui)
@@ -3595,12 +3788,7 @@ func _update_action_btn() -> void:
 		card_play_btn.disabled = not (hung_target_valid and hung_card_valid)
 		card_play_btn.text = "💪 HÙNG SỨC → %s" % generals_data[selected_target_seat]["name"] if hung_target_valid and hung_card_valid else "💪 HÙNG SỨC: CHỌN VŨ KHÍ VÀ MỤC TIÊU"
 		return
-	if is_targeting_van_sach:
-		var van_sach_card_valid = selected_card_ui != null and is_instance_valid(selected_card_ui) and int(_get_card_info_from_ui(selected_card_ui).get("cat", -1)) == 0
-		card_play_btn.visible = true
-		card_play_btn.disabled = not van_sach_card_valid
-		card_play_btn.text = "📚 ĐỔI BÀI BẰNG VĂN SÁCH" if van_sach_card_valid else "📚 VĂN SÁCH: CHỌN 1 BÀI CƠ BẢN"
-		return
+
 	if huynh_truong_pending:
 		var huynh_target_valid = selected_target_seat > 0 and selected_target_seat != my_seat and generals_data.has(selected_target_seat) and generals_data[selected_target_seat].get("is_alive", false)
 		var huynh_card_valid = selected_card_ui != null and is_instance_valid(selected_card_ui)
@@ -3866,6 +4054,16 @@ func _reset_player_turn_timer() -> void:
 			generals_data[my_seat]["avatar_node"].update_turn_timer(40)
 
 func _on_hich_recast_btn_clicked() -> void:
+	if current_server_phase == "AWAIT_VAN_SACH" and current_waiting_seat == my_seat:
+		if selected_card_ui == null or not is_instance_valid(selected_card_ui):
+			desc_text.text = "⚠️ [VĂN SÁCH] hãy chọn 1 lá trên tay để bỏ."
+			return
+		var discard_id = str(_get_card_info_from_ui(selected_card_ui).get("id", ""))
+		var tgt_seat = selected_target_seat if selected_target_seat > 0 and selected_target_seat != my_seat else 0
+		NetworkClient.send_respond_action(true, discard_id, "RECAST", [], tgt_seat, {"choice": "RECAST", "recast": true})
+		card_play_btn.disabled = true
+		hich_recast_btn.disabled = true
+		return
 	if not is_player_turn or not selected_card_ui or not is_instance_valid(selected_card_ui):
 		return
 	var c_info = _get_card_info_from_ui(selected_card_ui)
@@ -4231,8 +4429,10 @@ func _on_card_play_btn_clicked() -> void:
 		if selected_card_ui == null or not is_instance_valid(selected_card_ui):
 			desc_text.text = "⚠️ [VĂN SÁCH] hãy chọn 1 lá trên tay để bỏ."
 			return
-		NetworkClient.send_respond_action(true, str(_get_card_info_from_ui(selected_card_ui).get("id", "")))
+		var discard_id = str(_get_card_info_from_ui(selected_card_ui).get("id", ""))
+		NetworkClient.send_respond_action(true, discard_id, "DRAW", [], 0, {"choice": "DRAW"})
 		card_play_btn.disabled = true
+		hich_recast_btn.disabled = true
 		return
 	if current_server_phase == "AWAIT_CAN_GIAN" and current_waiting_seat == my_seat:
 		if selected_card_ui == null or not is_instance_valid(selected_card_ui):
@@ -4311,19 +4511,7 @@ func _on_card_play_btn_clicked() -> void:
 		_refresh_local_skill_buttons(my_seat)
 		card_play_btn.disabled = true
 		return
-	if is_targeting_van_sach:
-		if selected_card_ui == null or not is_instance_valid(selected_card_ui):
-			desc_text.text = "⚠️ [VĂN SÁCH] cần chọn 1 Bài Cơ Bản."
-			return
-		var van_sach_card = _get_card_info_from_ui(selected_card_ui)
-		if int(van_sach_card.get("cat", -1)) != 0:
-			desc_text.text = "⚠️ [VĂN SÁCH] chỉ đổi được Bài Cơ Bản."
-			return
-		NetworkClient.send_use_skill("Văn Sách", 0, str(van_sach_card.get("id", "")))
-		is_targeting_van_sach = false
-		_refresh_local_skill_buttons(my_seat)
-		card_play_btn.disabled = true
-		return
+
 	if is_targeting_hung_suc:
 		if hung_suc_submission_pending:
 			return
@@ -4466,8 +4654,10 @@ func _on_card_play_btn_clicked() -> void:
 	var c_info = _get_card_info_from_ui(selected_card_ui)
 	var c_name = c_info.get("name", "")
 	var c_id = c_info.get("id", c_name)
-	if c_id.is_empty(): c_id = c_name
 	last_played_card_info = c_info.duplicate()
+	var played_cat = int(c_info.get("cat", -1))
+	if played_cat in [2, 3] or _is_scroll_card_name(c_name):
+		last_played_scroll_card = c_info.duplicate()
 
 	var p_gen_play = generals_data.get(my_seat, {})
 	var is_trac_lac_hero_play = _hero_has_skill(p_gen_play, "trac_lac") and int(p_gen_play.get("hp", 4)) <= 2
@@ -5795,6 +5985,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 	if state == null or not (state is Dictionary) or state.is_empty():
 		return
 	is_network_mode = true
+	latest_server_state = state
 	var previous_server_phase = current_server_phase
 	var server_version = int(state.get("version", -1))
 	if server_version >= 0 and server_version < last_server_version:
@@ -5808,7 +5999,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		# selected Trảm.
 		var incoming_phase := str(state.get("phase", current_server_phase))
 		var incoming_waiting_seat := int(state.get("waitingTargetSeat", current_waiting_seat))
-		if incoming_phase not in ["AWAIT_SLASH_DEFENSE", "AWAIT_DAN_CAU", "AWAIT_TARGET_CARD"] or incoming_waiting_seat != my_seat:
+		if incoming_phase not in ["AWAIT_SLASH_DEFENSE", "AWAIT_DAN_CAU", "AWAIT_TARGET_CARD", "AWAIT_THANG_MOC"] or incoming_waiting_seat != my_seat:
 			reaction_submission_pending = false
 			reaction_submission_version = -1
 
@@ -6047,6 +6238,9 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
 		selected_target_seat = -1
 		card_play_btn.visible = false
+	if previous_server_phase == "AWAIT_VAN_SACH" and server_phase != "AWAIT_VAN_SACH":
+		_apply_action_buttons_layout(false)
+		hich_recast_btn.visible = false
 	# Uất Khí chỉ tồn tại trong đúng pha chờ server; dọn trạng thái cũ
 	# trước khi phần render pha hiện tại thiết lập lại nút hành động.
 	if server_phase != "AWAIT_UAT_KHI" and server_phase != "AWAIT_UAT_KHI_TARGET" and uat_khi_pending:
@@ -6064,6 +6258,9 @@ func _apply_network_game_state(state: Dictionary) -> void:
 	if server_phase != "AWAIT_THANG_MOC" and card_pick_modal and card_pick_modal.visible and card_pick_effect_type == "THANG_MOC":
 		card_pick_modal.visible = false
 		card_pick_effect_type = ""
+		card_pick_target_seat = -1
+		selected_card_pick_option.clear()
+		card_pick_submission_pending = false
 	# Cứu Hấp Hối và Mượn Gươm là các phản ứng độc quyền. Nếu state vừa đổi
 	# pha, không để modal Đỡ/Trảm cũ chiếm lần bấm đầu tiên trên bài trên tay.
 	if server_waiting_seat != my_seat:
@@ -6078,7 +6275,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 	elif previous_server_phase in ["AWAIT_SLASH_DEFENSE", "AWAIT_OAI_NHUOC", "AWAIT_HICH_CASTER_DISCARD", "AWAIT_HICH_TARGET_DISCARD", "AWAIT_DRUM_CHOICE", "AWAIT_SONG_CUNG_FOLLOW_UP", "AWAIT_DAN_CAU", "AWAIT_CAN_GIAN", "AWAIT_THU_PHAP_DISCARD"] and server_phase != previous_server_phase and (is_waiting_dodge or is_waiting_song_cung):
 		_close_song_cung_modal()
 		_close_dodge_reaction_state()
-	if server_phase not in ["AWAIT_SLASH_DEFENSE", "AWAIT_DAN_CAU"] or server_waiting_seat != my_seat:
+	if server_phase not in ["AWAIT_SLASH_DEFENSE", "AWAIT_DAN_CAU", "AWAIT_TARGET_CARD", "AWAIT_THANG_MOC"] or server_waiting_seat != my_seat:
 		reaction_submission_pending = false
 	if server_phase != "AWAIT_AOE":
 		is_giac_toi_reaction = false
@@ -6407,8 +6604,9 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			elif server_phase == "AWAIT_VAN_SACH":
 				card_play_btn.text = "📚 BỎ LÁ ĐỂ RÚT 1 LÁ"
 				end_turn_btn.text = "BỎ QUA"
-				turn_indicator.text = "📚 VĂN SÁCH: BỎ 1 LÁ ĐỂ RÚT 1 LÁ? (%ds)" % server_waiting_timer
-				desc_text.text = "Sau khi dùng Cẩm Nang thứ hai trong lượt, chọn 1 lá trên tay để bỏ và rút 1 lá, hoặc bỏ qua."
+				turn_indicator.text = "📚 VĂN SÁCH: BỎ 1 LÁ ĐỂ RÚT HOẶC DÙNG LẠI (%ds)" % server_waiting_timer
+				desc_text.text = "Sau khi dùng Cẩm Nang thứ hai trong lượt, chọn 1 lá trên tay để bỏ rồi chọn Rút 1 lá hoặc Dùng lại cẩm nang vừa dùng."
+				_update_action_btn()
 			elif server_phase == "AWAIT_TRU_QUAN":
 				card_play_btn.text = "👑 GIẢM 1 MÁU RÚT 2 LÁ"
 				turn_indicator.text = "👑 TRỮ QUÂN: RÚT THÊM 2 LÁ? (%ds)" % server_waiting_timer
@@ -6535,6 +6733,8 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		card_play_btn.visible = false
 		end_turn_btn.visible = false
 		if server_waiting_seat == my_seat:
+			if reaction_submission_pending or card_pick_submission_pending:
+				return
 			var thang_moc_data = state.get("pendingThangMoc", {}) if state.get("pendingThangMoc") is Dictionary else {}
 			var caster_s = int(thang_moc_data.get("casterSeat", server_turn_seat))
 			var available_scrolls = thang_moc_data.get("availableScrolls", [])
@@ -6545,6 +6745,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		else:
 			if card_pick_modal.visible and card_pick_effect_type == "THANG_MOC":
 				card_pick_modal.visible = false
+				card_pick_effect_type = ""
 			var wait_gen = generals_data.get(server_waiting_seat, {})
 			var wait_name = wait_gen.get("name", "Ghế %d" % server_waiting_seat) if wait_gen is Dictionary else "Ghế %d" % server_waiting_seat
 			turn_indicator.text = "📜 ĐANG CHỜ %s QUYẾT ĐỊNH THANG MỘC (%ds)..." % [wait_name, server_waiting_timer]
@@ -7791,6 +7992,11 @@ func _on_network_action_received(delta: Dictionary) -> void:
 		card_name = _get_friendly_card_name(card_id)
 	if not played_card.is_empty():
 		last_played_card_info = played_card.duplicate()
+		if caster_seat == my_seat:
+			var cat = int(played_card.get("cat", -1))
+			var c_name_str = str(played_card.get("name", card_name))
+			if cat in [2, 3] or _is_scroll_card_name(c_name_str):
+				last_played_scroll_card = played_card.duplicate()
 
 	# Bãi Cọc can arrive either as its own judgement action or attached to the
 	# resumed action. Support both payload shapes so every connected client sees it.
@@ -13202,13 +13408,17 @@ func _show_thang_moc_modal(caster_seat: int, available_scrolls: Array) -> void:
 	card_pick_cancel_btn.visible = true
 	card_pick_status_lbl.text = "👉 Hãy chọn 1 Cẩm Nang Trì Hoãn hoặc bấm [TỪ CHỐI]"
 
+	if card_pick_equip_scroll:
+		card_pick_equip_scroll.visible = false
+		card_pick_equip_scroll.custom_minimum_size = Vector2.ZERO
+
 	var card_pick_box := card_pick_modal.get_node_or_null("Dim/Box") as Control
 	var card_pick_dim := card_pick_modal.get_node_or_null("Dim") as Control
 	if card_pick_box:
-		card_pick_box.custom_minimum_size = Vector2(490, 260)
+		card_pick_box.custom_minimum_size = Vector2(520, 240)
 	if card_pick_dim:
-		card_pick_dim.offset_top = 20.0
-		card_pick_dim.offset_bottom = -180.0
+		card_pick_dim.offset_top = 0.0
+		card_pick_dim.offset_bottom = -140.0
 
 	for c in card_pick_options_hbox.get_children():
 		c.queue_free()
@@ -13229,7 +13439,7 @@ func _show_thang_moc_modal(caster_seat: int, available_scrolls: Array) -> void:
 		var s_subtype = int(scroll.get("subType", 0))
 		var s_icon = str(scroll.get("icon", "📜"))
 		var btn = Button.new()
-		btn.custom_minimum_size = Vector2(105, 80)
+		btn.custom_minimum_size = Vector2(110, 80)
 		btn.focus_mode = Control.FOCUS_NONE
 		btn.text = "%s\n%s" % [s_icon, s_name]
 		btn.add_theme_font_size_override("font_size", 12)
@@ -13247,6 +13457,12 @@ func _show_thang_moc_modal(caster_seat: int, available_scrolls: Array) -> void:
 		style.corner_radius_bottom_right = 8
 		btn.add_theme_stylebox_override("normal", style)
 
+		var hover_style = style.duplicate()
+		hover_style.bg_color = Color(0.28, 0.22, 0.42, 0.98)
+		hover_style.border_color = Color(1.0, 0.9, 0.4, 1.0)
+		btn.add_theme_stylebox_override("hover", hover_style)
+		btn.add_theme_stylebox_override("pressed", hover_style)
+
 		var opt = {
 			"type": "thang_moc",
 			"token": str(s_subtype),
@@ -13257,8 +13473,11 @@ func _show_thang_moc_modal(caster_seat: int, available_scrolls: Array) -> void:
 			"confirm_text": "📜 GÀI [%s] & RÚT 2 LÁ" % s_name.to_upper()
 		}
 		btn.pressed.connect(func():
-			_select_card_pick_option(opt)
-			card_pick_confirm_btn.text = opt["confirm_text"]
+			if selected_card_pick_option.get("token", "") == opt.get("token", ""):
+				_on_card_pick_confirmed()
+			else:
+				_select_card_pick_option(opt)
+				card_pick_confirm_btn.text = opt["confirm_text"]
 		)
 		card_pick_options_hbox.add_child(btn)
 
@@ -13307,7 +13526,16 @@ func _show_card_pick_modal(is_steal: bool, target_seat: int, selection_data: Dic
 		if card_pick_dim:
 			card_pick_dim.offset_top = 20.0
 			card_pick_dim.offset_bottom = -180.0
-	elif effect_type == "THUONG_NGAU":
+	else:
+		if card_pick_box:
+			card_pick_box.custom_minimum_size = Vector2(680, 455)
+		if card_pick_dim:
+			card_pick_dim.offset_top = 250.0
+			card_pick_dim.offset_bottom = 0.0
+		if card_pick_equip_scroll:
+			card_pick_equip_scroll.visible = true
+			card_pick_equip_scroll.custom_minimum_size = Vector2(0, 174)
+	if effect_type == "THUONG_NGAU":
 		card_pick_title.text = "🗡️ THƯƠNG NGÂU LÃNG BẠC: PHÁ HỦY BÀI CỦA %s" % tgt["name"].to_upper()
 		card_pick_confirm_btn.text = "🗡️ XÁC NHẬN PHÁ HỦY"
 		card_pick_desc.text = "💡 Trảm đã trúng. Chọn 1 lá bài úp trên tay hoặc 1 trang bị của %s để phá hủy:" % tgt["name"]
@@ -13579,7 +13807,11 @@ func _select_card_pick_option(opt: Dictionary) -> void:
 	for btn in card_pick_options_hbox.get_children():
 		var st = btn.get_theme_stylebox("normal") as StyleBoxFlat
 		if st:
-			st.border_color = Color(0.83, 0.68, 0.22, 0.8)
+			if card_pick_effect_type == "THANG_MOC":
+				st.border_color = Color(0.6, 0.65, 0.8, 0.7)
+				st.bg_color = Color(0.18, 0.15, 0.28, 0.95)
+			else:
+				st.border_color = Color(0.83, 0.68, 0.22, 0.8)
 	for card in card_pick_equipment_hbox.get_children():
 		if card.has_method("set_selected"):
 			card.set_selected(false)
@@ -13590,8 +13822,13 @@ func _select_card_pick_option(opt: Dictionary) -> void:
 		else:
 			var active_st = opt["button"].get_theme_stylebox("normal") as StyleBoxFlat
 			if active_st:
-				active_st.border_color = Color(1.0, 0.95, 0.35, 1.0)
-	_layout_card_pick_hand(opt.get("button", null))
+				if card_pick_effect_type == "THANG_MOC":
+					active_st.border_color = Color(1.0, 0.95, 0.35, 1.0)
+					active_st.bg_color = Color(0.35, 0.22, 0.52, 0.98)
+				else:
+					active_st.border_color = Color(1.0, 0.95, 0.35, 1.0)
+	if opt.get("type", "") not in ["thang_moc", "dai_viet_color"]:
+		_layout_card_pick_hand(opt.get("button", null))
 
 	card_pick_status_lbl.text = "👉 Đã chọn: %s" % opt.get("label", "")
 	card_pick_confirm_btn.disabled = false
@@ -13682,6 +13919,35 @@ func _on_card_pick_confirmed() -> void:
 		if card_pick_effect_type == "DAI_VIET_COLOR":
 			var chosen_color = str(target_token).replace("DAI_VIET:", "")
 			_add_log("🎨 [ĐẠI VIỆT] Đã chọn màu %s." % chosen_color)
+			card_pick_effect_type = ""
+			card_pick_target_seat = -1
+			selected_card_pick_option.clear()
+			card_pick_modal.visible = false
+			return
+		elif card_pick_effect_type == "THANG_MOC":
+			var chosen_name = str(opt.get("label", "Cẩm Nang"))
+			var s_subtype = int(opt.get("subType", 0))
+			_add_log("📜 [THANG MỘC] Bạn kích hoạt Thang Mộc, rút 2 lá và tự gài [%s]!" % chosen_name)
+			for _i in range(2):
+				_add_card_to_player_hand(_draw_card_from_pile())
+			var my_g = generals_data[my_seat]
+			match s_subtype:
+				19:
+					my_g["has_dai_hong_thuy"] = true
+					if my_g.has("avatar_node") and is_instance_valid(my_g["avatar_node"]):
+						my_g["avatar_node"].set_delayed_trick("dai_hong_thuy", true)
+				20:
+					my_g["has_cat_luong"] = true
+					if my_g.has("avatar_node") and is_instance_valid(my_g["avatar_node"]):
+						my_g["avatar_node"].set_delayed_trick("cat_luong", true)
+				21:
+					my_g["has_tram_ao"] = true
+					if my_g.has("avatar_node") and is_instance_valid(my_g["avatar_node"]):
+						my_g["avatar_node"].set_delayed_trick("tram_ao", true)
+				22:
+					my_g["has_bai_coc"] = true
+					if my_g.has("avatar_node") and is_instance_valid(my_g["avatar_node"]):
+						my_g["avatar_node"].set_delayed_trick("bai_coc", true)
 			card_pick_effect_type = ""
 			card_pick_target_seat = -1
 			selected_card_pick_option.clear()
@@ -13844,6 +14110,7 @@ func _hide_card_pick_modal() -> void:
 	if card_pick_effect_type == "THANG_MOC":
 		if is_network_mode and NetworkClient and NetworkClient.is_connected_to_server:
 			reaction_submission_pending = true
+			card_pick_submission_pending = true
 			reaction_submission_version = last_server_version
 			NetworkClient.send_respond_action(false, "")
 		_add_log("📜 [THANG MỘC] Bạn đã từ chối kích hoạt Thang Mộc.")

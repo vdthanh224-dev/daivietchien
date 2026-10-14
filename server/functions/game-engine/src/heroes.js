@@ -159,7 +159,7 @@ export const SKILLS = {
   XUNG_DE: { id: 'XUNG_DE', name: 'Xưng Đế', type: 'PASSIVE', description: 'Khi bạn không bị thương, giới hạn bài giữ trên tay của bạn được tăng thêm 2 lá.' },
   TUNG_NGHIA: { id: 'TUNG_NGHIA', name: 'Tùng Nghĩa', type: 'TRIGGERED', description: 'Khi vùng trang bị của bạn có ít nhất 1 lá Chiến Mã hoặc Áo Giáp, cuối lượt, bạn được rút 1 lá và giới hạn trữ bài +1.' },
   TRUNG_KIEN: { id: 'TRUNG_KIEN', name: 'Trung Kiên', type: 'OPTIONAL', description: 'Khi một người sắp vào trạng thái tử trận, bạn có thể tự giảm 1 Máu để giúp người đó hồi đến 1 máu.' },
-  VAN_SACH: { id: 'VAN_SACH', name: 'Văn Sách', type: 'OPTIONAL', description: 'Sau khi bạn sử dụng lá bài Cẩm Nang thứ hai trong lượt, bạn có thể bỏ 1 lá bài trên tay để rút 1 lá.' },
+  VAN_SACH: { id: 'VAN_SACH', name: 'Văn Sách', type: 'OPTIONAL', description: 'Sau khi bạn sử dụng lá bài Cẩm Nang thứ hai trong lượt, bạn có thể bỏ 1 lá bài trên tay để rút 1 lá hoặc coi như là sử dụng lại lá cẩm nang gần nhất vừa sử dụng.' },
   HAN_LAM: { id: 'HAN_LAM', name: 'Hán Lâm', type: 'OPTIONAL', description: 'Mỗi khi bạn dùng thành công một lá Bài Cẩm Nang, bạn được xem lá bài trên cùng của xấp bài rút và có quyền chọn để nguyên hay đặt xuống đáy, sau đó rút 1 lá.' },
   TRAN_NAM: { id: 'TRAN_NAM', name: 'Trấn Nam', type: 'PASSIVE', description: 'Bạn miễn nhiễm hoàn toàn với sát thương từ Cẩm Nang Giặc Tới. Khi bạn dùng Trảm Thường Đen hoặc Vàng, mục tiêu không thể kích hoạt hiệu ứng của Giáp Đồng Sơn Vi.' },
   HOA_DAN: { id: 'HOA_DAN', name: 'Hóa Dân', type: 'OPTIONAL', description: 'Cuối lượt của bạn, nếu bạn đang đeo trang bị Áo Giáp, bạn có thể bỏ 1 trang bị bất kỳ để hồi 1 máu.' },

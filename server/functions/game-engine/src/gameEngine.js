@@ -872,6 +872,7 @@ export function drawCards(state, seat, count = 2, allowDying = false) {
 
 function discardCard(state, card, reveal = true) {
     if (!card) return;
+    if (card.virtual || card.isVirtual) return;
     if (card.originalCardId) { const orig = findCardByIdInDeck(card.originalCardId); if (orig) card = orig; }
     if (card.orig_name) {
         card.name = card.orig_name;
@@ -1232,10 +1233,16 @@ function maybeStartVanSachPrompt(state) {
   state.waitingReactionType = "VAN_SACH";
   state.waitingTimer = 40;
   state.timerStartAt = Date.now();
+  state.pendingVanSach = {
+    seat: owner.seat,
+    lastScroll: owner.usedSkills?.VanSachLastScroll ? { ...owner.usedSkills.VanSachLastScroll } : null
+  };
+  const lastScrollCard = owner.usedSkills?.VanSachLastScroll?.card;
+  const replayDesc = lastScrollCard?.name ? ` hoặc dùng lại cẩm nang [${lastScrollCard.name}]` : "";
   recordAction(state, {
     type: "VAN_SACH_PROMPT",
     casterSeat: owner.seat,
-    description: `📚 ${owner.generalName} đã dùng Cẩm Nang thứ hai trong lượt, có thể bỏ 1 lá trên tay để rút 1 lá.`
+    description: `📚 ${owner.generalName} đã dùng Cẩm Nang thứ hai trong lượt, có thể bỏ 1 lá trên tay để rút 1 lá${replayDesc}.`
   });
   return true;
 }
@@ -2335,10 +2342,10 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
   if (card.category === CARD_CATEGORIES.DELAYED_SCROLL || card.subType === CARD_SUBTYPES.DAI_HONG_THUY || card.subType === CARD_SUBTYPES.SUPPLY_SHORTAGE || card.subType === CARD_SUBTYPES.ACEDIA) {
     return executeCardEffect(state, card, casterSeat, targetSeat);
   }
-  if (card.subType === CARD_SUBTYPES.IRON_CHAIN && card.recast) {
+  if (card.subType === CARD_SUBTYPES.IRON_CHAIN && card.recast && !card.isReplay) {
     return executeCardEffect(state, card, casterSeat, targetSeat);
   }
-  if (card.subType === CARD_SUBTYPES.HICH_TUONG_SI && card.recast) {
+  if (card.subType === CARD_SUBTYPES.HICH_TUONG_SI && card.recast && !card.isReplay) {
     return executeCardEffect(state, card, casterSeat, targetSeat);
   }
   if (card.subType === CARD_SUBTYPES.ARROW_RAIN || card.subType === CARD_SUBTYPES.BARBARIAN_INVASION || card.subType === CARD_SUBTYPES.HARVEST) {
@@ -3593,9 +3600,14 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0, paylo
   const target = state.players.find(x => x.seat === targetSeat);
 
   const isScroll = card.category === CARD_CATEGORIES.INSTANT_SCROLL || card.category === CARD_CATEGORIES.DELAYED_SCROLL;
-  if (!payload?._hanLamResolved && isScroll && !card.recast && heroHasSkill(caster, "VAN_SACH")) {
+  if (!payload?._hanLamResolved && isScroll && !card.recast && !card.isReplay && heroHasSkill(caster, "VAN_SACH")) {
     if (!caster.usedSkills) caster.usedSkills = {};
     caster.usedSkills.CamNangUsedThisTurn = (caster.usedSkills.CamNangUsedThisTurn || 0) + 1;
+    caster.usedSkills.VanSachLastScroll = {
+      card: { ...card },
+      targetSeat: targetSeat || 0,
+      payload: { ...(payload || {}) }
+    };
     if (caster.usedSkills.CamNangUsedThisTurn === 2) caster.usedSkills.VanSachPending = true;
   }
   if (!payload?._hanLamResolved && isScroll && !card.recast && heroHasSkill(caster, "HAN_LAM")) {
@@ -3716,7 +3728,7 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0, paylo
     const seatsToChain = ironChainTargets.seats;
 
     discardCard(state, card);
-    if (ironChainTargets.recast || card.recast === true) {
+    if ((ironChainTargets.recast || card.recast === true) && !card.isReplay) {
       const drawn = drawCards(state, casterSeat, 1);
       resetWaitingState(state);
       recordAction(state, {
@@ -3805,7 +3817,7 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0, paylo
   }
 
   // 1.2. HỊCH TƯỚNG SĨ
-  if (card.subType === CARD_SUBTYPES.HICH_TUONG_SI && card.recast === true) {
+  if (card.subType === CARD_SUBTYPES.HICH_TUONG_SI && card.recast === true && !card.isReplay) {
     discardCard(state, card);
     const drawn = drawCards(state, casterSeat, 1);
     resetWaitingState(state);
@@ -4776,6 +4788,71 @@ export function getAvailableThangMocScrolls(state, seat) {
   return candidateScrolls.filter((s) => !existingSubTypes.has(s.subType));
 }
 
+function executeReplayedScroll(state, card, casterSeat, preferredTargetSeat = 0, payload = {}) {
+  state.pendingVanSach = null;
+  state.phase = "PLAY";
+  state.waitingTargetSeat = 0;
+  state.waitingReactionType = "NONE";
+  state.activeCard = null;
+
+  const isTargeted = [
+    CARD_SUBTYPES.SNATCH,
+    CARD_SUBTYPES.DISMANTLE,
+    CARD_SUBTYPES.DUEL,
+    CARD_SUBTYPES.BLOOD_BATTLE,
+    CARD_SUBTYPES.THUY_TRIEU_RUT,
+    CARD_SUBTYPES.HICH_TUONG_SI,
+    CARD_SUBTYPES.MUON_GUOM_DIET_DICH,
+    CARD_SUBTYPES.SUPPLY_SHORTAGE,
+    CARD_SUBTYPES.ACEDIA,
+    CARD_SUBTYPES.BAI_COC_BACH_DANG,
+    CARD_SUBTYPES.DAI_HONG_THUY
+  ].includes(card.subType) || card.category === CARD_CATEGORIES.DELAYED_SCROLL;
+
+  let targetSeat = preferredTargetSeat;
+  if (isTargeted) {
+    if (card.subType === CARD_SUBTYPES.DAI_HONG_THUY) {
+      targetSeat = casterSeat;
+    } else {
+      let t = state.players.find(p => p.seat === targetSeat && isLivingPlayer(p) && p.seat !== casterSeat);
+      if (card.subType === CARD_SUBTYPES.SNATCH || card.subType === CARD_SUBTYPES.DISMANTLE) {
+        const hasCards = (p) => ((p.hand || []).length > 0 || (p.equipments || []).length > 0 || (p.judgements || []).length > 0);
+        if (!t || !hasCards(t)) {
+          const cand = state.players.find(p => isLivingPlayer(p) && p.seat !== casterSeat && hasCards(p) && !areTeammatesInState(state, casterSeat, p.seat))
+                    || state.players.find(p => isLivingPlayer(p) && p.seat !== casterSeat && hasCards(p));
+          targetSeat = cand ? cand.seat : 0;
+        }
+      } else {
+        if (!t) {
+          const cand = state.players.find(p => isLivingPlayer(p) && p.seat !== casterSeat && !areTeammatesInState(state, casterSeat, p.seat))
+                    || state.players.find(p => isLivingPlayer(p) && p.seat !== casterSeat);
+          targetSeat = cand ? cand.seat : 0;
+        }
+      }
+    }
+  }
+
+  // If a targeted scroll has no valid target anywhere:
+  if (isTargeted && targetSeat === 0 && card.subType !== CARD_SUBTYPES.DAI_HONG_THUY) {
+    drawCards(state, casterSeat, 1);
+    recordAction(state, {
+      type: "VAN_SACH_NO_TARGET",
+      casterSeat,
+      description: `📚 [${card.name}] không có mục tiêu hợp lệ, chuyển thành rút 1 lá.`
+    });
+    resetWaitingState(state);
+    return { success: true, state };
+  }
+
+  if (card.category === CARD_CATEGORIES.DELAYED_SCROLL || card.subType === CARD_SUBTYPES.DAI_HONG_THUY || card.subType === CARD_SUBTYPES.SUPPLY_SHORTAGE || card.subType === CARD_SUBTYPES.ACEDIA || card.subType === CARD_SUBTYPES.BAI_COC_BACH_DANG) {
+    return executeCardEffect(state, card, casterSeat, targetSeat, payload);
+  }
+  if (card.subType === CARD_SUBTYPES.ARROW_RAIN || card.subType === CARD_SUBTYPES.BARBARIAN_INVASION || card.subType === CARD_SUBTYPES.HARVEST) {
+    return executeCardEffect(state, card, casterSeat, targetSeat, payload);
+  }
+  return startNullifyChain(state, card, casterSeat, targetSeat);
+}
+
 export function handleRespondAction(state, respondentSeat, accepted, cardId, targetCardId = null, cardIds = null, targetSeat = null, payload = null) {
   if (state.status === "FINISHED") return { error: "Trận đấu đã kết thúc" };
   respondentSeat = Number(respondentSeat);
@@ -4977,6 +5054,34 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       });
     }
     resetWaitingState(state);
+    if (originalTurnSeat) {
+      state.turnSeat = originalTurnSeat;
+    }
+    const nextThangMoc = state.players.find((cand) =>
+      isLivingPlayer(cand) && cand.seat !== originalTurnSeat && heroHasSkill(cand, "THANG_MOC") && !cand.usedSkills?.ThangMocTurnResolved
+      && getAvailableThangMocScrolls(state, cand.seat).length > 0
+    );
+    if (nextThangMoc) {
+      nextThangMoc.usedSkills = nextThangMoc.usedSkills || {};
+      nextThangMoc.usedSkills.ThangMocTurnResolved = true;
+      state.phase = "AWAIT_THANG_MOC";
+      state.waitingTargetSeat = nextThangMoc.seat;
+      state.waitingReactionType = "THANG_MOC";
+      state.waitingTimer = 40;
+      state.timerStartAt = Date.now();
+      state.thangMocCasterSeat = originalTurnSeat;
+      state.pendingThangMoc = {
+        casterSeat: originalTurnSeat,
+        targetSeat: nextThangMoc.seat,
+        availableScrolls: getAvailableThangMocScrolls(state, nextThangMoc.seat)
+      };
+      recordAction(state, {
+        type: "THANG_MOC_PROMPT",
+        casterSeat: nextThangMoc.seat,
+        description: `📜 <b>${nextThangMoc.generalName}</b> có thể kích hoạt [Thang Mộc] vào cuối lượt của ${state.players.find((p) => p.seat === originalTurnSeat)?.generalName || originalTurnSeat}: rút 2 lá bài và tự gài 1 Cẩm Nang Trì Hoãn lên bản thân.`
+      });
+      return { success: true, state };
+    }
     return advanceTurn(state);
   }
 
@@ -5298,20 +5403,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         : `📖 ${respondent.generalName} dùng [Hán Lâm], đặt [${topCard?.name || "lá bài"}] xuống đáy, sau đó rút [${drawn?.name || "1 lá"}].`
     });
     const result = executeCardEffect(state, pending.card, pending.casterSeat, pending.targetSeat, { ...(pending.payload || {}), _hanLamResolved: true });
-    const owner = state.players.find((player) => player.seat === respondentSeat);
-    if (owner?.usedSkills?.VanSachPending && state.phase === "PLAY" && owner.hand.length > 0) {
-      owner.usedSkills.VanSachPending = false;
-      state.phase = "AWAIT_VAN_SACH";
-      state.waitingTargetSeat = respondentSeat;
-      state.waitingReactionType = "VAN_SACH";
-      state.waitingTimer = 40;
-      state.timerStartAt = Date.now();
-      recordAction(state, {
-        type: "VAN_SACH_PROMPT",
-        casterSeat: respondentSeat,
-        description: `📚 ${owner.generalName} đã dùng Cẩm Nang thứ hai trong lượt, có thể bỏ 1 lá trên tay để rút 1 lá.`
-      });
-    }
+    maybeStartVanSachPrompt(state);
     return result;
   }
 
@@ -5320,22 +5412,61 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       return { error: "Văn Sách không còn hiệu lực" };
     }
     if (accepted) {
-      const selectedId = cardId || (Array.isArray(cardIds) ? cardIds[0] : null);
+      const rawChoice = String(payload?.choice || (typeof cardIds === "string" ? cardIds : "") || (payload?.recast ? "RECAST" : "DRAW")).toUpperCase();
+      const isRecast = rawChoice === "RECAST" || rawChoice === "REPLAY" || payload?.recast === true;
+
+      let selectedId = cardId;
+      if (Array.isArray(cardIds) && cardIds.length > 0) {
+        selectedId = cardIds.find(id => id && id !== "DRAW" && id !== "RECAST" && id !== "REPLAY") || selectedId;
+      }
+      if (!selectedId && payload?.discardCardId) {
+        selectedId = payload.discardCardId;
+      }
+
       const index = respondent.hand.findIndex((card) => card.id === selectedId);
       if (index < 0) return { error: "Văn Sách cần chọn 1 lá trên tay để bỏ" };
       const discarded = respondent.hand.splice(index, 1)[0];
       discardCard(state, discarded);
-      const drawn = drawCards(state, respondentSeat, 1)[0] || null;
-      recordAction(state, {
-        type: "VAN_SACH_TRIGGERED",
-        casterSeat: respondentSeat,
-        cardId: discarded.id,
-        cardName: discarded.name,
-        description: `📚 ${respondent.generalName} dùng [Văn Sách], bỏ [${discarded.name}] và rút [${drawn?.name || "1 lá"}].`
-      });
+
+      const lastScrollInfo = state.pendingVanSach?.lastScroll || respondent.usedSkills?.VanSachLastScroll;
+      if (isRecast && lastScrollInfo?.card) {
+        const replayedCard = {
+          ...lastScrollInfo.card,
+          id: `VAN_SACH_REPLAY_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          virtual: true,
+          isVirtual: true,
+          recast: true,
+          isReplay: true,
+          vanSachReplay: true
+        };
+        const preferredTarget = Number(targetSeat) > 0 ? Number(targetSeat) : (Number(lastScrollInfo.targetSeat) > 0 ? Number(lastScrollInfo.targetSeat) : 0);
+        recordAction(state, {
+          type: "VAN_SACH_TRIGGERED",
+          casterSeat: respondentSeat,
+          cardId: discarded.id,
+          cardName: discarded.name,
+          replayedCardId: replayedCard.id,
+          replayedCardName: replayedCard.name,
+          choice: "RECAST",
+          targetSeat: preferredTarget,
+          description: `📚 <b>${respondent.generalName}</b> dùng [Văn Sách], bỏ [${discarded.name}] để sử dụng lại cẩm nang [${replayedCard.name}]!`
+        });
+        return executeReplayedScroll(state, replayedCard, respondentSeat, preferredTarget, lastScrollInfo.payload || {});
+      } else {
+        const drawn = drawCards(state, respondentSeat, 1)[0] || null;
+        recordAction(state, {
+          type: "VAN_SACH_TRIGGERED",
+          casterSeat: respondentSeat,
+          cardId: discarded.id,
+          cardName: discarded.name,
+          choice: "DRAW",
+          description: `📚 <b>${respondent.generalName}</b> dùng [Văn Sách], bỏ [${discarded.name}] và rút [${drawn?.name || "1 lá"}].`
+        });
+      }
     } else {
       recordAction(state, { type: "VAN_SACH_DECLINED", casterSeat: respondentSeat, description: `📚 ${respondent.generalName} không kích hoạt [Văn Sách].` });
     }
+    state.pendingVanSach = null;
     resetWaitingState(state);
     return { success: true, state };
   }
@@ -8800,8 +8931,13 @@ export function handleAIReaction(state, aiSeat) {
   }
 
   if (state.phase === "AWAIT_VAN_SACH" && state.waitingTargetSeat === aiSeat) {
-    const discard = ai.hand?.[0];
-    return discard ? handleRespondAction(state, aiSeat, true, discard.id) : handleRespondAction(state, aiSeat, false, null);
+    if (!ai.hand?.length) return handleRespondAction(state, aiSeat, false, null);
+    const discard = ai.hand.find(c => c.category !== CARD_CATEGORIES.BASIC) || ai.hand[0];
+    const lastScroll = state.pendingVanSach?.lastScroll?.card || ai.usedSkills?.VanSachLastScroll?.card;
+    if (lastScroll) {
+      return handleRespondAction(state, aiSeat, true, discard.id, "RECAST", null, 0, { choice: "RECAST", recast: true });
+    }
+    return handleRespondAction(state, aiSeat, true, discard.id, "DRAW", null, 0, { choice: "DRAW" });
   }
 
   if (state.phase === "AWAIT_TRUNG_KIEN" && state.waitingTargetSeat === aiSeat) {
@@ -9592,6 +9728,17 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
           availableScrolls: getAvailableThangMocScrolls(state, state.waitingTargetSeat)
         }
       : null,
+    pendingVanSach: (state.phase === "AWAIT_VAN_SACH")
+      ? {
+          seat: state.waitingTargetSeat,
+          lastScroll: state.pendingVanSach?.lastScroll
+            ? {
+                card: cardSummary(state.pendingVanSach.lastScroll.card),
+                targetSeat: state.pendingVanSach.lastScroll.targetSeat || 0
+              }
+            : null
+        }
+      : null,
     lastAction: sanitizeActionForClient(state.lastAction, viewerSeat),
     // Keep the recent log bounded so a long match cannot exceed the client's
     // WebSocket packet limit. The authoritative server history stays intact.
@@ -10210,6 +10357,14 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
     }
     return { error: "Cận Vệ chỉ phát động khi người trong Tầm 1 bị Trảm" };
   }
+  if (norm.includes("văn sách") || norm.includes("van sach")) {
+    if (state.phase === "AWAIT_VAN_SACH" && state.waitingTargetSeat === seat) {
+      const selectedId = cardId || (typeof targetSeat === "string" && isNaN(Number(targetSeat)) ? targetSeat : null);
+      const tgt = Number(targetSeat) > 0 ? Number(targetSeat) : 0;
+      return handleRespondAction(state, seat, true, selectedId, null, null, tgt, extraData);
+    }
+    return { error: "Văn Sách tự kích hoạt sau khi bạn sử dụng Cẩm Nang thứ hai trong lượt" };
+  }
 
   if (state.phase !== "PLAY" || state.turnSeat !== seat) return { error: "Chỉ được dùng kỹ năng trong lượt của bạn" };
 
@@ -10320,10 +10475,6 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
     }
     checkGameOver(state);
     return { success: true, state, damageResult };
-  }
-
-  if (norm.includes("văn sách") || norm.includes("van sach")) {
-    return { error: "Văn Sách tự kích hoạt sau khi bạn sử dụng Cẩm Nang thứ hai trong lượt" };
   }
 
   if (norm.includes("bát nạ") || norm.includes("bat na")) {
