@@ -9898,7 +9898,7 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
     return handleDiscardCards(state, seat, [cardId]);
   }
 
-  if (norm.includes("thang mộc") || norm.includes("thang moc")) {
+  if (norm.includes("thang mộc") || norm.includes("thang moc") || norm.includes("thang_moc") || norm === "thang_moc") {
     if (state.phase !== "AWAIT_THANG_MOC") return { error: "Không phải thời điểm dùng Thang Mộc" };
     return handleRespondAction(state, seat, true, cardId);
   }

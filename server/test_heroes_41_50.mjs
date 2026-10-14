@@ -422,7 +422,7 @@ function createTestState(heroIds = ["HERO_41", "HERO_42", "HERO_43", "HERO_44"])
   assert.equal(state.phase, "AWAIT_THANG_MOC");
   assert.equal(state.waitingTargetSeat, 2);
 
-  const tmResp = handleRespondAction(state, 2, true, CARD_SUBTYPES.SUPPLY_SHORTAGE);
+  const tmResp = handleUseSkill(state, 2, "thang_moc", 0, CARD_SUBTYPES.SUPPLY_SHORTAGE);
   assert.equal(tmResp.success, true);
   assert.equal(p2.hand.length, 2);
   assert.equal((p2.judgements || []).length, 1);
