@@ -4747,23 +4747,8 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
   }
 
   if (state.phase === "AWAIT_THU_PHAP_DISCARD") {
-    if (state.waitingTargetSeat !== respondentSeat) return { error: "Không phải lượt bỏ bài của bạn" };
-    const idx = (respondent.hand || []).findIndex((c) => c.id === cardId || c.name === cardId);
-    const discardIdx = idx >= 0 ? idx : 0;
-    if (respondent.hand.length > 0) {
-      const discarded = respondent.hand.splice(discardIdx, 1)[0];
-      discardCard(state, discarded);
-      recordAction(state, {
-        type: "THU_PHAP_DISCARD",
-        casterSeat: respondentSeat,
-        cardId: discarded.id,
-        cardName: discarded.name,
-        description: `📜 <b>${respondent.generalName}</b> hoàn thành [Thủ Pháp], đã bỏ ${formatCardText(discarded)}.`
-      });
-    }
-    resetWaitingState(state);
-    state.phase = "PLAY";
-    return handleEndTurn(state, respondentSeat);
+    if (!accepted || !cardId) return { error: "Thủ Pháp yêu cầu bỏ đúng 1 lá bài" };
+    return handleDiscardCards(state, respondentSeat, [cardId]);
   }
 
   if (state.phase === "AWAIT_CHUYEN_CHE_RESPOND") {
@@ -7373,6 +7358,26 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
   return { finalDamage, enteredNearDeath: false, armorEffect, armorChargesRemaining, armorExpired };
 }
 
+function startThuPhap(state, player) {
+  if (!heroHasSkill(player, "THU_PHAP") || player.usedSkills?.ThuPhapResolved
+      || (player.turnPlayedColors?.size || 0) < 3) return false;
+  player.usedSkills = player.usedSkills || {};
+  player.usedSkills.ThuPhapResolved = true;
+  drawCards(state, player.seat, 3);
+  recordAction(state, {
+    type: "THU_PHAP_DRAW",
+    casterSeat: player.seat,
+    skillActivations: [{ name: "Thủ Pháp", seat: player.seat }],
+    description: `📜 <b>${player.generalName}</b> kích hoạt [Thủ Pháp] (đã đánh ${player.turnPlayedColors.size} màu bài), rút 3 lá và bỏ 1 lá.`
+  });
+  state.phase = "AWAIT_THU_PHAP_DISCARD";
+  state.waitingTargetSeat = player.seat;
+  state.waitingReactionType = "DISCARD";
+  state.waitingTimer = 40;
+  state.timerStartAt = Date.now();
+  return true;
+}
+
 /**
  * Kết thúc lượt đánh (Chuyển sang bỏ bài nếu thừa, hoặc rút bài cho người kế tiếp)
  */
@@ -7387,6 +7392,8 @@ export function handleEndTurn(state, casterSeat) {
 
   const caster = state.players.find(x => x.seat === casterSeat);
   if (!caster || caster.hp <= 0) return { error: "Người chơi không hợp lệ" };
+  const skipHandLimitCheck = state.skipHandLimitCheckSeat === casterSeat;
+  if (skipHandLimitCheck) delete state.skipHandLimitCheckSeat;
   caster.isWineBuffActive = false;
   state.isWineBuffActive = false;
   if (state.drumReveal?.viewerSeat === casterSeat) state.drumReveal = null;
@@ -7441,7 +7448,7 @@ export function handleEndTurn(state, casterSeat) {
   const xungDeTriggered = heroHasSkill(caster, "XUNG_DE") && caster.hp === caster.maxHp
     && caster.hand.length > Math.max(0, Number(caster.hp) || 0) + tungNghiaBonus;
   const excess = caster.hand.length - handLimit;
-  if (excess > 0 && caster.hp > 0) {
+  if (!skipHandLimitCheck && excess > 0 && caster.hp > 0) {
     state.phase = "DISCARD";
     state.waitingTargetSeat = casterSeat;
     state.waitingReactionType = "DISCARD";
@@ -7532,23 +7539,7 @@ export function handleEndTurn(state, casterSeat) {
       });
     }
   }
-  if (isPlayPhase && heroHasSkill(caster, "THU_PHAP") && !caster.usedSkills?.ThuPhapResolved && (caster.turnPlayedColors?.size || 0) >= 3) {
-    caster.usedSkills = caster.usedSkills || {};
-    caster.usedSkills.ThuPhapResolved = true;
-    drawCards(state, casterSeat, 3);
-    recordAction(state, {
-      type: "THU_PHAP_DRAW",
-      casterSeat,
-      skillActivations: [{ name: "Thủ Pháp", seat: casterSeat }],
-      description: `📜 <b>${caster.generalName}</b> kích hoạt [Thủ Pháp] (đã đánh ${caster.turnPlayedColors.size} màu bài), rút 3 lá và bỏ 1 lá.`
-    });
-    state.phase = "AWAIT_THU_PHAP_DISCARD";
-    state.waitingTargetSeat = casterSeat;
-    state.waitingReactionType = "DISCARD";
-    state.waitingTimer = 40;
-    state.timerStartAt = Date.now();
-    return { success: true, state };
-  }
+  if (isPlayPhase && startThuPhap(state, caster)) return { success: true, state };
 
   if (isPlayPhase && heroHasSkill(caster, "BON_PHAN") && !caster.usedSkills?.BonPhanResolved && (caster.hand || []).some((c) => isSlash(c))) {
     caster.usedSkills = caster.usedSkills || {};
@@ -7612,6 +7603,7 @@ export function handleDiscardCards(state, seat, cardIds) {
     });
     resetWaitingState(state);
     state.phase = "PLAY";
+    state.skipHandLimitCheckSeat = seat;
     return handleEndTurn(state, seat);
   }
   const isDiscardPhase = (state.phase === "DISCARD" && (state.waitingTargetSeat === seat || state.turnSeat === seat));
@@ -7704,6 +7696,12 @@ export function handleDiscardCards(state, seat, cardIds) {
 
   triggerLapLang(state, p);
   triggerKhoanGianAfterDiscard(state, p);
+
+  // Thủ Pháp là kỹ năng cuối lượt: chỉ kích hoạt sau khi đã bỏ hết bài thừa.
+  if (startThuPhap(state, p)) {
+    refreshLastDelta(state);
+    return { success: true, state };
+  }
 
   // HERO_41_46_50_AFTER_DISCARD
   if (heroHasSkill(p, "BON_PHAN") && !p.usedSkills?.BonPhanResolved && (p.hand || []).some((c) => isSlash(c))) {
