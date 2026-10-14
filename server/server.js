@@ -253,11 +253,17 @@ async function sweepAppwriteMatchmaking() {
   if (matchmakingSweepRunning) return;
   matchmakingSweepRunning = true;
   try {
-    const query = encodeURIComponent(JSON.stringify({ method: "orderDesc", attribute: "timestamp" }));
     const limit = encodeURIComponent(JSON.stringify({ method: "limit", values: [100] }));
-    const response = await appwriteMatchmakingRequest(`/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents?queries[0]=${query}&queries[1]=${limit}`);
-    if (!response?.ok) return;
-    const body = await response.json();
+    const matchmakingStatuses = ["ROOM_WAITING", "ROOM_MERGED", "ROOM_STARTED", "ROOM_FINISHED"];
+    const documents = [];
+    for (const status of matchmakingStatuses) {
+      const query = encodeURIComponent(JSON.stringify({ method: "equal", attribute: "userId", values: [status] }));
+      const response = await appwriteMatchmakingRequest(`/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents?queries[0]=${query}&queries[1]=${limit}`);
+      if (!response?.ok) continue;
+      const body = await response.json();
+      if (Array.isArray(body?.documents)) documents.push(...body.documents);
+    }
+    const body = { documents: [...new Map(documents.map((document) => [String(document?.$id || ""), document])).values()] };
     const now = Date.now();
     const roomsWaiting = [];
     for (const document of Array.isArray(body?.documents) ? body.documents : []) {
