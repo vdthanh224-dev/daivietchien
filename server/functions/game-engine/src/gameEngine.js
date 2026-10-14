@@ -378,6 +378,15 @@ export function hydrateGameState(rawState, roomId = "") {
       description: String(state.targetCardSelection.description || ""),
       compact: state.targetCardSelection.compact === true,
       avoidHandOverlap: state.targetCardSelection.avoidHandOverlap === true,
+      panelSize: String(state.targetCardSelection.panelSize || ""),
+      placement: String(state.targetCardSelection.placement || ""),
+      promptKind: String(state.targetCardSelection.promptKind || ""),
+      skillName: String(state.targetCardSelection.skillName || ""),
+      skillDescription: String(state.targetCardSelection.skillDescription || ""),
+      maxWidth: Number(state.targetCardSelection.maxWidth) || 0,
+      ui: state.targetCardSelection.ui && typeof state.targetCardSelection.ui === "object"
+        ? { ...state.targetCardSelection.ui }
+        : null,
       operation: ["STEAL", "RETURN", "MOVE", "COLOR"].includes(state.targetCardSelection.operation)
         ? state.targetCardSelection.operation : "DESTROY",
       options: Array.isArray(state.targetCardSelection.options)
@@ -1022,7 +1031,8 @@ function daiVietColorChoices() {
     ["YELLOW", "Vàng", "Club"], ["BLACK", "Đen", "Spade"]].map(([color, label, suit]) => ({
     id: `DAI_VIET:${color}`, name: `Đại Việt: ${label}`, suit, rank: 1,
     category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE,
-    desc: `Chọn màu ${label} cho Đại Việt trong lượt này.`
+    label,
+    desc: `Chọn màu ${label} để kích hoạt skill Đại Việt. Mỗi khi đánh lá cùng màu trong lượt này, bạn rút 1 lá.`
   }));
 }
 
@@ -1041,10 +1051,26 @@ function startDaiVietColorChoice(state, player) {
     operation: "COLOR",
     effectType: "DAI_VIET_COLOR",
     cardName: "Đại Việt",
-    title: "🎨 CHỌN MÀU KÍCH HOẠT ĐẠI VIỆT",
-    description: "Chọn 1 màu bài để kích hoạt skill Đại Việt. Trong lượt này, mỗi khi đánh ra lá bài cùng màu, bạn được rút 1 lá.",
+    promptKind: "SKILL_COLOR_PICKER",
+    skillName: "Đại Việt",
+    skillDescription: "Chọn 1 màu để kích hoạt skill Đại Việt. Mỗi khi đánh lá cùng màu trong lượt này, bạn rút 1 lá.",
+    title: "🎨 ĐẠI VIỆT: CHỌN MÀU",
+    description: "Chọn 1 màu để kích hoạt skill Đại Việt. Mỗi khi đánh lá cùng màu trong lượt này, bạn rút 1 lá.",
     compact: true,
     avoidHandOverlap: true,
+    panelSize: "SMALL",
+    placement: "ABOVE_HAND",
+    maxWidth: 360,
+    ui: {
+      kind: "DAI_VIET_COLOR",
+      title: "🎨 ĐẠI VIỆT: CHỌN MÀU",
+      description: "Chọn 1 màu để kích hoạt skill Đại Việt. Mỗi khi đánh lá cùng màu trong lượt này, bạn rút 1 lá.",
+      compact: true,
+      avoidHandOverlap: true,
+      panelSize: "SMALL",
+      placement: "ABOVE_HAND",
+      maxWidth: 360
+    },
     options
   };
   state.phase = "AWAIT_TARGET_CARD";
@@ -9173,6 +9199,13 @@ function sanitizeTargetCardSelection(selection, requestingSeat) {
     description: selection.description || "",
     compact: selection.compact === true,
     avoidHandOverlap: selection.avoidHandOverlap === true,
+    panelSize: selection.panelSize || "",
+    placement: selection.placement || "",
+    promptKind: selection.promptKind || "",
+    skillName: selection.skillName || "",
+    skillDescription: selection.skillDescription || "",
+    maxWidth: Number(selection.maxWidth) || 0,
+    ui: selection.ui && typeof selection.ui === "object" ? { ...selection.ui } : null,
     effectType: selection.effectType || "TARGET_CARD",
     remainingCount: selection.remainingCount !== undefined ? selection.remainingCount : 1,
     options: (selection.options || []).map((option) => ({
