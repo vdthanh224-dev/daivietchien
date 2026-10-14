@@ -303,6 +303,14 @@ async function sweepAppwriteMatchmaking() {
         const anchorPath = `/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents/${encodeURIComponent(anchor.documentId)}`;
         const updated = await appwriteMatchmakingRequest(anchorPath, { method: "PATCH", body: JSON.stringify(matchmakingRoomPayload(anchor)) });
         if (!updated?.ok) continue;
+        // Keep the in-memory document snapshot used by alias reconciliation
+        // in step with the just-patched anchor response.
+        const anchorDocumentSnapshot = body.documents.find((document) => String(document?.$id || "") === String(anchor.documentId));
+        if (anchorDocumentSnapshot) {
+          anchorDocumentSnapshot.userId = "ROOM_WAITING";
+          anchorDocumentSnapshot.userName = encodeMatchmakingRoom(anchor);
+          anchorDocumentSnapshot.timestamp = anchor.timestamp;
+        }
         const sourcePath = `/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents/${encodeURIComponent(source.documentId)}`;
         matchmakingRoomAliases.set(source.roomId, anchor.roomId);
         mergeInMemoryMatchRooms(source.roomId, anchor.roomId);
