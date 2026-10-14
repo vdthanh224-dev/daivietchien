@@ -2465,6 +2465,10 @@ func _refresh_tran_thu_equipped_previews() -> void:
 	if not is_waiting_dodge or current_server_phase != "AWAIT_SLASH_DEFENSE" or not generals_data.has(my_seat):
 		_clear_tran_thu_equipped_previews()
 		return
+	var my_gen = generals_data.get(my_seat, {})
+	if not _hero_has_skill(my_gen, "tran_thu"):
+		_clear_tran_thu_equipped_previews()
+		return
 	var desired: Dictionary = {}
 	var equipment_cards = _get_local_equipment_cards_for_song_cung(generals_data[my_seat])
 	if equipment_cards is Array:
@@ -2494,6 +2498,7 @@ func _refresh_tran_thu_equipped_previews() -> void:
 
 func _refresh_song_cung_equipped_previews() -> void:
 	if not is_waiting_song_cung or not generals_data.has(my_seat):
+		_clear_song_cung_equipped_previews()
 		return
 	var desired: Dictionary = {}
 	var equipment_cards = _get_local_equipment_cards_for_song_cung(generals_data[my_seat])
@@ -2545,6 +2550,7 @@ func _refresh_song_cung_equipped_previews() -> void:
 
 func _refresh_trao_bao_equipped_previews() -> void:
 	if not is_targeting_trao_bao or not generals_data.has(my_seat):
+		_clear_trao_bao_equipped_previews()
 		return
 	var desired: Dictionary = {}
 	var equipment_cards = _get_local_equipment_cards_for_song_cung(generals_data[my_seat])
@@ -2648,6 +2654,7 @@ func _record_local_equipment_card(card_info: Dictionary) -> void:
 
 func _refresh_hung_suc_equipped_weapon_previews() -> void:
 	if not (is_targeting_hung_suc or is_targeting_cai_cach or is_targeting_binh_san) or not generals_data.has(my_seat):
+		_clear_hung_suc_equipped_weapon_previews()
 		return
 	var desired_weapons: Dictionary = {}
 	var equipment_cards = generals_data[my_seat].get("equipment_cards", [])
@@ -3369,7 +3376,7 @@ func _get_card_info_from_ui(ui_node: Control) -> Dictionary:
 		"desc": desc,
 		"cat": cat,
 		"subType": ui_node.card_data.sub_type if ui_node.get("card_data") and ui_node.card_data != null else -1,
-		"is_equipped": ui_node.has_meta("hung_suc_equipped_preview") or ui_node.has_meta("song_cung_equipped_preview") or ui_node.has_meta("trao_bao_equipped_preview"),
+		"is_equipped": ui_node.has_meta("hung_suc_equipped_preview") or ui_node.has_meta("song_cung_equipped_preview") or ui_node.has_meta("trao_bao_equipped_preview") or ui_node.has_meta("tran_thu_equipped_preview") or ui_node.has_meta("tau_vi_equipped_preview"),
 		"card_node": ui_node
 	}
 
@@ -5569,7 +5576,10 @@ func _sync_player_equipments_from_server(seat: int, equips: Array) -> void:
 	if seat == my_seat and is_targeting_tau_vi:
 		_refresh_tau_vi_equipped_previews()
 	if seat == my_seat and is_waiting_dodge and current_server_phase == "AWAIT_SLASH_DEFENSE":
-		_refresh_tran_thu_equipped_previews()
+		if _hero_has_skill(generals_data.get(my_seat, {}), "tran_thu"):
+			_refresh_tran_thu_equipped_previews()
+		else:
+			_clear_tran_thu_equipped_previews()
 
 func _has_equipped_weapon_name(general: Dictionary, weapon_name: String) -> bool:
 	return weapon_name in str(general.get("equipped_weapon", ""))
@@ -8457,7 +8467,10 @@ func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_e
 		dodge_card_selector_scroll.visible = false
 	_build_dodge_card_selector_buttons([])
 
-	_refresh_tran_thu_equipped_previews()
+	if _hero_has_skill(generals_data.get(my_seat, {}), "tran_thu"):
+		_refresh_tran_thu_equipped_previews()
+	else:
+		_clear_tran_thu_equipped_previews()
 	var valid_cards = _get_valid_dodge_cards(attacker_seat, true)
 	_set_reaction_hand_focus(true, "Đỡ", attacker_seat, false, true)
 	if valid_cards.size() > 0:
