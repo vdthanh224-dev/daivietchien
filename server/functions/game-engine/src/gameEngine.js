@@ -8409,6 +8409,13 @@ export function handleAIReaction(state, aiSeat) {
   const ai = state.players.find(x => x.seat === aiSeat);
   if (!ai || (ai.hp <= 0 && !["AWAIT_NEAR_DEATH", "AWAIT_UAT_KHI_TARGET"].includes(state.phase))) return { error: "Người chơi không hợp lệ" };
 
+  if (state.phase === "AWAIT_CAN_GIAN" && state.waitingTargetSeat === aiSeat) {
+    const cost = (ai.hand || []).find((card) => ["RED", "WHITE"].includes(cardColor(card.suit)));
+    return cost
+      ? handleRespondAction(state, aiSeat, true, cost.id)
+      : handleRespondAction(state, aiSeat, false, null);
+  }
+
   if (state.phase === "AWAIT_UAT_KHI_TARGET" && state.waitingTargetSeat === aiSeat) {
     const pending = state.uatKhiPending;
     const livingAllies = state.players.filter(
@@ -8871,6 +8878,15 @@ export function tickGameState(state, connectedSeats = null) {
   const elapsedMs = Date.now() - state.timerStartAt;
   const elapsed = Math.floor(elapsedMs / 1000);
   const newTimer = Math.max(0, 40 - elapsed);
+
+  // Render clients do not expose a separate Can Gián choice panel. Resolve
+  // the optional response promptly on the authoritative server so the skill
+  // cannot leave the delayed scroll flow stuck for the player.
+  if (state.phase === "AWAIT_CAN_GIAN" && state.waitingTargetSeat > 0 && elapsedMs >= 1000) {
+    const waitingPlayer = state.players.find((player) => player.seat === state.waitingTargetSeat);
+    const result = handleAIReaction(state, state.waitingTargetSeat);
+    return { changed: !!result && !result.error, important: true };
+  }
 
   // Giai đoạn chờ lật bài phán xét (AWAIT_JUDGEMENT)
   if (state.phase === "AWAIT_JUDGEMENT") {
