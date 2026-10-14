@@ -5993,7 +5993,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		reaction_submission_pending = false
 	elif previous_server_phase != server_phase and server_phase in ["AWAIT_NEAR_DEATH", "AWAIT_BORROW_SWORD"]:
 		_close_dodge_reaction_state()
-	elif previous_server_phase in ["AWAIT_SLASH_DEFENSE", "AWAIT_OAI_NHUOC", "AWAIT_HICH_CASTER_DISCARD", "AWAIT_HICH_TARGET_DISCARD", "AWAIT_DRUM_CHOICE", "AWAIT_SONG_CUNG_FOLLOW_UP", "AWAIT_DAN_CAU", "AWAIT_CAN_GIAN"] and server_phase != previous_server_phase and (is_waiting_dodge or is_waiting_song_cung):
+	elif previous_server_phase in ["AWAIT_SLASH_DEFENSE", "AWAIT_OAI_NHUOC", "AWAIT_HICH_CASTER_DISCARD", "AWAIT_HICH_TARGET_DISCARD", "AWAIT_DRUM_CHOICE", "AWAIT_SONG_CUNG_FOLLOW_UP", "AWAIT_DAN_CAU", "AWAIT_CAN_GIAN", "AWAIT_THU_PHAP_DISCARD"] and server_phase != previous_server_phase and (is_waiting_dodge or is_waiting_song_cung):
 		_close_song_cung_modal()
 		_close_dodge_reaction_state()
 	if server_phase not in ["AWAIT_SLASH_DEFENSE", "AWAIT_DAN_CAU"] or server_waiting_seat != my_seat:
@@ -6276,7 +6276,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		elif server_waiting_seat != my_seat:
 			turn_indicator.text = "🐘 ĐANG CHỜ MỤC TIÊU CHỌN OAI NHƯỢC (%ds)..." % server_waiting_timer
 
-	elif server_phase in ["AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_TRUNG_KIEN", "AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_THU_PHAP_DISCARD"]:
+	elif server_phase in ["AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_TRUNG_KIEN", "AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP"]:
 		is_player_turn = false
 		if server_waiting_seat == my_seat:
 			card_play_btn.visible = true
@@ -6284,12 +6284,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			end_turn_btn.visible = true
 			end_turn_btn.disabled = false
 			end_turn_btn.text = "TỪ CHỐI"
-			if server_phase == "AWAIT_THU_PHAP_DISCARD":
-				end_turn_btn.visible = false
-				turn_indicator.text = "📜 THỦ PHÁP: CHỌN 1 LÁ ĐỂ BỎ (%ds)!" % server_waiting_timer
-				desc_text.text = "📜 Lý Nhật Tôn [Thủ Pháp]: Bạn đã rút 3 lá bài. Hãy chọn 1 lá bài trên tay và bấm [BỎ LÁ] để hoàn tất lượt."
-				_update_action_btn()
-			elif server_phase == "AWAIT_TRAO_BAO_EQUIP":
+			if server_phase == "AWAIT_TRAO_BAO_EQUIP":
 				var eq_name = "trang bị"
 				if state.has("pendingTraoBao") and state["pendingTraoBao"] is Dictionary:
 					var eq_card = state["pendingTraoBao"].get("card", {})
@@ -6420,12 +6415,38 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			elif server_phase == "AWAIT_THAN_CHINH_LE_HOAN":
 				turn_indicator.text = "⚔️ ĐANG CHỜ %s PHẢN HỒI THÂN CHINH (%ds)..." % [wait_name, server_waiting_timer]
 				desc_text.text = "⚔️ %s đang chọn giao 1 lá bài hoặc chịu 1 sát thương..." % wait_name
-			elif server_phase == "AWAIT_THU_PHAP_DISCARD":
-				turn_indicator.text = "📜 ĐANG CHỜ %s BỎ BÀI THEO THỦ PHÁP (%ds)..." % [wait_name, server_waiting_timer]
-				desc_text.text = "📜 %s đang chọn 1 lá trên tay để bỏ theo kỹ năng [Thủ Pháp]..." % wait_name
 			else:
 				turn_indicator.text = "⏳ ĐANG CHỜ %s QUYẾT ĐỊNH (%ds)..." % [wait_name, server_waiting_timer]
 				desc_text.text = "⏳ Đang chờ %s phản hồi..." % wait_name
+
+	elif server_phase == "AWAIT_THU_PHAP_DISCARD":
+		is_player_turn = false
+		card_play_btn.visible = false
+		end_turn_btn.visible = false
+		if server_waiting_seat == my_seat:
+			if not is_waiting_dodge:
+				_prompt_reaction_modal(
+					"📜 THỦ PHÁP (LÝ NHẬT TÔN)",
+					"Bạn đã kích hoạt [Thủ Pháp] và rút 3 lá bài.\nHãy chọn 1 lá bài trên tay để bỏ hoàn tất lượt:",
+					"Bỏ bài",
+					"",
+					"🗑️ BỎ LÁ",
+					server_waiting_timer,
+					false,
+					false,
+					false,
+					false
+				)
+				custom_reaction_callback = func(accepted: bool, card_info: Dictionary):
+					var cid = str(card_info.get("id", ""))
+					NetworkClient.send_respond_action(true, cid)
+			elif dodge_timer_lbl and is_instance_valid(dodge_timer_lbl):
+				dodge_timer_lbl.text = "⏳ Còn lại: %ds" % server_waiting_timer
+		else:
+			var wait_gen = generals_data.get(server_waiting_seat, {})
+			var wait_name = wait_gen.get("name", "Ghế %d" % server_waiting_seat) if wait_gen is Dictionary else "Ghế %d" % server_waiting_seat
+			turn_indicator.text = "📜 ĐANG CHỜ %s BỎ BÀI THEO THỦ PHÁP (%ds)..." % [wait_name, server_waiting_timer]
+			desc_text.text = "📜 %s đang chọn 1 lá trên tay để bỏ theo kỹ năng [Thủ Pháp]..." % wait_name
 
 	elif server_phase == "AWAIT_CAN_GIAN":
 		is_player_turn = false
@@ -7431,7 +7452,7 @@ func _prompt_reaction_modal(title_text: String, desc_text_msg: String, required_
 	current_reaction_allow_dodge_as_slash = allow_dodge_as_slash
 	is_current_reaction_slash = is_slash_attack
 	dodge_pass_btn.text = pass_text
-	dodge_pass_btn.visible = true
+	dodge_pass_btn.visible = !pass_text.is_empty()
 	dodge_pass_btn.disabled = false
 	dodge_confirm_btn.text = "%s [CHỌN BÀI]" % confirm_prefix if requires_card else confirm_prefix
 	dodge_confirm_btn.disabled = requires_card

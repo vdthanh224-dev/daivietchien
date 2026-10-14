@@ -4858,7 +4858,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
   }
 
   if (state.phase === "AWAIT_THU_PHAP_DISCARD") {
-    const chosenId = cardId || (Array.isArray(extraPayload?.cardIds) ? extraPayload.cardIds[0] : null);
+    const chosenId = cardId || (Array.isArray(cardIds) ? cardIds[0] : (Array.isArray(payload?.cardIds) ? payload.cardIds[0] : null));
     if (!chosenId) return { error: "Thủ Pháp yêu cầu bỏ đúng 1 lá bài" };
     return handleDiscardCards(state, respondentSeat, [chosenId]);
   }
@@ -8610,6 +8610,9 @@ export function handleAIReaction(state, aiSeat) {
   }
 
   if (state.phase === "AWAIT_THU_PHAP_DISCARD" && state.waitingTargetSeat === aiSeat) {
+    if (!ai.isAI) {
+      return { error: "Chờ người chơi tự bỏ bài theo Thủ Pháp" };
+    }
     const card = ai.hand?.[0];
     return card
       ? handleDiscardCards(state, aiSeat, [card.id])
