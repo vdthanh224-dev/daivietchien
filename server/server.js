@@ -306,6 +306,8 @@ async function sweepAppwriteMatchmaking() {
         const sourcePath = `/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents/${encodeURIComponent(source.documentId)}`;
         matchmakingRoomAliases.set(source.roomId, anchor.roomId);
         mergeInMemoryMatchRooms(source.roomId, anchor.roomId);
+        source.slots = anchor.slots.map((slot) => ({ ...slot }));
+        source.version = Math.max(source.version, anchor.version);
         source.status = "MERGED";
         await appwriteMatchmakingRequest(sourcePath, { method: "PATCH", body: JSON.stringify(matchmakingRoomPayload(source, "ROOM_MERGED")) });
         console.log(`[Render Matchmaking] Gộp phòng ${source.roomId} vào ${anchor.roomId} (${matchmakingRealPlayers(anchor).length} người thật).`);
