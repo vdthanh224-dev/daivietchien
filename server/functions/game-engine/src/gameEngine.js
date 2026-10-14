@@ -601,7 +601,7 @@ export function initGame(roomId, playersInput, modeId = "2v2") {
 
   const firstPlayer = initialState.players.find((player) => player.seat === initialState.turnSeat);
   if (firstPlayer) {
-    if (heroHasSkill(firstPlayer, "DUNG_NUOC")) {
+    if (heroHasSkill(firstPlayer, "DUNG_NUOC") || heroHasSkill(firstPlayer, "DAI_VIET")) {
       initialState.turnStart = {
         seat: firstPlayer.seat,
         judgementCards: [],
@@ -610,7 +610,8 @@ export function initGame(roomId, playersInput, modeId = "2v2") {
         skipPlay: false,
         drawCount: 1,
         anDanResolved: false,
-        dungNuocResolved: false
+        dungNuocResolved: false,
+        daiVietResolved: false
       };
       continueTurnStart(initialState);
     } else {
@@ -7822,17 +7823,24 @@ function continueTurnStart(state) {
 
   if (!turnStart.daiVietResolved && heroHasSkill(player, "DAI_VIET")) {
     turnStart.daiVietResolved = true;
-    state.phase = "AWAIT_DAI_VIET_COLOR";
-    state.waitingTargetSeat = player.seat;
-    state.waitingReactionType = "DAI_VIET_COLOR";
-    state.waitingTimer = 40;
-    state.timerStartAt = Date.now();
+    const colorCounts = new Map();
+    for (const card of player.hand || []) {
+      const color = cardColor(card?.suit);
+      if (color) colorCounts.set(color, (colorCounts.get(color) || 0) + 1);
+    }
+    const preferredColors = ["RED", "WHITE", "YELLOW", "BLACK"];
+    const chosenColor = preferredColors
+      .slice()
+      .sort((left, right) => (colorCounts.get(right) || 0) - (colorCounts.get(left) || 0))[0];
+    player.daiVietColor = chosenColor;
+    player.turnPlayedColors = new Set();
     recordAction(state, {
-      type: "DAI_VIET_PROMPT",
+      type: "DAI_VIET_COLOR_CHOSEN",
       casterSeat: player.seat,
-      description: `👑 <b>${player.generalName}</b> kích hoạt [Đại Việt]: chọn 1 màu bài (Đỏ / Trắng / Vàng / Đen).`
+      color: chosenColor,
+      skillActivations: [{ name: "Đại Việt", seat: player.seat }],
+      description: `👑 <b>${player.generalName}</b> kích hoạt [Đại Việt], chọn màu <b>${chosenColor}</b> cho lượt này.`
     });
-    return { success: true, state };
   }
 
   if (!turnStart.chinhThongResolved && heroHasSkill(player, "CHINH_THONG")) {
