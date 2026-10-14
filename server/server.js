@@ -253,7 +253,7 @@ async function sweepAppwriteMatchmaking() {
   if (matchmakingSweepRunning) return;
   matchmakingSweepRunning = true;
   try {
-    const query = encodeURIComponent(JSON.stringify({ method: "limit", values: [100] }));
+    const query = encodeURIComponent(JSON.stringify({ method: "orderDesc", attribute: "timestamp" }));
     const limit = encodeURIComponent(JSON.stringify({ method: "limit", values: [100] }));
     const response = await appwriteMatchmakingRequest(`/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents?queries[0]=${query}&queries[1]=${limit}`);
     if (!response?.ok) return;
