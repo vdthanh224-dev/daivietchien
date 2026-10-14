@@ -166,27 +166,31 @@ function matchmakingRoomPayload(room, status = "ROOM_WAITING") {
   };
 }
 
-async function reconcileMatchmakingAliases() {
+async function reconcileMatchmakingAliases(documents = []) {
+  const documentList = Array.isArray(documents) ? documents : [];
+  const documentByRoomId = new Map();
+  for (const document of documentList) {
+    const roomId = String(document?.userName || "").split("|")[1] || "";
+    if (roomId) documentByRoomId.set(roomId, document);
+  }
   for (const [sourceRoomId, targetRoomId] of matchmakingRoomAliases) {
-    const sourceResponse = await appwriteMatchmakingRequest(`/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents?queries[0]=${encodeURIComponent(JSON.stringify({ method: "limit", values: [100] }))}`);
-    if (!sourceResponse?.ok) continue;
-    const sourceBody = await sourceResponse.json();
-    const sourceDocument = (sourceBody?.documents || []).find((document) => String(document?.userName || "").split("|")[1] === sourceRoomId);
-    if (!sourceDocument) continue;
-    const targetResponse = sourceResponse;
-    if (!targetResponse?.ok) continue;
-    const targetBody = sourceBody;
-    const targetDocument = (targetBody?.documents || []).find((document) => String(document?.userName || "").split("|")[1] === targetRoomId);
+    const sourceDocument = documentByRoomId.get(sourceRoomId);
+    const targetDocument = documentByRoomId.get(targetRoomId);
+    if (!sourceDocument || !targetDocument) continue;
     const targetRoom = decodeMatchmakingRoom(targetDocument);
     if (!targetRoom) continue;
     const sourceRoom = decodeMatchmakingRoom(sourceDocument);
     if (!sourceRoom) continue;
     sourceRoom.slots = targetRoom.slots.map((slot) => ({ ...slot }));
-    sourceRoom.status = targetRoom.status;
     sourceRoom.version = Math.max(sourceRoom.version, targetRoom.version);
+    const mirrorStatus = targetRoom.status === "STARTED"
+      ? "ROOM_STARTED"
+      : targetRoom.status === "FINISHED"
+        ? "ROOM_FINISHED"
+        : "ROOM_MERGED";
     await appwriteMatchmakingRequest(matchmakingDocumentPath(sourceRoom.documentId), {
       method: "PATCH",
-      body: JSON.stringify(matchmakingRoomPayload(sourceRoom, targetRoom.status === "WAITING" ? "ROOM_WAITING" : targetRoom.status === "STARTED" ? "ROOM_STARTED" : "ROOM_FINISHED")),
+      body: JSON.stringify(matchmakingRoomPayload(sourceRoom, mirrorStatus)),
     });
   }
 }
@@ -301,7 +305,7 @@ async function sweepAppwriteMatchmaking() {
         console.log(`[Render Matchmaking] Gộp phòng ${source.roomId} vào ${anchor.roomId} (${matchmakingRealPlayers(anchor).length} người thật).`);
       }
     }
-    await reconcileMatchmakingAliases();
+    await reconcileMatchmakingAliases(body?.documents);
   } catch (error) {
     console.error("[Render Matchmaking] Sweep error:", error.message);
   } finally {
