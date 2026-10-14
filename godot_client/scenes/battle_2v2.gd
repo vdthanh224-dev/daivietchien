@@ -75,7 +75,8 @@ const HERO_SKILL_ACTIONS := {
 	"DOI_DO_TRIGGERED": {"name": "Dời Đô"},
 	"THAI_BINH_TRIGGERED": {"name": "Thái Bình"},
 	"THAN_CHINH_BONUS_SLASH": {"name": "Thân Chinh"},
-	"PHAT_CHAM_HEAL": {"name": "Phạt Chăm"}
+	"PHAT_CHAM_HEAL": {"name": "Phạt Chăm"},
+	"GIAI_ACH_DRAW": {"name": "Giải Ách"}
 }
 const IMPLEMENTED_HERO_SKILL_NAMES := [
 	"Chế Nỏ", "Liên Châu", "Xạ Thuẫn", "Phù Trấn", "Hịch Nghĩa", "Uất Khí",
@@ -85,7 +86,8 @@ const IMPLEMENTED_HERO_SKILL_NAMES := [
 	"Trấn Nam", "Hóa Dân", "Dạ Trạch", "Nỏ Đỉnh", "Phục Hổ", "An Dân", "Lực Địch", "Hùng Sức",
 	"Vạn An", "Đế Nghiệp", "Khoan Giản", "Chính Thống", "Khoan Hòa", "Cải Cách", "Thiên Cảm", "Nam Tấn", "Bình Sạn", "Cát Cứ", "Cố Thủ", "Hồi Hồ", "Phòng Duyện", "Liệt Chiến", "Tây Phu", "Nghĩa Tử", "Dưỡng Binh",
 	"Tế Giang", "Ưu Thiếp", "Cờ Lau", "Thu Phục", "Vạn Thắng", "Trữ Quân", "Cột Kinh", "Trung Tiết", "Cận Vệ",
-	"Định Quốc", "Tận Trung", "Bao Lăm", "Trấn Thủ", "Phá Tống", "Thân Chinh", "Trao Bào", "Nhiếp Chính", "Bạo Nộ", "Ngọa Triều", "Phò Tá", "Mưu Định", "Dời Đô", "Thái Bình", "Phạt Chăm"
+	"Định Quốc", "Tận Trung", "Bao Lăm", "Trấn Thủ", "Phá Tống", "Thân Chinh", "Trao Bào", "Nhiếp Chính", "Bạo Nộ", "Ngọa Triều", "Phò Tá", "Mưu Định", "Dời Đô", "Thái Bình", "Phạt Chăm",
+	"Thang Mộc", "Giải Ách"
 ]
 
 # UI Node References
@@ -8276,6 +8278,9 @@ func _on_network_action_received(delta: Dictionary) -> void:
 	elif act_type == "UU_THIEP_SKIPPED":
 		var c_name = generals_data.get(caster_seat, {}).get("name", "Lã Đường")
 		_add_log("🐎 [ƯU THIẾP] %s đã bỏ qua cướp Trang bị từ Ưu Thiếp." % c_name)
+	elif act_type == "GIAI_ACH_DRAW":
+		_animate_showcase_card("Giải Ách", str(delta.get("description", "Giải Ách: Thoát khỏi cẩm nang trì hoãn, rút 1 lá bài!")))
+		AudioManager.play_skill()
 	elif act_type in ["OAI_NHUOC_DISCARD", "DUNG_NUOC_TRIGGERED", "TUNG_NGHIA_DRAW", "VAN_SACH_TRIGGERED", "HAN_LAM_KEEP", "HAN_LAM_BOTTOM", "TRUNG_KIEN_TRIGGERED"]:
 		var skill_effect_names = {
 			"OAI_NHUOC_DISCARD": "Oai Nhược",
@@ -11876,12 +11881,30 @@ func _resolve_local_thuy_trieu_rut(caster_seat: int, target_seat: int) -> void:
 	_add_log("🌊 [THỦY TRIỀU RÚT] Lá đưa không phải Bài Cơ Bản; %s ít bài hơn sau chuyển, chịu 1 sát thương Thủy." % victim.get("name", "Mục tiêu"))
 	_apply_damage_to_general(victim_seat, 1, caster_seat, "WATER")
 
+func _trigger_local_giai_ach(general_data: Dictionary, delayed_name: String = "") -> void:
+	if not _hero_has_skill(general_data, "giai_ach"):
+		return
+	var seat = int(general_data.get("seat", 0))
+	var gen_name = str(general_data.get("name", "Tô Hiến Thành"))
+	_animate_showcase_card("Giải Ách", "📜 %s kích hoạt [Giải Ách], thoát khỏi %s và rút 1 lá bài!" % [gen_name, delayed_name if not delayed_name.is_empty() else "cẩm nang trì hoãn"])
+	AudioManager.play_skill()
+	_add_log("📜 <b>%s</b> kích hoạt [Giải Ách], thoát khỏi %s và được rút 1 lá bài!" % [gen_name, delayed_name if not delayed_name.is_empty() else "cẩm nang trì hoãn"])
+	if seat == my_seat:
+		_add_card_to_player_hand(_draw_card_from_pile())
+	else:
+		var c = _draw_card_from_pile()
+		general_data["hand_cards"].append(c)
+		general_data["hand_count"] = general_data["hand_cards"].size()
+		if general_data.has("avatar_node") and is_instance_valid(general_data["avatar_node"]):
+			general_data["avatar_node"].update_hand_count(general_data["hand_count"])
+
 func _handle_dai_hong_thuy_judgement(seat_num: int) -> void:
 	var g = generals_data[seat_num]
 	if await _maybe_local_nullify_delayed(g, "Đại Hồng Thủy", "hủy phán xét Đại Hồng Thủy"):
 		g["has_dai_hong_thuy"] = false
 		g["has_lightning"] = false
 		g["avatar_node"].set_delayed_trick("dai_hong_thuy", false)
+		_trigger_local_giai_ach(g, "Đại Hồng Thủy")
 		return
 	_add_log("🌊 [GIAI ĐOẠN PHÁN XÉT] %s đang mang [Đại Hồng Thủy]! Bắt đầu lật bài phán xét..." % g["name"])
 	_animate_showcase_card("Đại Hồng Thủy", "🌊 [Đại Hồng Thủy]: Phán xét bài Đen 2..9!")
@@ -11926,6 +11949,7 @@ func _handle_dai_hong_thuy_judgement(seat_num: int) -> void:
 		else:
 			_show_judgement_result(false, "Đại Hồng Thủy", judge_card)
 			_add_log("🌊 [Đại Hồng Thủy] Phán xét an toàn: Lật [Bài %s %s]. Không còn tướng nhận, lá bài bị loại bỏ!" % [rank_str, suit_name])
+		_trigger_local_giai_ach(g, "Đại Hồng Thủy")
 		await get_tree().create_timer(1.0).timeout
 
 func _handle_supply_shortage_judgement(seat_num: int) -> bool:
@@ -11933,6 +11957,7 @@ func _handle_supply_shortage_judgement(seat_num: int) -> bool:
 	if await _maybe_local_nullify_delayed(g, "Cắt Đường Lương", "hủy phán xét Cắt Đường Lương"):
 		g["has_cat_luong"] = false
 		g["avatar_node"].set_delayed_trick("supply_shortage", false)
+		_trigger_local_giai_ach(g, "Cắt Đường Lương")
 		return false
 	_add_log("🌾 [PHÁN XÉT CẮT LƯƠNG] %s bị [Cắt Đường Lương]! Bắt đầu lật bài phán xét..." % g["name"])
 	_animate_showcase_card("Cắt Đường Lương", "🌾 Phán xét: Không phải bài Vàng -> Cấm rút bài!")
@@ -11955,6 +11980,7 @@ func _handle_supply_shortage_judgement(seat_num: int) -> bool:
 		_animate_showcase_card("Thoát Cắt Lương", "🌾 Lật [Bài %s %s]: Thoát hiểm! Được rút bài bình thường." % [rank_str, suit_name], judge_card)
 		_add_log("🌾 [Cắt Đường Lương] Thoát hiểm: Lật [Bài %s %s] (bài Vàng) -> %s được rút bài!" % [rank_str, suit_name, g["name"]])
 		AudioManager.play_parry()
+		_trigger_local_giai_ach(g, "Cắt Đường Lương")
 		await get_tree().create_timer(1.0).timeout
 		return false
 	else:
@@ -11971,6 +11997,7 @@ func _handle_acedia_judgement(seat_num: int) -> bool:
 	if await _maybe_local_nullify_delayed(g, "Trầm Ảo Sa Bẫy", "hủy phán xét Trầm Ảo Sa Bẫy"):
 		g["has_tram_ao"] = false
 		g["avatar_node"].set_delayed_trick("acedia", false)
+		_trigger_local_giai_ach(g, "Trầm Ảo Sa Bẫy")
 		return false
 	_add_log("🕸️ [PHÁN XÉT TRẦM ẢO] %s bị [Trầm Ảo Sa Bẫy]! Bắt đầu lật bài phán xét..." % g["name"])
 	_animate_showcase_card("Trầm Ảo Sa Bẫy", "🕸️ Phán xét: Không phải bài Đỏ -> Cấm ra bài!")
@@ -11993,6 +12020,7 @@ func _handle_acedia_judgement(seat_num: int) -> bool:
 		_animate_showcase_card("Thoát Trầm Ảo", "🕸️ Lật [Bài %s %s]: Thoát bẫy! Được ra bài bình thường." % [rank_str, suit_name], judge_card)
 		_add_log("🕸️ [Trầm Ảo Sa Bẫy] Thoát bẫy: Lật [Bài %s %s] (bài Đỏ) -> %s được ra bài!" % [rank_str, suit_name, g["name"]])
 		AudioManager.play_parry()
+		_trigger_local_giai_ach(g, "Trầm Ảo Sa Bẫy")
 		await get_tree().create_timer(1.0).timeout
 		return false
 	else:
@@ -13076,6 +13104,7 @@ func _resolve_local_bai_coc_action(actor_seat: int, attacker_seat: int) -> bool:
 		actor["bai_coc_judgement_count"] = 0
 		actor["avatar_node"].set_delayed_trick("bai_coc", false)
 		_add_log("🛡️ Diệu Kế Phá Mưu đã phá Bãi Cọc Bạch Đằng của %s." % actor["name"])
+		_trigger_local_giai_ach(actor, "Bãi Cọc Bạch Đằng")
 		return true
 
 	var judge_card = _draw_card_from_pile()
@@ -13095,6 +13124,7 @@ func _resolve_local_bai_coc_action(actor_seat: int, attacker_seat: int) -> bool:
 		actor["avatar_node"].set_delayed_trick("bai_coc", false)
 		_animate_showcase_card("Bãi Cọc Bạch Đằng", "Phán xét [Bài %s %s] Bài Đỏ/Bài Trắng -> hành động được tiếp tục. Bãi Cọc rời đi." % [rank_text, suit_name], judge_card)
 		_add_log("🪵 [Bãi Cọc Bạch Đằng] phán xét Bài Đỏ/Bài Trắng cho %s, hành động tiếp tục; Bãi Cọc rời đi." % actor["name"])
+		_trigger_local_giai_ach(actor, "Bãi Cọc Bạch Đằng")
 		return true
 
 	_animate_showcase_card("Bãi Cọc Bạch Đằng", "Phán xét [Bài %s %s] Bài Vàng/Bài Đen -> hủy hành động, -1 Máu thường. Bãi Cọc rời đi." % [rank_text, suit_name], judge_card)
@@ -14121,6 +14151,7 @@ func _on_card_pick_confirmed() -> void:
 						"Bãi Cọc Bạch Đằng":
 							tgt["has_bai_coc"] = false
 							tgt["avatar_node"].set_delayed_trick("bai_coc", false)
+					_trigger_local_giai_ach(tgt, item_name)
 
 			var target_card = opt.get("card", _find_card_dict_by_name(item_name))
 			if not (target_card is Dictionary):

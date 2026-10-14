@@ -428,8 +428,163 @@ function createTestState(heroIds = ["HERO_41", "HERO_42", "HERO_43", "HERO_44"])
   assert.equal((p2.judgements || []).length, 1);
   assert.equal(p2.judgements[0].subType, CARD_SUBTYPES.SUPPLY_SHORTAGE);
 
-  // Giải Ách: when escaping delayed scroll
-  assert.equal(heroHasSkill(p2, "GIAI_ACH"), true);
+  // Giải Ách tests:
+  // 1. Escaping Cắt Đường Lương at turn start
+  for (const player of state.players) player.hand = [];
+  p2.judgements = [{
+    id: "TEST_SUPPLY",
+    name: "Cắt Đường Lương",
+    suit: "Spade",
+    rank: 10,
+    category: CARD_CATEGORIES.DELAYED_SCROLL,
+    subType: CARD_SUBTYPES.SUPPLY_SHORTAGE,
+    attachedBySeat: 1
+  }];
+  state._deck = [
+    { id: "D3", name: "Trảm", suit: "Heart", rank: 4, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
+    { id: "D2", name: "Trảm", suit: "Heart", rank: 3, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
+    { id: "D1", name: "Trảm", suit: "Heart", rank: 2, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
+    { id: "JUDGE_CLUB", name: "Đỡ", suit: "Club", rank: 8, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE }
+  ];
+  state.turnSeat = 1;
+  state.phase = "PLAY";
+  p2.usedSkills = { ThangMocTurnResolved: true };
+  handleEndTurn(state, 1);
+  assert.equal(state.phase, "AWAIT_JUDGEMENT");
+  assert.equal(state.pendingJudgement?.actionType, "SUPPLY_SHORTAGE_PASSED");
+  state.timerStartAt = Date.now() - 4000;
+  tickGameState(state);
+  // P2 drew 1 from Giải Ách + 2 from turn start = 3 cards
+  assert.equal(p2.hand.length, 3);
+  assert.equal((p2.judgements || []).length, 0);
+  assert.equal(state.actionHistory.some(a => a.type === "GIAI_ACH_DRAW" && a.casterSeat === 2), true);
+
+  // 2. Escaping Đại Hồng Thủy at turn start
+  p2.hand = [];
+  p2.judgements = [{
+    id: "TEST_FLOOD",
+    name: "Đại Hồng Thủy",
+    suit: "Spade",
+    rank: 1,
+    category: CARD_CATEGORIES.DELAYED_SCROLL,
+    subType: CARD_SUBTYPES.DAI_HONG_THUY,
+    attachedBySeat: 2
+  }];
+  state._deck = [
+    { id: "D6", name: "Trảm", suit: "Heart", rank: 7, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
+    { id: "D5", name: "Trảm", suit: "Heart", rank: 6, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
+    { id: "D4", name: "Trảm", suit: "Heart", rank: 5, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
+    { id: "JUDGE_HEART", name: "Đỡ", suit: "Heart", rank: 10, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE }
+  ];
+  state.turnSeat = 1;
+  state.phase = "PLAY";
+  p2.usedSkills = { ThangMocTurnResolved: true };
+  handleEndTurn(state, 1);
+  assert.equal(state.phase, "AWAIT_JUDGEMENT");
+  assert.equal(state.pendingJudgement?.actionType, "DAI_HONG_THUY_PASSED");
+  state.timerStartAt = Date.now() - 4000;
+  tickGameState(state);
+  // P2 drew 1 from Giải Ách + 2 from turn start = 3 cards
+  assert.equal(p2.hand.length, 3);
+  assert.equal(state.actionHistory.some(a => a.type === "GIAI_ACH_DRAW" && a.description?.includes("Đại Hồng Thủy")), true);
+
+  // 3. Escaping Bãi Cọc Bạch Đằng via Safe Judgement
+  p2.judgements = [{
+    id: "TEST_BAI_COC_SAFE",
+    name: "Bãi Cọc Bạch Đằng",
+    suit: "Spade",
+    rank: 9,
+    category: CARD_CATEGORIES.DELAYED_SCROLL,
+    subType: CARD_SUBTYPES.BAI_COC_BACH_DANG,
+    attachedBySeat: 1
+  }];
+  p2.hand = [{ id: "SLASH_SAFE", name: "Trảm", suit: "Heart", rank: 8, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }];
+  state.players[0].hand = [];
+  state.players[2].hand = [];
+  state.players[3].hand = [];
+  state._deck = [
+    { id: "BC_DRAW_CARD", name: "Trảm", suit: "Club", rank: 9, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
+    { id: "JUDGE_SAFE", name: "Đỡ", suit: "Heart", rank: 7, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE }
+  ];
+  state.phase = "PLAY";
+  state.turnSeat = 2;
+  state.slashesUsedThisTurn = 0;
+  const bcPlayRes = handlePlayCard(state, 2, "SLASH_SAFE", 1);
+  assert.equal(bcPlayRes.success, true);
+  // P2 played 1 card, but drew 1 card from Giải Ách! Hand length is 1 (the drawn card)
+  assert.equal(p2.hand.length, 1);
+  assert.equal((p2.judgements || []).length, 0);
+  assert.equal(state.actionHistory.some(a => a.type === "GIAI_ACH_DRAW" && a.description?.includes("Bãi Cọc Bạch Đằng")), true);
+
+  // 4. Escaping Bãi Cọc Bạch Đằng via Diệu Kế Phá Mưu nullification
+  p2.judgements = [{
+    id: "TEST_BAI_COC_NULL",
+    name: "Bãi Cọc Bạch Đằng",
+    suit: "Spade",
+    rank: 9,
+    category: CARD_CATEGORIES.DELAYED_SCROLL,
+    subType: CARD_SUBTYPES.BAI_COC_BACH_DANG,
+    attachedBySeat: 1
+  }];
+  p2.hand = [{ id: "SLASH_NULL", name: "Trảm", suit: "Heart", rank: 9, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }];
+  state.players[3].hand = [{ id: "DK_P4", name: "Diệu Kế Phá Mưu", suit: "Club", rank: 11, category: CARD_CATEGORIES.INSTANT_SCROLL, subType: CARD_SUBTYPES.FLAWLESS_DEFENSE }];
+  state.players[0].hand = [];
+  state.players[2].hand = [];
+  state._deck = [
+    { id: "DK_DRAW_CARD", name: "Trảm", suit: "Heart", rank: 4, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }
+  ];
+  state.phase = "PLAY";
+  state.turnSeat = 2;
+  state.slashesUsedThisTurn = 0;
+  handlePlayCard(state, 2, "SLASH_NULL", 1);
+  assert.equal(state.phase, "AWAIT_NULLIFY");
+  // P4 plays Diệu Kế to nullify Bãi Cọc
+  const nullResp = handleRespondAction(state, 4, true, "DK_P4");
+  assert.equal(nullResp.success, true);
+  // Nobody else has Diệu Kế, so nullify chain concludes
+  // P2 drew 1 card from Giải Ách!
+  assert.equal(p2.hand.length, 1);
+  assert.equal((p2.judgements || []).length, 0);
+
+  // 5. Escaping delayed scroll via An Dân
+  p2.judgements = [{
+    id: "TEST_AN_DAN_DELAY",
+    name: "Trầm Ảo Sa Bẫy",
+    suit: "Heart",
+    rank: 12,
+    category: CARD_CATEGORIES.DELAYED_SCROLL,
+    subType: CARD_SUBTYPES.ACEDIA,
+    attachedBySeat: 1
+  }];
+  p2.hand = [];
+  state._deck = [
+    { id: "AN_DAN_DRAW_CARD", name: "Trảm", suit: "Heart", rank: 5, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }
+  ];
+  state.targetCardSelection = {
+    chooserSeat: 1,
+    targetSeat: 2,
+    operation: "MOVE",
+    cardId: "AN_DAN",
+    cardName: "An Dân",
+    effectType: "AN_DAN",
+    options: [{
+      token: `AN_DAN|2|TEST_AN_DAN_DELAY|3`,
+      zone: "JUDGEMENT",
+      label: "P2 -> P3",
+      card: p2.judgements[0]
+    }]
+  };
+  state.phase = "AWAIT_TARGET_CARD";
+  state.waitingTargetSeat = 1;
+  state.waitingReactionType = "TARGET_CARD";
+  const anDanRes = handleRespondAction(state, 1, true, `AN_DAN|2|TEST_AN_DAN_DELAY|3`);
+  assert.equal(anDanRes.success, true);
+  assert.equal((p2.judgements || []).length, 0);
+  assert.equal(state.players[2].judgements.some(c => c.id === "TEST_AN_DAN_DELAY"), true);
+  // P2 drew 1 card from Giải Ách
+  assert.equal(p2.hand.length, 1);
+  assert.equal(state.actionHistory.some(a => a.type === "GIAI_ACH_DRAW" && a.casterSeat === 2), true);
+
   console.log("✅ Hero 46: Tô Hiến Thành (Thiết Diện, Thang Mộc, Giải Ách) OK");
 }
 

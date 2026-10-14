@@ -2491,6 +2491,15 @@ function resolveBaiCocAction(state, continuation, nullified) {
 
   if (nullified) {
     consumeTrap();
+    if (heroHasSkill(actor, "GIAI_ACH")) {
+      drawCards(state, actor.seat, 1);
+      recordAction(state, {
+        type: "GIAI_ACH_DRAW",
+        casterSeat: actor.seat,
+        skillActivations: [{ name: "Giải Ách", seat: actor.seat }],
+        description: `📜 <b>${actor.generalName}</b> kích hoạt [Giải Ách], thoát khỏi Bãi Cọc Bạch Đằng và rút 1 lá bài!`
+      });
+    }
     recordAction(state, {
       type: "BAI_COC_BACH_DANG_NULLIFIED",
       casterSeat: actorSeat,
@@ -2530,6 +2539,15 @@ function resolveBaiCocAction(state, continuation, nullified) {
       return { success: true, state, damageResult };
     }
     consumeTrap();
+    if (heroHasSkill(actor, "GIAI_ACH")) {
+      drawCards(state, actor.seat, 1);
+      recordAction(state, {
+        type: "GIAI_ACH_DRAW",
+        casterSeat: actor.seat,
+        skillActivations: [{ name: "Giải Ách", seat: actor.seat }],
+        description: `📜 <b>${actor.generalName}</b> kích hoạt [Giải Ách], thoát khỏi Bãi Cọc Bạch Đằng và rút 1 lá bài!`
+      });
+    }
 
     if (continuation?.type === "BORROW_SWORD_SLASH") {
       return resolveBorrowSwordSlash(state, continuation);
@@ -3283,6 +3301,15 @@ function completeTargetCardSelection(state, chooserSeat, targetCardId) {
     const movedCard = source.judgements.splice(cardIndex, 1)[0];
     destination.judgements = destination.judgements || [];
     destination.judgements.push(movedCard);
+    if (heroHasSkill(source, "GIAI_ACH")) {
+      drawCards(state, source.seat, 1);
+      recordAction(state, {
+        type: "GIAI_ACH_DRAW",
+        casterSeat: source.seat,
+        skillActivations: [{ name: "Giải Ách", seat: source.seat }],
+        description: `📜 <b>${source.generalName}</b> kích hoạt [Giải Ách], thoát khỏi cẩm nang trì hoãn và rút 1 lá bài!`
+      });
+    }
     const caster = state.players.find((player) => player.seat === chooserSeat);
     recordAction(state, {
       type: "AN_DAN_TRIGGERED",
@@ -3386,6 +3413,15 @@ function completeTargetCardSelection(state, chooserSeat, targetCardId) {
     if (pending.remaining > 0) return startDanCauStealPrompt(state);
     state.danCauStealPending = null;
     resetWaitingState(state);
+    if (resolvedSteal.option.zone === "JUDGEMENT" && heroHasSkill(resolvedSteal.target, "GIAI_ACH")) {
+      drawCards(state, resolvedSteal.target.seat, 1);
+      recordAction(state, {
+        type: "GIAI_ACH_DRAW",
+        casterSeat: resolvedSteal.target.seat,
+        skillActivations: [{ name: "Giải Ách", seat: resolvedSteal.target.seat }],
+        description: `📜 <b>${resolvedSteal.target.generalName}</b> kích hoạt [Giải Ách], thoát khỏi cẩm nang trì hoãn và rút 1 lá bài!`
+      });
+    }
     recordAction(state, {
       type: "DAN_CAU_STEAL",
       casterSeat: owner.seat,
@@ -3442,6 +3478,16 @@ function completeTargetCardSelection(state, chooserSeat, targetCardId) {
         description: `🍊 <b>${target.generalName}</b> kích hoạt [Cam Lạc], bị hủy bài trên tay và được rút 1 lá bài!`
       });
     }
+  }
+
+  if (option.zone === "JUDGEMENT" && heroHasSkill(target, "GIAI_ACH")) {
+    drawCards(state, target.seat, 1);
+    recordAction(state, {
+      type: "GIAI_ACH_DRAW",
+      casterSeat: target.seat,
+      skillActivations: [{ name: "Giải Ách", seat: target.seat }],
+      description: `📜 <b>${target.generalName}</b> kích hoạt [Giải Ách], thoát khỏi cẩm nang trì hoãn và rút 1 lá bài!`
+    });
   }
 
   const actionType = selection.effectType === "BINH_SAN" ? "BINH_SAN_DESTROY"
@@ -8134,6 +8180,15 @@ function applyPendingJudgement(state) {
         }
       } else {
         discardCard(state, cardObj);
+      }
+      if (heroHasSkill(target, "GIAI_ACH")) {
+        drawCards(state, target.seat, 1);
+        recordAction(state, {
+          type: "GIAI_ACH_DRAW",
+          casterSeat: target.seat,
+          skillActivations: [{ name: "Giải Ách", seat: target.seat }],
+          description: `📜 <b>${target.generalName}</b> kích hoạt [Giải Ách], thoát khỏi Đại Hồng Thủy và rút 1 lá bài!`
+        });
       }
     }
   } else {
