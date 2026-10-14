@@ -374,7 +374,11 @@ export function hydrateGameState(rawState, roomId = "") {
       ...state.targetCardSelection,
       chooserSeat: Number(state.targetCardSelection.chooserSeat) || 0,
       targetSeat: Number(state.targetCardSelection.targetSeat) || 0,
-      operation: ["STEAL", "RETURN", "MOVE"].includes(state.targetCardSelection.operation)
+      title: String(state.targetCardSelection.title || ""),
+      description: String(state.targetCardSelection.description || ""),
+      compact: state.targetCardSelection.compact === true,
+      avoidHandOverlap: state.targetCardSelection.avoidHandOverlap === true,
+      operation: ["STEAL", "RETURN", "MOVE", "COLOR"].includes(state.targetCardSelection.operation)
         ? state.targetCardSelection.operation : "DESTROY",
       options: Array.isArray(state.targetCardSelection.options)
         ? state.targetCardSelection.options.map((option) => ({
@@ -1037,6 +1041,10 @@ function startDaiVietColorChoice(state, player) {
     operation: "COLOR",
     effectType: "DAI_VIET_COLOR",
     cardName: "Đại Việt",
+    title: "🎨 CHỌN MÀU KÍCH HOẠT ĐẠI VIỆT",
+    description: "Chọn 1 màu bài để kích hoạt skill Đại Việt. Trong lượt này, mỗi khi đánh ra lá bài cùng màu, bạn được rút 1 lá.",
+    compact: true,
+    avoidHandOverlap: true,
     options
   };
   state.phase = "AWAIT_TARGET_CARD";
@@ -9163,6 +9171,10 @@ function sanitizeTargetCardSelection(selection, requestingSeat) {
     operation: selection.operation,
     cardId: selection.cardId,
     cardName: selection.cardName,
+    title: selection.title || "",
+    description: selection.description || "",
+    compact: selection.compact === true,
+    avoidHandOverlap: selection.avoidHandOverlap === true,
     effectType: selection.effectType || "TARGET_CARD",
     remainingCount: selection.remainingCount !== undefined ? selection.remainingCount : 1,
     options: (selection.options || []).map((option) => ({
