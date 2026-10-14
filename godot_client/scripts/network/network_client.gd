@@ -362,7 +362,12 @@ func send_json(dict: Dictionary) -> void:
 func register_social_profile() -> void:
 	if not AuthManager or AuthManager.current_user_id.is_empty():
 		return
-	send_json({"action": "SOCIAL_REGISTER", "userId": AuthManager.current_user_id, "userName": AuthManager.current_user_name})
+	send_json({
+		"action": "SOCIAL_REGISTER",
+		"userId": AuthManager.current_user_id,
+		"userName": AuthManager.current_user_name,
+		"level": AuthManager.current_level if AuthManager else 1
+	})
 
 func request_friend_list() -> void:
 	if AuthManager and not AuthManager.current_user_id.is_empty():

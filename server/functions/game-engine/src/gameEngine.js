@@ -289,6 +289,18 @@ export function hydrateGameState(rawState, roomId = "") {
   state.duelTargetSeat = Math.max(0, Number(state.duelTargetSeat) || 0);
   state.nearDeathVictimSeat = Math.max(0, Number(state.nearDeathVictimSeat) || 0);
   state.nearDeathAttackerSeat = Math.max(0, Number(state.nearDeathAttackerSeat) || 0);
+  state.khuyenNongQueue = Array.isArray(state.khuyenNongQueue)
+    ? state.khuyenNongQueue.map((pending) => ({
+      casterSeat: Number(pending?.casterSeat) || 0,
+      healedSeat: Number(pending?.healedSeat) || 0
+    })).filter((pending) => isSeatInState(state, pending.casterSeat) && isSeatInState(state, pending.healedSeat))
+    : [];
+  state.khuyenNongPending = state.khuyenNongPending && typeof state.khuyenNongPending === "object"
+    ? {
+      casterSeat: Number(state.khuyenNongPending.casterSeat) || 0,
+      healedSeat: Number(state.khuyenNongPending.healedSeat) || 0
+    }
+    : null;
   state.turnStart = state.turnStart && typeof state.turnStart === "object"
     ? {
       ...state.turnStart,
@@ -389,6 +401,10 @@ export function hydrateGameState(rawState, roomId = "") {
         : null,
       operation: ["STEAL", "RETURN", "MOVE", "COLOR"].includes(state.targetCardSelection.operation)
         ? state.targetCardSelection.operation : "DESTROY",
+      effectType: String(state.targetCardSelection.effectType || "TARGET_CARD"),
+      cardId: String(state.targetCardSelection.cardId || ""),
+      cardName: String(state.targetCardSelection.cardName || ""),
+      selectionId: String(state.targetCardSelection.selectionId || ""),
       options: Array.isArray(state.targetCardSelection.options)
         ? state.targetCardSelection.options.map((option) => ({
           ...option,
@@ -568,6 +584,8 @@ export function initGame(roomId, playersInput, modeId = "2v2") {
     nearDeathVictimSeat: 0,
     nearDeathAttackerSeat: 0,
     nearDeathAskerQueue: [],
+    khuyenNongQueue: [],
+    khuyenNongPending: null,
     slashesUsedThisTurn: 0,
     turnDamageDealt: false,
     isWineBuffActive: false,
@@ -1046,6 +1064,7 @@ function startDaiVietColorChoice(state, player) {
     card
   }));
   state.targetCardSelection = {
+    selectionId: `DAI_VIET:${player.seat}:${state.turnNumber || state.turnIndex || 0}:${Date.now()}`,
     chooserSeat: player.seat,
     targetSeat: player.seat,
     operation: "COLOR",
@@ -1230,6 +1249,7 @@ function resetWaitingState(state, clearActiveCard = true) {
   state.timerStartAt = Date.now();
   if (clearActiveCard) state.activeCard = null;
   maybeStartVanSachPrompt(state);
+  startNextKhuyenNongPrompt(state);
   refreshLastDelta(state);
 }
 
@@ -2884,6 +2904,7 @@ function startTargetCardSelection(state, card, casterSeat, targetSeat, selection
 
   const operation = selectionOptions.operation || (card.subType === CARD_SUBTYPES.SNATCH ? "STEAL" : "DESTROY");
   state.targetCardSelection = {
+    selectionId: `TARGET_CARD:${casterSeat}:${targetSeat}:${card.id}:${Date.now()}`,
     chooserSeat: casterSeat,
     targetSeat,
     operation,
@@ -2891,6 +2912,8 @@ function startTargetCardSelection(state, card, casterSeat, targetSeat, selection
     cardName: card.name,
     options,
     effectType: selectionOptions.effectType || "TARGET_CARD",
+    title: selectionOptions.title || "",
+    description: selectionOptions.description || "",
     remainingCount: Math.max(1, Number(selectionOptions.remainingCount) || 1)
   };
   state.phase = "AWAIT_TARGET_CARD";
@@ -2981,22 +3004,65 @@ function getDuelRequiredSlashCount(state, respondentSeat) {
 }
 
 function triggerKhuyenNong(state, healedSeat) {
+  const healedPlayer = state.players.find((x) => x.seat === Number(healedSeat));
   for (const p of state.players) {
-    if (isLivingPlayer(p) && heroHasSkill(p, "KHUYEN_NONG")) {
-      drawCards(state, p.seat, 1);
-      const healedPlayer = state.players.find((x) => x.seat === Number(healedSeat));
-      if (healedPlayer && isLivingPlayer(healedPlayer) && healedPlayer.seat !== p.seat) {
-        drawCards(state, healedPlayer.seat, 1);
-      }
-      recordAction(state, {
-        type: "KHUYEN_NONG_DRAW",
-        casterSeat: p.seat,
-        targetSeat: Number(healedSeat),
-        skillActivations: [{ name: "Khuyến Nông", seat: p.seat }],
-        description: `🌾 ${p.generalName} kích hoạt [Khuyến Nông], cùng ${healedPlayer ? healedPlayer.generalName : "người hồi máu"} mỗi người rút 1 lá bài.`
-      });
-    }
+    if (!isLivingPlayer(p) || !heroHasSkill(p, "KHUYEN_NONG")) continue;
+    state.khuyenNongQueue = state.khuyenNongQueue || [];
+    state.khuyenNongQueue.push({ casterSeat: p.seat, healedSeat: Number(healedSeat) });
   }
+  if (state.phase === "PLAY") startNextKhuyenNongPrompt(state);
+}
+
+function startNextKhuyenNongPrompt(state) {
+  if (state.phase !== "PLAY" || state.khuyenNongPending || !(state.khuyenNongQueue || []).length) return false;
+  while (state.khuyenNongQueue.length) {
+    const pending = state.khuyenNongQueue.shift();
+    const caster = state.players.find((p) => p.seat === pending.casterSeat);
+    const healed = state.players.find((p) => p.seat === pending.healedSeat);
+    if (!isLivingPlayer(caster) || !heroHasSkill(caster, "KHUYEN_NONG") || !isLivingPlayer(healed)) continue;
+    state.khuyenNongPending = pending;
+    state.phase = "AWAIT_KHUYEN_NONG";
+    state.waitingTargetSeat = caster.seat;
+    state.waitingReactionType = "KHUYEN_NONG";
+    state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
+    recordAction(state, {
+      type: "KHUYEN_NONG_PROMPT",
+      casterSeat: caster.seat,
+      targetSeat: healed.seat,
+      description: `🌾 ${caster.generalName} có muốn kích hoạt [Khuyến Nông] để bản thân và ${healed.generalName} mỗi người rút 1 lá không?`
+    });
+    return true;
+  }
+  return false;
+}
+
+function resolveKhuyenNong(state, accepted, respondentSeat) {
+  const pending = state.khuyenNongPending;
+  const caster = state.players.find((p) => p.seat === Number(respondentSeat));
+  const healed = pending ? state.players.find((p) => p.seat === Number(pending.healedSeat)) : null;
+  state.khuyenNongPending = null;
+  if (!pending || !caster || !healed) return false;
+  if (accepted) {
+    drawCards(state, caster.seat, 1);
+    if (healed.seat !== caster.seat) drawCards(state, healed.seat, 1);
+  }
+  recordAction(state, {
+    type: accepted ? "KHUYEN_NONG_DRAW" : "KHUYEN_NONG_DECLINED",
+    casterSeat: caster.seat,
+    targetSeat: healed.seat,
+    skillActivations: accepted ? [{ name: "Khuyến Nông", seat: caster.seat }] : [],
+    description: accepted
+      ? `🌾 ${caster.generalName} kích hoạt [Khuyến Nông], cùng ${healed.generalName} mỗi người rút 1 lá bài.`
+      : `🌾 ${caster.generalName} từ chối kích hoạt [Khuyến Nông].`
+  });
+  state.phase = "PLAY";
+  state.waitingTargetSeat = 0;
+  state.waitingReactionType = "NONE";
+  state.waitingTimer = 0;
+  state.timerStartAt = Date.now();
+  startNextKhuyenNongPrompt(state);
+  return true;
 }
 
 function triggerBaoLam(state, healedSeat) {
@@ -3401,6 +3467,7 @@ function completeTargetCardSelection(state, chooserSeat, targetCardId) {
     targetSeat: target.seat,
     cardId: selection.cardId,
     cardName: selection.cardName,
+    selectionId: selection.selectionId || "",
     targetCardId: option.zone === "HAND" ? null : card.id,
     targetCardName: publicTargetName,
     targetCardZone: option.zone,
@@ -4034,7 +4101,9 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0, paylo
   discardCard(state, card);
   return startTargetCardSelection(state, card, casterSeat, targetSeat, {
     allowDelayed: card.subType === CARD_SUBTYPES.SNATCH || card.subType === CARD_SUBTYPES.DISMANTLE || card.subType === CARD_SUBTYPES.FLAWLESS_DEFENSE,
-    includeHand: [CARD_SUBTYPES.SNATCH, CARD_SUBTYPES.DISMANTLE].includes(card.subType)
+    includeHand: [CARD_SUBTYPES.SNATCH, CARD_SUBTYPES.DISMANTLE].includes(card.subType),
+    title: card.subType === CARD_SUBTYPES.SNATCH ? `🌿 VƯỜN KHÔNG NHÀ TRỐNG: PHÁ HỦY BÀI CỦA ${state.players.find((player) => player.seat === targetSeat)?.generalName || "mục tiêu"}` : "",
+    description: card.subType === CARD_SUBTYPES.SNATCH ? `💡 Hãy chọn 1 lá bài úp trên tay hoặc 1 trang bị đang mặc của ${state.players.find((player) => player.seat === targetSeat)?.generalName || "mục tiêu"}.` : ""
   });
 }
 
@@ -4734,24 +4803,34 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
   if (state.phase === "AWAIT_CAN_GIAN") {
     if (state.waitingTargetSeat !== respondentSeat) return { error: "Không phải lượt Can Gián của bạn" };
     const pending = state.pendingCanGian;
-    state.pendingCanGian = null;
-    if (accepted && cardId) {
-      const idx = (respondent.hand || []).findIndex((c) => (c.id === cardId || c.name === cardId) && cardColor(c.suit) === "RED");
-      if (idx >= 0) {
-        const discarded = respondent.hand.splice(idx, 1)[0];
-        discardCard(state, discarded);
-        if (pending?.card) discardCard(state, pending.card);
-        recordAction(state, {
-          type: "CAN_GIAN_TRIGGERED",
-          casterSeat: respondentSeat,
-          skillActivations: [{ name: "Can Gián", seat: respondentSeat }],
-          description: `📜 <b>${respondent.generalName}</b> kích hoạt [Can Gián], bỏ ${formatCardText(discarded)} để hủy bỏ hoàn toàn cẩm nang ${formatCardText(pending.card)}!`
-        });
-        resetWaitingState(state);
-        return { success: true, state };
+    if (accepted) {
+      if (!cardId) {
+        return { error: "Vui lòng chọn 1 lá bài màu Đỏ trên tay để Can Gián" };
       }
+      const idx = (respondent.hand || []).findIndex((c) => (c.id === cardId || c.name === cardId));
+      if (idx < 0) {
+        return { error: "Không tìm thấy lá bài đã chọn trên tay" };
+      }
+      const chosenCard = respondent.hand[idx];
+      if (cardColor(chosenCard.suit) !== "RED") {
+        return { error: "Lá bài chọn để Can Gián phải là bài màu Đỏ (Cơ hoặc Rô)" };
+      }
+      state.pendingCanGian = null;
+      const discarded = respondent.hand.splice(idx, 1)[0];
+      discardCard(state, discarded);
+      if (pending?.card) discardCard(state, pending.card);
+      recordAction(state, {
+        type: "CAN_GIAN_TRIGGERED",
+        casterSeat: respondentSeat,
+        skillActivations: [{ name: "Can Gián", seat: respondentSeat }],
+        description: `📜 <b>${respondent.generalName}</b> kích hoạt [Can Gián], bỏ ${formatCardText(discarded)} để hủy bỏ hoàn toàn cẩm nang ${formatCardText(pending?.card)}!`
+      });
+      resetWaitingState(state);
+      return { success: true, state };
     }
+
     // Can Gián declined -> attach delayed scroll normally
+    state.pendingCanGian = null;
     if (pending) {
       const attachTarget = state.players.find((p) => p.seat === pending.targetSeat);
       if (attachTarget) {
@@ -4772,9 +4851,16 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     return { success: true, state };
   }
 
+  if (state.phase === "AWAIT_KHUYEN_NONG") {
+    if (state.waitingTargetSeat !== respondentSeat) return { error: "Không phải lượt phản hồi Khuyến Nông của bạn" };
+    if (!resolveKhuyenNong(state, accepted, respondentSeat)) return { error: "Khuyến Nông không còn hiệu lực" };
+    return { success: true, state };
+  }
+
   if (state.phase === "AWAIT_THU_PHAP_DISCARD") {
-    if (!accepted || !cardId) return { error: "Thủ Pháp yêu cầu bỏ đúng 1 lá bài" };
-    return handleDiscardCards(state, respondentSeat, [cardId]);
+    const chosenId = cardId || (Array.isArray(extraPayload?.cardIds) ? extraPayload.cardIds[0] : null);
+    if (!chosenId) return { error: "Thủ Pháp yêu cầu bỏ đúng 1 lá bài" };
+    return handleDiscardCards(state, respondentSeat, [chosenId]);
   }
 
   if (state.phase === "AWAIT_CHUYEN_CHE_RESPOND") {
@@ -8530,8 +8616,17 @@ export function handleAIReaction(state, aiSeat) {
       : { error: "Không còn lá để bỏ theo Thủ Pháp" };
   }
 
+  if (state.phase === "AWAIT_KHUYEN_NONG" && state.waitingTargetSeat === aiSeat) {
+    return handleRespondAction(state, aiSeat, true, null);
+  }
+
   if (state.phase === "AWAIT_CAN_GIAN" && state.waitingTargetSeat === aiSeat) {
-    const cost = (ai.hand || []).find((card) => cardColor(card.suit) === "RED");
+    if (!ai.isAI) {
+      return handleRespondAction(state, aiSeat, false, null);
+    }
+    const pending = state.pendingCanGian;
+    const isAllyOrSelf = pending && areTeammatesInState(state, pending.targetSeat, aiSeat);
+    const cost = isAllyOrSelf ? (ai.hand || []).find((card) => cardColor(card.suit) === "RED") : null;
     return cost
       ? handleRespondAction(state, aiSeat, true, cost.id)
       : handleRespondAction(state, aiSeat, false, null);
@@ -8976,6 +9071,8 @@ export function executeFallbackReactionForSeat(state, waitingSeat, waitingPlayer
     return handleAIReaction(state, waitingSeat);
   } else if (state.phase === "AWAIT_THU_PHAP_DISCARD") {
     return handleAIReaction(state, waitingSeat);
+  } else if (state.phase === "AWAIT_KHUYEN_NONG") {
+    return handleAIReaction(state, waitingSeat);
   } else if (state.phase === "AWAIT_TARGET_CARD") {
     return handleRespondAction(state, waitingSeat, true, null, null);
   } else if (state.phase === "AWAIT_DOAN_DAO_CHOICE") {
@@ -9011,7 +9108,7 @@ export function executeFallbackReactionForSeat(state, waitingSeat, waitingPlayer
     return handleUseSkill(state, waitingSeat, "Huynh Trưởng", 0);
   } else if (state.phase === "AWAIT_THU_MUC") {
     return handleRespondAction(state, waitingSeat, false, null);
-  } else if (["AWAIT_DAN_CAU", "AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_TRUNG_KIEN",
+  } else if (["AWAIT_DAN_CAU", "AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_CAN_GIAN", "AWAIT_TRUNG_KIEN",
     "AWAIT_CHINH_THONG_TARGET", "AWAIT_CHINH_THONG_GIVE", "AWAIT_KHOAN_HOA", "AWAIT_NGHIA_TU",
     "AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_UAT_KHI_TARGET",
     "AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_MUU_DINH_CHOICE", "AWAIT_NGHICH_Y"].includes(state.phase)) {
@@ -9038,15 +9135,6 @@ export function tickGameState(state, connectedSeats = null) {
   const elapsedMs = Date.now() - state.timerStartAt;
   const elapsed = Math.floor(elapsedMs / 1000);
   const newTimer = Math.max(0, 40 - elapsed);
-
-  // Render clients do not expose a separate Can Gián choice panel. Resolve
-  // the optional response promptly on the authoritative server so the skill
-  // cannot leave the delayed scroll flow stuck for the player.
-  if (state.phase === "AWAIT_CAN_GIAN" && state.waitingTargetSeat > 0 && elapsedMs >= 1000) {
-    const waitingPlayer = state.players.find((player) => player.seat === state.waitingTargetSeat);
-    const result = handleAIReaction(state, state.waitingTargetSeat);
-    return { changed: !!result && !result.error, important: true };
-  }
 
   // Giai đoạn chờ lật bài phán xét (AWAIT_JUDGEMENT)
   if (state.phase === "AWAIT_JUDGEMENT") {
@@ -9077,7 +9165,9 @@ export function tickGameState(state, connectedSeats = null) {
         casterSeat: waitingSeat,
         description: `⏰ <b>${waitingPlayer ? waitingPlayer.generalName : 'Người chơi'}</b> hết 40s: AI tự động phản ứng hỗ trợ!`
       });
-      const aiRes = handleAIReaction(state, waitingSeat);
+      const aiRes = (state.phase === "AWAIT_CAN_GIAN" && !waitingPlayer?.isAI)
+        ? handleRespondAction(state, waitingSeat, false, null)
+        : handleAIReaction(state, waitingSeat);
       if (!aiRes || aiRes.error) {
         if (state.phase === "AWAIT_SLASH_DEFENSE") {
           handleRespondAction(state, waitingSeat, false, null);
@@ -9119,7 +9209,10 @@ export function tickGameState(state, connectedSeats = null) {
 			handleUseSkill(state, waitingSeat, "Huynh Trưởng", 0);
         } else if (state.phase === "AWAIT_THU_MUC") {
 			handleRespondAction(state, waitingSeat, false, null);
-        } else if (["AWAIT_DAN_CAU", "AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_TRUNG_KIEN",
+        } else if (state.phase === "AWAIT_THU_PHAP_DISCARD") {
+			const card = waitingPlayer?.hand?.[0];
+			if (card) handleDiscardCards(state, waitingSeat, [card.id]);
+        } else if (["AWAIT_DAN_CAU", "AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_CAN_GIAN", "AWAIT_TRUNG_KIEN",
 			"AWAIT_CHINH_THONG_TARGET", "AWAIT_CHINH_THONG_GIVE", "AWAIT_KHOAN_HOA", "AWAIT_NGHIA_TU",
 			"AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_UAT_KHI_TARGET",
 			"AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_MUU_DINH_CHOICE", "AWAIT_NGHICH_Y"].includes(state.phase)) {
@@ -9138,7 +9231,7 @@ export function tickGameState(state, connectedSeats = null) {
     const isDisconnectedOrAway = waitingPlayer && (
       waitingPlayer.isDisconnected === true ||
       waitingPlayer.isAiTakeover === true ||
-      (Array.isArray(connectedSeats) && !connectedSeats.includes(waitingSeat))
+      (Array.isArray(connectedSeats) && !connectedSeats.map(Number).includes(Number(waitingSeat)))
     );
     const isAISlot = waitingPlayer && (waitingPlayer.isAI === true || isDisconnectedOrAway);
     const canAIReact = !["AWAIT_UAT_KHI", "AWAIT_KHOI_BINH", "AWAIT_HUYNH_TRUONG"].includes(state.phase)
@@ -9234,8 +9327,10 @@ function sanitizeTargetCardSelection(selection, requestingSeat) {
     chooserSeat: selection.chooserSeat,
     targetSeat: selection.targetSeat,
     operation: selection.operation,
+    effectType: selection.effectType || "TARGET_CARD",
     cardId: selection.cardId,
     cardName: selection.cardName,
+    selectionId: selection.selectionId || "",
     title: selection.title || "",
     description: selection.description || "",
     compact: selection.compact === true,
@@ -9335,12 +9430,14 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
   const elapsed = state.timerStartAt ? Math.floor((Date.now() - state.timerStartAt) / 1000) : 0;
   const remaining = Math.max(0, 40 - elapsed);
 
+  const clientPhase = state.phase === "AWAIT_KHUYEN_NONG" ? "AWAIT_TRAO_BAO_EQUIP"
+    : state.phase;
   const clientState = {
     version: state.version,
     roomId: state.roomId,
     status: state.status,
     turnSeat: state.turnSeat,
-    phase: state.phase,
+    phase: clientPhase,
     turnTimer: (state.phase === "PLAY") ? remaining : 0,
     waitingTargetSeat: state.phase === "AWAIT_NULLIFY" && viewerSeat !== state.waitingTargetSeat
       ? 0
@@ -9424,6 +9521,13 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
           casterSeat: state.pendingTraoBao?.casterSeat,
           targetSeat: state.pendingTraoBao?.targetSeat,
           card: cardSummary(state.pendingTraoBao?.card)
+        }
+      : null,
+    pendingCanGian: (state.phase === "AWAIT_CAN_GIAN")
+      ? {
+          casterSeat: state.pendingCanGian?.casterSeat,
+          targetSeat: state.pendingCanGian?.targetSeat,
+          card: cardSummary(state.pendingCanGian?.card)
         }
       : null,
     lastAction: sanitizeActionForClient(state.lastAction, viewerSeat),
@@ -9554,6 +9658,16 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
     });
     refreshLastDelta(state);
     return { success: true, state };
+  }
+
+  if (norm.includes("can gián") || norm.includes("can gian")) {
+    if (state.phase !== "AWAIT_CAN_GIAN") return { error: "Không phải thời điểm dùng Can Gián" };
+    return handleRespondAction(state, seat, true, cardId);
+  }
+
+  if (norm.includes("thủ pháp") || norm.includes("thu phap")) {
+    if (state.phase !== "AWAIT_THU_PHAP_DISCARD") return { error: "Không phải thời điểm bỏ bài theo Thủ Pháp" };
+    return handleDiscardCards(state, seat, [cardId]);
   }
 
   if (norm.includes("hịch tướng") || norm.includes("hich tuong")) {

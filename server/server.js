@@ -465,9 +465,65 @@ function socialUserName(value) {
   return String(value || "Đại Tướng Quân").trim().slice(0, 64) || "Đại Tướng Quân";
 }
 
+let lastSocialAppwriteSync = 0;
+let socialAppwriteSyncRunning = false;
+
+async function syncSocialProfilesFromAppwrite() {
+  if (socialAppwriteSyncRunning) return;
+  socialAppwriteSyncRunning = true;
+  try {
+    let offset = 0;
+    const limit = 100;
+    while (true) {
+      const q_equal = encodeURIComponent(JSON.stringify({ method: "equal", attribute: "userId", values: ["LEADERBOARD_PLAYER"] }));
+      const q_limit = encodeURIComponent(JSON.stringify({ method: "limit", values: [limit] }));
+      const q_offset = encodeURIComponent(JSON.stringify({ method: "offset", values: [offset] }));
+      const path = `/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents?queries[0]=${q_equal}&queries[1]=${q_limit}&queries[2]=${q_offset}`;
+      const res = await appwriteMatchmakingRequest(path);
+      if (!res || !res.ok) break;
+      const data = await res.json();
+      if (!data.documents || data.documents.length === 0) break;
+      for (const doc of data.documents) {
+        try {
+          const parsed = JSON.parse(doc.userName);
+          const uid = socialUserId(parsed.user_id || parsed.userId);
+          const name = String(parsed.name || parsed.userName || "").trim().slice(0, 32);
+          const level = Math.max(1, Number(parsed.level) || 1);
+          if (uid && name) {
+            const existing = socialProfiles.get(uid);
+            if (existing) {
+              existing.userName = name;
+              existing.level = level;
+            } else {
+              socialProfiles.set(uid, {
+                userId: uid,
+                userName: name,
+                level,
+                socket: null
+              });
+            }
+          }
+        } catch (e) {}
+      }
+      offset += data.documents.length;
+      if (offset >= (data.total || 0)) break;
+    }
+    lastSocialAppwriteSync = Date.now();
+  } catch (err) {
+    console.error("[Social] Failed to sync profiles from Appwrite:", err.message);
+  } finally {
+    socialAppwriteSyncRunning = false;
+  }
+}
+
 function socialProfile(userId) {
   const profile = socialProfiles.get(userId);
-  return profile ? { userId: profile.userId, userName: profile.userName, online: profile.socket?.readyState === WebSocket.OPEN } : null;
+  return profile ? {
+    userId: profile.userId,
+    userName: profile.userName,
+    level: profile.level || 1,
+    online: profile.socket?.readyState === WebSocket.OPEN
+  } : null;
 }
 
 function socialFriendSet(userId) {
@@ -479,7 +535,12 @@ function socialSnapshot(userId) {
   const friends = Array.from(socialFriendSet(userId)).map(socialProfile).filter(Boolean);
   const incoming = Array.from(socialRequests.values())
     .filter((request) => request.toUserId === userId && request.status === "PENDING")
-    .map((request) => ({ requestId: request.requestId, fromUserId: request.fromUserId, fromUserName: request.fromUserName }));
+    .map((request) => ({
+      requestId: request.requestId,
+      fromUserId: request.fromUserId,
+      fromUserName: request.fromUserName,
+      level: request.fromUserLevel || socialProfiles.get(request.fromUserId)?.level || 1
+    }));
   return { friends, incoming };
 }
 
@@ -502,7 +563,7 @@ function validateClientPayload(payload, rawBytes) {
   for (const key of ["cardId", "targetCardId", "skillId", "heroName", "userId", "userName", "targetUserId", "query", "requestId", "fromUserId", "fromUserName"]) {
     if (payload[key] !== undefined && (typeof payload[key] !== "string" || payload[key].length > 256)) return `${key} không hợp lệ`;
   }
-  for (const key of ["seat", "targetSeat", "targetSeat2", "expectedVersion"]) {
+  for (const key of ["seat", "targetSeat", "targetSeat2", "expectedVersion", "level"]) {
     if (payload[key] !== undefined && (!Number.isInteger(Number(payload[key])) || Number(payload[key]) < 0)) return `${key} không hợp lệ`;
   }
   if (payload.cardIds !== undefined && (!Array.isArray(payload.cardIds) || payload.cardIds.length > 20 || payload.cardIds.some((id) => typeof id !== "string" || id.length > 256))) return "Danh sách lá bài không hợp lệ";
@@ -629,6 +690,8 @@ console.log("🎮 [Deno Server] Đại Việt Chiến 2v2 Unified Game Server (1
 // Start after boot so an Appwrite outage cannot delay the WebSocket server.
 setInterval(() => { sweepAppwriteMatchmaking(); }, APPWRITE_MATCHMAKING_POLL_MS);
 sweepAppwriteMatchmaking();
+setInterval(() => { syncSocialProfilesFromAppwrite(); }, 60000);
+syncSocialProfilesFromAppwrite();
 
 function ensureLocalRoom(roomId, players = null, forceReinit = false, modeId = "2v2") {
   let room = rooms.get(roomId);
@@ -752,7 +815,7 @@ function broadcastStateUpdate(room, action = "STATE_UPDATE") {
 function tickSharedRoom(roomId, room) {
   const connectedSeats = Array.from(room.sockets.entries())
     .filter(([seat, ws]) => ws && ws.readyState === WebSocket.OPEN)
-    .map(([seat]) => seat);
+    .map(([seat]) => Number(seat));
 
   const result = mutateSharedState(roomId, undefined, {
     action: "SERVER_TICK",
@@ -1367,8 +1430,14 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           if (!socialId) return sendSocialError(socket, "Chưa đăng nhập tài khoản");
           const name = socialUserName(userName || payload.fromUserName);
           if (action === "SOCIAL_REGISTER") {
+            const level = Math.max(1, Number(payload.level) || 1);
             const previous = socialProfiles.get(socialId);
-            socialProfiles.set(socialId, { userId: socialId, userName: name, socket });
+            socialProfiles.set(socialId, {
+              userId: socialId,
+              userName: name,
+              level: level || previous?.level || 1,
+              socket
+            });
             if (previous?.socket && previous.socket !== socket) previous.socket = null;
             socket.socialUserId = socialId;
             socket.send(JSON.stringify({ type: "SOCIAL_REGISTERED", ...socialSnapshot(socialId) }));
@@ -1385,6 +1454,9 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
               socket.send(JSON.stringify({ type: "FRIEND_SEARCH_RESULT", results: [], query: rawQuery }));
               return;
             }
+            if (socialProfiles.size <= 1 || Date.now() - lastSocialAppwriteSync > 60000) {
+              await syncSocialProfilesFromAppwrite();
+            }
             const tokens = queryNorm.split(/\s+/).filter(Boolean);
 
             const scored = [];
@@ -1394,6 +1466,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
               const uid = String(profile.userId || "");
               const nameNorm = foldVietnamese(name);
               const uidNorm = foldVietnamese(uid);
+              const lvlNorm = `lv${profile.level || 1}`;
               const isOnline = profile.socket?.readyState === WebSocket.OPEN;
 
               let score = 0;
@@ -1416,7 +1489,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
 
               // 5. Multi-token match (word order independent)
               if (tokens.length > 1) {
-                const matchedTokens = tokens.filter((t) => nameNorm.includes(t) || uidNorm.includes(t));
+                const matchedTokens = tokens.filter((t) => nameNorm.includes(t) || uidNorm.includes(t) || lvlNorm.includes(t));
                 if (matchedTokens.length === tokens.length) {
                   score += 450;
                 } else if (matchedTokens.length > 0) {
@@ -1431,7 +1504,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
               }
 
               if (score > 0) {
-                if (isOnline) score += 30; // Online bonus
+                if (isOnline) score += 50; // Online bonus
                 score -= Math.min(25, Math.floor(name.length / 2));
                 scored.push({ profile, score });
               }
@@ -1445,6 +1518,9 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           if (action === "FRIEND_REQUEST") {
             const targetId = socialUserId(payload.targetUserId);
             if (!targetId || targetId === socialId) return sendSocialError(socket, "Người chơi không hợp lệ");
+            if (!socialProfiles.has(targetId)) {
+              await syncSocialProfilesFromAppwrite();
+            }
             if (!socialProfiles.has(targetId)) return sendSocialError(socket, "Không tìm thấy người chơi này");
             if (socialFriendSet(socialId).has(targetId)) return sendSocialError(socket, "Hai người đã là bạn");
             const duplicate = Array.from(socialRequests.values()).find((r) => r.status === "PENDING" && r.fromUserId === socialId && r.toUserId === targetId);
@@ -1455,7 +1531,15 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
                 socialFriendSet(socialId).add(targetId);
                 socialFriendSet(targetId).add(socialId);
               } else {
-                const newRequest = { requestId: `fr_${nextSocialRequestId++}`, fromUserId: socialId, fromUserName: name, toUserId: targetId, status: "PENDING" };
+                const senderProfile = socialProfiles.get(socialId);
+                const newRequest = {
+                  requestId: `fr_${nextSocialRequestId++}`,
+                  fromUserId: socialId,
+                  fromUserName: name,
+                  fromUserLevel: senderProfile?.level || 1,
+                  toUserId: targetId,
+                  status: "PENDING"
+                };
                 socialRequests.set(newRequest.requestId, newRequest);
               }
             }

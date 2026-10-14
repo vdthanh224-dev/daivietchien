@@ -7,7 +7,11 @@ import {
   handleRespondAction,
   handleEndTurn,
   handleDiscardCards,
-  applyDamageToPlayer
+  applyDamageToPlayer,
+  sanitizeGameStateForClient,
+  handleAIReaction,
+  executeFallbackReactionForSeat,
+  tickGameState
 } from './functions/game-engine/src/gameEngine.js';
 import {
   getHeroById,
@@ -99,28 +103,120 @@ function createTestState(heroIds = ["HERO_41", "HERO_42", "HERO_43", "HERO_44"])
 // -------------------------------------------------------------
 {
   const state = createTestState(["HERO_1", "HERO_42", "HERO_3", "HERO_4"]);
-  const p1 = state.players[0];
-  const p2 = state.players[1];
+  const p1 = state.players[0]; // seat 1, team 1
+  const p2 = state.players[1]; // seat 2, team 2 (Lý Đạo Thành)
+  const p3 = state.players[2]; // seat 3, team 1
+  const p4 = state.players[3]; // seat 4, team 2
   assert.equal(heroHasSkill(p2, "CAN_GIAN"), true);
   assert.equal(heroHasSkill(p2, "DINH_TRIEU"), true);
 
-  // Test Can Gián: P1 attempts to attach delayed scroll to P3
+  // 1. Prompting & Client State
   p1.hand = [{ id: "DELAY_1", name: "Trầm Ảo Sa Bẫy", suit: "Heart", rank: 13, category: CARD_CATEGORIES.DELAYED_SCROLL, subType: CARD_SUBTYPES.ACEDIA }];
-  p2.hand = [{ id: "RED_CARD_P2", name: "Đỡ", suit: "Heart", rank: 7, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE }];
+  p2.hand = [
+    { id: "RED_CARD_P2", name: "Đỡ", suit: "Heart", rank: 7, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE },
+    { id: "BLACK_CARD_P2", name: "Trảm", suit: "Spade", rank: 8, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }
+  ];
   state.phase = "PLAY";
   state.turnSeat = 1;
 
-  const playRes = handlePlayCard(state, 1, "DELAY_1", 3);
-  assert.equal(playRes.success, true);
+  const playRes1 = handlePlayCard(state, 1, "DELAY_1", 3);
+  assert.equal(playRes1.success, true);
   assert.equal(state.phase, "AWAIT_CAN_GIAN");
   assert.equal(state.waitingTargetSeat, 2);
 
-  // P2 responds with Can Gián using RED_CARD_P2
-  const respRes = handleRespondAction(state, 2, true, "RED_CARD_P2");
-  assert.equal(respRes.success, true);
-  // Delayed scroll should be canceled and discarded, NOT on P3
-  assert.equal((state.players[2].judgements || []).length, 0);
-  assert.equal(p2.hand.length, 0);
+  // Check client sanitation preserves AWAIT_CAN_GIAN and provides pendingCanGian
+  const clientView = sanitizeGameStateForClient(state, 2);
+  assert.equal(clientView.phase, "AWAIT_CAN_GIAN");
+  assert.equal(clientView.pendingCanGian?.targetSeat, 3);
+  assert.equal(clientView.pendingCanGian?.card?.id, "DELAY_1");
+
+  // 2. Error cases: Accepting without card or with non-red card
+  const errNoCard = handleRespondAction(state, 2, true, null);
+  assert.equal(!!errNoCard.error, true);
+  assert.equal(state.phase, "AWAIT_CAN_GIAN"); // Phase must not be cleared on error
+  assert.equal(!!state.pendingCanGian, true);
+
+  const errBlackCard = handleRespondAction(state, 2, true, "BLACK_CARD_P2");
+  assert.equal(!!errBlackCard.error, true);
+  assert.equal(state.phase, "AWAIT_CAN_GIAN");
+  assert.equal(!!state.pendingCanGian, true);
+
+  // 3. Declining Can Gián attaches the delayed scroll
+  const declineRes = handleRespondAction(state, 2, false, null);
+  assert.equal(declineRes.success, true);
+  assert.equal(p3.judgements.length, 1);
+  assert.equal(p3.judgements[0].id, "DELAY_1");
+  assert.equal(p2.hand.length, 2); // Hand untouched
+
+  // 4. Accepting Can Gián with RED card cancels the delayed scroll
+  p3.judgements = [];
+  p1.hand = [{ id: "DELAY_2", name: "Trầm Ảo Sa Bẫy", suit: "Heart", rank: 6, category: CARD_CATEGORIES.DELAYED_SCROLL, subType: CARD_SUBTYPES.ACEDIA }];
+  state.phase = "PLAY";
+  state.turnSeat = 1;
+
+  const playRes2 = handlePlayCard(state, 1, "DELAY_2", 3);
+  assert.equal(playRes2.success, true);
+  assert.equal(state.phase, "AWAIT_CAN_GIAN");
+  const acceptRes = handleRespondAction(state, 2, true, "RED_CARD_P2");
+  assert.equal(acceptRes.success, true);
+  assert.equal(p3.judgements.length, 0); // Cancelled!
+  assert.equal(p2.hand.some(c => c.id === "RED_CARD_P2"), false); // Discarded!
+
+  // 5. Using Can Gián via handleUseSkill
+  p2.hand.push({ id: "RED_CARD_P2_2", name: "Đỡ", suit: "Heart", rank: 9, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE });
+  p1.hand = [{ id: "DELAY_3", name: "Trầm Ảo Sa Bẫy", suit: "Diamond", rank: 1, category: CARD_CATEGORIES.DELAYED_SCROLL, subType: CARD_SUBTYPES.ACEDIA }];
+  state.phase = "PLAY";
+  state.turnSeat = 1;
+
+  const playRes3 = handlePlayCard(state, 1, "DELAY_3", 3);
+  assert.equal(playRes3.success, true);
+  assert.equal(state.phase, "AWAIT_CAN_GIAN");
+  const skillRes = handleUseSkill(state, 2, "Can Gián", 0, "RED_CARD_P2_2");
+  assert.equal(skillRes.success, true);
+  assert.equal(p3.judgements.length, 0); // Cancelled!
+
+  // 6. AI Bot logic: AI does NOT save enemies, only allies/self
+  p2.isAI = true;
+  p2.hand.push({ id: "RED_AI_CARD", name: "Đỡ", suit: "Heart", rank: 3, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE });
+  p1.hand = [{ id: "DELAY_ENEMY", name: "Trầm Ảo Sa Bẫy", suit: "Heart", rank: 13, category: CARD_CATEGORIES.DELAYED_SCROLL, subType: CARD_SUBTYPES.ACEDIA }];
+  state.phase = "PLAY";
+  state.turnSeat = 1;
+
+  // Targeting P3 (enemy of P2)
+  handlePlayCard(state, 1, "DELAY_ENEMY", 3);
+  assert.equal(state.phase, "AWAIT_CAN_GIAN");
+  const aiEnemyReaction = handleAIReaction(state, 2);
+  assert.equal(aiEnemyReaction.success, true);
+  assert.equal(p3.judgements.length, 1); // Not saved! Enemy gets delayed scroll!
+  assert.equal(p2.hand.some(c => c.id === "RED_AI_CARD"), true); // Card kept!
+
+  // Targeting P4 (ally of P2)
+  p1.hand = [{ id: "DELAY_ALLY", name: "Cắt Đường Lương", suit: "Club", rank: 4, category: CARD_CATEGORIES.DELAYED_SCROLL, subType: CARD_SUBTYPES.SUPPLY_SHORTAGE }];
+  state.phase = "PLAY";
+  state.turnSeat = 1;
+  handlePlayCard(state, 1, "DELAY_ALLY", 4);
+  assert.equal(state.phase, "AWAIT_CAN_GIAN");
+  const aiAllyReaction = handleAIReaction(state, 2);
+  assert.equal(aiAllyReaction.success, true);
+  assert.equal(p4.judgements.length, 0); // Saved! Cancelled!
+  assert.equal(p2.hand.some(c => c.id === "RED_AI_CARD"), false); // Discarded to save ally!
+
+  // 7. Human timeout fallback declines instead of auto-discarding
+  p2.isAI = false;
+  p3.judgements = [];
+  p2.hand.push({ id: "RED_HUMAN_CARD", name: "Đỡ", suit: "Heart", rank: 5, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE });
+  p1.hand = [{ id: "DELAY_TIMEOUT", name: "Trầm Ảo Sa Bẫy", suit: "Heart", rank: 13, category: CARD_CATEGORIES.DELAYED_SCROLL, subType: CARD_SUBTYPES.ACEDIA }];
+  state.phase = "PLAY";
+  state.turnSeat = 1;
+  const playResTimeout = handlePlayCard(state, 1, "DELAY_TIMEOUT", 3);
+  assert.equal(playResTimeout.success, true);
+  assert.equal(state.phase, "AWAIT_CAN_GIAN");
+
+  // Fallback reaction on timeout
+  const fallbackRes = executeFallbackReactionForSeat(state, 2, p2);
+  assert.equal(fallbackRes.success, true);
+  assert.equal(p2.hand.some(c => c.id === "RED_HUMAN_CARD"), true); // Human red card NOT discarded!
+  assert.equal(p3.judgements.length, 1); // Scroll attached to target
 
   // Test Định Triều: P2 gives scroll to P3, draws 1
   state.phase = "PLAY";
@@ -170,7 +266,11 @@ function createTestState(heroIds = ["HERO_41", "HERO_42", "HERO_43", "HERO_44"])
   const peachRes = handlePlayCard(state, 2, "PEACH_1", 2);
   assert.equal(peachRes.success, true);
   assert.equal(state.players[1].hp, 3);
-  // Both Ỷ Lan (P1) and P2 should have drawn from Khuyến Nông!
+  // Khuyến Nông now asks Ỷ Lan before drawing for both players.
+  assert.equal(state.phase, "AWAIT_KHUYEN_NONG");
+  assert.equal(state.waitingTargetSeat, 1);
+  const khuyenNongRes = handleRespondAction(state, 1, true, null);
+  assert.equal(khuyenNongRes.success, true);
   assert.equal(p1.hand.length, 1);
   console.log("✅ Hero 43: Ỷ Lan (Nhiếp Chính & Khuyến Nông) OK");
 }

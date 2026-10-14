@@ -2725,12 +2725,12 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 	if is_waiting_dodge:
 		_handle_dodge_hand_card_selection(card_node, c_info)
 		return
-	if is_network_mode and current_server_phase not in ["PLAY", "AWAIT_HUYNH_TRUONG", "AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_NGHICH_Y", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_TARGET_CARD"] and not is_discard_phase:
+	if is_network_mode and current_server_phase not in ["PLAY", "AWAIT_HUYNH_TRUONG", "AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_THU_PHAP_DISCARD", "AWAIT_NGHICH_Y", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_TARGET_CARD"] and not is_discard_phase:
 		card_play_btn.visible = false
 		_clear_normal_hand_selection()
 		return
 	if not is_player_turn and not is_discard_phase:
-		if current_server_phase not in ["AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_NGHICH_Y", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_TARGET_CARD"] or current_waiting_seat != my_seat:
+		if current_server_phase not in ["AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_THU_PHAP_DISCARD", "AWAIT_NGHICH_Y", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_TARGET_CARD"] or current_waiting_seat != my_seat:
 			return
 	if current_server_phase in ["AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_THAN_CHINH_LE_HOAN"] and current_waiting_seat == my_seat:
 		if selected_card_ui and is_instance_valid(selected_card_ui) and selected_card_ui != card_node:
@@ -2761,6 +2761,18 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 		return
 	if current_server_phase == "AWAIT_VAN_SACH" and current_waiting_seat == my_seat:
 		if selected_card_ui and is_instance_valid(selected_card_ui) and selected_card_ui != card_node:
+			selected_card_ui.set_selected(false)
+		selected_card_ui = card_node
+		card_node.set_selected(true)
+		_update_action_btn()
+		return
+	if current_server_phase == "AWAIT_THU_PHAP_DISCARD" and current_waiting_seat == my_seat:
+		if selected_card_ui == card_node:
+			selected_card_ui.set_selected(false)
+			selected_card_ui = null
+			_update_action_btn()
+			return
+		if selected_card_ui and is_instance_valid(selected_card_ui):
 			selected_card_ui.set_selected(false)
 		selected_card_ui = card_node
 		card_node.set_selected(true)
@@ -3414,6 +3426,26 @@ func _update_action_btn() -> void:
 		card_play_btn.visible = true
 		card_play_btn.disabled = not van_sach_card_valid
 		card_play_btn.text = "📚 BỎ LÁ ĐỂ RÚT 1 LÁ" if van_sach_card_valid else "📚 CHỌN 1 LÁ ĐỂ BỎ"
+		return
+	if current_server_phase == "AWAIT_CAN_GIAN" and current_waiting_seat == my_seat:
+		var can_gian_valid := selected_card_ui != null and is_instance_valid(selected_card_ui)
+		card_play_btn.visible = true
+		card_play_btn.disabled = not can_gian_valid
+		if can_gian_valid:
+			var c_info = _get_card_info_from_ui(selected_card_ui)
+			card_play_btn.text = "📜 CAN GIÁN BẰNG [%s]" % str(c_info.get("name", "Bài Đỏ")).to_upper()
+		else:
+			card_play_btn.text = "📜 CHỌN 1 LÁ ĐỎ ĐỂ CAN GIÁN"
+		return
+	if current_server_phase == "AWAIT_THU_PHAP_DISCARD" and current_waiting_seat == my_seat:
+		var thu_phap_valid := selected_card_ui != null and is_instance_valid(selected_card_ui)
+		card_play_btn.visible = true
+		card_play_btn.disabled = not thu_phap_valid
+		if thu_phap_valid:
+			var c_info = _get_card_info_from_ui(selected_card_ui)
+			card_play_btn.text = "🗑️ BỎ [%s] (THỦ PHÁP)" % str(c_info.get("name", "Bài")).to_upper()
+		else:
+			card_play_btn.text = "📜 CHỌN 1 LÁ ĐỂ BỎ"
 		return
 	if is_targeting_chinh_thong and current_server_phase == "AWAIT_CHINH_THONG_TARGET" and current_waiting_seat == my_seat:
 		var chinh_thong_ready: bool = selected_target_seat > 0 and selected_target_seat != my_seat and generals_data.has(selected_target_seat) and bool(generals_data[selected_target_seat].get("is_alive", false))
@@ -4121,6 +4153,27 @@ func _on_card_play_btn_clicked() -> void:
 			desc_text.text = "⚠️ [VĂN SÁCH] hãy chọn 1 lá trên tay để bỏ."
 			return
 		NetworkClient.send_respond_action(true, str(_get_card_info_from_ui(selected_card_ui).get("id", "")))
+		card_play_btn.disabled = true
+		return
+	if current_server_phase == "AWAIT_CAN_GIAN" and current_waiting_seat == my_seat:
+		if selected_card_ui == null or not is_instance_valid(selected_card_ui):
+			desc_text.text = "⚠️ [CAN GIÁN] hãy chọn 1 lá bài màu ĐỎ trên tay để bỏ."
+			return
+		var c_info = _get_card_info_from_ui(selected_card_ui)
+		var suit = str(c_info.get("suit", ""))
+		if _get_card_color(suit) != "RED":
+			desc_text.text = "⚠️ [CAN GIÁN] chỉ chấp nhận lá bài màu ĐỎ (Cơ hoặc Rô)."
+			return
+		NetworkClient.send_respond_action(true, str(c_info.get("id", "")))
+		card_play_btn.disabled = true
+		return
+	if current_server_phase == "AWAIT_THU_PHAP_DISCARD" and current_waiting_seat == my_seat:
+		if selected_card_ui == null or not is_instance_valid(selected_card_ui):
+			desc_text.text = "⚠️ [THỦ PHÁP] hãy chọn 1 lá bài trên tay để bỏ."
+			return
+		var c_info = _get_card_info_from_ui(selected_card_ui)
+		var c_id = str(c_info.get("id", ""))
+		NetworkClient.send_respond_action(true, c_id)
 		card_play_btn.disabled = true
 		return
 	if huynh_truong_pending:
@@ -5940,7 +5993,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		reaction_submission_pending = false
 	elif previous_server_phase != server_phase and server_phase in ["AWAIT_NEAR_DEATH", "AWAIT_BORROW_SWORD"]:
 		_close_dodge_reaction_state()
-	elif previous_server_phase in ["AWAIT_SLASH_DEFENSE", "AWAIT_OAI_NHUOC", "AWAIT_HICH_CASTER_DISCARD", "AWAIT_HICH_TARGET_DISCARD", "AWAIT_DRUM_CHOICE", "AWAIT_SONG_CUNG_FOLLOW_UP", "AWAIT_DAN_CAU"] and server_phase != previous_server_phase and (is_waiting_dodge or is_waiting_song_cung):
+	elif previous_server_phase in ["AWAIT_SLASH_DEFENSE", "AWAIT_OAI_NHUOC", "AWAIT_HICH_CASTER_DISCARD", "AWAIT_HICH_TARGET_DISCARD", "AWAIT_DRUM_CHOICE", "AWAIT_SONG_CUNG_FOLLOW_UP", "AWAIT_DAN_CAU", "AWAIT_CAN_GIAN"] and server_phase != previous_server_phase and (is_waiting_dodge or is_waiting_song_cung):
 		_close_song_cung_modal()
 		_close_dodge_reaction_state()
 	if server_phase not in ["AWAIT_SLASH_DEFENSE", "AWAIT_DAN_CAU"] or server_waiting_seat != my_seat:
@@ -5959,8 +6012,8 @@ func _apply_network_game_state(state: Dictionary) -> void:
 	elif server_waiting_seat != harvest_waiting_seat:
 		harvest_choice_sent = false
 		harvest_modal_signature = ""
-	var keep_reaction_hand_selection = server_waiting_seat == my_seat and (is_waiting_dodge or is_waiting_thuy_trieu_rut_give or is_waiting_song_cung or server_phase in ["AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_NGHICH_Y", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_THAN_CHINH_LE_HOAN"])
-	if server_phase not in ["PLAY", "DISCARD", "AWAIT_HUYNH_TRUONG", "AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_NGHICH_Y", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_THAN_CHINH_LE_HOAN"] or (server_phase == "DISCARD" and server_waiting_seat != my_seat):
+	var keep_reaction_hand_selection = server_waiting_seat == my_seat and (is_waiting_dodge or is_waiting_thuy_trieu_rut_give or is_waiting_song_cung or server_phase in ["AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_THU_PHAP_DISCARD", "AWAIT_NGHICH_Y", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_THAN_CHINH_LE_HOAN"])
+	if server_phase not in ["PLAY", "DISCARD", "AWAIT_HUYNH_TRUONG", "AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_THU_PHAP_DISCARD", "AWAIT_NGHICH_Y", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_THAN_CHINH_LE_HOAN"] or (server_phase == "DISCARD" and server_waiting_seat != my_seat):
 		card_play_btn.visible = false
 		if not keep_reaction_hand_selection:
 			_clear_normal_hand_selection()
@@ -5968,7 +6021,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			_set_reaction_hand_focus(false)
 			if dodge_card_selector_scroll and is_instance_valid(dodge_card_selector_scroll):
 				dodge_card_selector_scroll.visible = false
-	if server_phase not in ["PLAY", "DISCARD", "AWAIT_HUYNH_TRUONG", "AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_NGHICH_Y", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_THAN_CHINH_LE_HOAN"]:
+	if server_phase not in ["PLAY", "DISCARD", "AWAIT_HUYNH_TRUONG", "AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_THU_PHAP_DISCARD", "AWAIT_NGHICH_Y", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_THAN_CHINH_LE_HOAN"]:
 		is_player_turn = false
 		is_discard_phase = false
 		card_play_btn.visible = false
@@ -6223,7 +6276,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		elif server_waiting_seat != my_seat:
 			turn_indicator.text = "🐘 ĐANG CHỜ MỤC TIÊU CHỌN OAI NHƯỢC (%ds)..." % server_waiting_timer
 
-	elif server_phase in ["AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_TRUNG_KIEN", "AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP"]:
+	elif server_phase in ["AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_TRUNG_KIEN", "AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_THU_PHAP_DISCARD"]:
 		is_player_turn = false
 		if server_waiting_seat == my_seat:
 			card_play_btn.visible = true
@@ -6231,7 +6284,12 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			end_turn_btn.visible = true
 			end_turn_btn.disabled = false
 			end_turn_btn.text = "TỪ CHỐI"
-			if server_phase == "AWAIT_TRAO_BAO_EQUIP":
+			if server_phase == "AWAIT_THU_PHAP_DISCARD":
+				end_turn_btn.visible = false
+				turn_indicator.text = "📜 THỦ PHÁP: CHỌN 1 LÁ ĐỂ BỎ (%ds)!" % server_waiting_timer
+				desc_text.text = "📜 Lý Nhật Tôn [Thủ Pháp]: Bạn đã rút 3 lá bài. Hãy chọn 1 lá bài trên tay và bấm [BỎ LÁ] để hoàn tất lượt."
+				_update_action_btn()
+			elif server_phase == "AWAIT_TRAO_BAO_EQUIP":
 				var eq_name = "trang bị"
 				if state.has("pendingTraoBao") and state["pendingTraoBao"] is Dictionary:
 					var eq_card = state["pendingTraoBao"].get("card", {})
@@ -6362,9 +6420,40 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			elif server_phase == "AWAIT_THAN_CHINH_LE_HOAN":
 				turn_indicator.text = "⚔️ ĐANG CHỜ %s PHẢN HỒI THÂN CHINH (%ds)..." % [wait_name, server_waiting_timer]
 				desc_text.text = "⚔️ %s đang chọn giao 1 lá bài hoặc chịu 1 sát thương..." % wait_name
+			elif server_phase == "AWAIT_THU_PHAP_DISCARD":
+				turn_indicator.text = "📜 ĐANG CHỜ %s BỎ BÀI THEO THỦ PHÁP (%ds)..." % [wait_name, server_waiting_timer]
+				desc_text.text = "📜 %s đang chọn 1 lá trên tay để bỏ theo kỹ năng [Thủ Pháp]..." % wait_name
 			else:
 				turn_indicator.text = "⏳ ĐANG CHỜ %s QUYẾT ĐỊNH (%ds)..." % [wait_name, server_waiting_timer]
 				desc_text.text = "⏳ Đang chờ %s phản hồi..." % wait_name
+
+	elif server_phase == "AWAIT_CAN_GIAN":
+		is_player_turn = false
+		card_play_btn.visible = false
+		end_turn_btn.visible = false
+		if server_waiting_seat == my_seat:
+			if not is_waiting_dodge:
+				var pending_cg = state.get("pendingCanGian", {}) if state.get("pendingCanGian") is Dictionary else {}
+				var scroll_card = pending_cg.get("card", {}) if pending_cg.get("card") is Dictionary else {}
+				var scroll_name = str(scroll_card.get("name", "Cẩm nang trì hoãn"))
+				var tgt_seat = int(pending_cg.get("targetSeat", 0))
+				var tgt_name = "bản thân"
+				if tgt_seat > 0 and tgt_seat != my_seat and generals_data.has(tgt_seat):
+					tgt_name = generals_data[tgt_seat].get("name", "Ghế %d" % tgt_seat)
+				elif tgt_seat == my_seat:
+					tgt_name = "bản thân"
+				var prompt_msg = "Cẩm nang [%s] đang gài vào %s.\nBỏ 1 lá bài màu ĐỎ trên tay để hủy bỏ, hoặc chọn [TỪ CHỐI]:" % [scroll_name, tgt_name]
+				_prompt_reaction_modal("📜 CAN GIÁN (LÝ ĐẠO THÀNH)", prompt_msg, "Bỏ bài Đỏ", "TỪ CHỐI", "📜 CAN GIÁN", server_waiting_timer, false, false, false, false)
+				custom_reaction_callback = func(accepted: bool, card_info: Dictionary):
+					var cid = str(card_info.get("id", "")) if accepted else ""
+					NetworkClient.send_respond_action(accepted, cid)
+			elif dodge_timer_lbl and is_instance_valid(dodge_timer_lbl):
+				dodge_timer_lbl.text = "⏳ Còn lại: %ds" % server_waiting_timer
+		else:
+			var wait_gen = generals_data.get(server_waiting_seat, {})
+			var wait_name = wait_gen.get("name", "Ghế %d" % server_waiting_seat) if wait_gen is Dictionary else "Ghế %d" % server_waiting_seat
+			turn_indicator.text = "📜 ĐANG CHỜ %s QUYẾT ĐỊNH CAN GIÁN (%ds)..." % [wait_name, server_waiting_timer]
+			desc_text.text = "📜 %s đang xem xét kích hoạt kỹ năng [Can Gián]..." % wait_name
 
 	elif server_phase == "AWAIT_AN_TICH":
 		is_player_turn = false
@@ -6671,8 +6760,13 @@ func _apply_network_game_state(state: Dictionary) -> void:
 					is_targeting_tau_vi = true
 					_refresh_tau_vi_equipped_previews()
 					_update_action_btn()
-			elif not card_pick_modal.visible and not sel.is_empty() and not card_pick_submission_pending:
-				_show_card_pick_modal(is_steal, tgt_s, sel)
+			elif not sel.is_empty() and not card_pick_submission_pending:
+				# Rebuild the prompt when the server changes selection type; otherwise
+				# an old Vườn Không Nhà Trống modal can remain over a new skill prompt.
+				var shown_sel_id = _get_target_card_selection_id(card_pick_current_selection)
+				if not card_pick_modal.visible or shown_sel_id != current_sel_id:
+					card_pick_modal.visible = false
+					_show_card_pick_modal(is_steal, tgt_s, sel)
 			if effect_type == "COT_KINH_DISCARD":
 				turn_indicator.text = "🏛️ CỘT KINH: BỎ 1 LÁ TRÊN TAY (%ds)!" % server_waiting_timer
 				desc_text.text = "🏛️ [Cột Kinh]: Bạn phải chọn 1 lá bài trên tay để bỏ."
@@ -8566,6 +8660,8 @@ func _is_card_valid_for_reaction(card_ui: Control, required_type: String, attack
 func _get_reaction_required_label(required_type: String) -> String:
 	if required_type == "Bỏ bài":
 		return "Bài"
+	if required_type == "Bỏ bài Đỏ":
+		return "Bài Đỏ"
 	if required_type == "Diệu Kế Phá Mưu":
 		return "Diệu Kế"
 	if required_type == "Cứu":
@@ -8604,6 +8700,8 @@ func _update_dodge_card_selector_buttons() -> void:
 		dodge_card_selector_scroll.visible = false
 
 func _select_dodge_card(card_ui: Control) -> void:
+	if card_ui != null and card_ui == selected_dodge_card_ui:
+		card_ui = null
 	if card_ui == null:
 		if selected_dodge_card_ui and is_instance_valid(selected_dodge_card_ui) and selected_dodge_card_ui.has_method("set_selected"):
 			selected_dodge_card_ui.set_selected(false)
@@ -9088,6 +9186,14 @@ func _get_card_color(suit: String) -> String:
 	if s in ["club", "chuon", "chuồn", "tep", "tép", "vàng", "vang", "yellow", "♣"]: return "YELLOW"
 	if s in ["spade", "bich", "bích", "đen", "den", "black", "♠"]: return "BLACK"
 	return ""
+
+func _get_dai_viet_color_bg(suit: String) -> Color:
+	match _get_card_color(suit):
+		"RED": return Color(0.62, 0.16, 0.16, 0.96)
+		"WHITE": return Color(0.76, 0.78, 0.82, 0.96)
+		"YELLOW": return Color(0.65, 0.48, 0.10, 0.96)
+		"BLACK": return Color(0.12, 0.14, 0.20, 0.98)
+	return Color(0.18, 0.22, 0.32, 0.98)
 
 func _is_black_card(info: Dictionary) -> bool:
 	var s = str(info.get("suit", "")).to_lower().strip_edges()
@@ -9766,10 +9872,14 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 		star_lbl.add_theme_font_size_override("font_size", 24)
 		star_lbl.pivot_offset = Vector2(12, 14)
 		if s < res["old_stars"]:
-			star_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.2, 1.0))
-			star_lbl.add_theme_color_override("font_shadow_color", Color(0.9, 0.6, 0.1, 0.7))
+			star_lbl.modulate = Color(1.3, 1.2, 0.5, 1.0)
+			star_lbl.add_theme_color_override("font_color", Color(1.0, 0.95, 0.3, 1.0))
+			star_lbl.add_theme_color_override("font_shadow_color", Color(1.0, 0.6, 0.0, 0.9))
+			star_lbl.add_theme_constant_override("shadow_offset_x", 0)
+			star_lbl.add_theme_constant_override("shadow_offset_y", 1)
 		else:
-			star_lbl.add_theme_color_override("font_color", Color(0.25, 0.28, 0.38, 0.8))
+			star_lbl.modulate = Color(0.18, 0.20, 0.28, 0.28)
+			star_lbl.add_theme_color_override("font_color", Color(0.2, 0.22, 0.3, 0.5))
 		stars_hbox.add_child(star_lbl)
 		star_nodes.append(star_lbl)
 
@@ -9920,7 +10030,11 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 			var s_node = star_nodes[target_star_idx] as Label
 			var s_tw = create_tween()
 			s_tw.tween_property(s_node, "scale", Vector2(1.8, 1.8), 0.18).set_trans(Tween.TRANS_BACK)
-			s_tw.parallel().tween_property(s_node, "theme_override_colors/font_color", Color(1.0, 0.88, 0.2, 1.0), 0.18)
+			s_tw.parallel().tween_property(s_node, "modulate", Color(1.3, 1.2, 0.5, 1.0), 0.18)
+			s_tw.parallel().tween_property(s_node, "theme_override_colors/font_color", Color(1.0, 0.95, 0.3, 1.0), 0.18)
+			s_node.add_theme_color_override("font_shadow_color", Color(1.0, 0.6, 0.0, 0.9))
+			s_node.add_theme_constant_override("shadow_offset_x", 0)
+			s_node.add_theme_constant_override("shadow_offset_y", 1)
 			s_tw.tween_property(s_node, "scale", Vector2(1.0, 1.0), 0.15)
 			AudioManager.play_card_draw()
 			await s_tw.finished
@@ -9930,8 +10044,10 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 			if target_star_idx < star_nodes.size():
 				var s_node = star_nodes[target_star_idx] as Label
 				var s_tw = create_tween()
-				s_tw.tween_property(s_node, "theme_override_colors/font_color", Color(1.0, 0.25, 0.25), 0.15)
-				s_tw.tween_property(s_node, "theme_override_colors/font_color", Color(0.25, 0.28, 0.38, 0.8), 0.25)
+				s_tw.tween_property(s_node, "modulate", Color(1.0, 0.25, 0.25, 0.9), 0.15)
+				s_tw.tween_property(s_node, "modulate", Color(0.18, 0.20, 0.28, 0.28), 0.25)
+				s_tw.parallel().tween_property(s_node, "theme_override_colors/font_color", Color(0.2, 0.22, 0.3, 0.5), 0.25)
+				s_node.remove_theme_color_override("font_shadow_color")
 				AudioManager.play_damage()
 				await s_tw.finished
 
@@ -9960,7 +10076,11 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 			var b_node = star_nodes[bonus_star_idx] as Label
 			var b_tw = create_tween()
 			b_tw.tween_property(b_node, "scale", Vector2(1.8, 1.8), 0.2)
-			b_tw.parallel().tween_property(b_node, "theme_override_colors/font_color", Color(1.0, 0.88, 0.2), 0.2)
+			b_tw.parallel().tween_property(b_node, "modulate", Color(1.3, 1.2, 0.5, 1.0), 0.2)
+			b_tw.parallel().tween_property(b_node, "theme_override_colors/font_color", Color(1.0, 0.95, 0.3, 1.0), 0.2)
+			b_node.add_theme_color_override("font_shadow_color", Color(1.0, 0.6, 0.0, 0.9))
+			b_node.add_theme_constant_override("shadow_offset_x", 0)
+			b_node.add_theme_constant_override("shadow_offset_y", 1)
 			b_tw.tween_property(b_node, "scale", Vector2(1.0, 1.0), 0.15)
 			await b_tw.finished
 		
@@ -10012,9 +10132,15 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 		for s in range(5):
 			var s_node = star_nodes[s] as Label
 			if s < res["stars"]:
-				s_node.add_theme_color_override("font_color", Color(1.0, 0.88, 0.2, 1.0))
+				s_node.modulate = Color(1.3, 1.2, 0.5, 1.0)
+				s_node.add_theme_color_override("font_color", Color(1.0, 0.95, 0.3, 1.0))
+				s_node.add_theme_color_override("font_shadow_color", Color(1.0, 0.6, 0.0, 0.9))
+				s_node.add_theme_constant_override("shadow_offset_x", 0)
+				s_node.add_theme_constant_override("shadow_offset_y", 1)
 			else:
-				s_node.add_theme_color_override("font_color", Color(0.25, 0.28, 0.38, 0.8))
+				s_node.modulate = Color(0.18, 0.20, 0.28, 0.28)
+				s_node.add_theme_color_override("font_color", Color(0.2, 0.22, 0.3, 0.5))
+				s_node.remove_theme_color_override("font_shadow_color")
 		star_count_lbl.text = " %d/5 Sao" % res["stars"]
 
 func _on_return_home_clicked() -> void:
@@ -11015,7 +11141,10 @@ func _on_end_turn_btn_clicked() -> void:
 		NetworkClient.send_respond_action(true, str(_get_card_info_from_ui(selected_card_ui).get("id", "")))
 		card_play_btn.disabled = true
 		return
-	if current_server_phase in ["AWAIT_AN_DAN", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_TRUNG_KIEN", "AWAIT_VAN_SACH", "AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_MUU_DINH_CHOICE"] and current_waiting_seat == my_seat:
+	if current_server_phase == "AWAIT_THU_PHAP_DISCARD" and current_waiting_seat == my_seat:
+		desc_text.text = "⚠️ [Thủ Pháp]: Bạn bắt buộc phải chọn 1 lá bài trên tay để bỏ."
+		return
+	if current_server_phase in ["AWAIT_AN_DAN", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_TRUNG_KIEN", "AWAIT_VAN_SACH", "AWAIT_CAN_GIAN", "AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_MUU_DINH_CHOICE"] and current_waiting_seat == my_seat:
 		_close_muu_dinh_modal()
 		NetworkClient.send_respond_action(false, "")
 		end_turn_btn.disabled = true
@@ -12909,7 +13038,20 @@ func _show_card_pick_modal(is_steal: bool, target_seat: int, selection_data: Dic
 
 	var effect_type = card_pick_effect_type
 	card_pick_cancel_btn.visible = (effect_type in ["UU_THIEP", "PHA_TONG"])
-	if effect_type == "THUONG_NGAU":
+	var card_pick_box := card_pick_modal.get_node_or_null("Dim/Box") as Control
+	var card_pick_dim := card_pick_modal.get_node_or_null("Dim") as Control
+	var is_dai_viet_color: bool = effect_type == "DAI_VIET_COLOR"
+	if is_dai_viet_color:
+		card_pick_title.text = "🎨 ĐẠI VIỆT: CHỌN MÀU"
+		card_pick_confirm_btn.text = "🎨 XÁC NHẬN MÀU"
+		card_pick_desc.text = "💡 Chọn màu để kích hoạt skill Đại Việt. Mỗi khi đánh lá cùng màu trong lượt này, bạn rút 1 lá."
+		card_pick_cancel_btn.visible = false
+		if card_pick_box:
+			card_pick_box.custom_minimum_size = Vector2(430, 255)
+		if card_pick_dim:
+			card_pick_dim.offset_top = 20.0
+			card_pick_dim.offset_bottom = -180.0
+	elif effect_type == "THUONG_NGAU":
 		card_pick_title.text = "🗡️ THƯƠNG NGÂU LÃNG BẠC: PHÁ HỦY BÀI CỦA %s" % tgt["name"].to_upper()
 		card_pick_confirm_btn.text = "🗡️ XÁC NHẬN PHÁ HỦY"
 		card_pick_desc.text = "💡 Trảm đã trúng. Chọn 1 lá bài úp trên tay hoặc 1 trang bị của %s để phá hủy:" % tgt["name"]
@@ -12969,7 +13111,7 @@ func _show_card_pick_modal(is_steal: bool, target_seat: int, selection_data: Dic
 	else:
 		card_pick_title.text = "🌾 VƯỜN KHÔNG NHÀ TRỐNG: PHÁ HỦY BÀI CỦA %s" % tgt["name"].to_upper()
 		card_pick_confirm_btn.text = "🌾 XÁC NHẬN PHÁ HỦY"
-	if effect_type not in ["THUONG_NGAU", "DOAN_DAO", "TAU_VI", "PHU_DE", "TRIEU_DANG", "HOA_DAN", "AN_DAN", "DAN_CAU_STEAL", "XUNG_VUONG_DISCARD", "AN_TICH_DEFENSE", "UU_THIEP", "CO_LAU", "PHA_TONG"]:
+	if effect_type not in ["DAI_VIET_COLOR", "THUONG_NGAU", "DOAN_DAO", "TAU_VI", "PHU_DE", "TRIEU_DANG", "HOA_DAN", "AN_DAN", "DAN_CAU_STEAL", "XUNG_VUONG_DISCARD", "AN_TICH_DEFENSE", "UU_THIEP", "CO_LAU", "PHA_TONG"]:
 		card_pick_desc.text = "💡 Hãy chọn 1 lá bài úp trên tay hoặc 1 trang bị đang mặc của %s:" % tgt["name"]
 
 	var has_options = false
@@ -13024,6 +13166,30 @@ func _show_card_pick_modal(is_steal: bool, target_seat: int, selection_data: Dic
 				var opt = {"type": "hand", "index": idx, "token": token, "label": "Lá bài úp #%d" % (idx + 1), "button": card_btn}
 				card_btn.pressed.connect(func(): _select_card_pick_option(opt))
 				card_pick_options_hbox.add_child(card_btn)
+			elif zone == "EQUIPMENT" and is_dai_viet_color:
+				has_options = true
+				var color_card = c_dict if c_dict is Dictionary else {}
+				var color_name = str(color_card.get("name", s_opt.get("label", "Chọn màu")))
+				var color_btn = Button.new()
+				color_btn.custom_minimum_size = Vector2(92, 72)
+				color_btn.focus_mode = Control.FOCUS_NONE
+				color_btn.text = color_name.replace("Đại Việt: ", "")
+				color_btn.add_theme_font_size_override("font_size", 13)
+				var color_style = StyleBoxFlat.new()
+				color_style.bg_color = _get_dai_viet_color_bg(str(color_card.get("suit", "")))
+				color_style.border_width_left = 2
+				color_style.border_width_top = 2
+				color_style.border_width_right = 2
+				color_style.border_width_bottom = 2
+				color_style.border_color = Color(1.0, 0.88, 0.35, 0.9)
+				color_style.corner_radius_top_left = 8
+				color_style.corner_radius_top_right = 8
+				color_style.corner_radius_bottom_left = 8
+				color_style.corner_radius_bottom_right = 8
+				color_btn.add_theme_stylebox_override("normal", color_style)
+				var color_opt = {"type": "dai_viet_color", "token": token, "label": color_name, "button": color_btn, "card": color_card}
+				color_btn.pressed.connect(func(): _select_card_pick_option(color_opt))
+				card_pick_options_hbox.add_child(color_btn)
 			elif zone == "EQUIPMENT":
 				has_options = true
 				var item_name = c_dict.get("name", "Trang bị") if c_dict is Dictionary else "Trang bị"
@@ -13234,17 +13400,28 @@ func _on_card_pick_confirmed() -> void:
 		card_pick_submitted_selection_id = _get_target_card_selection_id(card_pick_current_selection)
 		reaction_submission_pending = true
 		reaction_submission_version = last_server_version
-		if card_pick_effect_type == "AN_TICH_DEFENSE":
+		if card_pick_effect_type == "DAI_VIET_COLOR":
+			NetworkClient.send_respond_action(true, "", target_token)
+		elif card_pick_effect_type == "AN_TICH_DEFENSE":
 			NetworkClient.send_respond_action(true, target_token)
 		else:
 			NetworkClient.send_respond_action(true, "", target_token)
 	else:
-		var fallback_name = "Đột Kích Trộm Lương" if card_pick_is_steal else "Vườn Không Nhà Trống"
+		var fallback_name = "Đại Việt" if card_pick_effect_type == "DAI_VIET_COLOR" else ("Đột Kích Trộm Lương" if card_pick_is_steal else "Vườn Không Nhà Trống")
 		var c_id = card_pick_source_card_id
 		if c_id.is_empty():
 			var c_info = _get_card_info_from_ui(selected_card_ui) if (selected_card_ui and is_instance_valid(selected_card_ui)) else {}
 			c_id = str(c_info.get("id", fallback_name))
 		if c_id.is_empty(): c_id = fallback_name
+
+		if card_pick_effect_type == "DAI_VIET_COLOR":
+			var chosen_color = str(target_token).replace("DAI_VIET:", "")
+			_add_log("🎨 [ĐẠI VIỆT] Đã chọn màu %s." % chosen_color)
+			card_pick_effect_type = ""
+			card_pick_target_seat = -1
+			selected_card_pick_option.clear()
+			card_pick_modal.visible = false
+			return
 
 		if selected_card_ui and is_instance_valid(selected_card_ui):
 			_discard_player_card(selected_card_ui)

@@ -1055,7 +1055,8 @@ func _build_friend_row(data: Dictionary, is_incoming: bool, is_friend: bool) -> 
 	var name = Label.new()
 	name.size_flags_horizontal = SIZE_EXPAND_FILL
 	var display_name = str(data.get("fromUserName", data.get("userName", "Chiến Tướng")))
-	name.text = "👤 %s" % display_name
+	var level = int(data.get("level", 1))
+	name.text = "👤 %s (Lv.%d)" % [display_name, level]
 	name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name.add_theme_font_size_override("font_size", 14)
 	row.add_child(name)
@@ -1076,6 +1077,10 @@ func _build_friend_row(data: Dictionary, is_incoming: bool, is_friend: bool) -> 
 		online.add_theme_color_override("font_color", Color(0.35, 0.95, 0.55, 1.0) if bool(data.get("online", false)) else COLOR_TEXT_MUTED)
 		row.add_child(online)
 	else:
+		var online = Label.new()
+		online.text = "● ONLINE" if bool(data.get("online", false)) else "○ NGOẠI TUYẾN"
+		online.add_theme_color_override("font_color", Color(0.35, 0.95, 0.55, 1.0) if bool(data.get("online", false)) else COLOR_TEXT_MUTED)
+		row.add_child(online)
 		var add_btn = Button.new()
 		add_btn.text = "KẾT BẠN"
 		_style_white_gold_button(add_btn, 6, 2, Vector2(0, 1))
@@ -6673,12 +6678,12 @@ func _build_profile_content() -> Control:
 		s_lbl.text = "⭐"
 		s_lbl.add_theme_font_size_override("font_size", 15)
 		if s < rank_stars:
-			s_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.2))
-			s_lbl.add_theme_color_override("font_shadow_color", Color(0.9, 0.6, 0.1, 0.7))
-			s_lbl.modulate = Color(1.0, 1.0, 1.0, 1.0)
+			s_lbl.modulate = Color(1.3, 1.2, 0.5, 1.0)
+			s_lbl.add_theme_color_override("font_color", Color(1.0, 0.95, 0.3, 1.0))
+			s_lbl.add_theme_color_override("font_shadow_color", Color(1.0, 0.6, 0.0, 0.9))
 		else:
-			s_lbl.add_theme_color_override("font_color", Color(0.25, 0.28, 0.38, 0.8))
-			s_lbl.modulate = Color(0.35, 0.38, 0.45, 0.45)
+			s_lbl.modulate = Color(0.18, 0.20, 0.28, 0.28)
+			s_lbl.add_theme_color_override("font_color", Color(0.2, 0.22, 0.3, 0.5))
 		stars_hbox.add_child(s_lbl)
 
 	var s_count = Label.new()
@@ -6920,15 +6925,15 @@ func _start_2v2_matchmaking(mode_id: String = "2v2") -> void:
 			star_lbl.add_theme_font_size_override("font_size", 20)
 			if s < rank_stars:
 				# Sao sáng (màu vàng kim rực rỡ)
-				star_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.2, 1.0))
-				star_lbl.add_theme_color_override("font_shadow_color", Color(0.9, 0.6, 0.1, 0.7))
+				star_lbl.modulate = Color(1.3, 1.2, 0.5, 1.0)
+				star_lbl.add_theme_color_override("font_color", Color(1.0, 0.95, 0.3, 1.0))
+				star_lbl.add_theme_color_override("font_shadow_color", Color(1.0, 0.6, 0.0, 0.9))
 				star_lbl.add_theme_constant_override("shadow_offset_x", 0)
 				star_lbl.add_theme_constant_override("shadow_offset_y", 1)
-				star_lbl.modulate = Color(1.0, 1.0, 1.0, 1.0)
 			else:
 				# Sao tối (màu xám tối)
-				star_lbl.add_theme_color_override("font_color", Color(0.25, 0.28, 0.38, 0.8))
-				star_lbl.modulate = Color(0.35, 0.38, 0.45, 0.45)
+				star_lbl.modulate = Color(0.18, 0.20, 0.28, 0.28)
+				star_lbl.add_theme_color_override("font_color", Color(0.2, 0.22, 0.3, 0.5))
 			stars_hbox.add_child(star_lbl)
 	rank_col.add_child(stars_hbox)
 
