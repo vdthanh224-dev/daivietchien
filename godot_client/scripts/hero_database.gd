@@ -275,7 +275,7 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 	if id == 1:
 		skills = [
 			{"id": "che_no", "name": "Chế Nỏ", "desc": "Bạn có thể dùng bất kỳ lá bài Đen như lá trang bị Nỏ Thần Kim Quy."},
-			{"id": "lien_chau", "name": "Liên Châu", "desc": "Bạn đánh ra lá Trảm khi đang đeo Nỏ Thần Kim Quy, bạn có thể bỏ thêm 1 lá bài trên tay để chọn thêm 1 mục tiêu khác trong Tầm đánh."}
+			{"id": "co_bien", "name": "Cơ Biến", "desc": "Bạn có thể đổi lá Đen thành lá khác."}
 		]
 	elif id == 2:
 		skills = [

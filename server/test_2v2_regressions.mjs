@@ -113,6 +113,7 @@ assert.equal(HERO_MAX_HP[7], 4);
 {
   const state = freshState();
   state.players[0].heroId = 1; // Cao Lo
+  state.players[0].skills = ['CHE_NO', 'LIEN_CHAU'];
   state.players[0].equipments.push({ id: "NO_THAN", name: "Nỏ Thần Kim Quy", subType: CARD_SUBTYPES.WEAPON, range: 1 });
   put(state, 1, card("LIEN_CHAU_SLASH", "Trảm Thường", CARD_SUBTYPES.ATTACK_NORMAL));
   put(state, 1, card("LIEN_CHAU_COST", "Bài bỏ", CARD_SUBTYPES.PEACH));

@@ -9,6 +9,7 @@ var voice_cache: Dictionary = {}
 
 const SKILL_VOICE_KEYS := {
 	"chế nỏ": "che_no",
+	"cơ biến": "co_bien",
 	"liên châu": "lien_chau",
 	"xạ thuẫn": "xa_thuan",
 	"phù trấn": "phu_tran",

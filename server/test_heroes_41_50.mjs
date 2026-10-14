@@ -296,10 +296,17 @@ function createTestState(heroIds = ["HERO_41", "HERO_42", "HERO_43", "HERO_44"])
   const playRes = handlePlayCard(state, 1, "HORSE_1", 2);
   assert.equal(playRes.success, true);
   assert.equal(state.phase, "AWAIT_SLASH_DEFENSE");
+  assert.equal(state.activeCard.thoBinhActive, true);
 
-  // Thổ Binh: Distance <= 2, Dodge rank 2..7 is rejected
+  // Check skill activations and action log description for Thổ Binh notification
+  const lastAct = state.actionHistory[state.actionHistory.length - 1];
+  assert.ok(lastAct.skillActivations.some(s => s.name === "Thổ Binh"));
+  assert.match(lastAct.description, /Thổ Binh/);
+
+  // Thổ Binh: Distance <= 2, Dodge rank 2..7 is rejected with helpful notification message
   const dodgeLowRes = handleRespondAction(state, 2, true, "DODGE_LOW");
   assert.equal(dodgeLowRes.error !== undefined, true);
+  assert.match(dodgeLowRes.error, /Thổ Binh/);
 
   // Dodge rank 9 is accepted
   const dodgeHighRes = handleRespondAction(state, 2, true, "DODGE_HIGH");

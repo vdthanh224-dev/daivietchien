@@ -7,7 +7,7 @@ export const FACTIONS = {
 };
 
 export const HEROES = {
-  HERO_1: { id: 'HERO_1', name: 'Cao Lỗ', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['CHE_NO', 'LIEN_CHAU'] },
+  HERO_1: { id: 'HERO_1', name: 'Cao Lỗ', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['CHE_NO', 'CO_BIEN'] },
   HERO_2: { id: 'HERO_2', name: 'Đào Hãn', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['XA_THUAN', 'PHU_TRAN'] },
   HERO_3: { id: 'HERO_3', name: 'Thi Sách', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['HICH_NGHIA', 'UAT_KHI'] },
   HERO_4: { id: 'HERO_4', name: 'Lê Chân', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['TRIEU_DANG', 'LAP_LANG'] },

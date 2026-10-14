@@ -1729,10 +1729,15 @@ function startSlashResolution(state, slashCard, casterSeat, targetSeat, options 
     liemDaoEligible: !!firstEquipmentHook(caster, 'slashHitDrawOnce', { target })
   };
 
+  const isThoBinh = heroHasSkill(caster, "THO_BINH") && getDistance(state, casterSeat, targetSeat) <= 2;
+  state.activeCard.thoBinhActive = isThoBinh;
+
   const cannon = getEquippedWeapon(caster, "Súng Thần Công");
   const requiredDodges = state.activeCard.requiredDodgeCount;
-  const requiredDodgeText = `${requiredDodges > 1 ? ` (cần ${requiredDodges} lá Đỡ do [Dũng Nữ])` : ""}${cannon ? " (chỉ được dùng lá Đỡ từ 7 trở lên)" : ""}`;
+  const thoBinhText = isThoBinh ? " (do [Thổ Binh], không thể dùng lá Đỡ từ 2 đến 7)" : "";
+  const requiredDodgeText = `${requiredDodges > 1 ? ` (cần ${requiredDodges} lá Đỡ do [Dũng Nữ])` : ""}${cannon ? " (chỉ được dùng lá Đỡ từ 7 trở lên)" : ""}${thoBinhText}`;
   const skillActivations = [];
+  if (isThoBinh) skillActivations.push({ name: "Thổ Binh", seat: casterSeat });
   if (heroHasSkill(caster, "XA_THUAN")) skillActivations.push({ name: "Xạ Thuẫn", seat: casterSeat });
   if (cocNgamBonus) skillActivations.push({ name: "Cọc Ngầm", seat: casterSeat });
   if (chienTuongBonus > 0) skillActivations.push({ name: "Chiến Tượng", seat: casterSeat });
@@ -5873,10 +5878,16 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     active.dodgesUsed = 0;
     active.liemDaoEligible = !!firstEquipmentHook(caster, 'slashHitDrawOnce', { target: effectiveTarget });
 
+    const isThoBinh = heroHasSkill(caster, "THO_BINH") && getDistance(state, active.casterSeat, effectiveTarget.seat) <= 2;
+    active.thoBinhActive = isThoBinh;
+
     const cannon = getEquippedWeapon(caster, "Súng Thần Công");
     const requiredDodges = active.requiredDodgeCount;
-    const requiredDodgeText = `${requiredDodges > 1 ? ` (cần ${requiredDodges} lá Đỡ do [Dũng Nữ])` : ""}${cannon ? " (chỉ được dùng lá Đỡ từ 7 trở lên)" : ""}`;
+    const thoBinhText = isThoBinh ? " (do [Thổ Binh], không thể dùng lá Đỡ từ 2 đến 7)" : "";
+    const requiredDodgeText = `${requiredDodges > 1 ? ` (cần ${requiredDodges} lá Đỡ do [Dũng Nữ])` : ""}${cannon ? " (chỉ được dùng lá Đỡ từ 7 trở lên)" : ""}${thoBinhText}`;
     const slashCard = { id: active.cardId, name: active.cardName, subType: active.subType, suit: active.suit };
+    const skillActivations = [];
+    if (isThoBinh) skillActivations.push({ name: "Thổ Binh", seat: active.casterSeat });
     recordAction(state, {
       type: "PLAY_SLASH",
       casterSeat: active.casterSeat,
@@ -5886,6 +5897,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       damage: active.damage,
       element: active.damageElement,
       isWineBuff: active.isWineBuff,
+      skillActivations,
       description: `🗡️ <b>${caster ? caster.generalName : 'Người chơi'}</b> tung chiêu ${formatCardText(slashCard)}${active.isWineBuff ? " <color=#FFD700><b>(kèm hiệu ứng Hủ Rượu: +1 Sát thương)</b></color>" : ""} nhắm vào <b>${effectiveTarget.generalName}</b>! (${oaiNhuocRequired ? "[Oai Nhược] mục tiêu chọn bỏ đúng 2 lá, gồm 1 lá Đỡ, hoặc chịu sát thương" : `Mục tiêu có 40s để Đỡ${requiredDodgeText}`})`
     });
     return { success: true, state };
@@ -6667,11 +6679,19 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       }
 
       const caster = state.players.find(x => x.seat === (state.activeCard ? state.activeCard.casterSeat : 0));
-      const handIdx = respondent.hand.findIndex(c => (c.id === cardId || c.name === cardId || ((cardId === "DO" || cardId === "do") && isDodge(c))) && canUseCardAsDodgeAgainstSlash(respondent, c, caster, state.activeCard));
+      const handIdx = respondent.hand.findIndex(c => (c.id === cardId || c.name === cardId || ((cardId === "DO" || cardId === "do") && isDodge(c))) && canUseCardAsDodgeAgainstSlash(respondent, c, caster, state.activeCard, state));
       const equipmentIdx = handIdx < 0
-        ? (respondent.equipments || []).findIndex(c => (c.id === cardId || c.name === cardId) && canUseCardAsDodgeAgainstSlash(respondent, c, caster, state.activeCard))
+        ? (respondent.equipments || []).findIndex(c => (c.id === cardId || c.name === cardId) && canUseCardAsDodgeAgainstSlash(respondent, c, caster, state.activeCard, state))
         : -1;
-      if (handIdx < 0 && equipmentIdx < 0) return { error: "Lá Đỡ hoặc trang bị không còn hợp lệ cho đòn Trảm này" };
+      if (handIdx < 0 && equipmentIdx < 0) {
+        if (caster && heroHasSkill(caster, "THO_BINH") && getDistance(state, caster.seat, respondent.seat) <= 2) {
+          const cardCandidate = respondent.hand.find(c => c.id === cardId || c.name === cardId) || (respondent.equipments || []).find(c => c.id === cardId || c.name === cardId);
+          if (cardCandidate && Number(cardCandidate.rank || 0) >= 2 && Number(cardCandidate.rank || 0) <= 7) {
+            return { error: "Do kỹ năng [Thổ Binh] của Tông Đản (Cự ly ≤ 2), không thể dùng lá Đỡ từ 2 đến 7!" };
+          }
+        }
+        return { error: "Lá Đỡ hoặc trang bị không còn hợp lệ cho đòn Trảm này" };
+      }
       {
         const dodgeCard = handIdx >= 0 ? respondent.hand.splice(handIdx, 1)[0] : respondent.equipments.splice(equipmentIdx, 1)[0];
         discardCard(state, dodgeCard);
@@ -9945,6 +9965,8 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
     discardCard(state, player.hand.splice(costIndex, 1)[0]);
     active.targetSeat = target.seat;
     active.nghichYRedirected = true;
+    const slashCaster = state.players.find(p => p.seat === slashCasterSeat);
+    active.thoBinhActive = Boolean(slashCaster && heroHasSkill(slashCaster, "THO_BINH") && getDistance(state, slashCasterSeat, target.seat) <= 2);
 
     const canVeGuard = state.players.find((candidate) =>
       isLivingPlayer(candidate) && candidate.seat !== target.seat && candidate.seat !== slashCasterSeat

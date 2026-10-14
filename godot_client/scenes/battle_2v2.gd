@@ -6,6 +6,7 @@ const AI_CARD_PLAY_DELAY: float = 1.5
 const AI_TURN_WATCHDOG_TIMEOUT: float = 60.0
 const IRON_CHAIN_DESCRIPTION := "Chạm avatar để chọn tối đa 2 mục tiêu để đưa họ vào hoặc thoát trạng thái xích (cùng nhận sát thương nguyên tố), có thể đổi thành lá mới."
 const HERO_SKILL_ACTIONS := {
+	"CO_BIEN_TRIGGERED": {"name": "Cơ Biến"},
 	"LIEN_CHAU_TRIGGERED": {"name": "Liên Châu"},
 	"PHU_TRAN_DRAW": {"name": "Phù Trấn"},
 	"UAT_KHI_DRAW": {"name": "Uất Khí"},
@@ -238,6 +239,7 @@ var is_targeting_thuy_chien: bool = false
 var is_targeting_nghich_y: bool = false
 var selected_nghich_y_card_id: String = ""
 var is_targeting_thien_cam: bool = false
+var is_targeting_co_bien: bool = false
 var dan_cau_forced_target_seat: int = -1
 var is_targeting_cai_cach: bool = false
 var is_targeting_binh_san: bool = false
@@ -1930,6 +1932,8 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 		buttons.append({"id": "thien_cam", "text": "🌙 THIÊN CẢM", "description": "Bỏ 1 Cẩm Nang Trì Hoãn trên tay để rút 2 lá mới.", "selected": is_targeting_thien_cam})
 	if seat == my_seat and _hero_has_skill(g, "che_no"):
 		buttons.append({"id": "che_no", "text": "🎯 CHẾ NỎ", "description": "Bật: mọi lá bài Đen trên tay trở thành Nỏ Thần Kim Quy. Bấm lại để hủy.", "selected": bool(g.get("che_no_active", false))})
+	if seat == my_seat and _hero_has_skill(g, "co_bien") and current_server_phase == "PLAY" and current_turn_seat == my_seat:
+		buttons.append({"id": "co_bien", "text": "🔄 CƠ BIẾN", "description": "Đổi 1 lá bài Đen trên tay hoặc đang mang lấy 1 lá mới.", "selected": is_targeting_co_bien})
 	if seat == my_seat and _hero_has_skill(g, "trieu_dang"):
 		buttons.append({"id": "trieu_dang", "text": "🌊 TRIỀU DÂNG", "description": "Chọn 1 người khác có trang bị để hủy 1 trang bị của họ.", "selected": is_targeting_trieu_dang})
 	if seat == my_seat and _hero_has_skill(g, "bat_na"):
@@ -1978,6 +1982,7 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 	avatar.set_skill_buttons(buttons)
 	if avatar.has_method("set_skill_button_selected"):
 		avatar.set_skill_button_selected("che_no", bool(g.get("che_no_active", false)))
+		avatar.set_skill_button_selected("co_bien", is_targeting_co_bien)
 		avatar.set_skill_button_selected("trieu_dang", is_targeting_trieu_dang)
 		avatar.set_skill_button_selected("bat_na", is_targeting_bat_na)
 		avatar.set_skill_button_selected("van_sach", is_targeting_van_sach)
@@ -2041,6 +2046,22 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 			turn_indicator.text = "🌙 THIÊN CẢM: CHỌN CẨM NANG TRÌ HOÃN"
 		else:
 			desc_text.text = "🌙 Đã hủy chọn [THIÊN CẢM]."
+		_refresh_local_skill_buttons(s_num)
+		_update_action_btn()
+		return
+	if s_num == my_seat and skill_key == "co_bien":
+		if current_server_phase != "PLAY" or current_turn_seat != my_seat:
+			desc_text.text = "⚠️ [CƠ BIẾN] chỉ dùng trong lượt của bạn."
+			return
+		is_targeting_co_bien = not is_targeting_co_bien
+		selected_card_ui = null
+		if is_targeting_co_bien:
+			_refresh_hung_suc_equipped_weapon_previews()
+			desc_text.text = "🔄 [CƠ BIẾN] Chọn 1 lá bài Đen trên tay hoặc đang mang để đổi thành lá khác."
+			turn_indicator.text = "🔄 CƠ BIẾN: CHỌN 1 LÁ BÀI ĐEN"
+		else:
+			_clear_hung_suc_equipped_weapon_previews()
+			desc_text.text = "🔄 Đã hủy chọn [CƠ BIẾN]."
 		_refresh_local_skill_buttons(s_num)
 		_update_action_btn()
 		return
@@ -2653,14 +2674,14 @@ func _record_local_equipment_card(card_info: Dictionary) -> void:
 	g["equipment_cards"] = equipment_cards
 
 func _refresh_hung_suc_equipped_weapon_previews() -> void:
-	if not (is_targeting_hung_suc or is_targeting_cai_cach or is_targeting_binh_san) or not generals_data.has(my_seat):
+	if not (is_targeting_hung_suc or is_targeting_cai_cach or is_targeting_binh_san or is_targeting_co_bien) or not generals_data.has(my_seat):
 		_clear_hung_suc_equipped_weapon_previews()
 		return
 	var desired_weapons: Dictionary = {}
 	var equipment_cards = generals_data[my_seat].get("equipment_cards", [])
 	if equipment_cards is Array:
 		for equipment in equipment_cards:
-			if equipment is Dictionary and (is_targeting_cai_cach or is_targeting_binh_san or int(equipment.get("subType", -1)) == 6):
+			if equipment is Dictionary and (is_targeting_cai_cach or is_targeting_binh_san or (is_targeting_co_bien and _is_black_card(equipment)) or int(equipment.get("subType", -1)) == 6):
 				desired_weapons[str(equipment.get("id", ""))] = equipment
 	for child in hand_container.get_children():
 		if child.has_meta("hung_suc_equipped_preview"):
@@ -2810,6 +2831,23 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 			selected_card_ui.set_selected(false)
 		selected_card_ui = card_node
 		card_node.set_selected(true)
+		_update_action_btn()
+		return
+	if is_targeting_co_bien:
+		if not _is_black_card(c_info):
+			desc_text.text = "⚠️ [CƠ BIẾN] chỉ chọn lá bài Đen."
+			return
+		if selected_card_ui == card_node:
+			selected_card_ui.set_selected(false)
+			selected_card_ui = null
+			desc_text.text = "🔄 [CƠ BIẾN] Chọn 1 lá bài Đen trên tay hoặc đang mang để đổi thành lá khác."
+			_update_action_btn()
+			return
+		if selected_card_ui and is_instance_valid(selected_card_ui):
+			selected_card_ui.set_selected(false)
+		selected_card_ui = card_node
+		card_node.set_selected(true)
+		AudioManager.play_card_select()
 		_update_action_btn()
 		return
 	if is_targeting_trao_bao:
@@ -2981,7 +3019,21 @@ func _handle_dodge_hand_card_selection(card_node: Control, _c_info: Dictionary) 
 		var atk = generals_data.get(dodge_attacker_seat, {}) if is_current_reaction_slash else {}
 		var slash_suit = atk.get("last_slash_suit", "") if is_current_reaction_slash else ""
 		var card_suit = info.get("suit", "")
-		if is_current_reaction_slash and _has_equipped_weapon_name(atk, "Súng Thần Công Hồ Triều") and int(info.get("rank", 1)) < 7:
+		var card_rank = int(info.get("rank", 1))
+		var is_tho_binh_active = false
+		if is_current_reaction_slash and dodge_attacker_seat > 0:
+			if is_network_mode:
+				var last_state_dict = NetworkClient.last_state if NetworkClient else {}
+				var active_c = last_state_dict.get("activeCard", {}) if last_state_dict is Dictionary else {}
+				if active_c is Dictionary and bool(active_c.get("thoBinhActive", false)):
+					is_tho_binh_active = true
+			if not is_tho_binh_active and (_hero_has_skill(atk, "tho_binh") or atk.get("hero_id", -1) == 44):
+				if _calculate_distance(dodge_attacker_seat, my_seat) <= 2:
+					is_tho_binh_active = true
+
+		if is_current_reaction_slash and is_tho_binh_active and card_rank >= 2 and card_rank <= 7:
+			desc_text.text = "❌ Do kỹ năng [Thổ Binh] của Tông Đản (Cự ly ≤ 2), không thể dùng lá Đỡ từ 2 đến 7!"
+		elif is_current_reaction_slash and _has_equipped_weapon_name(atk, "Súng Thần Công Hồ Triều") and card_rank < 7:
 			desc_text.text = "❌ Súng Thần Công chỉ cho phép dùng lá Đỡ từ 7 trở lên!"
 		else:
 			var required_label = _get_reaction_required_label(current_reaction_required_type)
@@ -3499,6 +3551,13 @@ func _update_action_btn() -> void:
 		card_play_btn.disabled = not thien_cam_ready
 		card_play_btn.text = "🌙 ĐỔI TRÌ HOÃN LẤY 2 LÁ" if thien_cam_ready else "🌙 THIÊN CẢM: CHỌN 1 CẨM NANG TRÌ HOÃN"
 		return
+	if is_targeting_co_bien:
+		var co_bien_info := _get_card_info_from_ui(selected_card_ui) if selected_card_ui and is_instance_valid(selected_card_ui) else {}
+		var is_black_card := not co_bien_info.is_empty() and _is_black_card(co_bien_info)
+		card_play_btn.visible = true
+		card_play_btn.disabled = not is_black_card
+		card_play_btn.text = "🔄 ĐỔI LÁ ĐEN" if is_black_card else "🔄 CƠ BIẾN: CHỌN 1 LÁ BÀI ĐEN"
+		return
 	if is_targeting_binh_san:
 		var binh_san_info := _get_card_info_from_ui(selected_card_ui) if selected_card_ui and is_instance_valid(selected_card_ui) else {}
 		var binh_san_card_valid := not binh_san_info.is_empty() and (int(binh_san_info.get("cat", binh_san_info.get("category", -1))) == 1 or selected_card_ui.has_meta("hung_suc_equipped_preview"))
@@ -3910,6 +3969,26 @@ func _on_card_play_btn_clicked() -> void:
 		NetworkClient.send_use_skill("Thiên Cảm", 0, str(thien_card.get("id", "")))
 		is_targeting_thien_cam = false
 		selected_card_ui.set_selected(false)
+		selected_card_ui = null
+		card_play_btn.disabled = true
+		_refresh_local_skill_buttons(my_seat)
+		return
+	if is_targeting_co_bien:
+		if selected_card_ui == null or not is_instance_valid(selected_card_ui):
+			desc_text.text = "⚠️ [CƠ BIẾN] hãy chọn 1 lá bài Đen."
+			return
+		var cb_card = _get_card_info_from_ui(selected_card_ui)
+		if not _is_black_card(cb_card):
+			desc_text.text = "⚠️ [CƠ BIẾN] chỉ chọn lá bài Đen."
+			return
+		NetworkClient.send_use_skill("Cơ Biến", 0, str(cb_card.get("id", "")))
+		if selected_card_ui.has_meta("hung_suc_equipped_preview"):
+			_clear_hung_suc_equipped_weapon_previews()
+		else:
+			_discard_player_card(selected_card_ui)
+		is_targeting_co_bien = false
+		if is_instance_valid(selected_card_ui):
+			selected_card_ui.set_selected(false)
 		selected_card_ui = null
 		card_play_btn.disabled = true
 		_refresh_local_skill_buttons(my_seat)
@@ -6592,12 +6671,19 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		card_play_btn.visible = false
 		if not (server_waiting_seat == my_seat and is_waiting_dodge):
 			_clear_normal_hand_selection()
+		var active_c = state.get("activeCard", {})
+		if not (active_c is Dictionary):
+			active_c = {}
+		var atk_s = int(active_c.get("casterSeat", 0))
+		var is_tho_binh = bool(active_c.get("thoBinhActive", false))
+		if not is_tho_binh and atk_s > 0:
+			var atk_gen = generals_data.get(atk_s, {})
+			if atk_gen is Dictionary and (_hero_has_skill(atk_gen, "tho_binh") or atk_gen.get("hero_id", -1) == 44):
+				if _calculate_distance(atk_s, server_waiting_seat) <= 2:
+					is_tho_binh = true
+
 		if server_waiting_seat == my_seat:
 			if not is_waiting_dodge and not reaction_submission_pending:
-				var active_c = state.get("activeCard", {})
-				if not (active_c is Dictionary):
-					active_c = {}
-				var atk_s = int(active_c.get("casterSeat", 0))
 				var dmg = _get_effect_damage(active_c)
 				var elem = str(active_c.get("damageElement", active_c.get("element", "NORMAL")))
 				var slash_suit = str(active_c.get("suit", ""))
@@ -6607,6 +6693,8 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			dodge_time_left = float(server_waiting_timer)
 			if dodge_timer_lbl:
 				dodge_timer_lbl.text = "⏳ Còn lại: %ds" % server_waiting_timer
+			if is_tho_binh:
+				turn_indicator.text = "🛡️ [THỔ BINH] KHÔNG THỂ DÙNG ĐỠ 2->7 (%ds)" % server_waiting_timer
 		else:
 			if is_waiting_dodge:
 				dodge_modal.visible = false
@@ -6615,8 +6703,12 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			if not (wait_gen is Dictionary):
 				wait_gen = {}
 			var wait_name = wait_gen.get("name", "Ghế %d" % server_waiting_seat)
-			turn_indicator.text = "🛡️ ĐANG CHỜ %s ĐỠ ĐÒN (%ds)..." % [wait_name, server_waiting_timer]
-			desc_text.text = "🛡️ Đang chờ %s phản hồi đòn Trảm..." % wait_name
+			if is_tho_binh:
+				turn_indicator.text = "🛡️ ĐANG CHỜ %s ĐỠ [THỔ BINH 2->7] (%ds)..." % [wait_name, server_waiting_timer]
+				desc_text.text = "🛡️ %s bị Trảm bởi Tông Đản [Thổ Binh] (Cự ly ≤ 2: không thể dùng lá Đỡ từ 2 đến 7)..." % wait_name
+			else:
+				turn_indicator.text = "🛡️ ĐANG CHỜ %s ĐỠ ĐÒN (%ds)..." % [wait_name, server_waiting_timer]
+				desc_text.text = "🛡️ Đang chờ %s phản hồi đòn Trảm..." % wait_name
 
 	elif server_phase == "AWAIT_AOE":
 		var active_c = state.get("activeCard", {})
@@ -8491,6 +8583,11 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 			var has_sung = _has_equipped_weapon_name(atk, "Súng Thần Công Hồ Triều")
 			if has_sung and int(c.get("rank", 1)) < 7:
 				continue
+			# Thổ Binh: Cự ly <= 2 không được dùng Đỡ từ 2..7
+			if (_hero_has_skill(atk, "tho_binh") or atk.get("hero_id", -1) == 44) and _calculate_distance(attacker_seat, target_seat) <= 2:
+				var c_rank = int(c.get("rank", 1))
+				if c_rank >= 2 and c_rank <= 7:
+					continue
 			dodge_idx = idx
 			break
 
@@ -8558,7 +8655,20 @@ func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_e
 	var slash_suit = atk.get("last_slash_suit", "")
 	var defender_name = generals_data[my_seat].get("name", "Bạn") if generals_data.has(my_seat) else "Bạn"
 	var has_sung = _has_equipped_weapon_name(atk, "Súng Thần Công Hồ Triều")
-	if has_sung:
+	var is_tho_binh = false
+	if is_network_mode:
+		var last_state_dict = NetworkClient.last_state if NetworkClient else {}
+		var active_c = last_state_dict.get("activeCard", {}) if last_state_dict is Dictionary else {}
+		if active_c is Dictionary and bool(active_c.get("thoBinhActive", false)):
+			is_tho_binh = true
+	if not is_tho_binh and (_hero_has_skill(atk, "tho_binh") or atk.get("hero_id", -1) == 44):
+		if _calculate_distance(attacker_seat, my_seat) <= 2:
+			is_tho_binh = true
+
+	if is_tho_binh:
+		dodge_desc_lbl.text = "⚠️ [Trảm] của %s đang tác động lên %s.\n[Thổ Binh] Cự ly ≤ 2: KHÔNG THỂ DÙNG lá Đỡ từ 2 đến 7!\nHãy chọn lá Đỡ hợp lệ (từ 8 trở lên) trên tay hoặc bấm [CHỊU ĐÒN]:" % [atk["name"], defender_name]
+		_add_log("⚠️ [THỔ BINH] %s tung chiêu Trảm lên %s (Cự ly ≤ 2): Mục tiêu không thể dùng lá Đỡ từ 2 đến 7!" % [atk["name"], defender_name])
+	elif has_sung:
 		dodge_desc_lbl.text = "⚠️ [Trảm] của %s đang tác động lên %s.\nSúng Thần Công chỉ cho phép dùng lá Đỡ từ 7 trở lên.\nHãy chọn lá Đỡ hợp lệ trên tay hoặc bấm [CHỊU ĐÒN]:" % [atk["name"], defender_name]
 	else:
 		dodge_desc_lbl.text = "[Trảm] của %s đang tác động lên %s.\nHãy CHỌN một lá bài trên tay để Đỡ hoặc bấm [CHỊU ĐÒN]:" % [atk["name"], defender_name]
@@ -8591,7 +8701,9 @@ func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_e
 			dodge_khien_may_btn.visible = true
 			dodge_khien_may_btn.disabled = false
 			dodge_khien_may_btn.text = "🎲 LẬT KHIÊN MÂY (ĐỎ = ĐỠ)"
-			if has_sung:
+			if is_tho_binh:
+				dodge_desc_lbl.text = "⚠️ [Trảm] của %s đang tác động lên %s.\n[Thổ Binh] Cự ly ≤ 2: KHÔNG THỂ DÙNG lá Đỡ từ 2 đến 7!\nBạn có thể [🎲 LẬT KHIÊN MÂY], chọn lá [ĐỠ] hợp lệ (từ 8 trở lên) trên tay hoặc [💥 CHỊU ĐÒN]:" % [atk["name"], defender_name]
+			elif has_sung:
 				dodge_desc_lbl.text = "⚠️ [Trảm] của %s đang tác động lên %s.\nSúng Thần Công chỉ cho phép dùng lá Đỡ từ 7 trở lên.\nBạn có thể [🎲 LẬT KHIÊN MÂY], chọn lá [ĐỠ] hợp lệ trên tay hoặc [💥 CHỊU ĐÒN]:" % [atk["name"], defender_name]
 			else:
 				dodge_desc_lbl.text = "[Trảm] của %s đang tác động lên %s.\nBạn có thể [🎲 LẬT KHIÊN MÂY], chọn lá [ĐỠ] trên tay hoặc [💥 CHỊU ĐÒN]:" % [atk["name"], defender_name]
@@ -8613,10 +8725,15 @@ func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_e
 	_set_reaction_hand_focus(true, "Đỡ", attacker_seat, false, true)
 	if valid_cards.size() > 0:
 		_select_dodge_card(null)
-		desc_text.text = "🛡️ Bị Trảm! Hãy chọn lá Đỡ bạn muốn dùng trên tay, rồi bấm nút để xác nhận."
+		if is_tho_binh:
+			desc_text.text = "🛡️ Bị Trảm bởi Tông Đản [Thổ Binh]! Cự ly ≤ 2: Không thể dùng lá Đỡ từ 2 đến 7. Hãy chọn lá Đỡ từ 8 trở lên."
+		else:
+			desc_text.text = "🛡️ Bị Trảm! Hãy chọn lá Đỡ bạn muốn dùng trên tay, rồi bấm nút để xác nhận."
 	else:
 		_select_dodge_card(null)
-		if has_khien_may and not atk_has_thuan_thien:
+		if is_tho_binh:
+			desc_text.text = "⚠️ Bị Trảm bởi Tông Đản [Thổ Binh] (Cự ly ≤ 2: không thể dùng Đỡ 2->7) và không có lá Đỡ hợp lệ!"
+		elif has_khien_may and not atk_has_thuan_thien:
 			desc_text.text = "🛡️ Bị Trảm! Bạn có thể bấm [🎲 LẬT KHIÊN MÂY] để phán xét né đòn, hoặc bấm [💥 CHỊU ĐÒN]."
 		elif has_sung:
 			desc_text.text = "⚠️ Bị Trảm bởi Súng Thần Công (chỉ nhận Đỡ từ 7 trở lên) và không có lá Đỡ hợp lệ!"
@@ -8648,11 +8765,19 @@ func _is_card_valid_for_dodge(card_ui: Control, attacker_seat: int, is_slash_att
 			if rank < 7:
 				return false
 
-		# 3. Hero 44: Tông Đản ("Thổ Binh"): Cự ly <= 2 không được dùng Đỡ từ 2..5
-		if atk_gen.get("hero_id", -1) == 44:
+		# 3. Hero 44: Tông Đản ("Thổ Binh"): Cự ly <= 2 không được dùng Đỡ từ 2..7
+		var is_tho_binh = false
+		if is_network_mode:
+			var last_state_dict = NetworkClient.last_state if NetworkClient else {}
+			var active_c = last_state_dict.get("activeCard", {}) if last_state_dict is Dictionary else {}
+			if active_c is Dictionary and bool(active_c.get("thoBinhActive", false)):
+				is_tho_binh = true
+		if not is_tho_binh and (_hero_has_skill(atk_gen, "tho_binh") or atk_gen.get("hero_id", -1) == 44):
 			var dist = _calculate_distance(attacker_seat, my_seat)
-			if dist <= 2 and rank >= 2 and rank <= 5:
-				return false
+			if dist <= 2:
+				is_tho_binh = true
+		if is_tho_binh and rank >= 2 and rank <= 7:
+			return false
 
 	# Cơ bản: Lá bài "Đỡ"
 	if "đỡ" in c_name.to_lower():
@@ -11291,6 +11416,7 @@ func _finish_player_end_turn(send_network_end_turn: bool = true) -> void:
 	is_targeting_van_an = false
 	is_targeting_cai_cach = false
 	is_targeting_thien_cam = false
+	is_targeting_co_bien = false
 	is_targeting_dinh_quoc = false
 	is_targeting_trao_bao = false
 	is_using_trac_lac = false
