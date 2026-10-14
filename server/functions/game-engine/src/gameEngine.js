@@ -3968,7 +3968,7 @@ export function executeCardEffect(state, card, casterSeat, targetSeat = 0, paylo
   if (card.category === CARD_CATEGORIES.DELAYED_SCROLL || card.subType === CARD_SUBTYPES.DAI_HONG_THUY || card.subType === CARD_SUBTYPES.SUPPLY_SHORTAGE || card.subType === CARD_SUBTYPES.ACEDIA || card.subType === CARD_SUBTYPES.BAI_COC_BACH_DANG) {
     const attachTarget = (card.subType === CARD_SUBTYPES.DAI_HONG_THUY) ? caster : target;
     if (attachTarget) {
-      const canGianPlayer = state.players.find(p => isLivingPlayer(p) && heroHasSkill(p, "CAN_GIAN") && (p.hand || []).some(c => cardColor(c.suit) === "RED" || cardColor(c.suit) === "WHITE" || isRedCardSuit(c.suit)));
+      const canGianPlayer = state.players.find(p => isLivingPlayer(p) && heroHasSkill(p, "CAN_GIAN") && (p.hand || []).some(c => cardColor(c.suit) === "RED"));
       if (canGianPlayer) {
         state.pendingCanGian = { card, casterSeat, targetSeat: attachTarget.seat };
         state.phase = "AWAIT_CAN_GIAN";
@@ -4254,7 +4254,7 @@ function continueSlashDamageAfterUatKhi(state, targetSeat, finalDamage, fallback
       });
     }
   }
-  if (finalDamage > 0 && isLivingPlayer(caster) && heroHasSkill(caster, "PHAT_CHAM")) {
+  if (finalDamage > 0 && isLivingPlayer(caster) && caster.seat === state.turnSeat && heroHasSkill(caster, "PHAT_CHAM")) {
     caster.usedSkills = caster.usedSkills || {};
     caster.playPhaseDamageDealt = (caster.playPhaseDamageDealt || 0) + finalDamage;
     if (caster.playPhaseDamageDealt >= 2 && !caster.usedSkills.phatChamTriggered) {
@@ -4736,7 +4736,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     const pending = state.pendingCanGian;
     state.pendingCanGian = null;
     if (accepted && cardId) {
-      const idx = (respondent.hand || []).findIndex((c) => (c.id === cardId || c.name === cardId) && (cardColor(c.suit) === "RED" || cardColor(c.suit) === "WHITE" || isRedCardSuit(c.suit)));
+      const idx = (respondent.hand || []).findIndex((c) => (c.id === cardId || c.name === cardId) && cardColor(c.suit) === "RED");
       if (idx >= 0) {
         const discarded = respondent.hand.splice(idx, 1)[0];
         discardCard(state, discarded);
@@ -7877,6 +7877,15 @@ function applyPendingJudgement(state) {
     }
   } else {
     discardCard(state, cardObj);
+    if (!triggered && heroHasSkill(target, "GIAI_ACH")) {
+      drawCards(state, target.seat, 1);
+      recordAction(state, {
+        type: "GIAI_ACH_DRAW",
+        casterSeat: target.seat,
+        skillActivations: [{ name: "Giải Ách", seat: target.seat }],
+        description: `📜 <b>${target.generalName}</b> kích hoạt [Giải Ách], thoát khỏi cẩm nang trì hoãn và rút 1 lá bài!`
+      });
+    }
     if (judgementCardType === CARD_SUBTYPES.SUPPLY_SHORTAGE && triggered) {
       if (state.turnStart) state.turnStart.skipDraw = true;
     } else if (judgementCardType === CARD_SUBTYPES.ACEDIA && triggered) {
@@ -8137,6 +8146,10 @@ function advanceTurn(state) {
     previousPlayer.extraSlashLimit = 0;
     previousPlayer.usedSkills = {};
     if (previousPlayer.sucSoiTurnsRemaining > 0) previousPlayer.sucSoiTurnsRemaining--;
+  }
+  for (const player of state.players) {
+    player.playPhaseDamageDealt = 0;
+    if (player.usedSkills) delete player.usedSkills.ThangMocTurnResolved;
   }
   state.pendingAfterNearDeath = null;
   if (state.drumReveal?.targetSeat === previousSeat) state.drumReveal = null;
@@ -8518,10 +8531,38 @@ export function handleAIReaction(state, aiSeat) {
   }
 
   if (state.phase === "AWAIT_CAN_GIAN" && state.waitingTargetSeat === aiSeat) {
-    const cost = (ai.hand || []).find((card) => ["RED", "WHITE"].includes(cardColor(card.suit)));
+    const cost = (ai.hand || []).find((card) => cardColor(card.suit) === "RED");
     return cost
       ? handleRespondAction(state, aiSeat, true, cost.id)
       : handleRespondAction(state, aiSeat, false, null);
+  }
+
+  if (state.phase === "AWAIT_CHUYEN_CHE_RESPOND" && state.waitingTargetSeat === aiSeat) {
+    const slash = (ai.hand || []).find((card) => canUseCardAsSlash(ai, card));
+    return slash
+      ? handleRespondAction(state, aiSeat, true, slash.id)
+      : handleRespondAction(state, aiSeat, false, null);
+  }
+
+  if (state.phase === "AWAIT_BON_PHAN" && state.waitingTargetSeat === aiSeat) {
+    const slash = (ai.hand || []).find((card) => isSlash(card));
+    const target = state.players.find((player) => isLivingPlayer(player) && player.seat !== aiSeat);
+    return slash && target
+      ? handleRespondAction(state, aiSeat, true, slash.id, null, null, target.seat)
+      : handleRespondAction(state, aiSeat, false, null);
+  }
+
+  if (state.phase === "AWAIT_THANG_MOC" && state.waitingTargetSeat === aiSeat) {
+    const existingSubTypes = new Set((ai.judgements || []).map((judgement) => judgement.subType));
+    const available = [
+      CARD_SUBTYPES.DAI_HONG_THUY,
+      CARD_SUBTYPES.SUPPLY_SHORTAGE,
+      CARD_SUBTYPES.ACEDIA,
+      CARD_SUBTYPES.BAI_COC_BACH_DANG
+    ].find((subType) => !existingSubTypes.has(subType));
+    return available === undefined
+      ? handleRespondAction(state, aiSeat, true, null)
+      : handleRespondAction(state, aiSeat, true, available);
   }
 
   if (state.phase === "AWAIT_UAT_KHI_TARGET" && state.waitingTargetSeat === aiSeat) {
