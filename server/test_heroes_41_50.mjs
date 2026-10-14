@@ -368,14 +368,50 @@ function createTestState(heroIds = ["HERO_41", "HERO_42", "HERO_43", "HERO_44"])
   assert.equal(snatchRes.error !== undefined, true);
   assert.match(snatchRes.error, /Thiết Diện/);
 
-  // Thang Mộc: at end of P1's turn, P2 draws 2 and self-attaches delayed scroll
+  // Thang Mộc: at end of P3's turn, P2 is asked if they want to activate Thang Mộc
+  state.turnSeat = 3;
+  state.phase = "PLAY";
+  p2.isAI = false;
   p2.hand = [];
-  state._deck = [
-    { id: "TM_DRAW_1", name: "Trảm", suit: "Spade", rank: 2, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
-    { id: "TM_DRAW_2", name: "Trảm", suit: "Spade", rank: 3, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }
-  ];
-  const endRes = handleEndTurn(state, 1);
+  const endRes = handleEndTurn(state, 3);
   assert.equal(endRes.success, true);
+  assert.equal(state.phase, "AWAIT_THANG_MOC");
+  assert.equal(state.waitingTargetSeat, 2);
+
+  // Client view exposes pendingThangMoc with 4 candidate scrolls
+  const clientView = sanitizeGameStateForClient(state, 2);
+  assert.ok(clientView.pendingThangMoc);
+  assert.equal(clientView.pendingThangMoc.targetSeat, 2);
+  assert.equal(clientView.pendingThangMoc.casterSeat, 3);
+  assert.equal(clientView.pendingThangMoc.availableScrolls.length, 4);
+
+  // AI bot logic does not auto-play for human player
+  const aiRes = handleAIReaction(state, 2);
+  assert.ok(aiRes.error);
+  assert.match(aiRes.error, /Chờ người chơi/);
+
+  // Fallback reaction on timeout declines Thang Mộc cleanly without taking scroll
+  // Advances turn to P4 without drawing cards for P2
+  const fallbackRes = executeFallbackReactionForSeat(state, 2, p2);
+  assert.equal(fallbackRes.success, true);
+  assert.equal(p2.hand.length, 0);
+  assert.equal((p2.judgements || []).length, 0);
+  assert.notEqual(state.phase, "AWAIT_THANG_MOC");
+
+  // At end of P4's turn, trigger Thang Mộc again and accept with specific scroll
+  state.turnSeat = 4;
+  state.turnDamageDealt = true;
+  state.phase = "PLAY";
+  state.players[3].hand = [];
+  delete p2.usedSkills?.ThangMocTurnResolved;
+  state._deck = [
+    { id: "TM_DRAW_1", name: "Trảm", suit: "Spade", rank: 4, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
+    { id: "TM_DRAW_2", name: "Trảm", suit: "Spade", rank: 5, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
+    { id: "P1_DRAW_1", name: "Đỡ", suit: "Heart", rank: 2, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE },
+    { id: "P1_DRAW_2", name: "Đỡ", suit: "Heart", rank: 3, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE }
+  ];
+  const endRes4 = handleEndTurn(state, 4);
+  assert.equal(endRes4.success, true);
   assert.equal(state.phase, "AWAIT_THANG_MOC");
   assert.equal(state.waitingTargetSeat, 2);
 
@@ -383,6 +419,7 @@ function createTestState(heroIds = ["HERO_41", "HERO_42", "HERO_43", "HERO_44"])
   assert.equal(tmResp.success, true);
   assert.equal(p2.hand.length, 2);
   assert.equal((p2.judgements || []).length, 1);
+  assert.equal(p2.judgements[0].subType, CARD_SUBTYPES.SUPPLY_SHORTAGE);
 
   // Giải Ách: when escaping delayed scroll
   assert.equal(heroHasSkill(p2, "GIAI_ACH"), true);

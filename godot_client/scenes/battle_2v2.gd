@@ -5982,6 +5982,9 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		_close_muu_dinh_modal()
 	if server_phase != "PLAY" and doi_do_modal and doi_do_modal.visible:
 		doi_do_modal.visible = false
+	if server_phase != "AWAIT_THANG_MOC" and card_pick_modal and card_pick_modal.visible and card_pick_effect_type == "THANG_MOC":
+		card_pick_modal.visible = false
+		card_pick_effect_type = ""
 	# Cứu Hấp Hối và Mượn Gươm là các phản ứng độc quyền. Nếu state vừa đổi
 	# pha, không để modal Đỡ/Trảm cũ chiếm lần bấm đầu tiên trên bài trên tay.
 	if server_waiting_seat != my_seat:
@@ -6447,6 +6450,26 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			var wait_name = wait_gen.get("name", "Ghế %d" % server_waiting_seat) if wait_gen is Dictionary else "Ghế %d" % server_waiting_seat
 			turn_indicator.text = "📜 ĐANG CHỜ %s BỎ BÀI THEO THỦ PHÁP (%ds)..." % [wait_name, server_waiting_timer]
 			desc_text.text = "📜 %s đang chọn 1 lá trên tay để bỏ theo kỹ năng [Thủ Pháp]..." % wait_name
+
+	elif server_phase == "AWAIT_THANG_MOC":
+		is_player_turn = false
+		card_play_btn.visible = false
+		end_turn_btn.visible = false
+		if server_waiting_seat == my_seat:
+			var thang_moc_data = state.get("pendingThangMoc", {}) if state.get("pendingThangMoc") is Dictionary else {}
+			var caster_s = int(thang_moc_data.get("casterSeat", server_turn_seat))
+			var available_scrolls = thang_moc_data.get("availableScrolls", [])
+			if not card_pick_modal.visible or card_pick_effect_type != "THANG_MOC":
+				_show_thang_moc_modal(caster_s, available_scrolls)
+			turn_indicator.text = "📜 THANG MỘC: CHỌN CẨM NANG (%ds)" % server_waiting_timer
+			desc_text.text = "📜 Kích hoạt [Thang Mộc] để rút 2 lá và tự gài 1 Cẩm Nang Trì Hoãn, hoặc bấm [TỪ CHỐI]."
+		else:
+			if card_pick_modal.visible and card_pick_effect_type == "THANG_MOC":
+				card_pick_modal.visible = false
+			var wait_gen = generals_data.get(server_waiting_seat, {})
+			var wait_name = wait_gen.get("name", "Ghế %d" % server_waiting_seat) if wait_gen is Dictionary else "Ghế %d" % server_waiting_seat
+			turn_indicator.text = "📜 ĐANG CHỜ %s QUYẾT ĐỊNH THANG MỘC (%ds)..." % [wait_name, server_waiting_timer]
+			desc_text.text = "📜 %s đang xem xét kích hoạt kỹ năng [Thang Mộc]..." % wait_name
 
 	elif server_phase == "AWAIT_CAN_GIAN":
 		is_player_turn = false
@@ -13030,6 +13053,92 @@ func _get_target_card_selection_id(sel: Dictionary) -> String:
 	return "%s|%s|%s|%s|%s|%s" % [chooser, target, card_id, eff, op, rem]
 
 # ==========================================================
+# 📜 TÔ HIẾN THÀNH: THANG MỘC
+# ==========================================================
+func _show_thang_moc_modal(caster_seat: int, available_scrolls: Array) -> void:
+	if not card_pick_modal:
+		return
+	card_pick_effect_type = "THANG_MOC"
+	card_pick_target_seat = my_seat
+	card_pick_current_selection = {"effectType": "THANG_MOC", "selectionId": "THANG_MOC_%d_%d" % [my_seat, Time.get_ticks_msec()]}
+	selected_card_pick_option.clear()
+	card_pick_submission_pending = false
+
+	var caster_name = "đối thủ"
+	if caster_seat > 0 and generals_data.has(caster_seat):
+		caster_name = generals_data[caster_seat].get("name", "Ghế %d" % caster_seat)
+
+	card_pick_title.text = "📜 THANG MỘC (TÔ HIẾN THÀNH)"
+	card_pick_desc.text = "💡 Cuối lượt của %s. Bạn có thể rút 2 lá bài và tự gài 1 Cẩm Nang Trì Hoãn lên bản thân:" % caster_name
+	card_pick_confirm_btn.text = "📜 CHỌN 1 CẨM NANG"
+	card_pick_confirm_btn.disabled = true
+	card_pick_cancel_btn.text = "TỪ CHỐI"
+	card_pick_cancel_btn.visible = true
+	card_pick_status_lbl.text = "👉 Hãy chọn 1 Cẩm Nang Trì Hoãn hoặc bấm [TỪ CHỐI]"
+
+	var card_pick_box := card_pick_modal.get_node_or_null("Dim/Box") as Control
+	var card_pick_dim := card_pick_modal.get_node_or_null("Dim") as Control
+	if card_pick_box:
+		card_pick_box.custom_minimum_size = Vector2(490, 260)
+	if card_pick_dim:
+		card_pick_dim.offset_top = 20.0
+		card_pick_dim.offset_bottom = -180.0
+
+	for c in card_pick_options_hbox.get_children():
+		c.queue_free()
+	for c in card_pick_equipment_hbox.get_children():
+		c.queue_free()
+
+	var scrolls_to_display = available_scrolls
+	if scrolls_to_display.is_empty():
+		scrolls_to_display = [
+			{"subType": 19, "name": "Đại Hồng Thủy", "icon": "🌊", "desc": "Phán xét: Lật Bích/Chuồn chịu 3 ST"},
+			{"subType": 20, "name": "Cắt Đường Lương", "icon": "🌾", "desc": "Phán xét: Bỏ qua rút bài"},
+			{"subType": 21, "name": "Trầm Ảo Sa Bẫy", "icon": "🕸️", "desc": "Phán xét: Bỏ qua ra bài"},
+			{"subType": 22, "name": "Bãi Cọc Bạch Đằng", "icon": "🪵", "desc": "Phán xét: Chịu 1 ST & bỏ trang bị"}
+		]
+
+	for scroll in scrolls_to_display:
+		var s_name = str(scroll.get("name", "Cẩm Nang"))
+		var s_subtype = int(scroll.get("subType", 0))
+		var s_icon = str(scroll.get("icon", "📜"))
+		var btn = Button.new()
+		btn.custom_minimum_size = Vector2(105, 80)
+		btn.focus_mode = Control.FOCUS_NONE
+		btn.text = "%s\n%s" % [s_icon, s_name]
+		btn.add_theme_font_size_override("font_size", 12)
+
+		var style = StyleBoxFlat.new()
+		style.bg_color = Color(0.18, 0.15, 0.28, 0.95)
+		style.border_width_left = 2
+		style.border_width_top = 2
+		style.border_width_right = 2
+		style.border_width_bottom = 2
+		style.border_color = Color(0.6, 0.65, 0.8, 0.7)
+		style.corner_radius_top_left = 8
+		style.corner_radius_top_right = 8
+		style.corner_radius_bottom_left = 8
+		style.corner_radius_bottom_right = 8
+		btn.add_theme_stylebox_override("normal", style)
+
+		var opt = {
+			"type": "thang_moc",
+			"token": str(s_subtype),
+			"label": s_name,
+			"button": btn,
+			"subType": s_subtype,
+			"name": s_name,
+			"confirm_text": "📜 GÀI [%s] & RÚT 2 LÁ" % s_name.to_upper()
+		}
+		btn.pressed.connect(func():
+			_select_card_pick_option(opt)
+			card_pick_confirm_btn.text = opt["confirm_text"]
+		)
+		card_pick_options_hbox.add_child(btn)
+
+	card_pick_modal.visible = true
+
+# ==========================================================
 # 🗡️🌾 CƯỚP / PHÁ HỦY BÀI: TỰ CHỌN BÀI ÚP HOẶC TRANG BỊ
 # ==========================================================
 func _show_card_pick_modal(is_steal: bool, target_seat: int, selection_data: Dictionary = {}) -> void:
@@ -13421,7 +13530,16 @@ func _on_card_pick_confirmed() -> void:
 		card_pick_submitted_selection_id = _get_target_card_selection_id(card_pick_current_selection)
 		reaction_submission_pending = true
 		reaction_submission_version = last_server_version
-		if card_pick_effect_type == "DAI_VIET_COLOR":
+		if card_pick_effect_type == "THANG_MOC":
+			NetworkClient.send_respond_action(true, str(target_token))
+			var chosen_name = str(opt.get("label", "Cẩm Nang"))
+			_add_log("📜 [THANG MỘC] Bạn kích hoạt Thang Mộc, rút 2 lá và tự gài [%s]!" % chosen_name)
+			card_pick_effect_type = ""
+			card_pick_target_seat = -1
+			selected_card_pick_option.clear()
+			card_pick_modal.visible = false
+			return
+		elif card_pick_effect_type == "DAI_VIET_COLOR":
 			NetworkClient.send_respond_action(true, "", target_token)
 		elif card_pick_effect_type == "AN_TICH_DEFENSE":
 			NetworkClient.send_respond_action(true, target_token)
@@ -13596,6 +13714,17 @@ func _hide_card_pick_modal() -> void:
 			"",
 			null
 		)
+		return
+	if card_pick_effect_type == "THANG_MOC":
+		if is_network_mode and NetworkClient and NetworkClient.is_connected_to_server:
+			reaction_submission_pending = true
+			reaction_submission_version = last_server_version
+			NetworkClient.send_respond_action(false, "")
+		_add_log("📜 [THANG MỘC] Bạn đã từ chối kích hoạt Thang Mộc.")
+		card_pick_modal.visible = false
+		card_pick_effect_type = ""
+		card_pick_target_seat = -1
+		selected_card_pick_option.clear()
 		return
 	if is_network_mode and current_server_phase == "AWAIT_TARGET_CARD":
 		card_pick_submission_pending = true

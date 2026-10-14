@@ -556,6 +556,7 @@ export function getSkillById(skillId) {
 }
 
 export function heroHasSkill(player, skillId) {
+  if (Array.isArray(player?.skills) && player.skills.includes(skillId)) return true;
   return !!getHeroById(normalizeHeroId(player?.heroId, player?.generalName))?.skills?.includes(skillId);
 }
 

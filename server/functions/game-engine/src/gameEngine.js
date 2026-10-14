@@ -4758,6 +4758,19 @@ function resumeNghiaTuDamage(state, pending, preventedDamage = 0) {
   return { success: true, state, damageResult: result };
 }
 
+export function getAvailableThangMocScrolls(state, seat) {
+  const player = state.players.find(p => p.seat === Number(seat));
+  if (!player) return [];
+  const candidateScrolls = [
+    { subType: CARD_SUBTYPES.DAI_HONG_THUY, name: "Đại Hồng Thủy", icon: "🌊", desc: "Phán xét: Lật Bích/Chuồn chịu 3 ST" },
+    { subType: CARD_SUBTYPES.SUPPLY_SHORTAGE, name: "Cắt Đường Lương", icon: "🌾", desc: "Phán xét: Bỏ qua giai đoạn rút bài" },
+    { subType: CARD_SUBTYPES.ACEDIA, name: "Trầm Ảo Sa Bẫy", icon: "🕸️", desc: "Phán xét: Bỏ qua giai đoạn ra bài" },
+    { subType: CARD_SUBTYPES.BAI_COC_BACH_DANG, name: "Bãi Cọc Bạch Đằng", icon: "🪵", desc: "Phán xét: Chịu 1 ST & bỏ trang bị" }
+  ];
+  const existingSubTypes = new Set((player.judgements || []).map((j) => j.subType));
+  return candidateScrolls.filter((s) => !existingSubTypes.has(s.subType));
+}
+
 export function handleRespondAction(state, respondentSeat, accepted, cardId, targetCardId = null, cardIds = null, targetSeat = null, payload = null) {
   if (state.status === "FINISHED") return { error: "Trận đấu đã kết thúc" };
   respondentSeat = Number(respondentSeat);
@@ -4923,18 +4936,13 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     if (state.waitingTargetSeat !== respondentSeat) return { error: "Không phải lượt Thang Mộc của bạn" };
     const originalTurnSeat = state.thangMocCasterSeat || state.turnSeat;
     state.thangMocCasterSeat = null;
+    state.pendingThangMoc = null;
     if (accepted) {
       drawCards(state, respondentSeat, 2);
-      const candidateScrolls = [
-        { subType: CARD_SUBTYPES.DAI_HONG_THUY, name: "Đại Hồng Thủy" },
-        { subType: CARD_SUBTYPES.SUPPLY_SHORTAGE, name: "Cắt Đường Lương" },
-        { subType: CARD_SUBTYPES.ACEDIA, name: "Trầm Ảo Sa Bẫy" },
-        { subType: CARD_SUBTYPES.BAI_COC_BACH_DANG, name: "Bãi Cọc Bạch Đằng" }
-      ];
-      const existingSubTypes = new Set((respondent.judgements || []).map((j) => j.subType));
-      const available = candidateScrolls.filter((s) => !existingSubTypes.has(s.subType));
+      const available = getAvailableThangMocScrolls(state, respondentSeat);
       if (available.length > 0) {
-        const chosen = (cardId ? available.find((s) => s.subType === Number(cardId) || s.name === cardId) : null) || available[0];
+        const chosenSub = cardId || targetCardId || payload?.subType || payload?.cardId;
+        const chosen = (chosenSub ? available.find((s) => s.subType === Number(chosenSub) || s.name === chosenSub || String(s.subType) === String(chosenSub)) : null) || available[0];
         const delayCard = {
           id: `THANG_MOC_${respondentSeat}_${Date.now()}`,
           name: chosen.name,
@@ -4953,7 +4961,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
           cardId: delayCard.id,
           cardName: delayCard.name,
           skillActivations: [{ name: "Thang Mộc", seat: respondentSeat }],
-          description: `📜 <b>${respondent.generalName}</b> kích hoạt [Thang Mộc], rút 2 lá bài và tự gài ${delayCard.name} vào khu phán xét của mình!`
+          description: `📜 <b>${respondent.generalName}</b> kích hoạt [Thang Mộc], rút 2 lá bài và tự gài <b>${delayCard.name}</b> vào khu phán xét của mình!`
         });
       }
     } else {
@@ -7669,7 +7677,10 @@ export function handleEndTurn(state, casterSeat) {
     return { success: true, state };
   }
 
-  const thangMocUser = state.players.find((p) => isLivingPlayer(p) && p.seat !== casterSeat && heroHasSkill(p, "THANG_MOC") && !p.usedSkills?.ThangMocTurnResolved);
+  const thangMocUser = state.players.find((p) =>
+    isLivingPlayer(p) && p.seat !== casterSeat && heroHasSkill(p, "THANG_MOC") && !p.usedSkills?.ThangMocTurnResolved
+    && getAvailableThangMocScrolls(state, p.seat).length > 0
+  );
   if (thangMocUser) {
     thangMocUser.usedSkills = thangMocUser.usedSkills || {};
     thangMocUser.usedSkills.ThangMocTurnResolved = true;
@@ -7679,6 +7690,11 @@ export function handleEndTurn(state, casterSeat) {
     state.waitingTimer = 40;
     state.timerStartAt = Date.now();
     state.thangMocCasterSeat = casterSeat;
+    state.pendingThangMoc = {
+      casterSeat,
+      targetSeat: thangMocUser.seat,
+      availableScrolls: getAvailableThangMocScrolls(state, thangMocUser.seat)
+    };
     recordAction(state, {
       type: "THANG_MOC_PROMPT",
       casterSeat: thangMocUser.seat,
@@ -7832,7 +7848,10 @@ export function handleDiscardCards(state, seat, cardIds) {
     return { success: true, state };
   }
 
-  const thangMocUserAfterDiscard = state.players.find((cand) => isLivingPlayer(cand) && cand.seat !== seat && heroHasSkill(cand, "THANG_MOC") && !cand.usedSkills?.ThangMocTurnResolved);
+  const thangMocUserAfterDiscard = state.players.find((cand) =>
+    isLivingPlayer(cand) && cand.seat !== seat && heroHasSkill(cand, "THANG_MOC") && !cand.usedSkills?.ThangMocTurnResolved
+    && getAvailableThangMocScrolls(state, cand.seat).length > 0
+  );
   if (thangMocUserAfterDiscard) {
     thangMocUserAfterDiscard.usedSkills = thangMocUserAfterDiscard.usedSkills || {};
     thangMocUserAfterDiscard.usedSkills.ThangMocTurnResolved = true;
@@ -7842,6 +7861,11 @@ export function handleDiscardCards(state, seat, cardIds) {
     state.waitingTimer = 40;
     state.timerStartAt = Date.now();
     state.thangMocCasterSeat = seat;
+    state.pendingThangMoc = {
+      casterSeat: seat,
+      targetSeat: thangMocUserAfterDiscard.seat,
+      availableScrolls: getAvailableThangMocScrolls(state, thangMocUserAfterDiscard.seat)
+    };
     recordAction(state, {
       type: "THANG_MOC_PROMPT",
       casterSeat: thangMocUserAfterDiscard.seat,
@@ -8552,6 +8576,15 @@ export function handleAIStep(state, aiSeat) {
     }
   }
 
+  if (heroHasSkill(ai, "CO_BIEN") && (ai.usedSkills?.coBienCount || 0) < 2) {
+    const blackCard = (ai.hand || []).find(c => isBlackCardSuit(c.suit) && !isPeach(c) && (!canSlash || !isSlash(c)));
+    if (blackCard) {
+      if (!ai.usedSkills) ai.usedSkills = {};
+      ai.usedSkills.coBienCount = (ai.usedSkills.coBienCount || 0) + 1;
+      return handleUseSkill(state, aiSeat, "Cơ Biến", 0, blackCard.id);
+    }
+  }
+
   // H. Cẩm nang diện rộng (Mưa Tên / Bãi Cọc)
   const aoe = ai.hand.find(c => c.subType === CARD_SUBTYPES.ARROW_RAIN || c.subType === CARD_SUBTYPES.BARBARIAN_INVASION);
   if (aoe) {
@@ -8651,16 +8684,13 @@ export function handleAIReaction(state, aiSeat) {
   }
 
   if (state.phase === "AWAIT_THANG_MOC" && state.waitingTargetSeat === aiSeat) {
-    const existingSubTypes = new Set((ai.judgements || []).map((judgement) => judgement.subType));
-    const available = [
-      CARD_SUBTYPES.DAI_HONG_THUY,
-      CARD_SUBTYPES.SUPPLY_SHORTAGE,
-      CARD_SUBTYPES.ACEDIA,
-      CARD_SUBTYPES.BAI_COC_BACH_DANG
-    ].find((subType) => !existingSubTypes.has(subType));
-    return available === undefined
-      ? handleRespondAction(state, aiSeat, true, null)
-      : handleRespondAction(state, aiSeat, true, available);
+    if (!ai.isAI) {
+      return { error: "Chờ người chơi phản hồi Thang Mộc" };
+    }
+    const available = getAvailableThangMocScrolls(state, aiSeat);
+    return available.length > 0
+      ? handleRespondAction(state, aiSeat, true, available[0].subType)
+      : handleRespondAction(state, aiSeat, false, null);
   }
 
   if (state.phase === "AWAIT_UAT_KHI_TARGET" && state.waitingTargetSeat === aiSeat) {
@@ -9111,7 +9141,7 @@ export function executeFallbackReactionForSeat(state, waitingSeat, waitingPlayer
     return handleUseSkill(state, waitingSeat, "Huynh Trưởng", 0);
   } else if (state.phase === "AWAIT_THU_MUC") {
     return handleRespondAction(state, waitingSeat, false, null);
-  } else if (["AWAIT_DAN_CAU", "AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_CAN_GIAN", "AWAIT_TRUNG_KIEN",
+  } else if (["AWAIT_DAN_CAU", "AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_CAN_GIAN", "AWAIT_THANG_MOC", "AWAIT_TRUNG_KIEN",
     "AWAIT_CHINH_THONG_TARGET", "AWAIT_CHINH_THONG_GIVE", "AWAIT_KHOAN_HOA", "AWAIT_NGHIA_TU",
     "AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_UAT_KHI_TARGET",
     "AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_MUU_DINH_CHOICE", "AWAIT_NGHICH_Y"].includes(state.phase)) {
@@ -9170,7 +9200,9 @@ export function tickGameState(state, connectedSeats = null) {
       });
       const aiRes = (state.phase === "AWAIT_CAN_GIAN" && !waitingPlayer?.isAI)
         ? handleRespondAction(state, waitingSeat, false, null)
-        : handleAIReaction(state, waitingSeat);
+        : ((state.phase === "AWAIT_THANG_MOC" && !waitingPlayer?.isAI)
+          ? handleRespondAction(state, waitingSeat, false, null)
+          : handleAIReaction(state, waitingSeat));
       if (!aiRes || aiRes.error) {
         if (state.phase === "AWAIT_SLASH_DEFENSE") {
           handleRespondAction(state, waitingSeat, false, null);
@@ -9215,7 +9247,7 @@ export function tickGameState(state, connectedSeats = null) {
         } else if (state.phase === "AWAIT_THU_PHAP_DISCARD") {
 			const card = waitingPlayer?.hand?.[0];
 			if (card) handleDiscardCards(state, waitingSeat, [card.id]);
-        } else if (["AWAIT_DAN_CAU", "AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_CAN_GIAN", "AWAIT_TRUNG_KIEN",
+        } else if (["AWAIT_DAN_CAU", "AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_CAN_GIAN", "AWAIT_THANG_MOC", "AWAIT_TRUNG_KIEN",
 			"AWAIT_CHINH_THONG_TARGET", "AWAIT_CHINH_THONG_GIVE", "AWAIT_KHOAN_HOA", "AWAIT_NGHIA_TU",
 			"AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_UAT_KHI_TARGET",
 			"AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_MUU_DINH_CHOICE", "AWAIT_NGHICH_Y"].includes(state.phase)) {
@@ -9533,6 +9565,13 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
           card: cardSummary(state.pendingCanGian?.card)
         }
       : null,
+    pendingThangMoc: (state.phase === "AWAIT_THANG_MOC")
+      ? {
+          casterSeat: state.pendingThangMoc?.casterSeat || state.thangMocCasterSeat || state.turnSeat,
+          targetSeat: state.waitingTargetSeat,
+          availableScrolls: getAvailableThangMocScrolls(state, state.waitingTargetSeat)
+        }
+      : null,
     lastAction: sanitizeActionForClient(state.lastAction, viewerSeat),
     // Keep the recent log bounded so a long match cannot exceed the client's
     // WebSocket packet limit. The authoritative server history stays intact.
@@ -9671,6 +9710,65 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
   if (norm.includes("thủ pháp") || norm.includes("thu phap")) {
     if (state.phase !== "AWAIT_THU_PHAP_DISCARD") return { error: "Không phải thời điểm bỏ bài theo Thủ Pháp" };
     return handleDiscardCards(state, seat, [cardId]);
+  }
+
+  if (norm.includes("thang mộc") || norm.includes("thang moc")) {
+    if (state.phase !== "AWAIT_THANG_MOC") return { error: "Không phải thời điểm dùng Thang Mộc" };
+    return handleRespondAction(state, seat, true, cardId);
+  }
+
+  if (norm.includes("cơ biến") || norm.includes("co bien") || norm === "co_bien") {
+    if (!heroHasSkill(player, "CO_BIEN")) return { error: "Chỉ tướng có Cơ Biến mới có thể dùng kỹ năng này" };
+    if (state.phase !== "PLAY" || state.turnSeat !== seat) return { error: "Cơ Biến chỉ dùng trong Giai đoạn Ra bài của bạn" };
+
+    let handIndex = (player.hand || []).findIndex(
+      (card) => (card.id === cardId || String(card.id) === String(cardId) || card.name === cardId) && isBlackCardSuit(card.suit)
+    );
+    let equipIndex = -1;
+    if (handIndex < 0) {
+      equipIndex = (player.equipments || []).findIndex(
+        (card) => (card.id === cardId || String(card.id) === String(cardId) || card.name === cardId) && isBlackCardSuit(card.suit)
+      );
+    }
+    if (handIndex < 0 && equipIndex < 0) {
+      if (!cardId) {
+        handIndex = (player.hand || []).findIndex((card) => isBlackCardSuit(card.suit));
+        if (handIndex < 0) {
+          equipIndex = (player.equipments || []).findIndex((card) => isBlackCardSuit(card.suit));
+        }
+      }
+    }
+    if (handIndex < 0 && equipIndex < 0) {
+      return { error: "Cơ Biến cần chọn 1 lá bài Đen trên tay hoặc đang trang bị" };
+    }
+
+    const exchanged = handIndex >= 0
+      ? player.hand.splice(handIndex, 1)[0]
+      : player.equipments.splice(equipIndex, 1)[0];
+
+    if (exchanged.orig_name) {
+      exchanged.name = exchanged.orig_name;
+      exchanged.subType = exchanged.orig_subType;
+      exchanged.category = exchanged.orig_category;
+      exchanged.desc = exchanged.orig_desc;
+      delete exchanged.orig_name;
+      delete exchanged.orig_subType;
+      delete exchanged.orig_category;
+      delete exchanged.orig_desc;
+    }
+
+    discardCard(state, exchanged);
+    drawCards(state, seat, 1);
+    recordAction(state, {
+      type: "CO_BIEN_TRIGGERED",
+      casterSeat: seat,
+      cardId: exchanged.id,
+      cardName: exchanged.name,
+      skillActivations: [{ name: "Cơ Biến", seat }],
+      description: `🔄 <b>${player.generalName}</b> kích hoạt [Cơ Biến], đổi lá Đen [${exchanged.name}] lấy 1 lá mới!`
+    });
+    refreshLastDelta(state);
+    return { success: true, state };
   }
 
   if (norm.includes("hịch tướng") || norm.includes("hich tuong")) {
