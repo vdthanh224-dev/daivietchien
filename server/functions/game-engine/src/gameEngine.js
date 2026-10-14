@@ -7585,6 +7585,27 @@ export function handleEndTurn(state, casterSeat) {
  */
 export function handleDiscardCards(state, seat, cardIds) {
   seat = Number(seat);
+  if (state.phase === "AWAIT_THU_PHAP_DISCARD") {
+    if (state.waitingTargetSeat !== seat) return { error: "Không phải lượt bỏ bài của bạn" };
+    const p = state.players.find(x => x.seat === seat);
+    if (!p) return { error: "Người chơi không hợp lệ" };
+    const requestedIds = Array.isArray(cardIds) ? [...new Set(cardIds.filter(Boolean))] : [];
+    if (requestedIds.length !== 1) return { error: "Thủ Pháp yêu cầu bỏ đúng 1 lá bài" };
+    const idx = p.hand.findIndex(c => c.id === requestedIds[0] || c.name === requestedIds[0]);
+    if (idx < 0) return { error: "Không tìm thấy lá bài cần bỏ" };
+    const discarded = p.hand.splice(idx, 1)[0];
+    discardCard(state, discarded);
+    recordAction(state, {
+      type: "THU_PHAP_DISCARD",
+      casterSeat: seat,
+      cardId: discarded.id,
+      cardName: discarded.name,
+      description: `📜 <b>${p.generalName}</b> hoàn thành [Thủ Pháp], đã bỏ ${formatCardText(discarded)}.`
+    });
+    resetWaitingState(state);
+    state.phase = "PLAY";
+    return handleEndTurn(state, seat);
+  }
   const isDiscardPhase = (state.phase === "DISCARD" && (state.waitingTargetSeat === seat || state.turnSeat === seat));
   const isPlayPhase = (state.phase === "PLAY" && state.turnSeat === seat);
   if (!isDiscardPhase && !isPlayPhase) {
@@ -8457,6 +8478,13 @@ export function handleAIReaction(state, aiSeat) {
     return handleRespondAction(state, aiSeat, true, colors[0]);
   }
 
+  if (state.phase === "AWAIT_THU_PHAP_DISCARD" && state.waitingTargetSeat === aiSeat) {
+    const card = ai.hand?.[0];
+    return card
+      ? handleDiscardCards(state, aiSeat, [card.id])
+      : { error: "Không còn lá để bỏ theo Thủ Pháp" };
+  }
+
   if (state.phase === "AWAIT_CAN_GIAN" && state.waitingTargetSeat === aiSeat) {
     const cost = (ai.hand || []).find((card) => ["RED", "WHITE"].includes(cardColor(card.suit)));
     return cost
@@ -8872,6 +8900,8 @@ export function executeFallbackReactionForSeat(state, waitingSeat, waitingPlayer
   } else if (state.phase === "AWAIT_NULLIFY") {
     return handleRespondAction(state, waitingSeat, false, null);
   } else if (state.phase === "AWAIT_TARGET_CARD" && state.targetCardSelection?.effectType === "DAI_VIET_COLOR") {
+    return handleAIReaction(state, waitingSeat);
+  } else if (state.phase === "AWAIT_THU_PHAP_DISCARD") {
     return handleAIReaction(state, waitingSeat);
   } else if (state.phase === "AWAIT_TARGET_CARD") {
     return handleRespondAction(state, waitingSeat, true, null, null);
