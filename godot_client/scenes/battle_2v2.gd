@@ -10552,6 +10552,7 @@ func _start_turn(seat_num: int) -> void:
 	current_turn_seat = seat_num
 	local_turn_dealt_damage = false
 	lap_lang_triggered_this_turn = false
+	g["used_trieu_dang_this_turn"] = false
 	slashes_used_this_turn = 0
 	local_van_an_uses = 0
 	doi_do_used_this_turn = false
@@ -11089,6 +11090,40 @@ func _execute_ai_turn(ai_seat: int) -> void:
 				_execute_local_drum_skill(ai_seat, enemy_s)
 				break
 
+	# AI Lê Chân sử dụng Triều Dâng phá hủy 1 trang bị của kẻ địch nếu có
+	if _hero_has_skill(ai_gen, "trieu_dang") and not ai_gen.get("used_trieu_dang_this_turn", false):
+		for enemy_s in enemies:
+			var e_gen = generals_data.get(enemy_s, {})
+			if not e_gen.get("is_alive", false):
+				continue
+			var target_slot := ""
+			var target_item := ""
+			if e_gen.get("equipped_weapon", "") != "":
+				target_slot = "weapon"
+				target_item = e_gen.get("equipped_weapon", "")
+			elif e_gen.get("equipped_armor", "") != "":
+				target_slot = "armor"
+				target_item = e_gen.get("equipped_armor", "")
+			elif e_gen.get("equipped_def_horse", "") != "":
+				target_slot = "def_horse"
+				target_item = e_gen.get("equipped_def_horse", "")
+			elif e_gen.get("equipped_off_horse", "") != "":
+				target_slot = "off_horse"
+				target_item = e_gen.get("equipped_off_horse", "")
+			elif e_gen.get("equipped_treasure", "") != "":
+				target_slot = "treasure"
+				target_item = e_gen.get("equipped_treasure", "")
+			if target_slot != "":
+				ai_gen["used_trieu_dang_this_turn"] = true
+				e_gen["equipped_" + target_slot] = ""
+				if e_gen.has("avatar_node") and is_instance_valid(e_gen["avatar_node"]):
+					e_gen["avatar_node"].set_equipment(target_slot, "", "")
+				_animate_showcase_card("Triều Dâng", "🌊 %s dùng [Triều Dâng] hủy [%s] của %s!" % [ai_gen["name"], target_item, e_gen["name"]])
+				_add_log("🌊 [TRIỀU DÂNG] %s đã dùng kỹ năng phá hủy [%s] của %s." % [ai_gen["name"], target_item, e_gen["name"]])
+				AudioManager.play_skill()
+				await _wait_for_ai_card_play()
+				break
+
 	var scroll_idx = -1
 	for idx in range(ai_gen["hand_cards"].size()):
 		var c = ai_gen["hand_cards"][idx]
@@ -11397,11 +11432,15 @@ func _execute_ai_turn(ai_seat: int) -> void:
 	if _hero_has_skill(ai_gen, "lap_lang") and not local_turn_dealt_damage and not lap_lang_triggered_this_turn:
 		lap_lang_triggered_this_turn = true
 		for _draw_index in range(2):
-			ai_gen["hand_cards"].append(_draw_card_from_pile())
+			var drawn_c = _draw_card_from_pile()
+			if drawn_c is Dictionary and not drawn_c.is_empty():
+				ai_gen["hand_cards"].append(drawn_c)
 		ai_gen["hand_count"] = ai_gen["hand_cards"].size()
-		ai_gen["avatar_node"].update_hand_count(ai_gen["hand_count"])
+		if ai_gen.has("avatar_node") and is_instance_valid(ai_gen["avatar_node"]):
+			ai_gen["avatar_node"].update_hand_count(ai_gen["hand_count"])
 		_animate_showcase_card("Lập Làng", "🏘️ %s đã bỏ bài xong và không gây sát thương, rút 2 lá bài." % ai_gen["name"])
 		_add_log("🏘️ [LẬP LÀNG] %s đã bỏ bài xong và không gây sát thương, rút 2 lá bài." % ai_gen["name"])
+		await _wait_for_ai_card_play()
 
 	# End AI turn. A watchdog recovery may have already advanced the match.
 	if ai_turn_token != turn_generation or ai_turn_watchdog_recovering:

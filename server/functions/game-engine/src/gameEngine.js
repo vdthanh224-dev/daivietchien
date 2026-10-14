@@ -8662,7 +8662,8 @@ export function handleAIStep(state, aiSeat) {
   if (heroHasSkill(ai, "TRIEU_DANG") && !ai.usedSkills?.["Triều Dâng"] && !ai.usedSkills?.trieu_dang) {
     const enemyWithEquip = enemies.find((e) => (e.equipments || []).length > 0);
     if (enemyWithEquip) {
-      return handleUseSkill(state, aiSeat, "Triều Dâng", enemyWithEquip.seat);
+      const equipToDestroy = enemyWithEquip.equipments[0];
+      return handleUseSkill(state, aiSeat, "Triều Dâng", enemyWithEquip.seat, equipToDestroy?.id);
     }
   }
 
@@ -9200,6 +9201,13 @@ export function handleAIReaction(state, aiSeat) {
       });
       if (enemyOption) chosenOption = enemyOption;
     }
+    if (selection?.effectType === "TRIEU_DANG") {
+      const targetOption = selection.options?.find(opt => {
+        const owner = opt.ownerSeat || opt.targetSeat || selection.targetSeat;
+        return owner && !areTeammatesInState(state, aiSeat, owner);
+      }) || selection.options?.[0];
+      if (targetOption) chosenOption = targetOption;
+    }
     const token = chosenOption?.token || null;
     return handleRespondAction(state, aiSeat, true, null, token);
   }
@@ -9263,7 +9271,13 @@ export function executeFallbackReactionForSeat(state, waitingSeat, waitingPlayer
   } else if (state.phase === "AWAIT_KHUYEN_NONG") {
     return handleAIReaction(state, waitingSeat);
   } else if (state.phase === "AWAIT_TARGET_CARD") {
-    return handleRespondAction(state, waitingSeat, true, null, null);
+    const selection = state.targetCardSelection;
+    const token = selection?.options?.[0]?.token || null;
+    const res = token ? handleRespondAction(state, waitingSeat, true, null, token) : null;
+    if (!res || res.error) {
+      resetTargetCardSelection(state);
+    }
+    return { success: true, state };
   } else if (state.phase === "AWAIT_DOAN_DAO_CHOICE") {
     return handleRespondAction(state, waitingSeat, true, null);
   } else if (state.phase === "AWAIT_HICH_CASTER_DISCARD" || state.phase === "AWAIT_HICH_TARGET_DISCARD"
@@ -9367,7 +9381,12 @@ export function tickGameState(state, connectedSeats = null) {
         } else if (state.phase === "AWAIT_NULLIFY") {
           handleRespondAction(state, waitingSeat, false, null);
         } else if (state.phase === "AWAIT_TARGET_CARD") {
-          handleRespondAction(state, waitingSeat, true, null, null);
+          const selection = state.targetCardSelection;
+          const token = selection?.options?.[0]?.token || null;
+          const res = token ? handleRespondAction(state, waitingSeat, true, null, token) : null;
+          if (!res || res.error) {
+            resetTargetCardSelection(state);
+          }
         } else if (state.phase === "AWAIT_DOAN_DAO_CHOICE") {
           handleRespondAction(state, waitingSeat, true, null);
         } else if (state.phase === "AWAIT_HICH_CASTER_DISCARD" || state.phase === "AWAIT_HICH_TARGET_DISCARD"
@@ -10843,6 +10862,8 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
       if (cardId) {
         const idx = target.equipments.findIndex(c => c.id === cardId || ("EQUIPMENT:" + c.id) === cardId);
         if (idx >= 0) equipToDestroy = target.equipments.splice(idx, 1)[0];
+      } else if (target.equipments.length === 1) {
+        equipToDestroy = target.equipments.splice(0, 1)[0];
       }
       if (equipToDestroy) {
         discardCard(state, equipToDestroy);
