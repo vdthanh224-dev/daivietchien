@@ -19,7 +19,10 @@ const heartbeat = setInterval(() => { if (socket.readyState === WebSocket.OPEN) 
 const closed = new Promise((resolve) => socket.addEventListener("close", resolve, { once: true }));
 socket.addEventListener("open", () => socket.send(JSON.stringify({ action: "SOCIAL_REGISTER",
   userId: `history-migration-${Date.now()}`, userName: "Kiểm tra lịch sử" })));
-socket.addEventListener("error", () => { failure = new Error("History migration connection failed"); socket.close(); });
+// Render may drop the old WebSocket without a close frame during deployment.
+// Finish draining already received messages; the guard below rejects a failed
+// initial connection that never delivered a history snapshot.
+socket.addEventListener("error", () => socket.close());
 socket.addEventListener("message", (event) => {
   pending = pending.then(async () => {
     const data = JSON.parse(event.data);
