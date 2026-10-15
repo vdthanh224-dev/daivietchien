@@ -2443,19 +2443,45 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 		# 1. Lý Thường Kiệt (ID 47 - Tiến Thoái): Biến Trảm thành Đỡ và ngược lại
 	if (h_id == 47 or "Lý Thường Kiệt" in h_name) and s_num == my_seat:
 		var converted_count = 0
+		var sample_card_info: Dictionary = {}
+		var sample_from := ""
+		var sample_to := ""
 		for card_ui in hand_container.get_children():
 			var info = _get_card_info_from_ui(card_ui)
-			var c_name = info.get("name", "")
+			var c_name = str(info.get("name", ""))
 			if "Trảm" in c_name:
-				card_ui.setup_card_data(info.get("id", ""), "Đỡ", info.get("rank", 1), info.get("suit", ""), 0, "Hóa giải hoàn toàn 1 đòn Trảm (Tiến Thoái)")
 				converted_count += 1
+				sample_card_info = info
+				sample_from = "Trảm"
+				sample_to = "Đỡ"
+				var c_id = str(info.get("id", ""))
+				var r = info.get("rank", 1)
+				var s = str(info.get("suit", ""))
+				var tw = card_ui.create_tween()
+				tw.tween_property(card_ui, "scale:x", 0.05, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+				tw.tween_callback(func():
+					card_ui.setup_card_data(c_id, "Đỡ", r, s, 0, "Hóa giải hoàn toàn 1 đòn Trảm (Tiến Thoái)")
+				)
+				tw.tween_property(card_ui, "scale:x", 1.0, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 			elif c_name == "Đỡ":
-				card_ui.setup_card_data(info.get("id", ""), "Trảm", info.get("rank", 1), info.get("suit", ""), 0, "Tấn công gây 1 sát thương (Tiến Thoái)")
 				converted_count += 1
+				sample_card_info = info
+				sample_from = "Đỡ"
+				sample_to = "Trảm"
+				var c_id = str(info.get("id", ""))
+				var r = info.get("rank", 1)
+				var s = str(info.get("suit", ""))
+				var tw = card_ui.create_tween()
+				tw.tween_property(card_ui, "scale:x", 0.05, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+				tw.tween_callback(func():
+					card_ui.setup_card_data(c_id, "Trảm", r, s, 0, "Tấn công gây 1 sát thương (Tiến Thoái)")
+				)
+				tw.tween_property(card_ui, "scale:x", 1.0, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		if converted_count > 0:
-			_animate_showcase_card("Tiến Thoái", "Lý Thường Kiệt: Hoán đổi %d lá Trảm ⟷ Đỡ!" % converted_count)
+			var morph_from = sample_from if sample_from != "" else "Trảm"
+			var morph_to = sample_to if sample_to != "" else "Đỡ"
+			_animate_tien_thoai_morph(my_seat, morph_from, morph_to, "Lý Thường Kiệt hoán chuyển %d lá %s ⟷ %s!" % [converted_count, morph_from, morph_to], sample_card_info)
 			_add_log("✨ [TIẾN THOÁI] Lý Thường Kiệt đã hoán chuyển %d lá Trảm ⟷ Đỡ trên tay!" % converted_count)
-			AudioManager.play_skill()
 			if is_waiting_dodge:
 				_set_reaction_hand_focus(true, current_reaction_required_type, dodge_attacker_seat if is_current_reaction_slash else 0, current_reaction_allow_dodge_as_slash, is_current_reaction_slash)
 				_select_dodge_card(null)
@@ -3974,7 +4000,23 @@ func _update_action_btn() -> void:
 		card_play_btn.text = "🍶 ĐÃ UỐNG RƯỢU TRONG LƯỢT" if (wine_used_this_turn and not can_unlimited_wine) else "🍶 UỐNG RƯỢU (+1 SÁT THƯƠNG)"
 		card_play_btn.visible = true
 	elif c_name == "Đỡ":
-		if is_trac_lac_hero and card_is_black:
+		var p_gen = generals_data.get(my_seat, {})
+		var is_tien_thoai_hero = p_gen.get("hero_id", -1) == 47 or _hero_has_skill(p_gen, "tien_thoai")
+		if is_tien_thoai_hero:
+			if selected_target_seat > 0 and generals_data.has(selected_target_seat):
+				var tgt = generals_data[selected_target_seat]
+				if tgt["is_alive"]:
+					card_play_btn.text = "⚔️ TRẢM [TIẾN THOÁI] → %s" % tgt["name"]
+					card_play_btn.disabled = false
+					card_play_btn.visible = true
+					desc_text.text = "⚔️ [TIẾN THOÁI] Dùng lá Đỡ như Trảm để tấn công %s!" % tgt["name"]
+					return
+			card_play_btn.text = "⚔️ CHỌN MỤC TIÊU ĐỂ TRẢM [TIẾN THOÁI]..."
+			card_play_btn.disabled = true
+			card_play_btn.visible = true
+			desc_text.text = "⚔️ [TIẾN THOÁI] Bạn có thể dùng lá Đỡ này như lá Trảm. Hãy chọn 1 mục tiêu để tấn công!"
+			return
+		elif is_trac_lac_hero and card_is_black:
 			card_play_btn.disabled = false
 			card_play_btn.text = "🍶 UỐNG RƯỢU [TRÁC LẠC]"
 			card_play_btn.visible = true
@@ -4760,12 +4802,13 @@ func _on_card_play_btn_clicked() -> void:
 		_refresh_local_skill_buttons(my_seat)
 		return
 
-	if "Trảm" in c_name:
+	var p_gen = generals_data[my_seat]
+	var is_tien_thoai_hero = p_gen.get("hero_id", -1) == 47 or _hero_has_skill(p_gen, "tien_thoai")
+	if "Trảm" in c_name or (c_name == "Đỡ" and is_tien_thoai_hero):
 		if selected_target_seat <= 0 or not generals_data.has(selected_target_seat):
 			desc_text.text = "⚠️ Vui lòng nhấp chọn 1 Tướng còn sống trên bàn để Trảm!"
 			return
 		var tgt = generals_data[selected_target_seat]
-		var p_gen = generals_data[my_seat]
 		var dist = _calculate_distance(my_seat, selected_target_seat)
 		var max_r = _get_attack_range(my_seat)
 		var water_bach_dang = ("Thủy" in c_name and p_gen.get("equipped_off_horse", "") == "Thuyền Bạch Đằng")
@@ -5445,14 +5488,21 @@ func _execute_slash_attack_action(tgt_seat: int, slash_card_ui: Control, c_info:
 	selected_card_ui = null
 	card_play_btn.visible = false
 
-	AudioManager.play_voice(c_name)
-	AudioManager.play_slash()
+	var is_tien_thoai_slash = (c_name == "Đỡ") and (generals_data.has(my_seat) and (generals_data[my_seat].get("hero_id", -1) == 47 or _hero_has_skill(generals_data[my_seat], "tien_thoai")))
+
+	if not is_tien_thoai_slash:
+		AudioManager.play_voice(c_name)
+		AudioManager.play_slash()
 	_broadcast_player_battle_action("PLAY_CARD", c_id, tgt["seat"], my_seat, 0, lien_targets, false, lien_cost_id, pha_tong_card_id)
 	if not pha_tong_card_id.is_empty():
 		_animate_showcase_card("Phá Tống", "⚔️ Đòn Trảm không thể bị Đỡ!", c_info)
 		_add_log("⚔️ [PHÁ TỐNG] Bạn bỏ thêm lá bài kích hoạt [Phá Tống], đòn Trảm không thể bị Đỡ!")
-	_animate_showcase_card(c_name, "Bạn dùng [%s] tấn công %s!" % [c_name, tgt["name"]], c_info)
-	_add_log("⚔️ Bạn dùng [%s]%s lên %s (Ghế %d)%s." % [c_name, " (kèm Hủ Rượu: +1 Sát Thương)" if is_wine else "", tgt["name"], tgt["seat"], " [KÈM PHÁ TỐNG: KHÔNG THỂ ĐỠ]" if not pha_tong_card_id.is_empty() else ""])
+	if is_tien_thoai_slash:
+		_animate_tien_thoai_morph(my_seat, "Đỡ", "Trảm", "Bạn kích hoạt [Tiến Thoái] dùng Đỡ như Trảm tấn công %s!" % tgt["name"], c_info)
+		_add_log("⚡ [TIẾN THOÁI] Bạn dùng [Đỡ] như [Trảm]%s lên %s (Ghế %d)%s." % [" (kèm Hủ Rượu: +1 Sát Thương)" if is_wine else "", tgt["name"], tgt["seat"], " [KÈM PHÁ TỐNG: KHÔNG THỂ ĐỠ]" if not pha_tong_card_id.is_empty() else ""])
+	else:
+		_animate_showcase_card(c_name, "Bạn dùng [%s] tấn công %s!" % [c_name, tgt["name"]], c_info)
+		_add_log("⚔️ Bạn dùng [%s]%s lên %s (Ghế %d)%s." % [c_name, " (kèm Hủ Rượu: +1 Sát Thương)" if is_wine else "", tgt["name"], tgt["seat"], " [KÈM PHÁ TỐNG: KHÔNG THỂ ĐỠ]" if not pha_tong_card_id.is_empty() else ""])
 	desc_text.text = "⚔️ Đã xuất Trảm lên %s! Đang chờ đối phương phản hồi..." % tgt["name"]
 	if DailyQuestSystem:
 		DailyQuestSystem.record_progress("slash", 1)
@@ -8168,6 +8218,10 @@ func _on_network_action_received(delta: Dictionary) -> void:
 				effect_card["damage"] = int(delta.get("damage", 0))
 			if delta.has("isWineBuff"):
 				effect_card["isWineBuff"] = bool(delta.get("isWineBuff", false))
+			if delta.has("tienThoaiConvert"):
+				effect_card["tienThoaiConvert"] = delta.get("tienThoaiConvert")
+			if delta.has("originalCardName"):
+				effect_card["originalCardName"] = delta.get("originalCardName")
 			_handle_remote_card_play(
 				caster_seat,
 				card_id if not card_id.is_empty() else card_name,
@@ -8197,15 +8251,17 @@ func _on_network_action_received(delta: Dictionary) -> void:
 			_play_dodge_response_ray(null, resp_seat)
 			_show_remote_card_use(delta, "phản ứng")
 			_add_log("🛡️ Tướng Ghế %d đã phản ứng thành công!" % resp_seat)
-			if AudioManager.has_voice(card_name):
-				AudioManager.play_voice(card_name)
-			else:
-				var resolved_name = _get_friendly_card_name(card_id)
-				if AudioManager.has_voice(resolved_name):
-					AudioManager.play_voice(resolved_name)
+			var is_tien_thoai_defense = delta.has("tienThoaiConvert") or defense_skill == "Tiến Thoái"
+			if not is_tien_thoai_defense:
+				if AudioManager.has_voice(card_name):
+					AudioManager.play_voice(card_name)
 				else:
-					AudioManager.play_voice("Đỡ")
-			AudioManager.play_parry()
+					var resolved_name = _get_friendly_card_name(card_id)
+					if AudioManager.has_voice(resolved_name):
+						AudioManager.play_voice(resolved_name)
+					else:
+						AudioManager.play_voice("Đỡ")
+				AudioManager.play_parry()
 		else:
 			_add_log("💥 Tướng Ghế %d không đỡ đòn!" % resp_seat)
 	elif act_type in ["AOE_DEFENDED", "DUEL_RESPOND", "RESCUE_SUCCESS", "RESCUE_ATTEMPT", "HICH_TUONG_SI_DISCARD", "NULLIFY_PLAYED", "BORROW_SWORD_SLASH", "NAM_SON_FOLLOW_UP_PLAYED", "DRUM_DISCARD", "HARVEST_PICKED"]:
@@ -8450,6 +8506,9 @@ func _show_activated_skills(activations: Array[Dictionary]) -> void:
 			avatar.show_skill_banner(skill_name.to_upper(), 2.0, true)
 
 func _show_remote_card_use(delta: Dictionary, action_label: String) -> void:
+	var seat = int(delta.get("casterSeat", delta.get("targetSeat", 0)))
+	if seat == my_seat and seat > 0:
+		return
 	var used_card = delta.get("card", {})
 	if not (used_card is Dictionary) or used_card.is_empty():
 		var fallback_name = str(delta.get("cardName", ""))
@@ -8459,8 +8518,25 @@ func _show_remote_card_use(delta: Dictionary, action_label: String) -> void:
 	var card_name = str(used_card.get("name", delta.get("cardName", "Bài")))
 	var suit = _get_suit_icon(str(used_card.get("suit", "")))
 	var rank = _format_rank(used_card.get("rank", 1))
-	var seat = int(delta.get("casterSeat", delta.get("targetSeat", 0)))
 	var actor = generals_data[seat].get("name", "Ghế %d" % seat) if generals_data.has(seat) and seat > 0 else "Một người chơi"
+
+	var tien_thoai_conv = delta.get("tienThoaiConvert", null)
+	if tien_thoai_conv == null and used_card is Dictionary and used_card.has("tienThoaiConvert"):
+		tien_thoai_conv = used_card.get("tienThoaiConvert", null)
+	if tien_thoai_conv == null and generals_data.has(seat) and (generals_data[seat].get("hero_id", -1) == 47 or _hero_has_skill(generals_data[seat], "tien_thoai")):
+		var orig = str(delta.get("originalCardName", ""))
+		if orig == "Trảm" and card_name == "Đỡ":
+			tien_thoai_conv = {"from": "Trảm", "to": "Đỡ"}
+		elif orig == "Đỡ" and card_name == "Trảm":
+			tien_thoai_conv = {"from": "Đỡ", "to": "Trảm"}
+
+	if tien_thoai_conv is Dictionary:
+		var from_c = str(tien_thoai_conv.get("from", "Trảm"))
+		var to_c = str(tien_thoai_conv.get("to", "Đỡ"))
+		var morph_banner = "%s kích hoạt [Tiến Thoái] dùng [%s] như [%s]!" % [actor, from_c, to_c]
+		_animate_tien_thoai_morph(seat, from_c, to_c, morph_banner, used_card)
+		return
+
 	var aoe_name = str(delta.get("aoeName", ""))
 	var active_card = delta.get("activeCard", {})
 	var source = aoe_name
@@ -8908,6 +8984,20 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 			dodge_idx = idx
 			break
 
+	if dodge_idx < 0 and (tgt.get("hero_id", -1) == 47 or _hero_has_skill(tgt, "tien_thoai")):
+		for idx in range(tgt["hand_cards"].size()):
+			var c = tgt["hand_cards"][idx]
+			if "Trảm" in c.get("name", ""):
+				var has_sung = _has_equipped_weapon_name(atk, "Súng Thần Công Hồ Triều")
+				if has_sung and int(c.get("rank", 1)) < 7:
+					continue
+				if (_hero_has_skill(atk, "tho_binh") or atk.get("hero_id", -1) == 44) and _calculate_distance(attacker_seat, target_seat) <= 2:
+					var c_rank = int(c.get("rank", 1))
+					if c_rank >= 2 and c_rank <= 7:
+						continue
+				dodge_idx = idx
+				break
+
 	if dodge_idx >= 0:
 		var used_dodge = tgt["hand_cards"][dodge_idx]
 		tgt["hand_cards"].remove_at(dodge_idx)
@@ -8915,11 +9005,16 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 		tgt["avatar_node"].update_hand_count(tgt["hand_count"])
 		var suit_sym = _get_suit_icon(used_dodge.get("suit", ""))
 		var rank_str = _format_rank(used_dodge.get("rank", 1))
-		_animate_showcase_card("Đỡ", "%s dùng [%s %s Đỡ] hóa giải đòn tấn công!" % [tgt["name"], suit_sym, rank_str], used_dodge)
-		_add_log("🛡️ %s đã dùng lá [%s %s Đỡ] hóa giải đòn Trảm thành công!" % [tgt["name"], suit_sym, rank_str])
+		var is_tien_thoai_ai_dodge = (tgt.get("hero_id", -1) == 47 or _hero_has_skill(tgt, "tien_thoai")) and ("Trảm" in used_dodge.get("name", ""))
+		if is_tien_thoai_ai_dodge:
+			_animate_tien_thoai_morph(target_seat, "Trảm", "Đỡ", "%s kích hoạt [Tiến Thoái] dùng Trảm như Đỡ hóa giải đòn Trảm!" % tgt["name"], used_dodge)
+			_add_log("⚡ [TIẾN THOÁI] %s đã dùng lá [%s %s Trảm] như [Đỡ] hóa giải đòn Trảm thành công!" % [tgt["name"], suit_sym, rank_str])
+		else:
+			_animate_showcase_card("Đỡ", "%s dùng [%s %s Đỡ] hóa giải đòn tấn công!" % [tgt["name"], suit_sym, rank_str], used_dodge)
+			_add_log("🛡️ %s đã dùng lá [%s %s Đỡ] hóa giải đòn Trảm thành công!" % [tgt["name"], suit_sym, rank_str])
+			AudioManager.play_voice("Đỡ")
+			AudioManager.play_parry()
 		_play_dodge_response_ray(null, target_seat)
-		AudioManager.play_voice("Đỡ")
-		AudioManager.play_parry()
 
 		_restore_truong_dao_slash_allowance(attacker_seat)
 		await _resolve_local_song_cung_if_applicable(attacker_seat, target_seat, damage_amount, damage_element)
@@ -9103,7 +9198,7 @@ func _is_card_valid_for_dodge(card_ui: Control, attacker_seat: int, is_slash_att
 		return true
 
 	# Hero 47: Lý Thường Kiệt ("Tiến Thoái"): Dùng Trảm như Đỡ
-	if my_gen.get("hero_id", -1) == 47 and "trảm" in c_name.to_lower():
+	if (my_gen.get("hero_id", -1) == 47 or _hero_has_skill(my_gen, "tien_thoai")) and "trảm" in c_name.to_lower():
 		return true
 
 	# Hero 83: Nguyễn Cảnh Chân ("Thủy Binh"): Dùng bài Vàng như Đỡ
@@ -9124,7 +9219,7 @@ func _is_card_valid_for_reaction(card_ui: Control, required_type: String, attack
 		if "trảm" in c_name:
 			return true
 		var my_gen = generals_data.get(my_seat, {})
-		return allow_dodge_as_slash and my_gen.get("hero_id", -1) == 47 and "đỡ" in c_name
+		return allow_dodge_as_slash and (my_gen.get("hero_id", -1) == 47 or _hero_has_skill(my_gen, "tien_thoai")) and "đỡ" in c_name
 	if required_type in ["Diệu Kế", "Diệu Kế Phá Mưu"]:
 		return "diệu kế" in c_name or c_sub_type == 10
 	if required_type in ["Bỏ bài", "Bài"]:
@@ -9444,11 +9539,26 @@ func _on_dodge_confirmed() -> void:
 	_broadcast_player_battle_action("DODGE_RESPONSE", card_id, dodge_attacker_seat)
 
 	var req_type = current_reaction_required_type
+	var p_gen = generals_data.get(my_seat, {})
+	var is_ltk = p_gen.get("hero_id", -1) == 47 or _hero_has_skill(p_gen, "tien_thoai")
+	var is_tien_thoai_dodge = is_ltk and (req_type == "Đỡ" or req_type.is_empty()) and ("trảm" in c_name.to_lower())
+	var is_tien_thoai_slash = is_ltk and (req_type == "Trảm" or is_giac_toi_reaction) and ("đỡ" in c_name.to_lower())
+
 	var is_dieu_ke = req_type in ["Diệu Kế", "Diệu Kế Phá Mưu"] or "diệu kế" in c_name.to_lower()
-	var is_tram_reaction = req_type == "Trảm" or is_giac_toi_reaction or "trảm" in c_name.to_lower()
+	var is_tram_reaction = not is_tien_thoai_dodge and (req_type == "Trảm" or is_giac_toi_reaction or (req_type != "Đỡ" and "trảm" in c_name.to_lower()))
 	var is_discard_reaction = req_type in ["Bỏ bài", "Bài"]
 
-	if is_dieu_ke:
+	if is_tien_thoai_dodge:
+		_animate_tien_thoai_morph(my_seat, "Trảm", "Đỡ", "Bạn kích hoạt [Tiến Thoái] dùng Trảm như Đỡ hóa giải đòn Trảm!", card_info)
+		_add_log("⚡ [TIẾN THOÁI] Bạn đã dùng lá [%s %s %s] như [Đỡ] hóa giải đòn Trảm thành công!" % [suit_sym, rank_str, c_name])
+		if DailyQuestSystem:
+			DailyQuestSystem.record_progress("dodge", 1)
+	elif is_tien_thoai_slash:
+		_animate_tien_thoai_morph(my_seat, "Đỡ", "Trảm", "Bạn kích hoạt [Tiến Thoái] dùng Đỡ như Trảm đáp trả!", card_info)
+		_add_log("⚡ [TIẾN THOÁI] Bạn đã dùng lá [%s %s %s] như [Trảm] đáp trả thành công!" % [suit_sym, rank_str, c_name])
+		if DailyQuestSystem:
+			DailyQuestSystem.record_progress("slash", 1)
+	elif is_dieu_ke:
 		_animate_showcase_card(c_name, "Bạn dùng [%s %s %s] hóa giải mưu kế!" % [suit_sym, rank_str, c_name], card_info)
 		_add_log("📜 Bạn đã dùng lá [%s %s %s] hóa giải mưu kế thành công!" % [suit_sym, rank_str, c_name])
 		if DailyQuestSystem:
@@ -9467,17 +9577,18 @@ func _on_dodge_confirmed() -> void:
 		if DailyQuestSystem:
 			DailyQuestSystem.record_progress("dodge", 1)
 
-	if AudioManager.has_voice(c_name):
-		AudioManager.play_voice(c_name)
-	elif not req_type.is_empty() and AudioManager.has_voice(req_type):
-		AudioManager.play_voice(req_type)
-	else:
-		AudioManager.play_voice("Trảm" if is_giac_toi_reaction else "Đỡ")
+	if not is_tien_thoai_dodge and not is_tien_thoai_slash:
+		if AudioManager.has_voice(c_name):
+			AudioManager.play_voice(c_name)
+		elif not req_type.is_empty() and AudioManager.has_voice(req_type):
+			AudioManager.play_voice(req_type)
+		else:
+			AudioManager.play_voice("Trảm" if is_giac_toi_reaction else "Đỡ")
 
-	if is_tram_reaction:
-		AudioManager.play_slash()
-	else:
-		AudioManager.play_parry()
+		if is_tram_reaction:
+			AudioManager.play_slash()
+		else:
+			AudioManager.play_parry()
 
 	# Local mode resolves immediately; network mode waits for authoritative state.
 	if not is_network_mode:
@@ -11092,10 +11203,36 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 		var elem = "NORMAL"
 		if "Hỏa" in card_name: elem = "FIRE"
 		elif "Thủy" in card_name or "Lôi" in card_name: elem = "WATER" # Accept old card names.
-		AudioManager.play_voice(card_name)
-		AudioManager.play_slash()
-		_animate_showcase_card(card_name, "%s dùng [%s] tấn công %s!" % [caster["name"], card_name, tgt["name"]], used_card)
-		_add_log("⚔️ %s dùng [%s]%s lên %s (Ghế %d)." % [caster["name"], card_name, " (kèm Hủ Rượu: +1 Sát Thương)" if used_wine else "", tgt["name"], target_seat])
+		var is_tien_thoai = used_card.has("tienThoaiConvert") and used_card["tienThoaiConvert"] is Dictionary
+		if not is_tien_thoai and (caster.get("hero_id", -1) == 47 or _hero_has_skill(caster, "tien_thoai")):
+			if used_card.get("originalCardName", "") == "Đỡ" or str(used_card.get("name", "")) == "Đỡ":
+				is_tien_thoai = true
+				used_card["tienThoaiConvert"] = {"from": "Đỡ", "to": "Trảm"}
+
+		if is_tien_thoai:
+			var conv = used_card.get("tienThoaiConvert", {"from": "Đỡ", "to": "Trảm"})
+			var from_c = str(conv.get("from", "Đỡ"))
+			var to_c = str(conv.get("to", "Trảm"))
+			_animate_tien_thoai_morph(
+				caster_seat,
+				from_c,
+				to_c,
+				"%s kích hoạt [Tiến Thoái] dùng [%s] như [%s] tấn công %s!" % [caster["name"], from_c, to_c, tgt["name"]],
+				used_card
+			)
+			_add_log("⚡ [TIẾN THOÁI] %s dùng [%s] như [%s]%s lên %s (Ghế %d)." % [
+				caster["name"],
+				from_c,
+				to_c,
+				" (kèm Hủ Rượu: +1 Sát Thương)" if used_wine else "",
+				tgt["name"],
+				target_seat
+			])
+		else:
+			AudioManager.play_voice(card_name)
+			AudioManager.play_slash()
+			_animate_showcase_card(card_name, "%s dùng [%s] tấn công %s!" % [caster["name"], card_name, tgt["name"]], used_card)
+			_add_log("⚔️ %s dùng [%s]%s lên %s (Ghế %d)." % [caster["name"], card_name, " (kèm Hủ Rượu: +1 Sát Thương)" if used_wine else "", tgt["name"], target_seat])
 		_play_smart_card_rays(card_name, caster_seat, [target_seat])
 		if resolve_reaction:
 			_handle_slash_attack(caster_seat, target_seat, slash_damage, elem, str(used_card.get("suit", "")))
@@ -11467,6 +11604,12 @@ func _execute_ai_turn(ai_seat: int) -> void:
 				slash_idx = idx
 				break
 
+		if slash_idx < 0 and (ai_gen.get("hero_id", -1) == 47 or _hero_has_skill(ai_gen, "tien_thoai")):
+			for idx in range(ai_gen["hand_cards"].size()):
+				if "Đỡ" in ai_gen["hand_cards"][idx].get("name", ""):
+					slash_idx = idx
+					break
+
 		if slash_idx >= 0:
 			var slash_card = ai_gen["hand_cards"][slash_idx]
 			var card_name = slash_card.get("name", "Trảm")
@@ -11503,12 +11646,17 @@ func _execute_ai_turn(ai_seat: int) -> void:
 							break
 
 					var tgt_gen = generals_data[chosen_tgt_seat]
+					var is_tien_thoai_ai_slash = (slash_card.get("name", "") == "Đỡ") and (ai_gen.get("hero_id", -1) == 47 or _hero_has_skill(ai_gen, "tien_thoai"))
 
-					AudioManager.play_voice(card_name)
-					AudioManager.play_slash()
 					_broadcast_player_battle_action("PLAY_CARD", card_name, chosen_tgt_seat, ai_seat)
-					_animate_showcase_card(card_name, "%s dùng [%s] tấn công %s!" % [ai_gen["name"], card_name, tgt_gen["name"]], slash_card)
-					_add_log("⚔️ %s (Ghế %d) dùng [%s] lên %s (Ghế %d)." % [ai_gen["name"], ai_seat, card_name, tgt_gen["name"], chosen_tgt_seat])
+					if is_tien_thoai_ai_slash:
+						_animate_tien_thoai_morph(ai_seat, "Đỡ", "Trảm", "%s kích hoạt [Tiến Thoái] dùng Đỡ như Trảm tấn công %s!" % [ai_gen["name"], tgt_gen["name"]], slash_card)
+						_add_log("⚡ [TIẾN THOÁI] %s (Ghế %d) dùng [Đỡ] như [Trảm] lên %s (Ghế %d)." % [ai_gen["name"], ai_seat, tgt_gen["name"], chosen_tgt_seat])
+					else:
+						AudioManager.play_voice(card_name)
+						AudioManager.play_slash()
+						_animate_showcase_card(card_name, "%s dùng [%s] tấn công %s!" % [ai_gen["name"], card_name, tgt_gen["name"]], slash_card)
+						_add_log("⚔️ %s (Ghế %d) dùng [%s] lên %s (Ghế %d)." % [ai_gen["name"], ai_seat, card_name, tgt_gen["name"], chosen_tgt_seat])
 					_play_smart_card_rays(card_name, ai_seat, [chosen_tgt_seat])
 
 					var ai_slash_suit = slash_card.get("suit", "Spade")
@@ -12255,6 +12403,157 @@ func _animate_showcase_card(c_name: String, banner_text: String, card_info: Dict
 	var tw = create_tween().set_parallel(true)
 	tw.tween_property(entry, "modulate:a", 1.0, 0.16)
 	tw.tween_property(entry, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func _animate_tien_thoai_morph(caster_seat: int, from_name: String, to_name: String, banner_text: String, card_info: Dictionary = {}, duration_override: float = 3.4) -> void:
+	_ensure_showcase_layer()
+	var info_from = _get_showcase_card_info(from_name, card_info)
+	var info_to = _get_showcase_card_info(to_name, card_info)
+	if not card_info.is_empty():
+		info_from["suit"] = card_info.get("suit", info_from.get("suit", "Heart"))
+		info_from["rank"] = card_info.get("rank", info_from.get("rank", 1))
+		info_to["suit"] = info_from["suit"]
+		info_to["rank"] = info_from["rank"]
+
+	var entry = VBoxContainer.new()
+	entry.custom_minimum_size = Vector2(150, 245)
+	entry.alignment = BoxContainer.ALIGNMENT_CENTER
+	entry.mouse_filter = MOUSE_FILTER_IGNORE
+	entry.pivot_offset = Vector2(75, 122)
+	entry.modulate.a = 0.0
+	entry.scale = Vector2(0.68, 0.68)
+
+	# Skill Tag Header
+	var skill_tag = Label.new()
+	skill_tag.custom_minimum_size = Vector2(150, 24)
+	skill_tag.text = "⚡ TUYỆT KỸ [TIẾN THOÁI] ⚡"
+	skill_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	skill_tag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	skill_tag.add_theme_font_size_override("font_size", 11)
+	skill_tag.add_theme_color_override("font_color", Color(1.0, 0.84, 0.2, 1.0))
+	skill_tag.mouse_filter = MOUSE_FILTER_IGNORE
+	entry.add_child(skill_tag)
+
+	# Card container for flipping and morphing
+	var card_container = Control.new()
+	card_container.custom_minimum_size = Vector2(138, 195)
+	card_container.size = Vector2(138, 195)
+	card_container.mouse_filter = MOUSE_FILTER_IGNORE
+	card_container.pivot_offset = Vector2(69, 97.5)
+
+	# Magic Aura Glow behind the card
+	var aura_panel = Panel.new()
+	aura_panel.size = Vector2(148, 205)
+	aura_panel.position = Vector2(-5, -5)
+	aura_panel.mouse_filter = MOUSE_FILTER_IGNORE
+	var aura_style = StyleBoxFlat.new()
+	aura_style.bg_color = Color(1.0, 0.85, 0.2, 0.22)
+	aura_style.border_width_left = 3
+	aura_style.border_width_top = 3
+	aura_style.border_width_right = 3
+	aura_style.border_width_bottom = 3
+	aura_style.border_color = Color(1.0, 0.9, 0.4, 0.95)
+	aura_style.corner_radius_top_left = 8
+	aura_style.corner_radius_top_right = 8
+	aura_style.corner_radius_bottom_left = 8
+	aura_style.corner_radius_bottom_right = 8
+	aura_panel.add_theme_stylebox_override("panel", aura_style)
+	aura_panel.modulate.a = 0.0
+	card_container.add_child(aura_panel)
+
+	# Card From
+	var card_from = CardUIScene.instantiate()
+	_make_card_display_only(card_from)
+	card_from.setup_card_data(
+		str(info_from.get("id", "morph_from")),
+		from_name,
+		info_from.get("rank", 1),
+		str(info_from.get("suit", "Heart")),
+		int(info_from.get("category", info_from.get("cat", 0))),
+		str(info_from.get("desc", "")),
+		int(info_from.get("subType", -1))
+	)
+	card_container.add_child(card_from)
+
+	# Card To
+	var card_to = CardUIScene.instantiate()
+	_make_card_display_only(card_to)
+	card_to.setup_card_data(
+		str(info_to.get("id", "morph_to")),
+		to_name,
+		info_to.get("rank", 1),
+		str(info_to.get("suit", "Heart")),
+		int(info_to.get("category", info_to.get("cat", 0))),
+		str(info_to.get("desc", "")),
+		int(info_to.get("subType", -1))
+	)
+	card_to.modulate.a = 0.0
+	card_to.visible = false
+	card_container.add_child(card_to)
+
+	entry.add_child(card_container)
+
+	# Transformation description label
+	var banner = Label.new()
+	banner.custom_minimum_size = Vector2(150, 32)
+	banner.text = banner_text
+	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	banner.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	banner.add_theme_font_size_override("font_size", 10)
+	banner.add_theme_color_override("font_color", Color(0.95, 0.95, 1.0, 1.0))
+	banner.mouse_filter = MOUSE_FILTER_IGNORE
+	entry.add_child(banner)
+
+	showcase_row.add_child(entry)
+	var display_duration = duration_override if duration_override > 0.0 else 3.4
+	showcase_entries.append({
+		"node": entry,
+		"expires_at": Time.get_ticks_msec() / 1000.0 + display_duration
+	})
+	showcase_center.visible = true
+
+	# Play audio and avatar skill banner
+	if AudioManager.has_voice("Tiến Thoái"):
+		AudioManager.play_voice("Tiến Thoái")
+	AudioManager.play_skill()
+	if caster_seat > 0 and generals_data.has(caster_seat):
+		var caster_avatar = generals_data[caster_seat].get("avatar_node")
+		if is_instance_valid(caster_avatar) and caster_avatar.has_method("show_skill_banner"):
+			caster_avatar.show_skill_banner("TIẾN THOÁI", 2.5)
+
+	# Phase 1: Appear entry
+	var tw = create_tween().set_parallel(true)
+	tw.tween_property(entry, "modulate:a", 1.0, 0.18)
+	tw.tween_property(entry, "scale", Vector2.ONE, 0.24).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+	# Phase 2: Glow aura pulse & begin horizontal flip
+	var tw_morph = create_tween()
+	tw_morph.tween_interval(0.35)
+
+	# Aura brightens and card folds in horizontally
+	tw_morph.tween_property(aura_panel, "modulate:a", 1.0, 0.32).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw_morph.parallel().tween_property(card_container, "scale:x", 0.02, 0.32).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw_morph.parallel().tween_property(card_from, "modulate:a", 0.0, 0.32)
+
+	# Midway callback: switch cards
+	tw_morph.tween_callback(func():
+		card_from.visible = false
+		card_to.visible = true
+		card_to.modulate.a = 1.0
+		skill_tag.text = "✨ [TIẾN THOÁI] %s ➔ %s ✨" % [from_name.to_upper(), to_name.to_upper()]
+		skill_tag.add_theme_color_override("font_color", Color(1.0, 1.0, 0.4, 1.0))
+		if to_name == "Trảm":
+			AudioManager.play_slash()
+		else:
+			AudioManager.play_parry()
+	)
+
+	# Expand back with energetic bounce and golden flash
+	tw_morph.tween_property(card_container, "scale:x", 1.12, 0.32).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw_morph.parallel().tween_property(card_container, "modulate", Color(1.8, 1.7, 1.2, 1.0), 0.16)
+	tw_morph.tween_property(card_container, "scale:x", 1.0, 0.14)
+	tw_morph.parallel().tween_property(card_container, "modulate", Color.WHITE, 0.25)
+	tw_morph.parallel().tween_property(aura_panel, "modulate:a", 0.35, 0.35)
 
 func _is_aoe_showcase(c_name: String, banner_text: String) -> bool:
 	return c_name in ["Giặc Tới", "Mưa Tên Liên Châu"] \

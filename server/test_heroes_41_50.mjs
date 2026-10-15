@@ -746,6 +746,7 @@ function createTestState(heroIds = ["HERO_41", "HERO_42", "HERO_43", "HERO_44"])
   const playRes = handlePlayCard(state, 1, "DODGE_AS_SLASH", 2);
   assert.equal(playRes.success, true);
   assert.equal(state.phase, "AWAIT_SLASH_DEFENSE");
+  assert.deepEqual(state.lastDelta.tienThoaiConvert, { from: "Đỡ", to: "Trảm" });
 
   // P2 cannot dodge -> takes damage from Slash
   const respRes = handleRespondAction(state, 2, false, null);
@@ -753,6 +754,25 @@ function createTestState(heroIds = ["HERO_41", "HERO_42", "HERO_43", "HERO_44"])
   assert.equal(state.players[1].hp, 3);
   // Nam Quốc Sơn Hà triggered! P1 and ally gain +1 attack range
   assert.equal(p1.namQuocSonHaRangeBuff >= 1, true);
+
+  // Tiến Thoái reverse: P2 slashes P1 (Lý Thường Kiệt), P1 dodges using a Slash card!
+  state.phase = "PLAY";
+  state.turnSeat = 2;
+  state.slashesUsedThisTurn = 0;
+  state.players[1].hand = [{ id: "SLASH_FROM_P2", name: "Trảm", suit: "Spade", rank: 8, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }];
+  p1.hand = [{ id: "SLASH_AS_DODGE", name: "Trảm", suit: "Diamond", rank: 6, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }];
+  const slashRes = handlePlayCard(state, 2, "SLASH_FROM_P2", 1);
+  assert.equal(slashRes.success, true);
+  assert.equal(state.phase, "AWAIT_SLASH_DEFENSE");
+  assert.equal(state.waitingTargetSeat, 1);
+
+  // P1 responds with Slash card as Dodge
+  const dodgeRes = handleRespondAction(state, 1, true, "SLASH_AS_DODGE");
+  assert.equal(dodgeRes.success, true);
+  assert.deepEqual(state.lastDelta.tienThoaiConvert, { from: "Trảm", to: "Đỡ" });
+  assert.equal(p1.hp, 4); // Not damaged
+  assert.equal(p1.hand.length, 0); // Card was discarded
+
   console.log("✅ Hero 47: Lý Thường Kiệt (Tiến Thoái & Nam Quốc Sơn Hà) OK");
 }
 

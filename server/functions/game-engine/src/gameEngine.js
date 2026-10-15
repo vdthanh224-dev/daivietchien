@@ -704,6 +704,8 @@ function buildStateDelta(state) {
     targetCardZone: action.targetCardZone || "",
     targetCard: action.targetCard || null,
     skillActivations: Array.isArray(action.skillActivations) ? action.skillActivations : [],
+    tienThoaiConvert: action.tienThoaiConvert || null,
+    originalCardName: action.originalCardName || "",
     aoeName: action.aoeName || "",
     judgeCard: action.judgeCard || null,
     baiCocJudgeCard: action.baiCocJudgeCard || null,
@@ -1753,18 +1755,26 @@ function startSlashResolution(state, slashCard, casterSeat, targetSeat, options 
   if (tranNamBypass && target.equipments?.some((equipment) => equipment.subType === CARD_SUBTYPES.ARMOR && equipment.name?.includes("Giáp Đồng"))) {
     skillActivations.push({ name: "Trấn Nam", seat: casterSeat });
   }
+  const isTienThoaiSlash = Boolean(slashCard.tienThoaiConvert || (heroHasSkill(caster, "TIEN_THOAI") && slashCard.originalCardName === "Đỡ"));
+  if (isTienThoaiSlash) {
+    skillActivations.push({ name: "Tiến Thoái", seat: casterSeat });
+  }
   recordAction(state, {
     type: options.actionType || "PLAY_SLASH",
     casterSeat,
     targetSeat,
     cardId: slashCard.id,
     cardName: slashCard.name,
+    originalCardName: isTienThoaiSlash ? "Đỡ" : "",
+    tienThoaiConvert: isTienThoaiSlash ? { from: "Đỡ", to: "Trảm" } : (slashCard.tienThoaiConvert || null),
     damage: totalDamage,
     element: damageElement,
     isWineBuff: isWine,
     skillActivations,
     baiCocJudgeCard: options.baiCocJudgeCard || null,
-    description: options.description || `🗡️ <b>${caster.generalName}</b> tung chiêu ${formatCardText(slashCard)}${isWine ? " <color=#FFD700><b>(kèm hiệu ứng Hủ Rượu: +1 Sát thương)</b></color>" : ""}${chienTuongBonus ? " <color=#FFD700><b>(Chiến Tượng: +1 Sát thương)</b></color>" : ""} nhắm vào <b>${target.generalName}</b>! (${oaiNhuocRequired ? "[Oai Nhược] mục tiêu chọn bỏ đúng 2 lá, gồm 1 lá Đỡ, hoặc chịu sát thương" : `Mục tiêu có 40s để Đỡ${requiredDodgeText}`})`
+    description: isTienThoaiSlash
+      ? `⚔️ <b>${caster.generalName}</b> kích hoạt [Tiến Thoái], dùng lá Đỡ như Trảm tấn công <b>${target.generalName}</b>!`
+      : (options.description || `🗡️ <b>${caster.generalName}</b> tung chiêu ${formatCardText(slashCard)}${isWine ? " <color=#FFD700><b>(kèm hiệu ứng Hủ Rượu: +1 Sát thương)</b></color>" : ""}${chienTuongBonus ? " <color=#FFD700><b>(Chiến Tượng: +1 Sát thương)</b></color>" : ""} nhắm vào <b>${target.generalName}</b>! (${oaiNhuocRequired ? "[Oai Nhược] mục tiêu chọn bỏ đúng 2 lá, gồm 1 lá Đỡ, hoặc chịu sát thương" : `Mục tiêu có 40s để Đỡ${requiredDodgeText}`})`)
   });
   return { success: true, state };
 }
@@ -1978,7 +1988,15 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
           card = { ...card, name: "Trảm Hỏa", category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_FIRE, element: "FIRE" };
       }
       if (heroHasSkill(caster, "TIEN_THOAI") && isDodge(card) && targetSeat && targetSeat !== casterSeat) {
-          card = { ...card, name: "Trảm", category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL, element: "NORMAL" };
+          card = {
+            ...card,
+            name: "Trảm",
+            category: CARD_CATEGORIES.BASIC,
+            subType: CARD_SUBTYPES.ATTACK_NORMAL,
+            element: "NORMAL",
+            originalCardName: "Đỡ",
+            tienThoaiConvert: { from: "Đỡ", to: "Trảm" }
+          };
       }
       if (heroHasSkill(caster, "VAN_DON") && card.category === CARD_CATEGORIES.EQUIPMENT && targetSeat && targetSeat !== casterSeat) {
           card = { ...card, name: "Cắt Đường Lương", category: CARD_CATEGORIES.DELAYED_SCROLL, subType: CARD_SUBTYPES.SUPPLY_SHORTAGE, desc: "Cắt Đường Lương: Phán xét Vàng thì bỏ qua Rút bài" };
@@ -2673,6 +2691,10 @@ function tryKhienMayDefense(state, targetSeat, sourceDescription) {
 function beginSlashAfterDodge(state, caster, targetSeat, defenseName = "Đỡ", defenseSkill = "") {
   const target = state.players.find((player) => player.seat === targetSeat);
   const activeCard = state.activeCard || {};
+  const defenseCard = state.discardTop;
+  const isTienThoaiDodge = heroHasSkill(target, "TIEN_THOAI") && (isSlash(defenseCard) || defenseSkill === "Tiến Thoái" || defenseName.includes("Tiến Thoái"));
+  if (isTienThoaiDodge) defenseSkill = "Tiến Thoái";
+
   const requiredDodgeCount = Math.max(1, Number(activeCard.requiredDodgeCount) || 1);
   const dodgesUsed = Math.max(0, Number(activeCard.dodgesUsed) || 0) + 1;
   if (dodgesUsed < requiredDodgeCount) {
@@ -2682,7 +2704,15 @@ function beginSlashAfterDodge(state, caster, targetSeat, defenseName = "Đỡ", 
     state.waitingReactionType = "DODGE";
     state.waitingTimer = 40;
     state.timerStartAt = Date.now();
-    recordAction(state, { type: "DODGE_PARTIAL", casterSeat: targetSeat, targetSeat, skillActivations: defenseSkill ? [{ name: defenseSkill, seat: targetSeat }] : [], description: `🛡️ ${target?.generalName || `Ghế ${targetSeat}`} đã dùng ${defenseName}; còn cần ${requiredDodgeCount - dodgesUsed} lá Đỡ để hóa giải Trảm [Dũng Nữ].` });
+    recordAction(state, {
+      type: "DODGE_PARTIAL",
+      casterSeat: targetSeat,
+      targetSeat,
+      tienThoaiConvert: isTienThoaiDodge ? { from: "Trảm", to: "Đỡ" } : null,
+      originalCardName: isTienThoaiDodge ? (defenseCard?.name || "Trảm") : "",
+      skillActivations: defenseSkill ? [{ name: defenseSkill, seat: targetSeat }] : [],
+      description: `🛡️ ${target?.generalName || `Ghế ${targetSeat}`} đã dùng ${defenseName}; còn cần ${requiredDodgeCount - dodgesUsed} lá Đỡ để hóa giải Trảm [Dũng Nữ].`
+    });
     return;
   }
   const songCung = getEquippedWeapon(caster, "Song Cung");
@@ -2695,16 +2725,19 @@ function beginSlashAfterDodge(state, caster, targetSeat, defenseName = "Đỡ", 
       state.slashesUsedThisTurn = Math.max(0, (Number(state.slashesUsedThisTurn) || 0) - 1);
     }
     resetWaitingState(state);
-    const defenseCard = state.discardTop;
     recordAction(state, {
       type: "DODGE_SUCCESS",
       casterSeat: targetSeat,
       targetSeat,
       cardId: defenseCard?.id || "",
-      cardName: defenseSkill || defenseCard?.name || defenseName,
+      cardName: isTienThoaiDodge ? "Đỡ" : (defenseSkill || defenseCard?.name || defenseName),
+      originalCardName: isTienThoaiDodge ? (defenseCard?.name || "Trảm") : "",
+      tienThoaiConvert: isTienThoaiDodge ? { from: "Trảm", to: "Đỡ" } : null,
       defenseSkill,
       skillActivations: defenseSkill ? [{ name: defenseSkill, seat: targetSeat }] : [],
-      description: `🛡️ ${target?.generalName || `Ghế ${targetSeat}`} đã dùng ${defenseName} hóa giải đòn Trảm!${consumedSlashAllowance ? " [Trường Đao Nam Sơn] xem như chưa sử dụng lượt Trảm." : ""}`
+      description: isTienThoaiDodge
+        ? `🛡️ <b>${target?.generalName || `Ghế ${targetSeat}`}</b> kích hoạt [Tiến Thoái], dùng ${formatCardText(defenseCard)} như Đỡ hóa giải đòn Trảm!`
+        : `🛡️ ${target?.generalName || `Ghế ${targetSeat}`} đã dùng ${defenseName} hóa giải đòn Trảm!${consumedSlashAllowance ? " [Trường Đao Nam Sơn] xem như chưa sử dụng lượt Trảm." : ""}`
     });
     return;
   }
@@ -2735,16 +2768,19 @@ function beginSlashAfterDodge(state, caster, targetSeat, defenseName = "Đỡ", 
 
   if (continueLienChau(state)) {
     if (defenseName !== "Khiên Mây Bện") {
-      const defenseCard = state.discardTop;
       recordAction(state, {
         type: "DODGE_SUCCESS",
         casterSeat: targetSeat,
         targetSeat,
         cardId: defenseCard?.id || "",
-        cardName: defenseSkill || defenseCard?.name || defenseName,
+        cardName: isTienThoaiDodge ? "Đỡ" : (defenseSkill || defenseCard?.name || defenseName),
+        originalCardName: isTienThoaiDodge ? (defenseCard?.name || "Trảm") : "",
+        tienThoaiConvert: isTienThoaiDodge ? { from: "Trảm", to: "Đỡ" } : null,
         defenseSkill,
         skillActivations: defenseSkill ? [{ name: defenseSkill, seat: targetSeat }] : [],
-        description: `🛡️ ${target?.generalName || `Ghế ${targetSeat}`} đã dùng ${defenseName} hóa giải đòn Trảm!`
+        description: isTienThoaiDodge
+          ? `🛡️ <b>${target?.generalName || `Ghế ${targetSeat}`}</b> kích hoạt [Tiến Thoái], dùng ${formatCardText(defenseCard)} như Đỡ hóa giải đòn Trảm!`
+          : `🛡️ ${target?.generalName || `Ghế ${targetSeat}`} đã dùng ${defenseName} hóa giải đòn Trảm!`
       });
     } else {
       refreshLastDelta(state);
@@ -2753,16 +2789,19 @@ function beginSlashAfterDodge(state, caster, targetSeat, defenseName = "Đỡ", 
   }
   resetWaitingState(state);
   if (defenseName !== "Khiên Mây Bện") {
-    const defenseCard = state.discardTop;
     recordAction(state, {
       type: "DODGE_SUCCESS",
       casterSeat: targetSeat,
       targetSeat,
       cardId: defenseCard?.id || "",
-      cardName: defenseSkill || defenseCard?.name || defenseName,
+      cardName: isTienThoaiDodge ? "Đỡ" : (defenseSkill || defenseCard?.name || defenseName),
+      originalCardName: isTienThoaiDodge ? (defenseCard?.name || "Trảm") : "",
+      tienThoaiConvert: isTienThoaiDodge ? { from: "Trảm", to: "Đỡ" } : null,
       defenseSkill,
       skillActivations: defenseSkill ? [{ name: defenseSkill, seat: targetSeat }] : [],
-      description: `🛡️ ${target?.generalName || `Ghế ${targetSeat}`} đã dùng ${defenseName} hóa giải đòn Trảm!`
+      description: isTienThoaiDodge
+        ? `🛡️ <b>${target?.generalName || `Ghế ${targetSeat}`}</b> kích hoạt [Tiến Thoái], dùng ${formatCardText(defenseCard)} như Đỡ hóa giải đòn Trảm!`
+        : `🛡️ ${target?.generalName || `Ghế ${targetSeat}`} đã dùng ${defenseName} hóa giải đòn Trảm!`
     });
   } else {
     refreshLastDelta(state);
@@ -6915,8 +6954,8 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       {
         const dodgeCard = handIdx >= 0 ? respondent.hand.splice(handIdx, 1)[0] : respondent.equipments.splice(equipmentIdx, 1)[0];
         discardCard(state, dodgeCard);
-
-        beginSlashAfterDodge(state, caster, respondentSeat, formatCardText(dodgeCard));
+        const isTienThoai = heroHasSkill(respondent, "TIEN_THOAI") && isSlash(dodgeCard);
+        beginSlashAfterDodge(state, caster, respondentSeat, isTienThoai ? "Trảm (Tiến Thoái)" : formatCardText(dodgeCard), isTienThoai ? "Tiến Thoái" : "");
         return { success: true, state };
       }
     }
@@ -7077,11 +7116,18 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     }
 
     if (accepted && cardId) {
-      const idx = respondent.hand.findIndex(c => c.id === cardId && (isArrow ? isDodge(c) : isSlash(c)));
+      const idx = respondent.hand.findIndex(c => (c.id === cardId || c.name === cardId) && (isArrow ? canUseCardAsDodge(respondent, c) : canUseCardAsSlash(respondent, c)));
       if (idx < 0) return { error: `Lá ${isArrow ? "Đỡ" : "Trảm"} không còn hợp lệ` };
       const c = respondent.hand.splice(idx, 1)[0];
+      const isTienThoai = heroHasSkill(respondent, "TIEN_THOAI") && (isArrow ? isSlash(c) : isDodge(c));
       discardCard(state, c);
       satisfied = true;
+      if (isTienThoai) {
+        state._lastTienThoaiAOE = {
+          from: isArrow ? "Trảm" : "Đỡ",
+          to: isArrow ? "Đỡ" : "Trảm"
+        };
+      }
     }
 
     if (accepted && !cardId) {
@@ -7103,18 +7149,25 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       }
     }
 
+    const tienThoaiAoe = state._lastTienThoaiAOE || null;
+    delete state._lastTienThoaiAOE;
     recordAction(state, {
       type: satisfied ? "AOE_DEFENDED" : "AOE_HIT",
       targetSeat: respondentSeat,
       cardId: satisfied ? (state.discardTop?.id || "") : "",
-      cardName: satisfied ? (state.discardTop?.name || (isArrow ? "Đỡ" : "Trảm")) : "",
+      cardName: satisfied ? (isArrow ? "Đỡ" : "Trảm") : "",
+      originalCardName: tienThoaiAoe ? tienThoaiAoe.from : (state.discardTop?.name || ""),
+      tienThoaiConvert: tienThoaiAoe ? { from: tienThoaiAoe.from, to: tienThoaiAoe.to } : null,
+      skillActivations: tienThoaiAoe ? [{ name: "Tiến Thoái", seat: respondentSeat }] : [],
       aoeName,
       armorEffect: aoeDamageResult.armorEffect || "",
       armorChargesRemaining: Number.isFinite(Number(aoeDamageResult.armorChargesRemaining)) ? aoeDamageResult.armorChargesRemaining : -1,
       armorExpired: aoeDamageResult.armorExpired === true,
-      description: satisfied
-        ? `🛡️ ${respondent.generalName} đã né đòn diện rộng thành công!`
-        : `💥 ${respondent.generalName} không ra bài né, bị mất 1 máu (${respondent.hp}/${respondent.maxHp})!`
+      description: tienThoaiAoe
+        ? `🛡️ <b>${respondent.generalName}</b> kích hoạt [Tiến Thoái], dùng lá ${tienThoaiAoe.from} như ${tienThoaiAoe.to} né đòn diện rộng thành công!`
+        : (satisfied
+          ? `🛡️ ${respondent.generalName} đã né đòn diện rộng thành công!`
+          : `💥 ${respondent.generalName} không ra bài né, bị mất 1 máu (${respondent.hp}/${respondent.maxHp})!`)
     });
 
     // Chuyển sang nạn nhân kế tiếp nếu còn
@@ -7132,6 +7185,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       if (idx < 0) return { error: "Lá Trảm đáp trả không còn hợp lệ" };
       {
         const s = respondent.hand.splice(idx, 1)[0];
+        const isTienThoai = heroHasSkill(respondent, "TIEN_THOAI") && isDodge(s);
         discardCard(state, s);
 
         const required = Math.max(1, Number(state.activeCard?.duelRequiredSlashes) || getDuelRequiredSlashCount(state, respondentSeat));
@@ -7144,7 +7198,10 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
             type: "DUEL_RESPOND_PARTIAL",
             casterSeat: respondentSeat,
             cardId: s.id,
-            cardName: s.name,
+            cardName: isTienThoai ? "Trảm" : s.name,
+            originalCardName: isTienThoai ? "Đỡ" : "",
+            tienThoaiConvert: isTienThoai ? { from: "Đỡ", to: "Trảm" } : null,
+            skillActivations: isTienThoai ? [{ name: "Tiến Thoái", seat: respondentSeat }] : [],
             description: `🐯 ${respondent.generalName} đã ra ${used}/${required} lá Trảm cần thiết do [Phục Hổ].`
           });
           return { success: true, state };
@@ -7165,7 +7222,13 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
           type: "DUEL_RESPOND",
           casterSeat: respondentSeat,
           cardId: s.id,
-          description: `⚔️ ${respondent.generalName} đáp trả 1 lá ${formatCardText(s)} trong Huyết Chiến!`
+          cardName: isTienThoai ? "Trảm" : (s.name || "Trảm"),
+          originalCardName: isTienThoai ? "Đỡ" : (s.name || ""),
+          tienThoaiConvert: isTienThoai ? { from: "Đỡ", to: "Trảm" } : null,
+          skillActivations: isTienThoai ? [{ name: "Tiến Thoái", seat: respondentSeat }] : [],
+          description: isTienThoai
+            ? `⚔️ <b>${respondent.generalName}</b> kích hoạt [Tiến Thoái], dùng ${formatCardText(s)} như Trảm đáp trả trong Huyết Chiến!`
+            : `⚔️ ${respondent.generalName} đáp trả 1 lá ${formatCardText(s)} trong Huyết Chiến!`
         });
         return { success: true, state };
       }
@@ -8781,7 +8844,7 @@ export function handleAIStep(state, aiSeat) {
     ai.hand.find(c => c.subType === CARD_SUBTYPES.WINE) ||
     (heroHasSkill(ai, "TRAC_LAC") && ai.hp <= 2 ? ai.hand.find(c => isBlackCardSuit(c.suit) && !isSlash(c) && !isPeach(c)) : null)
   );
-  const slash = ai.hand.find(c => isSlash(c));
+  const slash = ai.hand.find(c => isSlash(c)) || (heroHasSkill(ai, "TIEN_THOAI") ? ai.hand.find(c => isDodge(c)) : null);
   const slashTarget = slash
     ? enemies.find((enemy) => {
         if (isDaTrachSlashBlocked(enemy, slash)) return false;
