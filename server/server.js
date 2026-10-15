@@ -28,6 +28,11 @@ const socialProfiles = new Map();
 const socialFriends = new Map();
 const socialRequests = new Map();
 let nextSocialRequestId = 1;
+const lobbyChatSockets = new Set();
+const lobbyChatMessages = [];
+const CHAT_HISTORY_LIMIT = 50;
+const CHAT_MAX_LENGTH = 280;
+let nextChatMessageId = 1;
 const startTime = Date.now();
 const instanceId = `node_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 const clusterChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("dvc_cluster_bus") : null;
@@ -442,7 +447,8 @@ const ALLOWED_WS_ACTIONS = new Set([
   "JOIN_ROOM", "INIT_GAME", "JOIN_DRAFT", "PICK_HERO", "HOVER_HERO", "GET_STATE", "PING",
   "USE_SKILL", "TOGGLE_SKILL", "PLAY_CARD", "RESPOND_ACTION", "END_TURN",
   "DISCARD_CARDS", "AI_STEP", "AI_REACTION", "CHECK_ACTIVE_MATCH", "RECONNECT_GAME",
-  "SOCIAL_REGISTER", "FRIEND_LIST", "FRIEND_SEARCH", "FRIEND_REQUEST", "FRIEND_RESPOND"
+  "SOCIAL_REGISTER", "FRIEND_LIST", "FRIEND_SEARCH", "FRIEND_REQUEST", "FRIEND_RESPOND",
+  "CHAT_SUBSCRIBE", "CHAT_UNSUBSCRIBE", "CHAT_SEND"
 ]);
 
 const SOCIAL_ACTIONS = new Set(["SOCIAL_REGISTER", "FRIEND_LIST", "FRIEND_SEARCH", "FRIEND_REQUEST", "FRIEND_RESPOND"]);
@@ -553,6 +559,70 @@ function sendSocialSnapshot(userId) {
 
 function sendSocialError(socket, error) {
   socket.send(JSON.stringify({ type: "SOCIAL_ERROR", error }));
+}
+
+function sendChatError(socket, channel, error) {
+  socket.send(JSON.stringify({ type: "CHAT_ERROR", channel, error }));
+}
+
+function handleChat(socket, payload, currentRoomId, currentSeat) {
+  const { action, channel } = payload;
+  if (channel !== "lobby" && channel !== "battle") {
+    return sendChatError(socket, channel, "Kênh trò chuyện không hợp lệ");
+  }
+  if (action === "CHAT_UNSUBSCRIBE") {
+    if (channel === "lobby") lobbyChatSockets.delete(socket);
+    return;
+  }
+
+  let room = null;
+  let sender;
+  let history;
+  if (channel === "lobby") {
+    const profile = socialProfiles.get(socket.socialUserId);
+    if (!profile || profile.socket !== socket) {
+      return sendChatError(socket, channel, "Vui lòng đăng nhập để trò chuyện");
+    }
+    sender = { userId: profile.userId, userName: profile.userName };
+    history = lobbyChatMessages;
+  } else {
+    room = rooms.get(currentRoomId);
+    if (!room || room.sockets.get(currentSeat) !== socket || resolveMatchmakingRoomId(payload.roomId) !== currentRoomId) {
+      return sendChatError(socket, channel, "Bạn chưa tham gia phòng đấu này");
+    }
+    // Only expose the player's public name and seat; dynasty roles stay private.
+    const player = room.draft?.slots?.find((p) => p.seat === currentSeat)
+      || room.state?.players?.find((p) => p.seat === currentSeat);
+    sender = { seat: currentSeat, userName: socialUserName(player?.userName || `Người chơi ${currentSeat}`) };
+    history = room.chatMessages ||= [];
+  }
+
+  if (action === "CHAT_SUBSCRIBE") {
+    if (channel === "lobby") lobbyChatSockets.add(socket);
+    socket.send(JSON.stringify({ type: "CHAT_HISTORY", channel, roomId: room ? currentRoomId : "", messages: history }));
+    return;
+  }
+  if (typeof payload.text !== "string" || Array.from(payload.text).length > CHAT_MAX_LENGTH) {
+    return sendChatError(socket, channel, `Tin nhắn tối đa ${CHAT_MAX_LENGTH} ký tự`);
+  }
+  const text = payload.text.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").replace(/\s+/g, " ").trim();
+  if (!text) return sendChatError(socket, channel, "Vui lòng nhập tin nhắn");
+  const now = Date.now();
+  if (socket.lastChatSentAt !== undefined && now - socket.lastChatSentAt < 1000) {
+    return sendChatError(socket, channel, "Vui lòng chờ 1 giây trước khi gửi tiếp");
+  }
+  socket.lastChatSentAt = now;
+  const message = {
+    id: `${instanceId}_chat_${nextChatMessageId++}`, channel,
+    roomId: room ? currentRoomId : "", ...sender, text, timestamp: now,
+  };
+  history.push(message);
+  if (history.length > CHAT_HISTORY_LIMIT) history.shift();
+  const packet = JSON.stringify({ type: "CHAT_MESSAGE", ...message });
+  const recipients = room ? room.sockets.values() : new Set([...lobbyChatSockets, socket]);
+  for (const recipient of recipients) {
+    if (recipient.readyState === WebSocket.OPEN) recipient.send(packet);
+  }
 }
 
 function validateClientPayload(payload, rawBytes) {
@@ -1416,7 +1486,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
         }
         const payload = JSON.parse(raw);
         const payloadError = validateClientPayload(payload, rawBytes);
-        if (payloadError) return socket.send(JSON.stringify({ type: "ERROR", error: payloadError }));
+        if (payloadError) return socket.send(JSON.stringify({ type: String(payload?.action).startsWith("CHAT_") ? "CHAT_ERROR" : "ERROR", channel: payload?.channel, error: payloadError }));
         if (payload.action === "PING") {
           const targetRoomId = resolveMatchmakingRoomId(payload.roomId || currentRoomId);
           if (targetRoomId && rooms.has(targetRoomId)) {
@@ -1443,6 +1513,10 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
         const requestedRoomId = String(payload.roomId || "");
         const roomId = resolveMatchmakingRoomId(requestedRoomId);
         const requestSeat = normalizeSeat(payload.seat);
+
+        if (action.startsWith("CHAT_")) {
+          return handleChat(socket, payload, currentRoomId, currentSeat);
+        }
 
         if (SOCIAL_ACTIONS.has(action)) {
           const socialId = socialUserId(userId || payload.fromUserId);
@@ -1953,6 +2027,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
     };
 
     socket.onclose = () => {
+      lobbyChatSockets.delete(socket);
       if (socket.socialUserId) {
         const social = socialProfiles.get(socket.socialUserId);
         if (social?.socket === socket) social.socket = null;
