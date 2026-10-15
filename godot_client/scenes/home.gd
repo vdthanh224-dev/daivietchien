@@ -8537,7 +8537,10 @@ func _build_settings_content() -> Control:
 				_refresh_user_profile_ui()
 			else:
 				gift_status_lbl.add_theme_color_override("font_color", Color(1.0, 0.35, 0.35, 1.0))
-				AudioManager.play_card_cancel()
+				if AudioManager.has_method("play_card_cancel"):
+					AudioManager.play_card_cancel()
+				else:
+					AudioManager.play_parry()
 		)
 	)
 

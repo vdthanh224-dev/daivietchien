@@ -122,6 +122,9 @@ func play_card_draw() -> void:
 func play_card_select() -> void:
 	play_sfx("sfx_card_select", -3.0)
 
+func play_card_cancel() -> void:
+	play_sfx("sfx_parry", 1.0)
+
 func play_card_sound(card_name: String) -> void:
 	play_voice(card_name)
 
