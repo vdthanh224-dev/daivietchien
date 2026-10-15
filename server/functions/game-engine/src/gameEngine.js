@@ -1442,7 +1442,8 @@ function hasDelayedScroll(player) {
 function validateTarget(state, casterSeat, targetSeat, card) {
   if (!requiresTarget(card)) return null;
   const normalizedTarget = Number(targetSeat);
-  if (!Number.isInteger(normalizedTarget) || normalizedTarget < 1 || normalizedTarget > 4) {
+  // Validate against this match's seats; eight-player tables include seats 5–8.
+  if (!Number.isInteger(normalizedTarget) || !isSeatInState(state, normalizedTarget)) {
     return { error: "Cần chọn mục tiêu" };
   }
   if (normalizedTarget === casterSeat) return { error: "Không thể chọn chính mình" };
@@ -6403,9 +6404,9 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     if (accepted) {
       let targetSeatsList = [];
       if (Array.isArray(cardIds) && cardIds.length > 0) {
-        targetSeatsList = cardIds.map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= 4);
+        targetSeatsList = cardIds.map(Number).filter(n => isSeatInState(state, n));
       } else if (typeof cardId === "string" && cardId.includes(",")) {
-        targetSeatsList = cardId.split(",").map(s => Number(s.trim())).filter(n => Number.isInteger(n) && n >= 1 && n <= 4);
+        targetSeatsList = cardId.split(",").map(s => Number(s.trim())).filter(n => isSeatInState(state, n));
       } else if (Number(targetCardId || cardId) > 0) {
         targetSeatsList = [Number(targetCardId || cardId)];
       } else if (Number(targetSeat) > 0) {
@@ -6413,12 +6414,12 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       }
 
       if (targetSeatsList.length === 0 || cardId === "all" || cardId === "allies") {
-        const allies = state.players.filter(p => isLivingPlayer(p) && (p.seat === respondent.seat || p.team === respondent.team || (respondent.isAlly && p.isAlly)));
+        const allies = state.players.filter(p => isLivingPlayer(p) && areTeammatesInState(state, respondent.seat, p.seat));
         targetSeatsList = allies.map(p => p.seat);
       }
 
       const validBuffed = [];
-      for (const seatNum of targetSeatsList) {
+      for (const seatNum of new Set(targetSeatsList)) {
         const p = state.players.find(cand => cand.seat === seatNum && isLivingPlayer(cand));
         if (p) {
           p.namQuocSonHaRangeBuff = (Number(p.namQuocSonHaRangeBuff) || 0) + 1;
