@@ -701,6 +701,8 @@ function buildStateDelta(state) {
     cardId: action.cardId || "",
     cardName: action.cardName || getCardName(playedCard),
     card: cardSummary(playedCard),
+    cards: Array.isArray(action.cards) ? action.cards.map(cardSummary).filter(Boolean) : (playedCard ? [cardSummary(playedCard)].filter(Boolean) : []),
+    discardedCount: Number.isFinite(action.discardedCount) ? Number(action.discardedCount) : (Array.isArray(action.cards) ? action.cards.length : (playedCard ? 1 : 0)),
     targetCardId: action.targetCardId || null,
     targetCardName: action.targetCardName || "",
     targetCardZone: action.targetCardZone || "",
@@ -758,6 +760,8 @@ function buildStateDelta(state) {
       targetSeats: Array.isArray(item.targetSeats) ? item.targetSeats.map(Number) : [],
       cardId: item.cardId || "",
       cardName: item.cardName || "",
+      card: item.card ? cardSummary(item.card) : null,
+      cards: Array.isArray(item.cards) ? item.cards.map(cardSummary).filter(Boolean) : [],
       skillActivations: Array.isArray(item.skillActivations) ? item.skillActivations : [],
       judgeCard: item.judgeCard || null,
       description: item.description || ""
@@ -3426,6 +3430,8 @@ function completeTargetCardSelection(state, chooserSeat, targetCardId) {
       targetSeat: resolved.target.seat,
       cardId: resolved.card.id,
       cardName: resolved.card.name,
+      card: cardSummary(resolved.card),
+      cards: [cardSummary(resolved.card)],
       description: `🏛️ <b>${resolved.target.generalName}</b> đã bỏ [${formatCardText(resolved.card)}] theo hiệu ứng [Cột Kinh] của <b>${owner ? owner.generalName : 'Đinh Liễn'}</b>.`
     });
     const resumeType = selection.cotKinhResumeType;
@@ -5462,7 +5468,15 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       if (index < 0) return { error: "Dạ Trạch cần chọn 1 lá trên tay để bỏ" };
       const discarded = respondent.hand.splice(index, 1)[0];
       discardCard(state, discarded);
-      recordAction(state, { type: "DA_TRACH_DISCARD", casterSeat: respondentSeat, cardId: discarded.id, cardName: discarded.name, description: `🌙 ${respondent.generalName} bỏ 1 lá theo [Dạ Trạch].` });
+      recordAction(state, {
+        type: "DA_TRACH_DISCARD",
+        casterSeat: respondentSeat,
+        cardId: discarded.id,
+        cardName: discarded.name,
+        card: cardSummary(discarded),
+        cards: [cardSummary(discarded)],
+        description: `🌙 <b>${respondent.generalName}</b> bỏ ${formatCardText(discarded)} theo [Dạ Trạch].`
+      });
     }
     resetWaitingState(state);
     return handleEndTurn(state, respondentSeat);
@@ -6640,7 +6654,9 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         targetSeat: selection.targetSeat,
         cardId: discarded.id,
         cardName: discarded.name,
-        description: `📣 ${respondent.generalName} đã tự chọn và bỏ 1 lá bài để nhận Sục Sôi.`
+        card: cardSummary(discarded),
+        cards: [cardSummary(discarded)],
+        description: `📣 <b>${respondent.generalName}</b> đã tự chọn và bỏ ${formatCardText(discarded)} để nhận Sục Sôi.`
       });
     } else if (accepted) {
       return { error: "Cần chọn 1 lá bài để bỏ" };
@@ -6734,7 +6750,9 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         targetSeat: selection.targetSeat,
         cardId: discarded.id,
         cardName: discarded.name,
-        description: `🥁 ${target.generalName} chọn bỏ 1 lá bài theo Điểm Trống của ${owner?.generalName || "người dùng Trống Đồng"}.`
+        card: cardSummary(discarded),
+        cards: [cardSummary(discarded)],
+        description: `🥁 <b>${target.generalName}</b> chọn bỏ ${formatCardText(discarded)} theo Điểm Trống của <b>${owner?.generalName || "người dùng Trống Đồng"}</b>.`
       });
       return { success: true, state };
     }
@@ -6941,8 +6959,10 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         targetSeat: respondentSeat,
         cardId: costCard.id,
         cardName: costCard.name,
+        card: cardSummary(costCard),
+        cards: [cardSummary(costCard), cardSummary(dodgeCard)],
         cardIds: [costCard.id, dodgeCard.id],
-        description: `🐘 ${respondent.generalName} bỏ ${formatCardText(costCard)} và dùng ${formatCardText(dodgeCard)} để hóa giải [Oai Nhược].`
+        description: `🐘 <b>${respondent.generalName}</b> bỏ ${formatCardText(costCard)} và dùng ${formatCardText(dodgeCard)} để hóa giải [Oai Nhược].`
       });
       beginSlashAfterDodge(state, caster, respondentSeat, formatCardText(dodgeCard));
       return { success: true, state };
@@ -8141,6 +8161,8 @@ export function handleDiscardCards(state, seat, cardIds) {
       casterSeat: seat,
       cardId: discarded.id,
       cardName: discarded.name,
+      card: cardSummary(discarded),
+      cards: [cardSummary(discarded)],
       description: `📜 <b>${p.generalName}</b> hoàn thành [Thủ Pháp], đã bỏ ${formatCardText(discarded)}.`
     });
     resetWaitingState(state);
@@ -8164,20 +8186,31 @@ export function handleDiscardCards(state, seat, cardIds) {
     return { error: `Chỉ được bỏ tối đa ${excess} lá bài thừa` };
   }
 
+  const discardedCards = [];
   for (const id of requestedIds) {
     const idx = p.hand.findIndex(c => c.id === id || c.name === id);
     if (idx >= 0) {
       const discarded = p.hand.splice(idx, 1)[0];
-      discardCard(state, discarded, false);
+      discardCard(state, discarded, true);
+      discardedCards.push(discarded);
     }
   }
+
+  const cardSummaries = discardedCards.map(cardSummary);
+  const cardNames = discardedCards.map(formatCardText).join(", ");
 
   recordAction(state, {
     type: "DISCARD_CARDS",
     casterSeat: seat,
     discardedCount: requestedIds.length,
-    description: p.hand.length > handLimit
-      ? `🗑️ <b>${p.generalName}</b> đã bỏ ${requestedIds.length} lá và còn phải bỏ ${p.hand.length - handLimit} lá bài thừa.`
+    cardId: discardedCards[0]?.id || "",
+    cardName: discardedCards[0]?.name || "",
+    card: cardSummaries[0] || null,
+    cards: cardSummaries,
+    description: cardNames.length > 0
+      ? (p.hand.length > handLimit
+          ? `🗑️ <b>${p.generalName}</b> đã bỏ bài: ${cardNames} (còn phải bỏ ${p.hand.length - handLimit} lá bài thừa).`
+          : `🗑️ <b>${p.generalName}</b> đã bỏ bài: ${cardNames}.`)
       : `🗑️ <b>${p.generalName}</b> đã bỏ bài thừa và hoàn thành lượt.`
   });
 

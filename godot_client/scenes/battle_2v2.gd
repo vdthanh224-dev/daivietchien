@@ -4761,6 +4761,7 @@ func _on_card_play_btn_clicked() -> void:
 
 		pending_discard_card_ids.clear()
 		var discarded_names: Array = []
+		var discarded_cards_info: Array = []
 		for c_node in selected_discard_nodes:
 			if is_instance_valid(c_node):
 				var info_d = _get_card_info_from_ui(c_node)
@@ -4769,6 +4770,7 @@ func _on_card_play_btn_clicked() -> void:
 				if c_id_d.is_empty(): c_id_d = c_name_d
 				pending_discard_card_ids.append(c_id_d)
 				discarded_names.append(c_name_d)
+				discarded_cards_info.append(info_d)
 				_discard_player_card(c_node)
 
 		var discarded_count = pending_discard_card_ids.size()
@@ -4780,7 +4782,9 @@ func _on_card_play_btn_clicked() -> void:
 		if is_discard_phase:
 			card_play_btn.text = "🗑️ BỎ BÀI (0/%d)" % cards_to_discard_count
 		_add_log("🗑️ Bạn đã bỏ %d lá bài thừa: [%s]." % [pending_discard_card_ids.size(), ", ".join(discarded_names)])
-		_animate_showcase_card("Bỏ Bài", "Bỏ %d lá bài thừa" % pending_discard_card_ids.size())
+		for info_d in discarded_cards_info:
+			var c_name_d = str(info_d.get("name", "Bài"))
+			_animate_showcase_card(c_name_d, "Bạn đã bỏ lá [%s]" % c_name_d, info_d, 2.5)
 		AudioManager.play_card_draw()
 
 		if is_network_mode:
@@ -6223,14 +6227,17 @@ func _apply_network_game_state(state: Dictionary) -> void:
 					var h_type = str(history_item.get("type", ""))
 					var has_skill_feedback := not _get_skill_activations(history_item).is_empty()
 					var should_replay_skill := has_skill_feedback and (not initial_history_sync or h_seq == newest_history_seq)
-					if _should_replay_history_effect(h_type, current_delta) and (should_replay_skill or h_type in [
+					var is_judgement_or_discard := h_type in [
+						"DISCARD_CARDS", "THU_PHAP_DISCARD", "DA_TRACH_DISCARD", "COT_KINH_DISCARD",
 						"DAI_HONG_THUY_HIT", "DAI_HONG_THUY_PASSED",
 						"LIGHTNING_HIT", "LIGHTNING_PASSED",
 						"SUPPLY_SHORTAGE_TRIGGERED", "SUPPLY_SHORTAGE_PASSED",
 						"ACEDIA_TRIGGERED", "ACEDIA_PASSED",
 						"KHIEN_MAY_SUCCESS", "KHIEN_MAY_FAILED",
 						"BAI_COC_BACH_DANG_SAFE", "BAI_COC_BACH_DANG_TRIGGERED"
-					]):
+					]
+					var should_replay_action := (not initial_history_sync or h_seq == newest_history_seq) and (should_replay_skill or is_judgement_or_discard)
+					if _should_replay_history_effect(h_type, current_delta) and should_replay_action:
 						_on_network_action_received(history_item)
 		while history_entries.size() > 50:
 			history_entries.pop_front()
@@ -8182,8 +8189,9 @@ func _on_network_action_received(delta: Dictionary) -> void:
 	var is_confirmed_slash_after_bai_coc = act_type in ["PLAY_SLASH", "SLASH_ATTACK"] \
 		and attached_bai_coc_judge is Dictionary and not attached_bai_coc_judge.is_empty()
 	var is_visible_target_card_action = act_type in ["PLAY_SNATCH", "PLAY_DISMANTLE", "TRIEU_DANG_DESTROY", "THUONG_NGAU_DESTROY", "PLAY_FLAWLESS_DEFENSE", "BINH_SAN_DESTROY", "CO_LAU_DESTROY", "UU_THIEP_STEAL"]
-	# Giáp và Phán xét phải hiện cho tất cả người chơi (kể cả nạn nhân vừa ra bài / người đang phán xét).
-	if caster_seat == my_seat and caster_seat > 0 and not is_an_tich_defense and not is_armor_event and not is_judgement_event and not is_visible_target_card_action and not is_confirmed_slash_after_bai_coc and not is_uat_khi_prompt and not is_visible_hero_skill_event:
+	var is_discard_event = act_type in ["DISCARD_CARDS", "THU_PHAP_DISCARD", "DA_TRACH_DISCARD", "COT_KINH_DISCARD"]
+	# Giáp, Phán xét, Bỏ bài phải hiện cho tất cả người chơi (kể cả nạn nhân vừa ra bài / người đang phán xét / Cột Kinh).
+	if caster_seat == my_seat and caster_seat > 0 and not is_discard_event and not is_an_tich_defense and not is_armor_event and not is_judgement_event and not is_visible_target_card_action and not is_confirmed_slash_after_bai_coc and not is_uat_khi_prompt and not is_visible_hero_skill_event:
 		return
 	var target_seats = delta.get("targetSeats", [])
 	if not (target_seats is Array):
@@ -8387,8 +8395,30 @@ func _on_network_action_received(delta: Dictionary) -> void:
 				generals_data[victim_seat]["avatar_node"].set_near_death(false)
 				generals_data[victim_seat]["avatar_node"].set_defeated(true)
 			AudioManager.play_defeat()
-	elif act_type == "DISCARD_CARDS":
-		_animate_discard_from_seat(caster_seat, int(delta.get("discardedCount", 1)))
+	elif act_type in ["DISCARD_CARDS", "THU_PHAP_DISCARD", "DA_TRACH_DISCARD", "COT_KINH_DISCARD"]:
+		var discarded_cards = delta.get("cards", [])
+		if not (discarded_cards is Array) or discarded_cards.is_empty():
+			if delta.has("card") and delta["card"] is Dictionary and not delta["card"].is_empty():
+				discarded_cards = [delta["card"]]
+		var d_count = discarded_cards.size() if (discarded_cards is Array and not discarded_cards.is_empty()) else int(delta.get("discardedCount", 1))
+		var who_discarded = target_seat if (act_type == "COT_KINH_DISCARD" and target_seat > 0) else caster_seat
+		_animate_discard_from_seat(who_discarded, d_count)
+		if who_discarded != my_seat:
+			var actor = generals_data[who_discarded].get("name", "Ghế %d" % who_discarded) if generals_data.has(who_discarded) and who_discarded > 0 else "Một người chơi"
+			if discarded_cards is Array and not discarded_cards.is_empty():
+				for card_obj in discarded_cards:
+					if card_obj is Dictionary:
+						var c_name = str(card_obj.get("name", "Bài"))
+						var banner = "%s đã bỏ lá [%s]" % [actor, c_name]
+						_animate_showcase_card(c_name, banner, card_obj, 3.0)
+		elif act_type in ["THU_PHAP_DISCARD", "DA_TRACH_DISCARD", "COT_KINH_DISCARD"]:
+			if discarded_cards is Array and not discarded_cards.is_empty():
+				for card_obj in discarded_cards:
+					if card_obj is Dictionary:
+						var c_name = str(card_obj.get("name", "Bài"))
+						var banner = "Bạn đã bỏ lá [%s]" % c_name
+						_animate_showcase_card(c_name, banner, card_obj, 3.0)
+		AudioManager.play_card_draw()
 	elif act_type == "CHAIN_DAMAGE_SPREAD":
 		pending_damage_elements[target_seat] = str(delta.get("element", "NORMAL"))
 	elif act_type == "DRUM_PROMPT":
@@ -11771,13 +11801,19 @@ func _execute_ai_turn(ai_seat: int) -> void:
 	var ai_hand_limit = _get_general_hand_limit(ai_gen)
 	var ai_excess = ai_gen["hand_cards"].size() - ai_hand_limit
 	if ai_excess > 0:
+		var ai_discarded_cards: Array = []
 		for d in range(ai_excess):
 			if not ai_gen["hand_cards"].is_empty():
-				ai_gen["hand_cards"].pop_back()
+				var discarded_c = ai_gen["hand_cards"].pop_back()
+				ai_discarded_cards.append(discarded_c)
 		ai_gen["hand_count"] = ai_gen["hand_cards"].size()
 		ai_gen["avatar_node"].update_hand_count(ai_gen["hand_count"])
 		_animate_discard_from_seat(ai_seat, ai_excess)
-		_animate_showcase_card("Bỏ bài thừa", "%s bỏ %d lá bài thừa!" % [ai_gen["name"], ai_excess])
+		for discarded_c in ai_discarded_cards:
+			if discarded_c is Dictionary:
+				var c_name_ai = str(discarded_c.get("name", "Bài"))
+				var banner_ai = "%s đã bỏ lá [%s]" % [ai_gen["name"], c_name_ai]
+				_animate_showcase_card(c_name_ai, banner_ai, discarded_c, 3.0)
 		_add_log("🗑️ %s đã bỏ %d lá bài thừa (Còn %d lá theo giới hạn trữ bài)." % [ai_gen["name"], ai_excess, ai_hand_limit])
 		AudioManager.play_card_draw()
 		await _wait_for_ai_card_play()
