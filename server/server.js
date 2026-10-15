@@ -687,6 +687,22 @@ function getHeroName(heroId) {
 
 console.log("🎮 [Deno Server] Đại Việt Chiến 2v2 Unified Game Server (100% In-Memory) is running!");
 
+// Render Free Web Services automatically sleep after 15 minutes of HTTP inactivity.
+// Pinging our own public health-check URL every 9 minutes keeps the container awake
+// and prevents cold boots (which take 30-50s and cause client connection drops).
+const RENDER_EXTERNAL_URL = (typeof Deno !== "undefined" && Deno.env?.get("RENDER_EXTERNAL_URL"))
+  || "https://daivietchien.onrender.com";
+
+setInterval(async () => {
+  try {
+    await fetch(`${RENDER_EXTERNAL_URL}/`, {
+      headers: { "User-Agent": "DaiVietChien-KeepAlive/1.0" },
+    });
+  } catch (_e) {
+    // Ignore transient network errors during self-ping
+  }
+}, 9 * 60 * 1000);
+
 // Start after boot so an Appwrite outage cannot delay the WebSocket server.
 setInterval(() => { sweepAppwriteMatchmaking(); }, APPWRITE_MATCHMAKING_POLL_MS);
 sweepAppwriteMatchmaking();
@@ -1404,6 +1420,11 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
         const payloadError = validateClientPayload(payload, rawBytes);
         if (payloadError) return socket.send(JSON.stringify({ type: "ERROR", error: payloadError }));
         if (payload.action === "PING") {
+          const targetRoomId = resolveMatchmakingRoomId(payload.roomId || currentRoomId);
+          if (targetRoomId && rooms.has(targetRoomId)) {
+            const r = rooms.get(targetRoomId);
+            if (r) r.lastActivity = Date.now();
+          }
           return socket.send(JSON.stringify({
             type: "PONG",
             clientTime: payload.clientTime ?? null,
