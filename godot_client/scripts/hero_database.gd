@@ -206,9 +206,9 @@ const HERO_SKINS_DATA: Dictionary = {
 	22: [
 		{
 			"id": "skin_ngo_quyen",
-			"name": "Bạch Đằng Thần Vương",
+			"name": "Tiền Ngô Vương Quyền",
 			"tier": "Hiếm",
-			"desc": "Đạp trên mũi chiến thuyền rồng lướt sóng thần, vung kiếm sấm sét chỉ huy bãi cọc nhọn bọc sắt chôn vùi vạn chiến thuyền.",
+			"desc": "Mão phượng hoàng kim, chiến bào đỏ thẫm viền vàng, đứng trên thuyền chiến gỗ chỉ huy bãi cọc nhọn bọc sắt chôn vùi vạn chiến thuyền Nam Hán.",
 			"texture_path": "res://assets/heroes_skins_transparent/skin_ngo_quyen.png"
 		}
 	],
@@ -300,6 +300,285 @@ const HERO_SKINS_DATA: Dictionary = {
 			"tier": "Hiếm",
 			"desc": "Thiết giáp Long Phù uy nghiêm, hai tay cắm đại kỳ Quốc Công thêu chữ vàng chấn hưng triều cương, khiên trung kiên bất diệt.",
 			"texture_path": "res://assets/heroes_skins_transparent/skin_dinh_dien.png"
+		}
+	],
+	33: [
+		{
+			"id": "skin_nguyen_bac",
+			"name": "Định Quốc Thần Tướng",
+			"tier": "Hiếm",
+			"desc": "Khôi giáp hắc thiết long phù, đại kỳ Định Quốc tung bay, đại đao hắc thiết trảm sơn đoạn thạch.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_nguyen_bac.png"
+		}
+	],
+	34: [
+		{
+			"id": "skin_pham_hap",
+			"name": "Bao Lăm Dũng Tướng",
+			"tier": "Hiếm",
+			"desc": "Chiến bào xám bạc đính ngọc lục bảo, ngân thương và thuẫn bạc hộ vệ phát quang phòng ngự kiên cường.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_pham_hap.png"
+		}
+	],
+	35: [
+		{
+			"id": "skin_le_hoan",
+			"name": "Phá Tống Bình Chiêm",
+			"tier": "Hiếm",
+			"desc": "Hoàng bào đỏ son dát vàng rực lửa, Long Đao Thần Binh bốc hỏa hoàng kim thiêu rụi chiến thuyền giặc Tống.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_le_hoan.png"
+		}
+	],
+	36: [
+		{
+			"id": "skin_duong_van_nga",
+			"name": "Lưỡng Triều Hoàng Hậu",
+			"tier": "Hiếm",
+			"desc": "Phượng bào ngũ sắc tuyệt mỹ, mũ phượng châu sa, tay nâng Long Bào Hoàng Kim tỏa vầng hào quang thiêng liêng.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_duong_van_nga.png"
+		}
+	],
+	37: [
+		{
+			"id": "skin_le_long_dinh",
+			"name": "Khai Thiên Bạo Vương",
+			"tier": "Hiếm",
+			"desc": "Hoàng bào hắc ám thêu long hỏa, mắt rực lửa cuồng nộ, trọng kiếm hắc diễm ma mị chém vỡ cự thạch sa trường.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_le_long_dinh.png"
+		}
+	],
+	38: [
+		{
+			"id": "skin_dao_cam_moc",
+			"name": "Khai Quốc Tòng Long",
+			"tier": "Hiếm",
+			"desc": "Triều phục tím tía thêu hạc tiên, ngọc hốt phát sáng cùng chiếu thư vàng mở ra điềm lành rồng bay ngũ sắc.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_dao_cam_moc.png"
+		}
+	],
+	39: [
+		{
+			"id": "skin_ly_cong_uan",
+			"name": "Thiên Đô Chiếu Sáng",
+			"tier": "Hiếm",
+			"desc": "Long bào vàng rực uy nghiêm, Chiếu Dời Đô tỏa ánh thái dương, Kim Long Thăng Long khổng lồ bay lượn giữa mây ngũ sắc.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_ly_cong_uan.png"
+		}
+	],
+	40: [
+		{
+			"id": "skin_ly_phat_ma",
+			"name": "Trấn Quốc Thân Chinh",
+			"tier": "Hiếm",
+			"desc": "Chiến giáp vàng rực thêu rồng oai vệ, vung Trấn Quốc Bảo Kiếm tung hoành trận tiền dẹp loạn chư vương.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_ly_phat_ma.png"
+		}
+	],
+	41: [
+		{
+			"id": "skin_ly_nhat_ton",
+			"name": "Quốc Hiệu Đại Việt",
+			"tier": "Hiếm",
+			"desc": "Cẩm bào hoàng gia thêu chữ vàng ĐẠI VIỆT, Khuê Văn Các phát kim quang tri thức và thái bình thịnh trị.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_ly_nhat_ton.png"
+		}
+	],
+	42: [
+		{
+			"id": "skin_ly_dao_thanh",
+			"name": "Thái Sư Thiết Thạch",
+			"tier": "Hiếm",
+			"desc": "Quan phục Thái sư lam thêu sen vàng, hốt ngọc và thước công lý tỏa ánh sáng thanh bạch xua tan tà khí.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_ly_dao_thanh.png"
+		}
+	],
+	43: [
+		{
+			"id": "skin_y_lan",
+			"name": "Phù Quốc Thái Hậu",
+			"tier": "Hiếm",
+			"desc": "Hoàng thái hậu ngự đài sen vàng phát quang, bình cam lộ và cành dương liễu ban phúc trạch cho muôn dân.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_y_lan.png"
+		}
+	],
+	44: [
+		{
+			"id": "skin_tong_dan",
+			"name": "Thổ Binh Thần Dũng",
+			"tier": "Hiếm",
+			"desc": "Thổ cẩm chỉ bạc và giáp nanh hổ dũng mãnh, nỏ thần phóng hỏa tiễn và đao cong sắc bén giữa vách núi mây ngàn.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_tong_dan.png"
+		}
+	],
+	45: [
+		{
+			"id": "skin_than_canh_phuc",
+			"name": "Động Chủ Phục Kích",
+			"tier": "Hiếm",
+			"desc": "Chiến bào rằn ri thêu văn cổ, trường cung gỗ mun ngắm bắn tên linh khí giữa màn sương rừng đại ngàn đầy cạm bẫy.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_than_canh_phuc.png"
+		}
+	],
+	46: [
+		{
+			"id": "skin_to_hien_thanh",
+			"name": "Chính Trực Đệ Nhất",
+			"tier": "Hiếm",
+			"desc": "Áo quan tím thêu vân long, sớ can gián và thanh kiếm chính trực chém tan cám dỗ vàng bạc của kẻ gian thần.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_to_hien_thanh.png"
+		}
+	],
+	47: [
+		{
+			"id": "skin_ly_thuong_kiet",
+			"name": "Nam Quốc Sơn Hà",
+			"tier": "Hiếm",
+			"desc": "Bạch kim chiến bào dát vàng thêu phượng lửa, Nam Quốc Thần Kiếm chỉ trời cao, Thơ Thần bằng đồng khắc chữ vàng rực sáng.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_ly_thuong_kiet.png"
+		}
+	],
+	48: [
+		{
+			"id": "skin_tran_canh",
+			"name": "Khai Sáng Đông A",
+			"tier": "Hiếm",
+			"desc": "Hoàng bào vàng thêu chim Lạc, Khai Quốc Trấn Thần Kiếm tỏa hào quang mặt trời thái dương khai sáng triều đại.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_tran_canh.png"
+		}
+	],
+	49: [
+		{
+			"id": "skin_tran_thu_do",
+			"name": "Thiết Huyết Thái Sư",
+			"tier": "Hiếm",
+			"desc": "Quan phục hắc kim dát vàng uy nghiêm, Thượng Phương Bảo Kiếm phát lôi điện tím, đại kỳ Định Quốc bốc khói đen uy áp tuyệt đối.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_tran_thu_do.png"
+		}
+	],
+	50: [
+		{
+			"id": "skin_tran_lieu",
+			"name": "An Sinh Hùng Vương",
+			"tier": "Hiếm",
+			"desc": "Chiến giáp đồng cổ khảm ngọc bích, vung Trảm Mã Đao rực lửa đồng đỏ, áo choàng đỏ viền vàng uy phong gia tộc.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_tran_lieu.png"
+		}
+	],
+	51: [
+		{
+			"id": "skin_tran_hoang",
+			"name": "Diên Hồng Minh Đế",
+			"tier": "Hiếm",
+			"desc": "Long bào đỏ son thêu rồng lửa, Lư Hương Diên Hồng tỏa khói vàng thiêng liêng, Hoàng Kim Kiếm bốc lửa ba quân rực cháy.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_tran_hoang.png"
+		}
+	],
+	52: [
+		{
+			"id": "skin_tran_kham",
+			"name": "Trúc Lâm Phật Hoàng",
+			"tier": "Hiếm",
+			"desc": "Cà sa hoàng kim và lam ngọc lơ lửng trên đài sen bồ đề tỏa Phật quang vạn trượng, thiền trượng vàng xua tan bóng tối sa trường.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_tran_kham.png"
+		}
+	],
+	53: [
+		{
+			"id": "skin_tran_quoc_tuan",
+			"name": "Vạn Kiếp Thần Soái",
+			"tier": "Hiếm",
+			"desc": "Khôi giáp bạc ròng viền vàng rực chói, Hịch Tướng Thần Kiếm chém ra lôi điện hoàng kim, Hịch Tướng Sĩ bằng đồng bốc lửa thiêng bất diệt.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_tran_quoc_tuan.png"
+		}
+	],
+	54: [
+		{
+			"id": "skin_tran_quang_khai",
+			"name": "Chương Dương Thần Uy",
+			"tier": "Hiếm",
+			"desc": "Chiến giáp lam ngọc dát vàng, song giản thép phát ra lôi quang sấm sét giữa sóng thần Chương Dương cuộn trào ngút trời.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_tran_quang_khai.png"
+		}
+	],
+	55: [
+		{
+			"id": "skin_tran_nhat_duat",
+			"name": "Hàm Tử Tiêu Kỵ",
+			"tier": "Hiếm",
+			"desc": "Giáp chiến viền lông đại bàng bạc cưỡi gió lướt sóng, đại đao lưỡi liềm phát hỏa diễm lam ngọc chém tan quân giặc Hàm Tử.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_tran_nhat_duat.png"
+		}
+	],
+	56: [
+		{
+			"id": "skin_tran_quoc_toan",
+			"name": "Lục Tự Kỳ Vương",
+			"tier": "Hiếm",
+			"desc": "Giáp đỏ tươi viền vàng, tay bóp Quả Cam Hoàng Kim bốc lửa hào quang, giương cao Đại Kỳ Thêu Sáu Chữ Vàng bay trong giông bão.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_tran_quoc_toan.png"
+		}
+	],
+	57: [
+		{
+			"id": "skin_tran_binh_trong",
+			"name": "Bất Tử Hùng Tâm",
+			"tier": "Hiếm",
+			"desc": "Mắt rực sáng linh hồn bất khuất, linh hồn Chiến Thần Đại Việt gầm thét xé toạc mây đen phương Bắc, thà làm quỷ Nam không làm vương Bắc.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_tran_binh_trong.png"
+		}
+	],
+	58: [
+		{
+			"id": "skin_tran_khanh_du",
+			"name": "Vân Đồn Hải Soái",
+			"tier": "Hiếm",
+			"desc": "Áo choàng vảy cá lam biếc, Thần Cung Thủy Lôi bắn 3 mũi tên băng sét xé nát đoàn thuyền lương giặc giữa biển đêm sóng gió.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_tran_khanh_du.png"
+		}
+	],
+	59: [
+		{
+			"id": "skin_pham_ngu_lao",
+			"name": "Hoành Sóc Giang Sơn",
+			"tier": "Hiếm",
+			"desc": "Hùng tướng giáp đồng đen vạm vỡ, cự giáo Hoành Sóc bằng đồng nung đỏ cắm sâu xuống đất tạo khe nứt dung nham cuồng bạo.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_pham_ngu_lao.png"
+		}
+	],
+	60: [
+		{
+			"id": "skin_yet_kieu",
+			"name": "Thủy Quái Thần Tiềm",
+			"tier": "Hiếm",
+			"desc": "Giáp vảy rồng nước xanh ngọc rẽ sóng đại dương, song chùy đục thuyền bằng ngọc phát xoáy nước cuộn trào nhấn chìm tàu chiến.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_yet_kieu.png"
+		}
+	],
+	61: [
+		{
+			"id": "skin_da_tuong",
+			"name": "Thần Tượng Cuồng Nộ",
+			"tier": "Hiếm",
+			"desc": "Cưỡi Voi Chiến Thiết Giáp khổng lồ ngà bọc sắt cắm chông nhọn, vung thiết phủ bổ đôi sa trường hộ vệ chủ soái.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_da_tuong.png"
+		}
+	],
+	62: [
+		{
+			"id": "skin_do_khac_chung",
+			"name": "Can Đảm Sứ Thần",
+			"tier": "Hiếm",
+			"desc": "Áo quan thiên thanh phong nhã, gậy sứ giả đính lông công và cuộn sớ phát kim quang an nhiên tự tại giữa vòng vây đao kiếm.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_do_khac_chung.png"
+		}
+	],
+	63: [
+		{
+			"id": "skin_ha_dac",
+			"name": "Ma Lục Thần Binh",
+			"tier": "Hiếm",
+			"desc": "Nỏ liên châu phát quang, triệu hồi các tượng gỗ chiến binh cơ giới du kích trong rừng trúc phát sáng kỳ bí Ma Lục.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_ha_dac.png"
 		}
 	]
 }

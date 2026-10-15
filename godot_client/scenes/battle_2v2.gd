@@ -6227,7 +6227,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 					var h_type = str(history_item.get("type", ""))
 					var has_skill_feedback := not _get_skill_activations(history_item).is_empty()
 					var should_replay_skill := has_skill_feedback and (not initial_history_sync or h_seq == newest_history_seq)
-					var is_judgement_or_discard := h_type in [
+					var is_judgement_or_discard: bool = h_type in [
 						"DISCARD_CARDS", "THU_PHAP_DISCARD", "DA_TRACH_DISCARD", "COT_KINH_DISCARD",
 						"DAI_HONG_THUY_HIT", "DAI_HONG_THUY_PASSED",
 						"LIGHTNING_HIT", "LIGHTNING_PASSED",
@@ -8538,7 +8538,7 @@ func _on_network_action_received(delta: Dictionary) -> void:
 	elif act_type == "NAM_QUOC_SON_HA_BUFF":
 		var c_seat = int(delta.get("casterSeat", 0))
 		var c_name = generals_data.get(c_seat, {}).get("name", "Lý Thường Kiệt")
-		var target_seats = delta.get("targetSeats", [])
+		target_seats = delta.get("targetSeats", [])
 		if target_seats is Array:
 			var target_int_seats: Array[int] = []
 			for s in target_seats:
