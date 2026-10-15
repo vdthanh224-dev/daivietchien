@@ -96,6 +96,8 @@ const wasDisconnected = Boolean(p2.isDisconnected || p2.isAiTakeover);
 assert.equal(wasDisconnected, true);
 p2.isDisconnected = false;
 p2.isAiTakeover = false;
+p2.isAI = false;
+state.timerStartAt = Date.now(); // Làm mới đồng hồ khi người chơi vào lại
 recordAction(state, {
   type: "PLAYER_RECONNECTED",
   casterSeat: 2,
@@ -104,12 +106,28 @@ recordAction(state, {
 
 assert.equal(p2.isDisconnected, false);
 assert.equal(p2.isAiTakeover, false);
+assert.equal(p2.isAI, false);
 assert.equal(state.lastAction?.type, "PLAYER_RECONNECTED");
 
 const reconnectedSanitize = sanitizeGameStateForClient(state, 2);
 const reconnectedP2 = reconnectedSanitize.players.find(p => p.seat === 2);
 assert.equal(reconnectedP2.isDisconnected, false);
 assert.equal(reconnectedP2.isAiTakeover, false);
+assert.equal(reconnectedP2.isAI, false);
 console.log("✅ Player successfully reconnected and AI relinquishes control");
+
+// 6. Test Bot AI KHÔNG ĐƯỢC tự đánh khi người chơi đã kết nối lại
+console.log("--> Test: Bot AI must NOT take action when reconnected human is thinking");
+state.phase = "PLAY";
+state.turnSeat = 2;
+p2.hand = [{ id: "SLASH_2", name: "Trảm", suit: "Spade", rank: 7, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }];
+// Giả lập 3 giây trôi qua (< 40 giây)
+state.timerStartAt = Date.now() - 3000;
+const reconnectedTick = tickGameState(state, [1, 2, 3, 4]);
+// AI không được ra bài hay kết thúc lượt vì người chơi thật đang kết nối!
+assert.equal(p2.hand.length, 1);
+assert.equal(state.phase, "PLAY");
+assert.equal(state.turnSeat, 2);
+console.log("✅ AI correctly did NOT auto-play for reconnected human player");
 
 console.log("🎉 All Disconnect & Reconnect / AI Takeover tests PASSED!");

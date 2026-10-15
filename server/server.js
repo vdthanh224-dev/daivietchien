@@ -1766,8 +1766,8 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           return;
         }
 
-        // C. KHỞI TẠO HOẶC THAM GIA PHÒNG ĐẤU
-        if (action === "JOIN_ROOM" || action === "INIT_GAME") {
+        // C. KHỞI TẠO HOẶC THAM GIA / KẾT NỐI LẠI PHÒNG ĐẤU
+        if (action === "JOIN_ROOM" || action === "INIT_GAME" || action === "RECONNECT_GAME") {
           const requestedMode = getModeRules(modeId || "2v2");
           const hasFullPlayers = Array.isArray(players) && !!requestedMode
             && players.length >= requestedMode.minPlayers && players.length <= requestedMode.maxPlayers;
@@ -1798,7 +1798,18 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
               wasDisconnected = Boolean(player.isDisconnected || player.isAiTakeover);
               player.isDisconnected = false;
               player.isAiTakeover = false;
+              player.isAI = false; // Người thật đã kết nối, tắt chế độ bot AI hoàn toàn
               if (wasDisconnected) {
+                // Làm mới lại đồng hồ 40s cho người vừa kết nối lại để họ có đủ thời gian suy nghĩ,
+                // tránh việc AI tự động đánh hộ ngay lập tức do thời gian cũ đã trôi qua khi ngắt mạng
+                if (room.state.turnSeat === currentSeat || room.state.waitingTargetSeat === currentSeat) {
+                  room.state.timerStartAt = Date.now();
+                  if (room.state.phase === "PLAY") {
+                    room.state.turnTimer = 40;
+                  } else if (room.state.waitingTargetSeat > 0) {
+                    room.state.waitingTimer = 40;
+                  }
+                }
                 recordAction(room.state, {
                   type: "PLAYER_RECONNECTED",
                   casterSeat: currentSeat,
@@ -1833,6 +1844,19 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           return;
         }
 
+        if (action === "CHECK_ACTIVE_MATCH") {
+          const existingRoom = rooms.get(roomId);
+          const hasActive = existingRoom && existingRoom.state && existingRoom.state.status === "PLAYING";
+          const player = hasActive ? existingRoom.state.players.find((p) => p.seat === (boundSeat || requestSeat)) : null;
+          return socket.send(JSON.stringify({
+            type: "ACTIVE_MATCH_STATUS",
+            roomId,
+            active: !!hasActive,
+            seat: boundSeat || requestSeat,
+            player: player ? { generalName: player.generalName, heroId: player.heroId } : null,
+          }));
+        }
+
         if (!room) room = await ensureLocalRoom(roomId);
         if (!room) {
           return socket.send(JSON.stringify({ type: "ERROR", error: "Phòng đấu không tồn tại hoặc đã kết thúc" }));
@@ -1850,6 +1874,14 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
         }
         if (!mappedSocket) bindSocket(room, boundSeat, socket);
         room.lastActivity = Date.now();
+        if (room.state && room.state.status === "PLAYING") {
+          const player = room.state.players.find((p) => p.seat === boundSeat);
+          if (player) {
+            player.isDisconnected = false;
+            player.isAiTakeover = false;
+            player.isAI = false;
+          }
+        }
 
         // B. LẤY SNAPSHOT TRẠNG THÁI HIỆN TẠI
         if (action === "GET_STATE") {

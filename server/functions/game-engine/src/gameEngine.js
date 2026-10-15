@@ -9810,7 +9810,7 @@ export function tickGameState(state, connectedSeats = null) {
     const isDisconnectedTurn = turnPlayer && (
       turnPlayer.isDisconnected === true ||
       turnPlayer.isAiTakeover === true ||
-      (Array.isArray(connectedSeats) && !connectedSeats.includes(state.turnSeat))
+      (Array.isArray(connectedSeats) && !connectedSeats.map(Number).includes(Number(state.turnSeat)))
     );
     const isAITurn = turnPlayer && (turnPlayer.isAI || isDisconnectedTurn);
     if (isAITurn && turnPlayer.hp > 0 && elapsedMs >= 1200 && elapsed < 40) {
