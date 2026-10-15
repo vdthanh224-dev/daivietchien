@@ -526,8 +526,8 @@ func _get_virtual_keyboard_height() -> int:
 
 func _has_any_input_focus() -> bool:
 	return (is_instance_valid(name_input) and name_input.has_focus()) or \
-	       (is_instance_valid(email_input) and email_input.has_focus()) or \
-	       (is_instance_valid(pass_input) and pass_input.has_focus())
+		   (is_instance_valid(email_input) and email_input.has_focus()) or \
+		   (is_instance_valid(pass_input) and pass_input.has_focus())
 
 func _on_input_focus_entered() -> void:
 	if UIScaleManager.is_mobile_mode() or _get_virtual_keyboard_height() > 0 or UIScaleManager.is_mobile_device():

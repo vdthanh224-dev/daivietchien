@@ -767,11 +767,8 @@ function applyActionToState(state, seat, payload) {
   if (payload.action === "DISCARD_CARDS") {
     return handleDiscardCards(state, seat, payload.cardIds);
   }
-  if (payload.action === "AI_STEP") {
-    return handleAIStep(state, seat);
-  }
-  if (payload.action === "AI_REACTION") {
-    return handleAIReaction(state, seat);
+  if (payload.action === "AI_STEP" || payload.action === "AI_REACTION") {
+    return { error: "Chỉ máy chủ mới có quyền điều khiển AI" };
   }
   return { error: "Hành động không hợp lệ" };
 }
@@ -1799,17 +1796,17 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
               player.isDisconnected = false;
               player.isAiTakeover = false;
               player.isAI = false; // Người thật đã kết nối, tắt chế độ bot AI hoàn toàn
-              if (wasDisconnected) {
-                // Làm mới lại đồng hồ 40s cho người vừa kết nối lại để họ có đủ thời gian suy nghĩ,
-                // tránh việc AI tự động đánh hộ ngay lập tức do thời gian cũ đã trôi qua khi ngắt mạng
-                if (room.state.turnSeat === currentSeat || room.state.waitingTargetSeat === currentSeat) {
-                  room.state.timerStartAt = Date.now();
-                  if (room.state.phase === "PLAY") {
-                    room.state.turnTimer = 40;
-                  } else if (room.state.waitingTargetSeat > 0) {
-                    room.state.waitingTimer = 40;
-                  }
+              // Luôn làm mới lại đồng hồ 40s cho người vừa kết nối lại nếu đang đến lượt/phản ứng của họ,
+              // tránh việc AI tự động đánh hộ ngay lập tức do thời gian cũ đã trôi qua khi ngắt mạng
+              if (room.state.turnSeat === currentSeat || room.state.waitingTargetSeat === currentSeat) {
+                room.state.timerStartAt = Date.now();
+                if (room.state.phase === "PLAY") {
+                  room.state.turnTimer = 40;
+                } else if (room.state.waitingTargetSeat > 0) {
+                  room.state.waitingTimer = 40;
                 }
+              }
+              if (wasDisconnected) {
                 recordAction(room.state, {
                   type: "PLAYER_RECONNECTED",
                   casterSeat: currentSeat,
@@ -1877,9 +1874,18 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
         if (room.state && room.state.status === "PLAYING") {
           const player = room.state.players.find((p) => p.seat === boundSeat);
           if (player) {
+            const hadTakeover = Boolean(player.isDisconnected || player.isAiTakeover);
             player.isDisconnected = false;
             player.isAiTakeover = false;
             player.isAI = false;
+            if (hadTakeover && (room.state.turnSeat === boundSeat || room.state.waitingTargetSeat === boundSeat)) {
+              room.state.timerStartAt = Date.now();
+              if (room.state.phase === "PLAY") {
+                room.state.turnTimer = 40;
+              } else if (room.state.waitingTargetSeat > 0) {
+                room.state.waitingTimer = 40;
+              }
+            }
           }
         }
 

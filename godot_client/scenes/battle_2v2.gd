@@ -620,18 +620,29 @@ func _ready() -> void:
 			NetworkClient.game_state_updated.connect(_on_network_game_state_updated)
 		if not NetworkClient.error_received.is_connected(_on_network_error_received):
 			NetworkClient.error_received.connect(_on_network_error_received)
-		if NetworkClient.is_connected_to_server:
+		var is_online_match = not is_screenshot_test and (
+			(AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary and not AppwriteMatchmaking.current_room.is_empty())
+			or (NetworkClient and not NetworkClient.room_id.is_empty())
+			or (NetworkClient and NetworkClient.has_active_match())
+			or (NetworkClient and (NetworkClient.is_connected_to_server or NetworkClient.is_connecting()))
+		)
+		if is_online_match:
+			is_network_mode = true
+			if NetworkClient.is_connected_to_server:
+				_on_network_connected()
+			else:
+				_show_reconnect_banner(true, "🌐 Đang kết nối máy chủ để đồng bộ trận đấu...")
+				var wait_t = 0.0
+				while wait_t < 12.0 and not NetworkClient.is_connected_to_server:
+					await get_tree().create_timer(0.2).timeout
+					wait_t += 0.2
+				if NetworkClient.is_connected_to_server:
+					_on_network_connected()
+				else:
+					_show_reconnect_banner(true, "⚠️ Mất kết nối tới máy chủ. Đang thử kết nối lại...")
+		elif NetworkClient.is_connected_to_server:
 			is_network_mode = true
 			_on_network_connected()
-		elif NetworkClient.has_method("is_connecting") and NetworkClient.is_connecting():
-			# Chờ tối đa 1.5s nếu NetworkClient đang trong tiến trình dò quét ưu tiên Render / Local
-			var wait_t = 0.0
-			while wait_t < 1.5 and NetworkClient.is_connecting() and not NetworkClient.is_connected_to_server:
-				await get_tree().create_timer(0.1).timeout
-				wait_t += 0.1
-			if NetworkClient.is_connected_to_server:
-				is_network_mode = true
-				_on_network_connected()
 
 	_add_log("⚔️ Đấu Trường Đại Việt: vai trò Vương Triều được giữ bí mật.")
 	_add_log("📜 Thứ tự ra bài bắt đầu từ Quân Vương rồi lần lượt theo ghế.")
@@ -6544,8 +6555,8 @@ func _apply_network_game_state(state: Dictionary) -> void:
 	var turn_gen = generals_data.get(server_turn_seat, {})
 	var turn_gen_name = turn_gen.get("name", "Ghế %d" % server_turn_seat)
 
-	if server_phase != "AWAIT_TARGET_CARD":
-		if card_pick_modal.visible and card_pick_effect_type not in ["PHA_TONG", "AN_TICH_DEFENSE"]:
+	if server_phase != "AWAIT_TARGET_CARD" and server_phase != "AWAIT_THANG_MOC":
+		if card_pick_modal.visible and card_pick_effect_type not in ["PHA_TONG", "AN_TICH_DEFENSE", "THANG_MOC"]:
 			card_pick_modal.visible = false
 		card_pick_submission_pending = false
 		card_pick_submitted_selection_id = ""

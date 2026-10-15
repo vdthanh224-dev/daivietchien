@@ -48,7 +48,10 @@ var right_inspect_panel: Control
 var hero_grid_scroll: ScrollContainer = null
 var hero_wait_lbl: Label = null
 var hero_swipe_active: bool = false
+var hero_swipe_is_dragging: bool = false
+var hero_swipe_start_pos: Vector2 = Vector2.ZERO
 var hero_swipe_last_y: float = 0.0
+var hero_swipe_drag_finished_msec: int = 0
 var inspect_title_lbl: Label
 var inspect_sub_lbl: Label
 var inspect_avatar_rect: TextureRect
@@ -725,18 +728,58 @@ func _build_center_grid_column() -> Control:
 	return col
 
 func _input(event: InputEvent) -> void:
-	if not is_instance_valid(hero_grid_scroll):
+	if not is_instance_valid(hero_grid_scroll) or not hero_grid_scroll.is_visible_in_tree():
 		return
+
 	if event is InputEventScreenTouch:
 		if event.index != 0:
 			return
-		hero_swipe_active = event.pressed
-		hero_swipe_last_y = event.position.y
+		if event.pressed:
+			if hero_grid_scroll.get_global_rect().has_point(event.position):
+				hero_swipe_active = true
+				hero_swipe_is_dragging = false
+				hero_swipe_start_pos = event.position
+				hero_swipe_last_y = event.position.y
+		else:
+			if hero_swipe_active:
+				if hero_swipe_is_dragging:
+					hero_swipe_drag_finished_msec = Time.get_ticks_msec()
+					get_viewport().set_input_as_handled()
+				hero_swipe_active = false
+				hero_swipe_is_dragging = false
 		return
+
 	if event is InputEventScreenDrag and hero_swipe_active:
 		var delta_y: float = event.position.y - hero_swipe_last_y
 		hero_swipe_last_y = event.position.y
-		if abs(delta_y) >= 0.5:
+		if abs(event.position.y - hero_swipe_start_pos.y) > 8.0:
+			hero_swipe_is_dragging = true
+		if hero_swipe_is_dragging and abs(delta_y) >= 0.5:
+			hero_grid_scroll.scroll_vertical = maxi(0, int(hero_grid_scroll.scroll_vertical - delta_y))
+		return
+
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			if hero_grid_scroll.get_global_rect().has_point(event.position):
+				hero_swipe_active = true
+				hero_swipe_is_dragging = false
+				hero_swipe_start_pos = event.position
+				hero_swipe_last_y = event.position.y
+		else:
+			if hero_swipe_active:
+				if hero_swipe_is_dragging:
+					hero_swipe_drag_finished_msec = Time.get_ticks_msec()
+					get_viewport().set_input_as_handled()
+				hero_swipe_active = false
+				hero_swipe_is_dragging = false
+		return
+
+	if event is InputEventMouseMotion and hero_swipe_active:
+		var delta_y: float = event.position.y - hero_swipe_last_y
+		hero_swipe_last_y = event.position.y
+		if abs(event.position.y - hero_swipe_start_pos.y) > 8.0:
+			hero_swipe_is_dragging = true
+		if hero_swipe_is_dragging and abs(delta_y) >= 0.5:
 			hero_grid_scroll.scroll_vertical = maxi(0, int(hero_grid_scroll.scroll_vertical - delta_y))
 
 func _create_hero_grid_card(hero: Dictionary) -> Control:
@@ -890,6 +933,8 @@ func _create_hero_grid_card(hero: Dictionary) -> Control:
 
 	# Sự kiện bấm chọn soi tướng
 	card_btn.pressed.connect(func():
+		if hero_swipe_is_dragging or (Time.get_ticks_msec() - hero_swipe_drag_finished_msec < 180):
+			return
 		AudioManager.play_card_select()
 		var tween = card_btn.create_tween()
 		tween.tween_property(card_btn, "scale", Vector2(1.04, 1.04), 0.08)

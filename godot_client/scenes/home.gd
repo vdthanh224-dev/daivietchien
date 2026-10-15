@@ -68,6 +68,12 @@ var _fullscreen_heroes_panel: Control = null
 var _heroes_gallery_scroll: ScrollContainer = null
 var _heroes_swipe_active: bool = false
 var _heroes_swipe_last_y: float = 0.0
+var _touch_scroll_active: bool = false
+var _touch_scroll_is_dragging: bool = false
+var _touch_scroll_start_pos: Vector2 = Vector2.ZERO
+var _touch_scroll_last_y: float = 0.0
+var _touch_scroll_target: ScrollContainer = null
+var _touch_drag_finished_msec: int = 0
 
 # Hero Stage & Tactical Command Controls
 var hero_stage_container: Control = null
@@ -1119,6 +1125,8 @@ func _build_15day_event_content() -> Control:
 
 	# Bấm vào hộp để mở ra / đóng lại
 	chest_btn.pressed.connect(func():
+		if _touch_scroll_is_dragging or (Time.get_ticks_msec() - _touch_drag_finished_msec < 180):
+			return
 		AudioManager.play_card_select()
 		cb_margin.visible = not cb_margin.visible
 		if cb_margin.visible:
@@ -2205,20 +2213,91 @@ func _start_ambient_effects() -> void:
 		embers_layer.add_child(ember)
 		ember_particles.append(ember)
 
+func _find_scroll_container_at(node: Node, pos: Vector2) -> ScrollContainer:
+	if not is_instance_valid(node):
+		return null
+	if node is CanvasItem and not node.is_visible_in_tree():
+		return null
+	if node is ScrollContainer and node.is_visible_in_tree():
+		if node.get_global_rect().has_point(pos):
+			return node
+	for child in node.get_children():
+		var found = _find_scroll_container_at(child, pos)
+		if found:
+			return found
+	return null
+
 func _input(event: InputEvent) -> void:
-	if not is_instance_valid(_fullscreen_heroes_panel) or not is_instance_valid(_heroes_gallery_scroll):
-		return
 	if event is InputEventScreenTouch:
 		if event.index != 0:
 			return
-		_heroes_swipe_active = event.pressed
-		_heroes_swipe_last_y = event.position.y
+		if event.pressed:
+			var target_sc: ScrollContainer = null
+			if is_instance_valid(modal_overlay) and modal_overlay.visible:
+				target_sc = _find_scroll_container_at(modal_overlay, event.position)
+			elif is_instance_valid(_fullscreen_heroes_panel) and _fullscreen_heroes_panel.visible:
+				target_sc = _find_scroll_container_at(_fullscreen_heroes_panel, event.position)
+			else:
+				target_sc = _find_scroll_container_at(self, event.position)
+			
+			if target_sc:
+				_touch_scroll_target = target_sc
+				_touch_scroll_active = true
+				_touch_scroll_is_dragging = false
+				_touch_scroll_start_pos = event.position
+				_touch_scroll_last_y = event.position.y
+		else:
+			if _touch_scroll_active:
+				if _touch_scroll_is_dragging:
+					_touch_drag_finished_msec = Time.get_ticks_msec()
+					get_viewport().set_input_as_handled()
+				_touch_scroll_active = false
+				_touch_scroll_is_dragging = false
+				_touch_scroll_target = null
 		return
-	if event is InputEventScreenDrag and _heroes_swipe_active:
-		var delta_y: float = event.position.y - _heroes_swipe_last_y
-		_heroes_swipe_last_y = event.position.y
-		if abs(delta_y) >= 0.5:
-			_heroes_gallery_scroll.scroll_vertical = maxi(0, int(_heroes_gallery_scroll.scroll_vertical - delta_y))
+
+	if event is InputEventScreenDrag and _touch_scroll_active and is_instance_valid(_touch_scroll_target):
+		var delta_y: float = event.position.y - _touch_scroll_last_y
+		_touch_scroll_last_y = event.position.y
+		if abs(event.position.y - _touch_scroll_start_pos.y) > 8.0:
+			_touch_scroll_is_dragging = true
+		if _touch_scroll_is_dragging and abs(delta_y) >= 0.5:
+			_touch_scroll_target.scroll_vertical = maxi(0, int(_touch_scroll_target.scroll_vertical - delta_y))
+		return
+
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			var target_sc: ScrollContainer = null
+			if is_instance_valid(modal_overlay) and modal_overlay.visible:
+				target_sc = _find_scroll_container_at(modal_overlay, event.position)
+			elif is_instance_valid(_fullscreen_heroes_panel) and _fullscreen_heroes_panel.visible:
+				target_sc = _find_scroll_container_at(_fullscreen_heroes_panel, event.position)
+			else:
+				target_sc = _find_scroll_container_at(self, event.position)
+			
+			if target_sc:
+				_touch_scroll_target = target_sc
+				_touch_scroll_active = true
+				_touch_scroll_is_dragging = false
+				_touch_scroll_start_pos = event.position
+				_touch_scroll_last_y = event.position.y
+		else:
+			if _touch_scroll_active:
+				if _touch_scroll_is_dragging:
+					_touch_drag_finished_msec = Time.get_ticks_msec()
+					get_viewport().set_input_as_handled()
+				_touch_scroll_active = false
+				_touch_scroll_is_dragging = false
+				_touch_scroll_target = null
+		return
+
+	if event is InputEventMouseMotion and _touch_scroll_active and is_instance_valid(_touch_scroll_target):
+		var delta_y: float = event.position.y - _touch_scroll_last_y
+		_touch_scroll_last_y = event.position.y
+		if abs(event.position.y - _touch_scroll_start_pos.y) > 8.0:
+			_touch_scroll_is_dragging = true
+		if _touch_scroll_is_dragging and abs(delta_y) >= 0.5:
+			_touch_scroll_target.scroll_vertical = maxi(0, int(_touch_scroll_target.scroll_vertical - delta_y))
 
 func _process(delta: float) -> void:
 	for p in ember_particles:
