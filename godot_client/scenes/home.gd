@@ -893,7 +893,7 @@ func _build_15day_event_content() -> Control:
 	b_vbox.add_child(title_lbl)
 
 	var desc_lbl = Label.new()
-	desc_lbl.text = "Tham gia Đấu Trường 2v2 Xếp Hạng để tích lũy điểm và thăng hạng. Khi mùa giải 15 ngày kết thúc, triều đình sẽ phát thưởng vinh dự cho Top 10 cao thủ bảng vàng!"
+	desc_lbl.text = "Tham gia Đấu Trường 2v2 Xếp Hạng để tích lũy Sao và thăng Bậc xếp hạng. Khi mùa giải 15 ngày kết thúc, triều đình sẽ phát rương báu phần thưởng vinh dự cho Top 10 cao thủ đứng đầu Bảng Phong Thần!"
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc_lbl.add_theme_font_size_override("font_size", 12)
 	desc_lbl.add_theme_color_override("font_color", Color(0.85, 0.88, 0.95, 1.0))
@@ -909,12 +909,89 @@ func _build_15day_event_content() -> Control:
 	banner.add_child(b_margin)
 	container.add_child(banner)
 
-	# 2. Season Rewards Box
-	var rew_header = Label.new()
-	rew_header.text = "🎁 PHẦN THƯỞNG XẾP HẠNG MÙA GIẢI (TOP 10)"
-	rew_header.add_theme_font_size_override("font_size", 14)
-	rew_header.add_theme_color_override("font_color", COLOR_GOLD_PRIMARY)
-	container.add_child(rew_header)
+	# 2. Treasure Chest Container (Hình Cái Hộp / Rương Báu Phần Thưởng)
+	var chest_box = PanelContainer.new()
+	var cb_style = StyleBoxFlat.new()
+	cb_style.bg_color = Color(0.14, 0.09, 0.05, 0.98) # Gỗ lim sơn son thếp vàng
+	cb_style.border_width_left = 2
+	cb_style.border_width_top = 2
+	cb_style.border_width_right = 2
+	cb_style.border_width_bottom = 2
+	cb_style.border_color = Color(0.96, 0.78, 0.28, 1.0) # Viền kim loại hoàng kim
+	cb_style.corner_radius_top_left = 14
+	cb_style.corner_radius_top_right = 14
+	cb_style.corner_radius_bottom_right = 14
+	cb_style.corner_radius_bottom_left = 14
+	cb_style.shadow_color = Color(0.95, 0.65, 0.15, 0.35)
+	cb_style.shadow_size = 14
+	cb_style.shadow_offset = Vector2(0, 4)
+	chest_box.add_theme_stylebox_override("panel", cb_style)
+
+	var cb_vbox = VBoxContainer.new()
+	cb_vbox.add_theme_constant_override("separation", 10)
+
+	# Nắp / Tiêu đề của Hộp Rương (Chest Lid Bar)
+	var chest_lid = PanelContainer.new()
+	var cl_style = StyleBoxFlat.new()
+	cl_style.bg_color = Color(0.25, 0.16, 0.08, 1.0)
+	cl_style.border_width_bottom = 2
+	cl_style.border_color = Color(0.96, 0.78, 0.28, 0.8)
+	cl_style.corner_radius_top_left = 12
+	cl_style.corner_radius_top_right = 12
+	chest_lid.add_theme_stylebox_override("panel", cl_style)
+
+	var cl_margin = MarginContainer.new()
+	cl_margin.add_theme_constant_override("margin_left", 14)
+	cl_margin.add_theme_constant_override("margin_right", 14)
+	cl_margin.add_theme_constant_override("margin_top", 8)
+	cl_margin.add_theme_constant_override("margin_bottom", 8)
+
+	var cl_hbox = HBoxContainer.new()
+	cl_hbox.add_theme_constant_override("separation", 10)
+
+	var chest_ico = TextureRect.new()
+	chest_ico.custom_minimum_size = Vector2(24, 24)
+	chest_ico.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	chest_ico.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var t_tex = load("res://assets/ui/icon_treasure.png")
+	if t_tex:
+		chest_ico.texture = t_tex
+		cl_hbox.add_child(chest_ico)
+	else:
+		var c_emoji = Label.new()
+		c_emoji.text = "📦"
+		c_emoji.add_theme_font_size_override("font_size", 18)
+		cl_hbox.add_child(c_emoji)
+
+	var cl_title = Label.new()
+	cl_title.text = "RƯƠNG BÁU PHẦN THƯỞNG MÙA GIẢI (TOP 10 ĐUA HẠNG 2v2)"
+	cl_title.add_theme_font_size_override("font_size", 13)
+	cl_title.add_theme_color_override("font_color", Color(1.0, 0.88, 0.35, 1.0))
+	cl_hbox.add_child(cl_title)
+
+	var cl_spacer = Control.new()
+	cl_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cl_hbox.add_child(cl_spacer)
+
+	var cl_status = Label.new()
+	cl_status.text = "🔒 Niêm phong Hoàng Cung • Mở sau 15 ngày"
+	cl_status.add_theme_font_size_override("font_size", 11)
+	cl_status.add_theme_color_override("font_color", Color(0.35, 0.90, 0.50, 1.0))
+	cl_hbox.add_child(cl_status)
+
+	cl_margin.add_child(cl_hbox)
+	chest_lid.add_child(cl_margin)
+	cb_vbox.add_child(chest_lid)
+
+	# Thân hộp rương (Chest Body Content)
+	var cb_margin = MarginContainer.new()
+	cb_margin.add_theme_constant_override("margin_left", 14)
+	cb_margin.add_theme_constant_override("margin_right", 14)
+	cb_margin.add_theme_constant_override("margin_top", 4)
+	cb_margin.add_theme_constant_override("margin_bottom", 12)
+
+	var cb_content_vbox = VBoxContainer.new()
+	cb_content_vbox.add_theme_constant_override("separation", 8)
 
 	var rewards_grid = GridContainer.new()
 	rewards_grid.columns = 2
@@ -923,34 +1000,34 @@ func _build_15day_event_content() -> Control:
 
 	var tiers = [
 		{
-			"rank": "🥇 TOP 1 (ĐẠI QUỐC CÔNG)",
+			"rank": "🥇 RƯƠNG TOP 1 (ĐẠI QUỐC CÔNG)",
 			"reward": "10 Vé Quay Tướng + 1 Vé Quay Trang Phục",
 			"border": Color(1.0, 0.85, 0.25, 1.0),
-			"bg": Color(0.18, 0.14, 0.06, 0.95)
+			"bg": Color(0.24, 0.17, 0.07, 0.95)
 		},
 		{
-			"rank": "🥈 TOP 2 (THƯỢNG TƯỚNG QUÂN)",
+			"rank": "🥈 RƯƠNG TOP 2 (THƯỢNG TƯỚNG QUÂN)",
 			"reward": "7 Vé Quay Tướng",
-			"border": Color(0.75, 0.85, 0.95, 1.0),
-			"bg": Color(0.10, 0.13, 0.18, 0.95)
+			"border": Color(0.78, 0.88, 0.98, 1.0),
+			"bg": Color(0.12, 0.16, 0.22, 0.95)
 		},
 		{
-			"rank": "🥉 TOP 3 (ĐẠI TƯỚNG QUÂN)",
+			"rank": "🥉 RƯƠNG TOP 3 (ĐẠI TƯỚNG QUÂN)",
 			"reward": "5 Vé Quay Tướng",
 			"border": Color(0.95, 0.65, 0.30, 1.0),
-			"bg": Color(0.16, 0.11, 0.07, 0.95)
+			"bg": Color(0.18, 0.12, 0.08, 0.95)
 		},
 		{
-			"rank": "🎖️ TOP 4 - 5 (TRUNG ĐẠI PHU)",
+			"rank": "🎖️ RƯƠNG TOP 4 - 5 (TRUNG ĐẠI PHU)",
 			"reward": "3 Vé Quay Tướng",
-			"border": Color(0.25, 0.75, 0.95, 0.85),
-			"bg": Color(0.08, 0.12, 0.18, 0.95)
+			"border": Color(0.25, 0.80, 0.95, 0.85),
+			"bg": Color(0.08, 0.14, 0.20, 0.95)
 		},
 		{
-			"rank": "🎗️ TOP 6 - 10 (TIÊN PHONG HÀO KIỆT)",
+			"rank": "🎗️ RƯƠNG TOP 6 - 10 (TIÊN PHONG HÀO KIỆT)",
 			"reward": "1 Vé Quay Tướng",
-			"border": Color(0.65, 0.45, 0.85, 0.85),
-			"bg": Color(0.12, 0.09, 0.16, 0.95)
+			"border": Color(0.75, 0.50, 0.95, 0.85),
+			"bg": Color(0.14, 0.10, 0.18, 0.95)
 		}
 	]
 
@@ -995,9 +1072,20 @@ func _build_15day_event_content() -> Control:
 		card.add_child(c_margin)
 		rewards_grid.add_child(card)
 
-	container.add_child(rewards_grid)
+	cb_content_vbox.add_child(rewards_grid)
 
-	# 3. Your Current Rank Status
+	var chest_hint = Label.new()
+	chest_hint.text = "💡 Rương báu sẽ được trao tự động qua Hòm Thư cho Top 10 Tướng Quân sau khi mùa giải 15 ngày khép lại."
+	chest_hint.add_theme_font_size_override("font_size", 10)
+	chest_hint.add_theme_color_override("font_color", Color(0.85, 0.78, 0.65, 0.85))
+	cb_content_vbox.add_child(chest_hint)
+
+	cb_margin.add_child(cb_content_vbox)
+	cb_vbox.add_child(cb_margin)
+	chest_box.add_child(cb_vbox)
+	container.add_child(chest_box)
+
+	# 3. Your Current Rank Status (Theo Bậc và Sao như Bảng Xếp Hạng)
 	var my_status_card = PanelContainer.new()
 	var ms_style = StyleBoxFlat.new()
 	ms_style.bg_color = Color(0.08, 0.12, 0.18, 0.90)
@@ -1021,94 +1109,148 @@ func _build_15day_event_content() -> Control:
 	var ms_hbox = HBoxContainer.new()
 	ms_hbox.add_theme_constant_override("separation", 16)
 
-	var my_name = AuthManager.current_user_name if AuthManager else "Đại Tướng Quân"
-	var my_pts = AuthManager.current_2v2_points if AuthManager else 1200
-	var my_rank_idx = AuthManager.current_2v2_rank_index if AuthManager else 0
-	var rank_name = "Dân Binh"
-	if RankSystem:
-		rank_name = RankSystem.get_rank_name(my_rank_idx)
-
-	var ms_left = Label.new()
-	ms_left.text = "👤 Bạn: %s  |  Bậc: %s  |  Điểm: %d" % [my_name, rank_name, my_pts]
-	ms_left.add_theme_font_size_override("font_size", 12)
-	ms_left.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
-	ms_hbox.add_child(ms_left)
+	var my_status_lbl_left = Label.new()
+	my_status_lbl_left.add_theme_font_size_override("font_size", 12)
+	my_status_lbl_left.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+	ms_hbox.add_child(my_status_lbl_left)
 
 	var ms_sp = Control.new()
 	ms_sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	ms_hbox.add_child(ms_sp)
 
-	var ms_right = Label.new()
-	ms_right.text = "Trạng thái: Đang Tranh Hạng Mùa 15 Ngày"
-	ms_right.add_theme_font_size_override("font_size", 11)
-	ms_right.add_theme_color_override("font_color", Color(0.35, 0.90, 0.45, 1.0))
-	ms_hbox.add_child(ms_right)
+	var my_status_lbl_right = Label.new()
+	my_status_lbl_right.add_theme_font_size_override("font_size", 11)
+	ms_hbox.add_child(my_status_lbl_right)
 
 	ms_margin.add_child(ms_hbox)
 	my_status_card.add_child(ms_margin)
 	container.add_child(my_status_card)
 
-	# 4. Top 10 Live Preview
+	# 4. Top 10 Live Preview (Theo Sao như Bảng Xếp Hạng)
+	var top10_panel = PanelContainer.new()
+	var tp_style = StyleBoxFlat.new()
+	tp_style.bg_color = Color(0.08, 0.06, 0.12, 0.90)
+	tp_style.border_width_left = 1
+	tp_style.border_width_top = 1
+	tp_style.border_width_right = 1
+	tp_style.border_width_bottom = 1
+	tp_style.border_color = Color(0.40, 0.32, 0.20, 0.60)
+	tp_style.corner_radius_top_left = 10
+	tp_style.corner_radius_top_right = 10
+	tp_style.corner_radius_bottom_right = 10
+	tp_style.corner_radius_bottom_left = 10
+	top10_panel.add_theme_stylebox_override("panel", tp_style)
+
+	var tp_margin = MarginContainer.new()
+	tp_margin.add_theme_constant_override("margin_left", 14)
+	tp_margin.add_theme_constant_override("margin_right", 14)
+	tp_margin.add_theme_constant_override("margin_top", 10)
+	tp_margin.add_theme_constant_override("margin_bottom", 10)
+
+	var tp_vbox = VBoxContainer.new()
+	tp_vbox.add_theme_constant_override("separation", 6)
+
+	var top10_hdr_box = HBoxContainer.new()
 	var top10_hdr = Label.new()
-	top10_hdr.text = "👑 BẢNG ANH HÀO TOP 10 (LIVE TỪ MÁY CHỦ)"
+	top10_hdr.text = "👑 BẢNG ANH HÀO TOP 10 (THEO SAO ĐẤU TRƯỜNG 2v2)"
 	top10_hdr.add_theme_font_size_override("font_size", 13)
 	top10_hdr.add_theme_color_override("font_color", Color(0.98, 0.85, 0.35, 1.0))
-	container.add_child(top10_hdr)
+	top10_hdr_box.add_child(top10_hdr)
+
+	var th_sp = Control.new()
+	th_sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top10_hdr_box.add_child(th_sp)
+
+	var live_tag = Label.new()
+	live_tag.text = "🟢 Live từ Appwrite Singapore"
+	live_tag.add_theme_font_size_override("font_size", 11)
+	live_tag.add_theme_color_override("font_color", Color(0.35, 0.85, 0.45, 1.0))
+	top10_hdr_box.add_child(live_tag)
+	tp_vbox.add_child(top10_hdr_box)
+
+	# Table Header Row
+	var th_row = PanelContainer.new()
+	var thr_sb = StyleBoxFlat.new()
+	thr_sb.bg_color = Color(0.12, 0.09, 0.16, 0.95)
+	thr_sb.border_width_bottom = 1
+	thr_sb.border_color = Color(0.40, 0.32, 0.20, 0.8)
+	thr_sb.corner_radius_top_left = 6
+	thr_sb.corner_radius_top_right = 6
+	thr_sb.corner_radius_bottom_right = 6
+	thr_sb.corner_radius_bottom_left = 6
+	th_row.add_theme_stylebox_override("panel", thr_sb)
+
+	var thr_margin = MarginContainer.new()
+	thr_margin.add_theme_constant_override("margin_left", 12)
+	thr_margin.add_theme_constant_override("margin_right", 12)
+	thr_margin.add_theme_constant_override("margin_top", 6)
+	thr_margin.add_theme_constant_override("margin_bottom", 6)
+
+	var thr_hbox = HBoxContainer.new()
+	thr_hbox.add_theme_constant_override("separation", 12)
+
+	var h_col1 = Label.new()
+	h_col1.custom_minimum_size = Vector2(75, 0)
+	h_col1.text = "HẠNG"
+	h_col1.add_theme_font_size_override("font_size", 11)
+	h_col1.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
+	thr_hbox.add_child(h_col1)
+
+	var h_col2 = Label.new()
+	h_col2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h_col2.text = "TƯỚNG QUÂN"
+	h_col2.add_theme_font_size_override("font_size", 11)
+	h_col2.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
+	thr_hbox.add_child(h_col2)
+
+	var h_col3 = Label.new()
+	h_col3.custom_minimum_size = Vector2(160, 0)
+	h_col3.text = "BẬC XẾP HẠNG"
+	h_col3.add_theme_font_size_override("font_size", 11)
+	h_col3.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
+	thr_hbox.add_child(h_col3)
+
+	var h_col4 = Label.new()
+	h_col4.custom_minimum_size = Vector2(160, 0)
+	h_col4.text = "SAO & TÍCH LŨY"
+	h_col4.add_theme_font_size_override("font_size", 11)
+	h_col4.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
+	thr_hbox.add_child(h_col4)
+
+	var h_col5 = Label.new()
+	h_col5.custom_minimum_size = Vector2(110, 0)
+	h_col5.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	h_col5.text = "THẮNG / BẠI"
+	h_col5.add_theme_font_size_override("font_size", 11)
+	h_col5.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
+	thr_hbox.add_child(h_col5)
+
+	thr_margin.add_child(thr_hbox)
+	th_row.add_child(thr_margin)
+	tp_vbox.add_child(th_row)
 
 	var top10_list = VBoxContainer.new()
 	top10_list.add_theme_constant_override("separation", 4)
+	tp_vbox.add_child(top10_list)
 
-	var players = _prepare_leaderboard_players(_leaderboard_cached_players)
-	_sort_leaderboard_players(players, 0)
+	tp_margin.add_child(tp_vbox)
+	top10_panel.add_child(tp_margin)
+	container.add_child(top10_panel)
 
-	var max_top = min(10, players.size())
-	if max_top == 0:
-		var empty_lbl = Label.new()
-		empty_lbl.text = "Đang đồng bộ dữ liệu Top 10 từ máy chủ Appwrite..."
-		empty_lbl.add_theme_font_size_override("font_size", 11)
-		empty_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
-		top10_list.add_child(empty_lbl)
-	else:
-		for i in range(max_top):
-			var p = players[i]
-			var p_row = HBoxContainer.new()
-			p_row.custom_minimum_size = Vector2(0, 26)
+	# Initial render
+	_populate_15day_top10(top10_list, my_status_lbl_left, my_status_lbl_right)
 
-			var rank_str = "#%d" % (i + 1)
-			var r_color = Color(1.0, 1.0, 1.0, 0.9)
-			if i == 0:
-				rank_str = "🥇 TOP 1"
-				r_color = Color(1.0, 0.85, 0.25, 1.0)
-			elif i == 1:
-				rank_str = "🥈 TOP 2"
-				r_color = Color(0.80, 0.88, 1.0, 1.0)
-			elif i == 2:
-				rank_str = "🥉 TOP 3"
-				r_color = Color(0.95, 0.65, 0.30, 1.0)
+	# Tự động đẩy kết quả mới nhất của mình lên Appwrite và tải Top 10 mới nhất
+	if AuthManager and AuthManager.is_logged_in:
+		AuthManager.sync_leaderboard_entry()
 
-			var r_badge = Label.new()
-			r_badge.custom_minimum_size = Vector2(70, 0)
-			r_badge.text = rank_str
-			r_badge.add_theme_font_size_override("font_size", 11)
-			r_badge.add_theme_color_override("font_color", r_color)
-			p_row.add_child(r_badge)
-
-			var p_name = Label.new()
-			p_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			p_name.text = str(p.get("name", "Vô Danh"))
-			p_name.add_theme_font_size_override("font_size", 12)
-			p_name.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
-			p_row.add_child(p_name)
-
-			var p_pts = Label.new()
-			p_pts.text = "%d Điểm" % int(p.get("rank2v2Points", 1200))
-			p_pts.add_theme_font_size_override("font_size", 12)
-			p_pts.add_theme_color_override("font_color", Color(1.0, 0.85, 0.35, 1.0))
-			p_row.add_child(p_pts)
-
-			top10_list.add_child(p_row)
-
-	container.add_child(top10_list)
+	if AuthManager and AuthManager.has_method("fetch_leaderboard_players"):
+		AuthManager.fetch_leaderboard_players(func(fetched_players: Array):
+			if not fetched_players.is_empty():
+				_leaderboard_cached_players = fetched_players
+			if is_instance_valid(top10_list):
+				_populate_15day_top10(top10_list, my_status_lbl_left, my_status_lbl_right)
+		)
 
 	# 5. Bottom Navigation Action Buttons
 	var act_row = HBoxContainer.new()
@@ -1145,6 +1287,222 @@ func _build_15day_event_content() -> Control:
 
 	container.add_child(act_row)
 	return container
+
+func _populate_15day_top10(top10_list: VBoxContainer, my_status_lbl_left: Label = null, my_status_lbl_right: Label = null) -> void:
+	if not is_instance_valid(top10_list):
+		return
+	for child in top10_list.get_children():
+		child.queue_free()
+
+	var players = _prepare_leaderboard_players(_leaderboard_cached_players)
+	_sort_leaderboard_players(players, 0)
+
+	var my_uid = AuthManager.current_user_id if AuthManager else ""
+	var my_email = AuthManager.current_user_email.to_lower() if AuthManager else ""
+	var my_name = AuthManager.current_user_name if AuthManager else ""
+	var my_rank_pos = -1
+
+	for i in range(players.size()):
+		var p = players[i]
+		var p_uid = str(p.get("user_id", ""))
+		var p_email = str(p.get("email", "")).to_lower()
+		var p_name = str(p.get("name", ""))
+		var is_self = false
+		if not my_uid.is_empty() and p_uid == my_uid:
+			is_self = true
+		elif not my_email.is_empty() and p_email == my_email:
+			is_self = true
+		elif my_uid.is_empty() and my_email.is_empty() and not my_name.is_empty() and p_name == my_name:
+			is_self = true
+		if is_self and my_rank_pos == -1:
+			my_rank_pos = i + 1
+			break
+
+	if is_instance_valid(my_status_lbl_left):
+		var my_rank_idx = AuthManager.current_2v2_rank_index if AuthManager else 0
+		var my_stars = AuthManager.current_2v2_stars if AuthManager else 0
+		var my_acc = AuthManager.current_2v2_accumulation_points if AuthManager else 0
+		var my_wins = AuthManager.current_wins if AuthManager else 0
+		var my_losses = AuthManager.current_losses if AuthManager else 0
+		var r_name = RankSystem.get_rank_name(my_rank_idx) if RankSystem else "Dân Binh"
+		var r_info = RankSystem.get_rank_info(my_rank_idx) if RankSystem else {}
+		var badge = str(r_info.get("badge", "🛡️"))
+		var s_text = ("👑 %d⭐ (Hoàng Tộc)" % my_stars) if my_rank_idx >= 11 else ("%d/5 ⭐" % my_stars)
+		my_status_lbl_left.text = "👤 Bạn: %s  |  %s %s • %s (%d/100 Tích Lũy)  |  %dT - %dB" % [
+			my_name, badge, r_name, s_text, my_acc, my_wins, my_losses
+		]
+
+	if is_instance_valid(my_status_lbl_right):
+		if my_rank_pos >= 1 and my_rank_pos <= 10:
+			my_status_lbl_right.text = "👑 Vị trí mùa giải: TOP %d (Đang trong nhóm nhận rương thưởng!)" % my_rank_pos
+			my_status_lbl_right.add_theme_color_override("font_color", Color(1.0, 0.85, 0.25, 1.0))
+		elif my_rank_pos > 10:
+			my_status_lbl_right.text = "📍 Vị trí mùa giải: #%d (Ngoài Top 10 - Hãy đấu để lọt Top!)" % my_rank_pos
+			my_status_lbl_right.add_theme_color_override("font_color", Color(0.35, 0.85, 0.95, 1.0))
+		else:
+			my_status_lbl_right.text = "📍 Vị trí mùa giải: Chưa vào bảng (Hãy đấu 2v2 để ghi danh!)"
+			my_status_lbl_right.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+
+	var max_top = min(10, players.size())
+	if max_top == 0:
+		var empty_lbl = Label.new()
+		empty_lbl.text = "Đang đồng bộ dữ liệu Top 10 từ máy chủ Appwrite Singapore..."
+		empty_lbl.add_theme_font_size_override("font_size", 12)
+		empty_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+		empty_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		top10_list.add_child(empty_lbl)
+		return
+
+	for i in range(max_top):
+		var p = players[i]
+		var p_uid = str(p.get("user_id", ""))
+		var p_email = str(p.get("email", "")).to_lower()
+		var p_name = str(p.get("name", "Đại Tướng Quân")).strip_edges()
+		if p_name.contains("@"):
+			p_name = p_name.split("@")[0]
+		if p_name.is_empty():
+			p_name = "Đại Tướng Quân"
+
+		var is_self = false
+		if not my_uid.is_empty() and p_uid == my_uid:
+			is_self = true
+		elif not my_email.is_empty() and p_email == my_email:
+			is_self = true
+		elif my_uid.is_empty() and my_email.is_empty() and not my_name.is_empty() and p_name == my_name:
+			is_self = true
+
+		var rank_idx = int(p.get("rank_index", p.get("rank2v2Index", 0)))
+		var stars = int(p.get("rank_stars", p.get("rank2v2Stars", 0)))
+		var acc_pts = int(p.get("rank_acc", p.get("rank2v2AccPoints", 0)))
+		var wins = int(p.get("wins", 0))
+		var losses = int(p.get("losses", 0))
+		var lvl = int(p.get("level", 1))
+
+		var rank_name = str(p.get("rank_name", ""))
+		if rank_name.is_empty() and RankSystem:
+			rank_name = RankSystem.get_rank_name(rank_idx)
+		if rank_name.is_empty():
+			rank_name = "Dân Binh"
+
+		var rank_info = {}
+		if RankSystem:
+			rank_info = RankSystem.get_rank_info(rank_idx)
+		var tier_badge = str(rank_info.get("badge", "🛡️"))
+		var tier_color: Color = rank_info.get("color", Color(0.8, 0.8, 0.8))
+
+		var row_panel = PanelContainer.new()
+		var rp_sb = StyleBoxFlat.new()
+		rp_sb.corner_radius_top_left = 6
+		rp_sb.corner_radius_top_right = 6
+		rp_sb.corner_radius_bottom_right = 6
+		rp_sb.corner_radius_bottom_left = 6
+
+		if is_self:
+			rp_sb.bg_color = Color(0.24, 0.18, 0.08, 0.95)
+			rp_sb.border_width_left = 1
+			rp_sb.border_width_top = 1
+			rp_sb.border_width_right = 1
+			rp_sb.border_width_bottom = 1
+			rp_sb.border_color = Color(1.0, 0.85, 0.25, 0.9)
+		elif i == 0:
+			rp_sb.bg_color = Color(0.20, 0.15, 0.06, 0.92)
+			rp_sb.border_width_left = 1
+			rp_sb.border_width_top = 1
+			rp_sb.border_width_right = 1
+			rp_sb.border_width_bottom = 1
+			rp_sb.border_color = Color(1.0, 0.85, 0.25, 0.8)
+		elif i == 1:
+			rp_sb.bg_color = Color(0.12, 0.14, 0.18, 0.92)
+			rp_sb.border_width_left = 1
+			rp_sb.border_width_top = 1
+			rp_sb.border_width_right = 1
+			rp_sb.border_width_bottom = 1
+			rp_sb.border_color = Color(0.80, 0.86, 0.95, 0.8)
+		elif i == 2:
+			rp_sb.bg_color = Color(0.16, 0.12, 0.08, 0.92)
+			rp_sb.border_width_left = 1
+			rp_sb.border_width_top = 1
+			rp_sb.border_width_right = 1
+			rp_sb.border_width_bottom = 1
+			rp_sb.border_color = Color(0.92, 0.62, 0.35, 0.8)
+		else:
+			rp_sb.bg_color = Color(0.09, 0.07, 0.12, 0.80)
+			rp_sb.border_width_left = 1
+			rp_sb.border_width_top = 1
+			rp_sb.border_width_right = 1
+			rp_sb.border_width_bottom = 1
+			rp_sb.border_color = Color(0.25, 0.20, 0.30, 0.40)
+
+		row_panel.add_theme_stylebox_override("panel", rp_sb)
+
+		var row_margin = MarginContainer.new()
+		row_margin.add_theme_constant_override("margin_left", 12)
+		row_margin.add_theme_constant_override("margin_right", 12)
+		row_margin.add_theme_constant_override("margin_top", 6)
+		row_margin.add_theme_constant_override("margin_bottom", 6)
+
+		var row_hbox = HBoxContainer.new()
+		row_hbox.add_theme_constant_override("separation", 12)
+
+		# 1. Hạng
+		var r_badge = Label.new()
+		r_badge.custom_minimum_size = Vector2(75, 0)
+		var rank_str = "#%d" % (i + 1)
+		var r_color = Color(0.8, 0.85, 0.9)
+		if i == 0:
+			rank_str = "🥇 TOP 1"
+			r_color = Color(1.0, 0.85, 0.25, 1.0)
+		elif i == 1:
+			rank_str = "🥈 TOP 2"
+			r_color = Color(0.82, 0.88, 1.0, 1.0)
+		elif i == 2:
+			rank_str = "🥉 TOP 3"
+			r_color = Color(0.95, 0.65, 0.30, 1.0)
+		r_badge.text = rank_str
+		r_badge.add_theme_font_size_override("font_size", 12)
+		r_badge.add_theme_color_override("font_color", r_color)
+		row_hbox.add_child(r_badge)
+
+		# 2. Tướng quân
+		var p_name_lbl = Label.new()
+		p_name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		p_name_lbl.text = "%s (Lv.%d)%s" % [p_name, lvl, " (Bạn)" if is_self else ""]
+		p_name_lbl.add_theme_font_size_override("font_size", 12)
+		p_name_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.35, 1.0) if is_self else Color(1.0, 1.0, 1.0, 1.0))
+		row_hbox.add_child(p_name_lbl)
+
+		# 3. Bậc xếp hạng
+		var tier_lbl = Label.new()
+		tier_lbl.custom_minimum_size = Vector2(160, 0)
+		tier_lbl.text = "%s %s" % [tier_badge, rank_name]
+		tier_lbl.add_theme_font_size_override("font_size", 12)
+		tier_lbl.add_theme_color_override("font_color", tier_color)
+		row_hbox.add_child(tier_lbl)
+
+		# 4. Sao & Tích lũy
+		var stars_lbl = Label.new()
+		stars_lbl.custom_minimum_size = Vector2(160, 0)
+		var s_disp = ("👑 %d⭐" % stars) if rank_idx >= 11 else ("%d/5 ⭐" % stars)
+		stars_lbl.text = "%s (%dđ)" % [s_disp, acc_pts]
+		stars_lbl.add_theme_font_size_override("font_size", 12)
+		stars_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3, 1.0))
+		row_hbox.add_child(stars_lbl)
+
+		# 5. Thắng / Bại
+		var rec_lbl = Label.new()
+		rec_lbl.custom_minimum_size = Vector2(110, 0)
+		rec_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		var tot = wins + losses
+		var wr = int(float(wins) / float(tot) * 100.0) if tot > 0 else 0
+		rec_lbl.text = "%dT - %dB (%d%%)" % [wins, losses, wr]
+		rec_lbl.add_theme_font_size_override("font_size", 11)
+		rec_lbl.add_theme_color_override("font_color", Color(0.4, 0.85, 0.5) if wr >= 50 else COLOR_TEXT_MUTED)
+		row_hbox.add_child(rec_lbl)
+
+		row_margin.add_child(row_hbox)
+		row_panel.add_child(row_margin)
+		top10_list.add_child(row_panel)
+
 
 func _build_four_game_modes() -> void:
 	pass
@@ -1882,7 +2240,7 @@ func _show_modal(title_text: String, content_node: Node) -> void:
 			modal_panel.custom_minimum_size = Vector2(600, 470)
 			if is_instance_valid(modal_scroll):
 				modal_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		elif title_text == "BẢNG PHONG THẦN":
+		elif title_text == "BẢNG PHONG THẦN" or title_text.begins_with("SỰ KIỆN"):
 			modal_panel.custom_minimum_size = Vector2(880, 560)
 			if is_instance_valid(modal_scroll):
 				modal_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
