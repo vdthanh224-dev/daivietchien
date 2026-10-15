@@ -84,6 +84,16 @@ var _social_friends: Array = []
 var _social_incoming: Array = []
 var _social_search_results: Array = []
 var _last_friend_search_query: String = ""
+var hero_nameplate_lbl: Label = null
+var hero_status_sub_lbl: Label = null
+var _active_hero_id: int = 47
+var _active_hero_slug: String = "ly_thuong_kiet"
+var _left_hero_cards_container: VBoxContainer = null
+var _left_hero_page: int = 0
+var _left_hero_count_lbl: Label = null
+var _quest_badge_dot: Control = null
+var _battle_card_title_lbl: Label = null
+var _top_avatar_rect: TextureRect = null
 
 func _ready() -> void:
 	anchors_preset = PRESET_FULL_RECT
@@ -142,7 +152,6 @@ func _build_ui() -> void:
 	bg_rect = TextureRect.new()
 	bg_rect.name = "Background"
 	bg_rect.set_anchors_preset(PRESET_FULL_RECT)
-	bg_rect.size = Vector2(1280, 720)
 	bg_rect.custom_minimum_size = Vector2(1280, 720)
 	bg_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	bg_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -157,7 +166,6 @@ func _build_ui() -> void:
 	dark_overlay = ColorRect.new()
 	dark_overlay.name = "DarkOverlay"
 	dark_overlay.set_anchors_preset(PRESET_FULL_RECT)
-	dark_overlay.size = Vector2(1280, 720)
 	dark_overlay.color = Color(0.02, 0.03, 0.05, 0.22)
 	dark_overlay.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(dark_overlay)
@@ -168,216 +176,192 @@ func _build_ui() -> void:
 	embers_layer.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(embers_layer)
 
-	# 4. Top Header Bar (0 to 66px)
+	# 4. Center: Standing Hero Stage
+	_build_hero_center_stage()
+
+	# 5. Left: Character Selection Column
+	_build_left_character_column()
+
+	# 6. Right: Tactical Deck ("Tìm trận" & 2x2 Feature Grid)
+	_build_right_action_deck()
+
+	# 7. Top Header Bar
 	_build_top_header()
 
-	# 5. Center: 4 Major Game Mode Cards (Y: 76px to 644px)
-	_build_four_game_modes()
-
-	# 6. Bottom Navigation Dock (Y: 656px to 720px)
-	_build_bottom_nav_dock()
-
-	# 7. Modal Overlay Layer
+	# 8. Modal Overlay Layer
 	_build_modal_layer()
 
 func _build_top_header() -> void:
 	var header_panel = Panel.new()
-	header_panel.custom_minimum_size = Vector2(1280, 66)
+	header_panel.custom_minimum_size = Vector2(1280, 68)
 	header_panel.set_anchors_preset(PRESET_TOP_WIDE)
-	header_panel.offset_bottom = 66
+	header_panel.offset_bottom = 68
 
 	var header_style = StyleBoxFlat.new()
-	header_style.bg_color = Color(0.06, 0.04, 0.08, 0.92) # Regal Dark Lacquer
-	header_style.border_width_bottom = 2
-	header_style.border_color = COLOR_GOLD_PRIMARY
-	header_style.shadow_color = COLOR_SHADOW_DEEP
-	header_style.shadow_size = 8
-	header_style.shadow_offset = Vector2(0, 3)
+	header_style.bg_color = Color(0.04, 0.05, 0.09, 0.75)
+	header_style.border_width_bottom = 1
+	header_style.border_color = Color(0.2, 0.3, 0.5, 0.3)
 	header_panel.add_theme_stylebox_override("panel", header_style)
 	add_child(header_panel)
 
-	# Sub-HBox spanning full width
 	var header_hbox = HBoxContainer.new()
 	header_hbox.set_anchors_preset(PRESET_FULL_RECT)
 	header_hbox.offset_left = 20
 	header_hbox.offset_right = -20
-	header_hbox.offset_top = 8
-	header_hbox.offset_bottom = -8
+	header_hbox.offset_top = 10
+	header_hbox.offset_bottom = -10
 	header_hbox.add_theme_constant_override("separation", 16)
 	header_panel.add_child(header_hbox)
 
-	# --- Left: Profile Section ---
+	# 1. Game Logo ("ĐẠI VIỆT CHIẾN")
+	var logo_panel = PanelContainer.new()
+	logo_panel.custom_minimum_size = Vector2(190, 46)
+	var lp_style = StyleBoxFlat.new()
+	lp_style.bg_color = Color(0.12, 0.07, 0.18, 0.85)
+	lp_style.border_width_left = 1
+	lp_style.border_width_top = 1
+	lp_style.border_width_right = 1
+	lp_style.border_width_bottom = 1
+	lp_style.border_color = Color(0.98, 0.4, 0.8, 0.8)
+	lp_style.corner_radius_top_left = 16
+	lp_style.corner_radius_top_right = 16
+	lp_style.corner_radius_bottom_right = 16
+	lp_style.corner_radius_bottom_left = 16
+	lp_style.shadow_color = Color(0.98, 0.28, 0.65, 0.35)
+	lp_style.shadow_size = 10
+	logo_panel.add_theme_stylebox_override("panel", lp_style)
+
+	var logo_lbl = Label.new()
+	logo_lbl.text = "👑 ĐẠI VIỆT CHIẾN"
+	logo_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	logo_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	logo_lbl.add_theme_font_size_override("font_size", 15)
+	logo_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.45, 1.0))
+	logo_panel.add_child(logo_lbl)
+	header_hbox.add_child(logo_panel)
+
+	# 2. Profile Capsule Pill
 	var profile_btn = Button.new()
-	profile_btn.custom_minimum_size = Vector2(280, 50)
-	_style_white_gold_button(profile_btn, 8, 4, Vector2(0, 2))
+	profile_btn.custom_minimum_size = Vector2(330, 46)
+	_style_glass_action_button(profile_btn, 23, Color(0.25, 0.45, 0.70, 0.75))
 	profile_btn.pressed.connect(_on_profile_clicked)
 
 	var p_hbox = HBoxContainer.new()
 	p_hbox.set_anchors_preset(PRESET_FULL_RECT)
-	p_hbox.offset_left = 8
-	p_hbox.offset_right = -8
-	p_hbox.offset_top = 4
-	p_hbox.offset_bottom = -4
+	p_hbox.offset_left = 4
+	p_hbox.offset_right = -10
+	p_hbox.offset_top = 3
+	p_hbox.offset_bottom = -3
 	p_hbox.add_theme_constant_override("separation", 10)
+	p_hbox.mouse_filter = MOUSE_FILTER_IGNORE
 	profile_btn.add_child(p_hbox)
 
-	# Avatar frame
+	# Circular Avatar
 	var avatar_frame = PanelContainer.new()
-	avatar_frame.custom_minimum_size = Vector2(42, 42)
+	avatar_frame.custom_minimum_size = Vector2(40, 40)
 	var af_style = StyleBoxFlat.new()
 	af_style.bg_color = Color(0.12, 0.16, 0.24, 1.0)
-	af_style.border_width_left = 2
-	af_style.border_width_top = 2
-	af_style.border_width_right = 2
-	af_style.border_width_bottom = 2
-	af_style.border_color = COLOR_GOLD_PRIMARY
-	af_style.corner_radius_top_left = 21
-	af_style.corner_radius_top_right = 21
-	af_style.corner_radius_bottom_right = 21
-	af_style.corner_radius_bottom_left = 21
+	af_style.border_width_left = 1.5
+	af_style.border_width_top = 1.5
+	af_style.border_width_right = 1.5
+	af_style.border_width_bottom = 1.5
+	af_style.border_color = Color(0.2, 0.85, 1.0, 0.9)
+	af_style.corner_radius_top_left = 20
+	af_style.corner_radius_top_right = 20
+	af_style.corner_radius_bottom_right = 20
+	af_style.corner_radius_bottom_left = 20
 	avatar_frame.add_theme_stylebox_override("panel", af_style)
+	avatar_frame.clip_children = Control.CLIP_CHILDREN_ONLY
 
-	var av_img = TextureRect.new()
-	av_img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	av_img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_top_avatar_rect = TextureRect.new()
+	_top_avatar_rect.set_anchors_preset(PRESET_FULL_RECT)
+	_top_avatar_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_top_avatar_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	var av_tex = load("res://assets/ui/ly_thuong_kiet.png")
-	if av_tex != null:
-		av_img.texture = av_tex
-	avatar_frame.add_child(av_img)
+	if av_tex: _top_avatar_rect.texture = av_tex
+	avatar_frame.add_child(_top_avatar_rect)
 	p_hbox.add_child(avatar_frame)
 
-	# Name + Rank VBox
+	# Name + Level & EXP VBox
 	var p_vbox = VBoxContainer.new()
 	p_vbox.size_flags_horizontal = SIZE_EXPAND_FILL
 	p_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	p_vbox.add_theme_constant_override("separation", 2)
-
-	var name_hbox = HBoxContainer.new()
-	name_hbox.add_theme_constant_override("separation", 6)
+	p_vbox.mouse_filter = MOUSE_FILTER_IGNORE
 
 	player_name_label = Label.new()
-	player_name_label.text = "LÝ THƯỜNG KIỆT"
+	player_name_label.text = "Người Chơi"
 	player_name_label.add_theme_font_size_override("font_size", 13)
-	player_name_label.add_theme_color_override("font_color", COLOR_TEXT_DARK)
-	name_hbox.add_child(player_name_label)
+	player_name_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+	player_name_label.mouse_filter = MOUSE_FILTER_IGNORE
+	p_vbox.add_child(player_name_label)
 
-	var level_badge = PanelContainer.new()
-	var lb_style = StyleBoxFlat.new()
-	lb_style.bg_color = Color(0.68, 0.12, 0.08, 0.95)
-	lb_style.border_width_left = 1
-	lb_style.border_width_top = 1
-	lb_style.border_width_right = 1
-	lb_style.border_width_bottom = 1
-	lb_style.border_color = COLOR_GOLD_PRIMARY
-	lb_style.corner_radius_top_left = 4
-	lb_style.corner_radius_top_right = 4
-	lb_style.corner_radius_bottom_right = 4
-	lb_style.corner_radius_bottom_left = 4
-	level_badge.add_theme_stylebox_override("panel", lb_style)
+	var exp_row = HBoxContainer.new()
+	exp_row.add_theme_constant_override("separation", 6)
+	exp_row.mouse_filter = MOUSE_FILTER_IGNORE
 
 	level_badge_label = Label.new()
-	level_badge_label.text = " CẤP 1 "
-	level_badge_label.add_theme_font_size_override("font_size", 10)
-	level_badge_label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.45, 1.0))
-	level_badge.add_child(level_badge_label)
-	name_hbox.add_child(level_badge)
-	p_vbox.add_child(name_hbox)
-
-	var rank_hbox = HBoxContainer.new()
-	rank_hbox.add_theme_constant_override("separation", 6)
-
-	rank_label = Label.new()
-	rank_label.text = "🔰 Tân Binh (50/100đ)"
-	rank_label.add_theme_font_size_override("font_size", 11)
-	rank_label.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
-	rank_hbox.add_child(rank_label)
+	level_badge_label.text = "Lv.1"
+	level_badge_label.add_theme_font_size_override("font_size", 11)
+	level_badge_label.add_theme_color_override("font_color", Color(0.2, 0.85, 1.0, 1.0))
+	level_badge_label.mouse_filter = MOUSE_FILTER_IGNORE
+	exp_row.add_child(level_badge_label)
 
 	exp_bar = ProgressBar.new()
-	exp_bar.custom_minimum_size = Vector2(65, 8)
+	exp_bar.custom_minimum_size = Vector2(90, 8)
 	exp_bar.size_flags_vertical = SIZE_SHRINK_CENTER
 	exp_bar.value = 0
 	exp_bar.show_percentage = false
 	var exp_bg = StyleBoxFlat.new()
-	exp_bg.bg_color = Color(0.20, 0.15, 0.22, 1.0)
+	exp_bg.bg_color = Color(0.12, 0.15, 0.22, 1.0)
 	exp_bg.corner_radius_top_left = 4
 	exp_bg.corner_radius_top_right = 4
 	exp_bg.corner_radius_bottom_right = 4
 	exp_bg.corner_radius_bottom_left = 4
 	var exp_fill = StyleBoxFlat.new()
-	exp_fill.bg_color = COLOR_GOLD_PRIMARY
+	exp_fill.bg_color = Color(0.20, 0.82, 0.98, 1.0)
 	exp_fill.corner_radius_top_left = 4
 	exp_fill.corner_radius_top_right = 4
 	exp_fill.corner_radius_bottom_right = 4
 	exp_fill.corner_radius_bottom_left = 4
 	exp_bar.add_theme_stylebox_override("background", exp_bg)
 	exp_bar.add_theme_stylebox_override("fill", exp_fill)
-	rank_hbox.add_child(exp_bar)
+	exp_bar.mouse_filter = MOUSE_FILTER_IGNORE
+	exp_row.add_child(exp_bar)
 
 	exp_text_label = Label.new()
 	exp_text_label.text = "0/20 EXP"
 	exp_text_label.add_theme_font_size_override("font_size", 10)
-	exp_text_label.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
-	rank_hbox.add_child(exp_text_label)
+	exp_text_label.add_theme_color_override("font_color", Color(0.65, 0.72, 0.85, 0.8))
+	exp_text_label.mouse_filter = MOUSE_FILTER_IGNORE
+	exp_row.add_child(exp_text_label)
 
-	p_vbox.add_child(rank_hbox)
+	p_vbox.add_child(exp_row)
 	p_hbox.add_child(p_vbox)
 	header_hbox.add_child(profile_btn)
 
-	# --- Center: Game Title Plaque ---
-	var center_spacer1 = Control.new()
-	center_spacer1.size_flags_horizontal = SIZE_EXPAND_FILL
-	header_hbox.add_child(center_spacer1)
+	# Center Spacer
+	var center_spacer = Control.new()
+	center_spacer.size_flags_horizontal = SIZE_EXPAND_FILL
+	header_hbox.add_child(center_spacer)
 
-	var title_panel = PanelContainer.new()
-	title_panel.custom_minimum_size = Vector2(280, 48)
-	var tp_style = StyleBoxFlat.new()
-	tp_style.bg_color = Color(0.08, 0.06, 0.11, 0.85)
-	tp_style.border_width_left = 2
-	tp_style.border_width_top = 2
-	tp_style.border_width_right = 2
-	tp_style.border_width_bottom = 2
-	tp_style.border_color = COLOR_GOLD_PRIMARY
-	tp_style.corner_radius_top_left = 8
-	tp_style.corner_radius_top_right = 8
-	tp_style.corner_radius_bottom_right = 8
-	tp_style.corner_radius_bottom_left = 8
-	tp_style.shadow_color = COLOR_SHADOW_DEEP
-	tp_style.shadow_size = 8
-	tp_style.shadow_offset = Vector2(0, 3)
-	title_panel.add_theme_stylebox_override("panel", tp_style)
-
-	var title_lbl = Label.new()
-	title_lbl.text = "👑 ĐẠI VIỆT CHIẾN"
-	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	title_lbl.add_theme_font_size_override("font_size", 21)
-	title_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.38, 1.0))
-	title_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.95))
-	title_lbl.add_theme_constant_override("shadow_offset_x", 1)
-	title_lbl.add_theme_constant_override("shadow_offset_y", 1)
-	title_panel.add_child(title_lbl)
-	header_hbox.add_child(title_panel)
-
-	var center_spacer2 = Control.new()
-	center_spacer2.size_flags_horizontal = SIZE_EXPAND_FILL
-	header_hbox.add_child(center_spacer2)
-
-	# --- Right: Currencies & Quick Icons ---
+	# 3. Currencies & Quick Action Icons
 	# Silver Capsule
 	var silver_btn = Button.new()
-	silver_btn.custom_minimum_size = Vector2(130, 44)
-	_style_white_gold_button(silver_btn, 8, 4, Vector2(0, 2))
+	silver_btn.custom_minimum_size = Vector2(130, 42)
+	_style_glass_action_button(silver_btn, 21, Color(0.3, 0.45, 0.65, 0.7))
 	silver_btn.pressed.connect(func(): _show_modal("TRÂN BẢO CÁC", _build_shop_content()))
 
 	var s_hbox = HBoxContainer.new()
 	s_hbox.set_anchors_preset(PRESET_FULL_RECT)
-	s_hbox.offset_left = 8
-	s_hbox.offset_right = -8
+	s_hbox.offset_left = 10
+	s_hbox.offset_right = -10
 	s_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	s_hbox.add_theme_constant_override("separation", 6)
+	s_hbox.mouse_filter = MOUSE_FILTER_IGNORE
 
 	var s_icon = TextureRect.new()
-	s_icon.custom_minimum_size = Vector2(22, 22)
+	s_icon.custom_minimum_size = Vector2(20, 20)
 	s_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	s_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	var s_tex = load("res://assets/ui/icon_silver.png")
@@ -386,14 +370,14 @@ func _build_top_header() -> void:
 
 	silver_label = Label.new()
 	silver_label.text = _format_number(current_silver)
-	silver_label.add_theme_font_size_override("font_size", 14)
-	silver_label.add_theme_color_override("font_color", COLOR_TEXT_DARK)
+	silver_label.add_theme_font_size_override("font_size", 13)
+	silver_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
 	s_hbox.add_child(silver_label)
 
 	var s_plus = Label.new()
-	s_plus.text = "+"
-	s_plus.add_theme_font_size_override("font_size", 15)
-	s_plus.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
+	s_plus.text = "＋"
+	s_plus.add_theme_font_size_override("font_size", 14)
+	s_plus.add_theme_color_override("font_color", Color(0.2, 0.85, 1.0, 1.0))
 	s_hbox.add_child(s_plus)
 
 	silver_btn.add_child(s_hbox)
@@ -401,19 +385,20 @@ func _build_top_header() -> void:
 
 	# Gold Capsule
 	var gold_btn = Button.new()
-	gold_btn.custom_minimum_size = Vector2(120, 44)
-	_style_white_gold_button(gold_btn, 8, 4, Vector2(0, 2))
+	gold_btn.custom_minimum_size = Vector2(120, 42)
+	_style_glass_action_button(gold_btn, 21, Color(0.3, 0.45, 0.65, 0.7))
 	gold_btn.pressed.connect(func(): _show_modal("TRÂN BẢO CÁC", _build_shop_content()))
 
 	var g_hbox = HBoxContainer.new()
 	g_hbox.set_anchors_preset(PRESET_FULL_RECT)
-	g_hbox.offset_left = 8
-	g_hbox.offset_right = -8
+	g_hbox.offset_left = 10
+	g_hbox.offset_right = -10
 	g_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	g_hbox.add_theme_constant_override("separation", 6)
+	g_hbox.mouse_filter = MOUSE_FILTER_IGNORE
 
 	var g_icon = TextureRect.new()
-	g_icon.custom_minimum_size = Vector2(22, 22)
+	g_icon.custom_minimum_size = Vector2(20, 20)
 	g_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	g_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	var g_tex = load("res://assets/ui/icon_gold.png")
@@ -422,25 +407,24 @@ func _build_top_header() -> void:
 
 	gold_label = Label.new()
 	gold_label.text = _format_number(current_gold)
-	gold_label.add_theme_font_size_override("font_size", 14)
-	gold_label.add_theme_color_override("font_color", Color(0.70, 0.48, 0.05, 1.0))
+	gold_label.add_theme_font_size_override("font_size", 13)
+	gold_label.add_theme_color_override("font_color", Color(0.2, 0.85, 1.0, 1.0))
 	g_hbox.add_child(gold_label)
 
 	var g_plus = Label.new()
-	g_plus.text = "+"
-	g_plus.add_theme_font_size_override("font_size", 15)
-	g_plus.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
+	g_plus.text = "＋"
+	g_plus.add_theme_font_size_override("font_size", 14)
+	g_plus.add_theme_color_override("font_color", Color(0.2, 0.85, 1.0, 1.0))
 	g_hbox.add_child(g_plus)
 
 	gold_btn.add_child(g_hbox)
 	header_hbox.add_child(gold_btn)
 
-	# Friends Button (🤝 BẠN BÈ)
+	# Friends Button (🤝)
 	var friend_btn = Button.new()
-	friend_btn.custom_minimum_size = Vector2(115, 44)
-	friend_btn.text = "🤝 BẠN BÈ"
-	friend_btn.add_theme_font_size_override("font_size", 12)
-	_style_white_gold_button(friend_btn, 8, 4, Vector2(0, 2))
+	friend_btn.custom_minimum_size = Vector2(42, 42)
+	friend_btn.text = "🤝"
+	_style_round_icon_button(friend_btn, 14)
 	friend_btn.pressed.connect(func():
 		AudioManager.play_card_select()
 		_show_friends_modal()
@@ -448,264 +432,760 @@ func _build_top_header() -> void:
 	friend_nav_btn = friend_btn
 	header_hbox.add_child(friend_btn)
 
-	# Mail Button (✉️)
+	# Mail Button (✉️) with red dot badge
 	var mail_btn = Button.new()
-	mail_btn.custom_minimum_size = Vector2(44, 44)
+	mail_btn.custom_minimum_size = Vector2(42, 42)
 	mail_btn.text = "✉️"
-	mail_btn.add_theme_font_size_override("font_size", 18)
-	_style_white_gold_button(mail_btn, 8, 4, Vector2(0, 2))
+	_style_round_icon_button(mail_btn, 14)
 	mail_btn.pressed.connect(func(): _show_modal("HÒM THƯ TRIỀU ĐÌNH", _build_mail_content()))
+
+	var mail_dot = PanelContainer.new()
+	mail_dot.custom_minimum_size = Vector2(10, 10)
+	mail_dot.position = Vector2(28, 4)
+	var m_dot_sb = StyleBoxFlat.new()
+	m_dot_sb.bg_color = Color(1.0, 0.2, 0.2, 1.0)
+	m_dot_sb.corner_radius_top_left = 5
+	m_dot_sb.corner_radius_top_right = 5
+	m_dot_sb.corner_radius_bottom_right = 5
+	m_dot_sb.corner_radius_bottom_left = 5
+	mail_dot.add_theme_stylebox_override("panel", m_dot_sb)
+	mail_dot.mouse_filter = MOUSE_FILTER_IGNORE
+	mail_btn.add_child(mail_dot)
+
 	header_hbox.add_child(mail_btn)
 
 	# Settings Button (⚙️)
 	var settings_btn = Button.new()
-	settings_btn.custom_minimum_size = Vector2(44, 44)
+	settings_btn.custom_minimum_size = Vector2(42, 42)
 	settings_btn.text = "⚙️"
-	settings_btn.add_theme_font_size_override("font_size", 18)
-	_style_white_gold_button(settings_btn, 8, 4, Vector2(0, 2))
+	_style_round_icon_button(settings_btn, 14)
 	settings_btn.pressed.connect(func(): _show_modal("THIẾT LẬP CHIẾN TRƯỜNG", _build_settings_content()))
 	header_hbox.add_child(settings_btn)
 
-func _build_four_game_modes() -> void:
-	# Sảnh Chính: Chiến Lệnh Đài và Thông Báo
-	_build_tactical_command_dock()
-	_build_event_notice_banner()
+func _build_hero_center_stage() -> void:
+	hero_stage_container = Control.new()
+	hero_stage_container.anchors_preset = PRESET_FULL_RECT
+	hero_stage_container.mouse_filter = MOUSE_FILTER_IGNORE
+	add_child(hero_stage_container)
 
-func _build_hero_stage() -> void:
-	pass
+	# Standing Hero Sprite
+	hero_sprite = TextureRect.new()
+	hero_sprite.position = Vector2(280, 100)
+	hero_sprite.custom_minimum_size = Vector2(490, 530)
+	hero_sprite.size = Vector2(490, 530)
+	hero_sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	hero_sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	hero_sprite.mouse_filter = MOUSE_FILTER_STOP
+	hero_sprite.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	hero_sprite.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			_trigger_hero_interaction()
+	)
 
-func _build_tactical_command_dock() -> void:
-	var cmd_container = Control.new()
-	cmd_container.anchors_preset = PRESET_FULL_RECT
-	cmd_container.mouse_filter = MOUSE_FILTER_IGNORE
-	add_child(cmd_container)
+	var default_tex = load("res://assets/heroes_transparent/ly_thuong_kiet.png")
+	if default_tex == null:
+		default_tex = load("res://assets/ui/ly_thuong_kiet.png")
+	if default_tex:
+		hero_sprite.texture = default_tex
+	hero_stage_container.add_child(hero_sprite)
 
-	# 1. Thẻ chọn Chế độ chơi (Mode Selector Pill)
+	# Idle Floating Tween Animation
+	var tw = create_tween().set_loops()
+	tw.tween_property(hero_sprite, "position:y", 96.0, 2.0).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(hero_sprite, "position:y", 108.0, 2.0).set_trans(Tween.TRANS_SINE)
+
+	# Dialogue Bubble
+	hero_dialogue_bubble = PanelContainer.new()
+	hero_dialogue_bubble.position = Vector2(360, 95)
+	hero_dialogue_bubble.custom_minimum_size = Vector2(250, 50)
+	hero_dialogue_bubble.visible = false
+	var bub_style = StyleBoxFlat.new()
+	bub_style.bg_color = Color(0.08, 0.10, 0.18, 0.95)
+	bub_style.border_width_left = 1
+	bub_style.border_width_top = 1
+	bub_style.border_width_right = 1
+	bub_style.border_width_bottom = 1
+	bub_style.border_color = Color(0.2, 0.85, 1.0, 0.9)
+	bub_style.corner_radius_top_left = 12
+	bub_style.corner_radius_top_right = 12
+	bub_style.corner_radius_bottom_right = 12
+	bub_style.corner_radius_bottom_left = 4
+	bub_style.shadow_color = Color(0.2, 0.85, 1.0, 0.4)
+	bub_style.shadow_size = 10
+	hero_dialogue_bubble.add_theme_stylebox_override("panel", bub_style)
+
+	var b_margin = MarginContainer.new()
+	b_margin.add_theme_constant_override("margin_left", 12)
+	b_margin.add_theme_constant_override("margin_right", 12)
+	b_margin.add_theme_constant_override("margin_top", 8)
+	b_margin.add_theme_constant_override("margin_bottom", 8)
+
+	hero_dialogue_label = Label.new()
+	hero_dialogue_label.text = "Nam quốc sơn hà Nam đế cư!"
+	hero_dialogue_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hero_dialogue_label.add_theme_font_size_override("font_size", 12)
+	hero_dialogue_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+	b_margin.add_child(hero_dialogue_label)
+	hero_dialogue_bubble.add_child(b_margin)
+	hero_stage_container.add_child(hero_dialogue_bubble)
+
+	# Nameplate Pill at feet
+	var nameplate = PanelContainer.new()
+	nameplate.position = Vector2(390, 636)
+	nameplate.custom_minimum_size = Vector2(270, 48)
+	var np_style = StyleBoxFlat.new()
+	np_style.bg_color = Color(0.06, 0.08, 0.14, 0.85)
+	np_style.border_width_left = 1
+	np_style.border_width_top = 1
+	np_style.border_width_right = 1
+	np_style.border_width_bottom = 1
+	np_style.border_color = Color(0.25, 0.40, 0.65, 0.65)
+	np_style.corner_radius_top_left = 24
+	np_style.corner_radius_top_right = 24
+	np_style.corner_radius_bottom_right = 24
+	np_style.corner_radius_bottom_left = 24
+	np_style.shadow_color = Color(0, 0, 0, 0.6)
+	np_style.shadow_size = 10
+	np_style.shadow_offset = Vector2(0, 3)
+	nameplate.add_theme_stylebox_override("panel", np_style)
+
+	var np_vbox = VBoxContainer.new()
+	np_vbox.set_anchors_preset(PRESET_FULL_RECT)
+	np_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	np_vbox.add_theme_constant_override("separation", 2)
+
+	hero_nameplate_lbl = Label.new()
+	hero_nameplate_lbl.text = "Lý Thường Kiệt / 47"
+	hero_nameplate_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hero_nameplate_lbl.add_theme_font_size_override("font_size", 14)
+	hero_nameplate_lbl.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+	np_vbox.add_child(hero_nameplate_lbl)
+
+	hero_status_sub_lbl = Label.new()
+	hero_status_sub_lbl.text = "ĐANG XUẤT TRẬN"
+	hero_status_sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hero_status_sub_lbl.add_theme_font_size_override("font_size", 10)
+	hero_status_sub_lbl.add_theme_color_override("font_color", Color(0.35, 0.85, 1.0, 0.9))
+	np_vbox.add_child(hero_status_sub_lbl)
+
+	nameplate.add_child(np_vbox)
+	hero_stage_container.add_child(nameplate)
+
+func _build_left_character_column() -> void:
+	var col = Control.new()
+	col.anchors_preset = PRESET_FULL_RECT
+	col.mouse_filter = MOUSE_FILTER_IGNORE
+	add_child(col)
+
+	var left_box = VBoxContainer.new()
+	left_box.position = Vector2(24, 84)
+	left_box.custom_minimum_size = Vector2(165, 600)
+	left_box.add_theme_constant_override("separation", 12)
+	col.add_child(left_box)
+
+	# 1. Header: "Nhân vật" + Count
+	var hdr_hbox = HBoxContainer.new()
+	hdr_hbox.custom_minimum_size = Vector2(165, 26)
+
+	var nv_lbl = Label.new()
+	nv_lbl.text = "Nhân vật"
+	nv_lbl.add_theme_font_size_override("font_size", 16)
+	nv_lbl.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+	hdr_hbox.add_child(nv_lbl)
+
+	var spacer = Control.new()
+	spacer.size_flags_horizontal = SIZE_EXPAND_FILL
+	hdr_hbox.add_child(spacer)
+
+	_left_hero_count_lbl = Label.new()
+	_left_hero_count_lbl.text = "01 - 02 / 10"
+	_left_hero_count_lbl.add_theme_font_size_override("font_size", 11)
+	_left_hero_count_lbl.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85, 0.75))
+	hdr_hbox.add_child(_left_hero_count_lbl)
+
+	left_box.add_child(hdr_hbox)
+
+	# 2. Hero Cards Stack
+	_left_hero_cards_container = VBoxContainer.new()
+	_left_hero_cards_container.add_theme_constant_override("separation", 10)
+	left_box.add_child(_left_hero_cards_container)
+
+	# 3. Paging Controls (< and >)
+	var page_hbox = HBoxContainer.new()
+	page_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	page_hbox.add_theme_constant_override("separation", 14)
+
+	var prev_btn = Button.new()
+	prev_btn.text = "‹"
+	prev_btn.custom_minimum_size = Vector2(34, 34)
+	_style_round_icon_button(prev_btn, 17)
+	prev_btn.pressed.connect(_on_left_hero_prev_page)
+	page_hbox.add_child(prev_btn)
+
+	var next_btn = Button.new()
+	next_btn.text = "›"
+	next_btn.custom_minimum_size = Vector2(34, 34)
+	_style_round_icon_button(next_btn, 17)
+	next_btn.pressed.connect(_on_left_hero_next_page)
+	page_hbox.add_child(next_btn)
+
+	left_box.add_child(page_hbox)
+
+	# Spacer to push buttons towards bottom
+	var v_spacer = Control.new()
+	v_spacer.custom_minimum_size = Vector2(0, 140)
+	v_spacer.size_flags_vertical = SIZE_EXPAND_FILL
+	left_box.add_child(v_spacer)
+
+	# 4. Button "[+] BỘ SƯU TẬP"
+	var coll_btn = Button.new()
+	coll_btn.custom_minimum_size = Vector2(150, 40)
+	coll_btn.text = "＋ BỘ SƯU TẬP"
+	_style_glass_action_button(coll_btn, 12, Color(0.25, 0.40, 0.65, 0.8))
+	coll_btn.pressed.connect(func():
+		AudioManager.play_card_select()
+		_open_inventory_modal()
+	)
+	left_box.add_child(coll_btn)
+
+	# 5. Button "👥 Đổi nhân vật"
+	var change_btn = Button.new()
+	change_btn.custom_minimum_size = Vector2(150, 44)
+	change_btn.text = "👥 Đổi nhân vật"
+	_style_glass_action_button(change_btn, 22, Color(0.15, 0.82, 1.0, 0.9))
+	change_btn.pressed.connect(func():
+		AudioManager.play_card_select()
+		_show_fullscreen_heroes()
+	)
+	left_box.add_child(change_btn)
+
+	_refresh_left_character_cards()
+
+func _refresh_left_character_cards() -> void:
+	if not is_instance_valid(_left_hero_cards_container):
+		return
+	for c in _left_hero_cards_container.get_children():
+		c.queue_free()
+
+	var hero_list: Array = []
+	var seen_slugs: Dictionary = {}
+
+	if AuthManager and AuthManager.current_generals.size() > 0:
+		for g in AuthManager.current_generals:
+			var s = str(g).to_lower().strip_edges()
+			if not seen_slugs.has(s):
+				seen_slugs[s] = true
+				hero_list.append(s)
+
+	if HeroDatabase:
+		for h in HeroDatabase.get_available_pick_heroes():
+			var s = str(h.get("slug", "")).to_lower().strip_edges()
+			if not seen_slugs.has(s):
+				seen_slugs[s] = true
+				hero_list.append(s)
+
+	if hero_list.is_empty():
+		hero_list = ["ly_thuong_kiet", "tran_hung_dao", "cao_lo", "le_chan", "ba_trieu"]
+
+	var total_count = hero_list.size()
+	var per_page = 2
+	var max_page = max(0, int(ceil(float(total_count) / float(per_page))) - 1)
+	if _left_hero_page > max_page:
+		_left_hero_page = max_page
+	if _left_hero_page < 0:
+		_left_hero_page = 0
+
+	var start_idx = _left_hero_page * per_page
+	var end_idx = min(start_idx + per_page, total_count)
+
+	if is_instance_valid(_left_hero_count_lbl):
+		_left_hero_count_lbl.text = "%02d - %02d / %02d" % [start_idx + 1, end_idx, total_count]
+
+	for i in range(start_idx, end_idx):
+		var slug = hero_list[i]
+		var is_selected = (slug.to_lower() == _active_hero_slug.to_lower())
+
+		var card_btn = Button.new()
+		card_btn.custom_minimum_size = Vector2(78, 78)
+
+		var normal_sb = StyleBoxFlat.new()
+		normal_sb.bg_color = Color(0.10, 0.12, 0.20, 0.88)
+		normal_sb.corner_radius_top_left = 16
+		normal_sb.corner_radius_top_right = 16
+		normal_sb.corner_radius_bottom_right = 16
+		normal_sb.corner_radius_bottom_left = 16
+		normal_sb.border_width_left = 2 if is_selected else 1
+		normal_sb.border_width_top = 2 if is_selected else 1
+		normal_sb.border_width_right = 2 if is_selected else 1
+		normal_sb.border_width_bottom = 2 if is_selected else 1
+		normal_sb.border_color = Color(0.20, 0.85, 1.0, 1.0) if is_selected else Color(0.28, 0.38, 0.52, 0.55)
+		if is_selected:
+			normal_sb.shadow_color = Color(0.20, 0.85, 1.0, 0.45)
+			normal_sb.shadow_size = 8
+
+		var hover_sb = normal_sb.duplicate() as StyleBoxFlat
+		hover_sb.border_color = Color(0.40, 0.92, 1.0, 1.0)
+		hover_sb.shadow_color = Color(0.20, 0.85, 1.0, 0.6)
+		hover_sb.shadow_size = 12
+
+		card_btn.add_theme_stylebox_override("normal", normal_sb)
+		card_btn.add_theme_stylebox_override("hover", hover_sb)
+		card_btn.add_theme_stylebox_override("pressed", hover_sb)
+		card_btn.add_theme_stylebox_override("focus", hover_sb)
+
+		var img = TextureRect.new()
+		img.set_anchors_preset(PRESET_FULL_RECT)
+		img.offset_left = 4
+		img.offset_top = 4
+		img.offset_right = -4
+		img.offset_bottom = -4
+		img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		img.mouse_filter = MOUSE_FILTER_IGNORE
+
+		var av_path = "res://assets/ui/%s.png" % slug
+		if ResourceLoader.exists(av_path):
+			img.texture = load(av_path)
+		elif ResourceLoader.exists("res://assets/heroes_transparent/%s.png" % slug):
+			img.texture = load("res://assets/heroes_transparent/%s.png" % slug)
+
+		card_btn.add_child(img)
+
+		var cur_slug = slug
+		card_btn.pressed.connect(func():
+			AudioManager.play_card_select()
+			_select_hero_by_slug(cur_slug)
+		)
+
+		_left_hero_cards_container.add_child(card_btn)
+
+func _on_left_hero_prev_page() -> void:
+	AudioManager.play_card_select()
+	if _left_hero_page > 0:
+		_left_hero_page -= 1
+		_refresh_left_character_cards()
+
+func _on_left_hero_next_page() -> void:
+	AudioManager.play_card_select()
+	_left_hero_page += 1
+	_refresh_left_character_cards()
+
+func _select_hero_by_slug(slug: String) -> void:
+	_active_hero_slug = slug
+	var hero_name = "Lý Thường Kiệt"
+	var hero_id = 47
+	if HeroDatabase:
+		for h in HeroDatabase.get_all_heroes():
+			if str(h.get("slug", "")).to_lower() == slug.to_lower() or str(h.get("avatarPath", "")).get_file().get_basename().to_lower() == slug.to_lower():
+				hero_name = str(h.get("name", hero_name))
+				hero_id = int(h.get("id", hero_id))
+				break
+	_active_hero_id = hero_id
+
+	if is_instance_valid(hero_sprite):
+		var trans_path = "res://assets/heroes_transparent/%s.png" % slug
+		if ResourceLoader.exists(trans_path):
+			hero_sprite.texture = load(trans_path)
+		elif ResourceLoader.exists("res://assets/ui/%s.png" % slug):
+			hero_sprite.texture = load("res://assets/ui/%s.png" % slug)
+
+	if is_instance_valid(hero_nameplate_lbl):
+		hero_nameplate_lbl.text = "%s / %02d" % [hero_name, _active_hero_id]
+	if is_instance_valid(hero_status_sub_lbl):
+		hero_status_sub_lbl.text = "ĐANG XUẤT TRẬN"
+
+	if is_instance_valid(_top_avatar_rect):
+		var av_path = "res://assets/ui/%s.png" % slug
+		if ResourceLoader.exists(av_path):
+			_top_avatar_rect.texture = load(av_path)
+		elif is_instance_valid(hero_sprite) and hero_sprite.texture:
+			_top_avatar_rect.texture = hero_sprite.texture
+
+	_refresh_left_character_cards()
+
+func _build_right_action_deck() -> void:
+	var deck = Control.new()
+	deck.anchors_preset = PRESET_FULL_RECT
+	deck.mouse_filter = MOUSE_FILTER_IGNORE
+	add_child(deck)
+
+	# 1. Top Card: "Tìm trận" (Large Neon Pink Card)
+	var battle_card = Panel.new()
+	battle_card.position = Vector2(810, 90)
+	battle_card.custom_minimum_size = Vector2(446, 186)
+	battle_card.size = Vector2(446, 186)
+
+	var bc_style = StyleBoxFlat.new()
+	bc_style.bg_color = Color(0.12, 0.08, 0.18, 0.94)
+	bc_style.border_width_left = 3
+	bc_style.border_width_top = 3
+	bc_style.border_width_right = 3
+	bc_style.border_width_bottom = 3
+	bc_style.border_color = Color(0.98, 0.28, 0.65, 1.0)
+	bc_style.corner_radius_top_left = 22
+	bc_style.corner_radius_top_right = 22
+	bc_style.corner_radius_bottom_right = 22
+	bc_style.corner_radius_bottom_left = 22
+	bc_style.shadow_color = Color(0.98, 0.28, 0.65, 0.50)
+	bc_style.shadow_size = 18
+	bc_style.shadow_offset = Vector2(0, 4)
+	battle_card.add_theme_stylebox_override("panel", bc_style)
+	deck.add_child(battle_card)
+
+	battle_cta_btn = Button.new()
+	battle_cta_btn.set_anchors_preset(PRESET_FULL_RECT)
+	battle_cta_btn.flat = true
+	battle_cta_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var empty_sb = StyleBoxEmpty.new()
+	battle_cta_btn.add_theme_stylebox_override("normal", empty_sb)
+	battle_cta_btn.add_theme_stylebox_override("hover", empty_sb)
+	battle_cta_btn.add_theme_stylebox_override("pressed", empty_sb)
+	battle_cta_btn.add_theme_stylebox_override("focus", empty_sb)
+	battle_cta_btn.pressed.connect(_on_battle_cta_pressed)
+	battle_card.add_child(battle_cta_btn)
+
+	var bc_hbox = HBoxContainer.new()
+	bc_hbox.set_anchors_preset(PRESET_FULL_RECT)
+	bc_hbox.offset_left = 24
+	bc_hbox.offset_right = -24
+	bc_hbox.offset_top = 16
+	bc_hbox.offset_bottom = -16
+	bc_hbox.add_theme_constant_override("separation", 20)
+	bc_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	bc_hbox.mouse_filter = MOUSE_FILTER_IGNORE
+	battle_card.add_child(bc_hbox)
+
+	var bc_icon = Label.new()
+	bc_icon.text = "👻"
+	bc_icon.add_theme_font_size_override("font_size", 54)
+	bc_icon.mouse_filter = MOUSE_FILTER_IGNORE
+	bc_hbox.add_child(bc_icon)
+
+	var bc_vbox = VBoxContainer.new()
+	bc_vbox.size_flags_horizontal = SIZE_EXPAND_FILL
+	bc_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	bc_vbox.add_theme_constant_override("separation", 8)
+	bc_vbox.mouse_filter = MOUSE_FILTER_IGNORE
+
+	_battle_card_title_lbl = Label.new()
+	_battle_card_title_lbl.text = "Tìm trận"
+	_battle_card_title_lbl.add_theme_font_size_override("font_size", 40)
+	_battle_card_title_lbl.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+	_battle_card_title_lbl.add_theme_color_override("font_shadow_color", Color(0.98, 0.28, 0.65, 0.8))
+	_battle_card_title_lbl.add_theme_constant_override("shadow_offset_x", 0)
+	_battle_card_title_lbl.add_theme_constant_override("shadow_offset_y", 2)
+	_battle_card_title_lbl.mouse_filter = MOUSE_FILTER_IGNORE
+	bc_vbox.add_child(_battle_card_title_lbl)
+
 	mode_selector_btn = Button.new()
-	mode_selector_btn.custom_minimum_size = Vector2(310, 54)
-	mode_selector_btn.position = Vector2(930, 455)
-	_style_white_gold_button(mode_selector_btn, 12, 6, Vector2(0, 3))
+	mode_selector_btn.custom_minimum_size = Vector2(210, 36)
+	mode_selector_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var mode_btn_sb = StyleBoxFlat.new()
+	mode_btn_sb.bg_color = Color(0.22, 0.10, 0.26, 0.85)
+	mode_btn_sb.corner_radius_top_left = 14
+	mode_btn_sb.corner_radius_top_right = 14
+	mode_btn_sb.corner_radius_bottom_right = 14
+	mode_btn_sb.corner_radius_bottom_left = 14
+	mode_btn_sb.border_width_left = 1
+	mode_btn_sb.border_width_top = 1
+	mode_btn_sb.border_width_right = 1
+	mode_btn_sb.border_width_bottom = 1
+	mode_btn_sb.border_color = Color(0.98, 0.45, 0.75, 0.8)
+	var mode_btn_hover = mode_btn_sb.duplicate() as StyleBoxFlat
+	mode_btn_hover.bg_color = Color(0.32, 0.14, 0.38, 0.95)
+	mode_selector_btn.add_theme_stylebox_override("normal", mode_btn_sb)
+	mode_selector_btn.add_theme_stylebox_override("hover", mode_btn_hover)
+	mode_selector_btn.add_theme_stylebox_override("pressed", mode_btn_hover)
+	mode_selector_btn.add_theme_stylebox_override("focus", mode_btn_hover)
 	mode_selector_btn.pressed.connect(_toggle_mode_drawer)
-
-	var p_hbox = HBoxContainer.new()
-	p_hbox.set_anchors_preset(PRESET_FULL_RECT)
-	p_hbox.offset_left = 12
-	p_hbox.offset_right = -12
-	p_hbox.offset_top = 4
-	p_hbox.offset_bottom = -4
-	p_hbox.add_theme_constant_override("separation", 10)
-	p_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-
-	var m_icon = Label.new()
-	m_icon.name = "ModeIcon"
-	m_icon.text = "⚔️"
-	m_icon.add_theme_font_size_override("font_size", 22)
-	p_hbox.add_child(m_icon)
-
-	var m_vbox = VBoxContainer.new()
-	m_vbox.size_flags_horizontal = SIZE_EXPAND_FILL
-	m_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	m_vbox.add_theme_constant_override("separation", 1)
-
-	var mode_subtitle = Label.new()
-	mode_subtitle.text = "CHIẾN TRƯỜNG ĐANG CHỌN"
-	mode_subtitle.add_theme_font_size_override("font_size", 9)
-	mode_subtitle.add_theme_color_override("font_color", COLOR_GOLD_PRIMARY)
-	m_vbox.add_child(mode_subtitle)
 
 	mode_title_lbl = Label.new()
 	mode_title_lbl.name = "ModeTitle"
-	mode_title_lbl.text = "ĐẤU TRƯỜNG 2v2 (XẾP HẠNG)"
+	mode_title_lbl.set_anchors_preset(PRESET_FULL_RECT)
+	mode_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mode_title_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	mode_title_lbl.text = "Đấu Trường 2v2 ▾"
 	mode_title_lbl.add_theme_font_size_override("font_size", 13)
-	mode_title_lbl.add_theme_color_override("font_color", COLOR_TEXT_DARK)
-	m_vbox.add_child(mode_title_lbl)
-	p_hbox.add_child(m_vbox)
+	mode_title_lbl.add_theme_color_override("font_color", Color(1.0, 0.90, 0.96, 1.0))
+	mode_selector_btn.add_child(mode_title_lbl)
+	bc_vbox.add_child(mode_selector_btn)
 
-	var arrow_lbl = Label.new()
-	arrow_lbl.text = "▾"
-	arrow_lbl.add_theme_font_size_override("font_size", 16)
-	arrow_lbl.add_theme_color_override("font_color", COLOR_GOLD_PRIMARY)
-	p_hbox.add_child(arrow_lbl)
+	bc_hbox.add_child(bc_vbox)
 
-	mode_selector_btn.add_child(p_hbox)
-	cmd_container.add_child(mode_selector_btn)
-
-	# 2. Nút "XUẤT TRẬN" Trống Đồng 3D cực đại (Thumb Zone góc ngón cái phải)
-	battle_cta_btn = Button.new()
-	battle_cta_btn.custom_minimum_size = Vector2(310, 84)
-	battle_cta_btn.position = Vector2(930, 524)
-	_style_bronze_drum_cta(battle_cta_btn)
-	battle_cta_btn.pressed.connect(_on_battle_cta_pressed)
-
-	var b_hbox = HBoxContainer.new()
-	b_hbox.set_anchors_preset(PRESET_FULL_RECT)
-	b_hbox.offset_left = 18
-	b_hbox.offset_right = -18
-	b_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	b_hbox.add_theme_constant_override("separation", 14)
-
-	var drum_icon = Label.new()
-	drum_icon.text = "🥁"
-	drum_icon.add_theme_font_size_override("font_size", 34)
-	b_hbox.add_child(drum_icon)
-
-	var b_vbox = VBoxContainer.new()
-	b_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	b_vbox.add_theme_constant_override("separation", 2)
-
-	var sub_cta = Label.new()
-	sub_cta.text = "ĐẠI VIỆT XUẤT QUÂN"
-	sub_cta.add_theme_font_size_override("font_size", 11)
-	sub_cta.add_theme_color_override("font_color", Color(1.0, 0.88, 0.40, 1.0))
-	b_vbox.add_child(sub_cta)
-
-	var main_cta = Label.new()
-	main_cta.text = "XUẤT TRẬN"
-	main_cta.add_theme_font_size_override("font_size", 24)
-	main_cta.add_theme_color_override("font_color", Color(1.0, 0.98, 0.90, 1.0))
-	main_cta.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
-	main_cta.add_theme_constant_override("shadow_offset_y", 2)
-	b_vbox.add_child(main_cta)
-
-	b_hbox.add_child(b_vbox)
-	battle_cta_btn.add_child(b_hbox)
-	cmd_container.add_child(battle_cta_btn)
-
-	# 3. Khay chọn chế độ cuộn lụa (Mode Drawer, ẩn mặc định)
+	# 2. Popover Mode Drawer
 	mode_drawer_panel = PanelContainer.new()
-	mode_drawer_panel.custom_minimum_size = Vector2(310, 230)
-	mode_drawer_panel.position = Vector2(930, 215)
+	mode_drawer_panel.custom_minimum_size = Vector2(446, 170)
+	mode_drawer_panel.position = Vector2(810, 282)
 	mode_drawer_panel.visible = false
+	var md_style = StyleBoxFlat.new()
+	md_style.bg_color = Color(0.10, 0.07, 0.14, 0.98)
+	md_style.border_width_left = 2
+	md_style.border_width_top = 2
+	md_style.border_width_right = 2
+	md_style.border_width_bottom = 2
+	md_style.border_color = Color(0.98, 0.28, 0.65, 0.9)
+	md_style.corner_radius_top_left = 16
+	md_style.corner_radius_top_right = 16
+	md_style.corner_radius_bottom_right = 16
+	md_style.corner_radius_bottom_left = 16
+	md_style.shadow_color = Color(0, 0, 0, 0.8)
+	md_style.shadow_size = 18
+	md_style.shadow_offset = Vector2(0, 6)
+	mode_drawer_panel.add_theme_stylebox_override("panel", md_style)
 
-	var d_style = StyleBoxFlat.new()
-	d_style.bg_color = Color(0.08, 0.06, 0.10, 0.96)
-	d_style.border_width_left = 2
-	d_style.border_width_top = 2
-	d_style.border_width_right = 2
-	d_style.border_width_bottom = 2
-	d_style.border_color = COLOR_GOLD_PRIMARY
-	d_style.corner_radius_top_left = 12
-	d_style.corner_radius_top_right = 12
-	d_style.corner_radius_bottom_right = 12
-	d_style.corner_radius_bottom_left = 12
-	d_style.shadow_color = Color(0, 0, 0, 0.75)
-	d_style.shadow_size = 18
-	d_style.shadow_offset = Vector2(0, 6)
-	mode_drawer_panel.add_theme_stylebox_override("panel", d_style)
+	var md_vbox = VBoxContainer.new()
+	md_vbox.set_anchors_preset(PRESET_FULL_RECT)
+	md_vbox.offset_left = 12
+	md_vbox.offset_right = -12
+	md_vbox.offset_top = 10
+	md_vbox.offset_bottom = -10
+	md_vbox.add_theme_constant_override("separation", 6)
 
-	var d_vbox = VBoxContainer.new()
-	d_vbox.set_anchors_preset(PRESET_FULL_RECT)
-	d_vbox.offset_left = 10
-	d_vbox.offset_right = -10
-	d_vbox.offset_top = 10
-	d_vbox.offset_bottom = -10
-	d_vbox.add_theme_constant_override("separation", 6)
-
-	var drawer_hdr = Label.new()
-	drawer_hdr.text = "CHỌN CHIẾN TRƯỜNG TRANH HÙNG"
-	drawer_hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	drawer_hdr.add_theme_font_size_override("font_size", 11)
-	drawer_hdr.add_theme_color_override("font_color", COLOR_GOLD_PRIMARY)
-	d_vbox.add_child(drawer_hdr)
-
-	var d_div = ColorRect.new()
-	d_div.custom_minimum_size = Vector2(0, 1)
-	d_div.color = Color(COLOR_GOLD_PRIMARY.r, COLOR_GOLD_PRIMARY.g, COLOR_GOLD_PRIMARY.b, 0.4)
-	d_vbox.add_child(d_div)
+	var md_hdr = Label.new()
+	md_hdr.text = "CHỌN CHIẾN TRƯỜNG TRANH HÙNG"
+	md_hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	md_hdr.add_theme_font_size_override("font_size", 12)
+	md_hdr.add_theme_color_override("font_color", Color(0.98, 0.45, 0.75, 1.0))
+	md_vbox.add_child(md_hdr)
 
 	var modes_list = [
 		{"id": "2v2", "icon": "⚔️", "title": "Đấu Trường 2v2", "sub": "Xếp Hạng"},
-		{"id": "dynasty_5", "icon": "👑", "title": "Vương Triều 5 người", "sub": "(Chưa làm xong)"},
-		{"id": "dynasty_8", "icon": "👑", "title": "Vương Triều 8 người", "sub": "(Chưa làm xong)"}
+		{"id": "dynasty_5", "icon": "👑", "title": "Vương Triều 5 người", "sub": "(Sắp ra mắt)"},
+		{"id": "dynasty_8", "icon": "👑", "title": "Vương Triều 8 người", "sub": "(Sắp ra mắt)"}
 	]
 
 	for m in modes_list:
 		var m_btn = Button.new()
-		m_btn.custom_minimum_size = Vector2(0, 38)
+		m_btn.custom_minimum_size = Vector2(0, 36)
 		m_btn.text = "%s  %s — %s" % [m["icon"], m["title"], m["sub"]]
 		m_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		_style_secondary_mode_button(m_btn)
 		var mode_id = m["id"]
-		var m_icon_str = m["icon"]
 		var m_title_str = m["title"]
 		m_btn.pressed.connect(func():
-			_select_mode(mode_id, m_icon_str, m_title_str)
+			_select_mode(mode_id, m["icon"], m_title_str + " ▾")
 		)
-		d_vbox.add_child(m_btn)
+		md_vbox.add_child(m_btn)
 
-	mode_drawer_panel.add_child(d_vbox)
-	cmd_container.add_child(mode_drawer_panel)
+	mode_drawer_panel.add_child(md_vbox)
+	deck.add_child(mode_drawer_panel)
 
-func _build_event_notice_banner() -> void:
-	var banner = PanelContainer.new()
-	banner.custom_minimum_size = Vector2(250, 175)
-	banner.position = Vector2(24, 82)
+	# 3. 2x2 Feature Grid
+	var grid = GridContainer.new()
+	grid.position = Vector2(810, 292)
+	grid.custom_minimum_size = Vector2(446, 388)
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 14)
+	grid.add_theme_constant_override("v_separation", 14)
+	deck.add_child(grid)
 
-	var b_style = StyleBoxFlat.new()
-	b_style.bg_color = Color(0.08, 0.06, 0.10, 0.88)
-	b_style.border_width_left = 1
-	b_style.border_width_top = 1
-	b_style.border_width_right = 1
-	b_style.border_width_bottom = 1
-	b_style.border_color = Color(0.85, 0.70, 0.22, 0.6)
-	b_style.corner_radius_top_left = 10
-	b_style.corner_radius_top_right = 10
-	b_style.corner_radius_bottom_right = 10
-	b_style.corner_radius_bottom_left = 10
-	b_style.shadow_color = Color(0, 0, 0, 0.5)
-	b_style.shadow_size = 10
-	b_style.shadow_offset = Vector2(0, 4)
-	banner.add_theme_stylebox_override("panel", b_style)
+	var cards_data = [
+		{
+			"id": "shop",
+			"title": "Cửa hàng",
+			"sub": "Trân Bảo Các",
+			"icon": "🛒",
+			"border_color": Color(1.0, 0.65, 0.15, 1.0),
+			"bg_color": Color(0.14, 0.10, 0.08, 0.92),
+			"glow_color": Color(1.0, 0.65, 0.15, 0.45),
+			"action": func(): _show_modal("TRÂN BẢO CÁC", _build_shop_content())
+		},
+		{
+			"id": "skins",
+			"title": "Trang phục",
+			"sub": "Thần Điện",
+			"icon": "👘",
+			"border_color": Color(0.15, 0.85, 1.0, 1.0),
+			"bg_color": Color(0.08, 0.12, 0.18, 0.92),
+			"glow_color": Color(0.15, 0.85, 1.0, 0.45),
+			"action": func(): _show_fullscreen_than_dien()
+		},
+		{
+			"id": "quests",
+			"title": "Nhiệm vụ",
+			"sub": "Quân Lệnh",
+			"icon": "📋",
+			"border_color": Color(0.20, 0.75, 1.0, 1.0),
+			"bg_color": Color(0.08, 0.11, 0.18, 0.92),
+			"glow_color": Color(0.20, 0.75, 1.0, 0.45),
+			"action": func(): _open_quests_modal()
+		},
+		{
+			"id": "events",
+			"title": "Sự kiện",
+			"sub": "Bảng Vàng & Quà",
+			"icon": "⭐",
+			"border_color": Color(0.85, 0.30, 0.98, 1.0),
+			"bg_color": Color(0.14, 0.08, 0.18, 0.92),
+			"glow_color": Color(0.85, 0.30, 0.98, 0.45),
+			"action": func(): _show_modal("BẢNG PHONG THẦN", _build_leaderboard_content())
+		}
+	]
 
-	var b_vbox = VBoxContainer.new()
-	b_vbox.set_anchors_preset(PRESET_FULL_RECT)
-	b_vbox.offset_left = 12
-	b_vbox.offset_right = -12
-	b_vbox.offset_top = 10
-	b_vbox.offset_bottom = -10
-	b_vbox.add_theme_constant_override("separation", 6)
+	for c in cards_data:
+		var card_btn = Button.new()
+		card_btn.custom_minimum_size = Vector2(216, 186)
+		card_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
-	var hdr = Label.new()
-	hdr.text = "📜 BINH THƯ YẾU LƯỢC"
-	hdr.add_theme_font_size_override("font_size", 12)
-	hdr.add_theme_color_override("font_color", COLOR_GOLD_PRIMARY)
-	b_vbox.add_child(hdr)
+		var card_sb = StyleBoxFlat.new()
+		card_sb.bg_color = c["bg_color"]
+		card_sb.border_width_left = 2
+		card_sb.border_width_top = 2
+		card_sb.border_width_right = 2
+		card_sb.border_width_bottom = 2
+		card_sb.border_color = c["border_color"]
+		card_sb.corner_radius_top_left = 18
+		card_sb.corner_radius_top_right = 18
+		card_sb.corner_radius_bottom_right = 18
+		card_sb.corner_radius_bottom_left = 18
+		card_sb.shadow_color = c["glow_color"]
+		card_sb.shadow_size = 14
+		card_sb.shadow_offset = Vector2(0, 3)
 
-	var ev1 = Button.new()
-	ev1.custom_minimum_size = Vector2(0, 34)
-	ev1.text = "⭐ Điểm danh 7 ngày"
-	_style_secondary_mode_button(ev1)
-	ev1.pressed.connect(func():
-		AudioManager.play_card_select()
-		_show_modal("QUÀ ĐIỂM DANH 7 NGÀY", _build_7day_rewards_content())
-	)
-	b_vbox.add_child(ev1)
+		var card_hover = card_sb.duplicate() as StyleBoxFlat
+		card_hover.shadow_size = 20
+		card_hover.shadow_color = Color(c["glow_color"].r, c["glow_color"].g, c["glow_color"].b, 0.75)
+		card_hover.border_width_left = 3
+		card_hover.border_width_top = 3
+		card_hover.border_width_right = 3
+		card_hover.border_width_bottom = 3
 
-	var ev2 = Button.new()
-	ev2.custom_minimum_size = Vector2(0, 34)
-	ev2.text = "🎁 Trân bảo ngập tràn"
-	_style_secondary_mode_button(ev2)
-	ev2.pressed.connect(func(): _show_modal("TRÂN BẢO CÁC", _build_shop_content()))
-	b_vbox.add_child(ev2)
+		card_btn.add_theme_stylebox_override("normal", card_sb)
+		card_btn.add_theme_stylebox_override("hover", card_hover)
+		card_btn.add_theme_stylebox_override("pressed", card_hover)
+		card_btn.add_theme_stylebox_override("focus", card_hover)
 
-	var ev3 = Button.new()
-	ev3.custom_minimum_size = Vector2(0, 34)
-	ev3.text = "🏆 Đua Top Hoàng Triều"
-	_style_secondary_mode_button(ev3)
-	ev3.pressed.connect(func(): _show_modal("BẢNG PHONG THẦN", _build_leaderboard_content()))
-	b_vbox.add_child(ev3)
+		var c_vbox = VBoxContainer.new()
+		c_vbox.set_anchors_preset(PRESET_FULL_RECT)
+		c_vbox.offset_left = 14
+		c_vbox.offset_right = -14
+		c_vbox.offset_top = 14
+		c_vbox.offset_bottom = -14
+		c_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		c_vbox.add_theme_constant_override("separation", 6)
+		c_vbox.mouse_filter = MOUSE_FILTER_IGNORE
 
-	banner.add_child(b_vbox)
-	add_child(banner)
+		var icon_lbl = Label.new()
+		icon_lbl.text = c["icon"]
+		icon_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		icon_lbl.add_theme_font_size_override("font_size", 38)
+		icon_lbl.mouse_filter = MOUSE_FILTER_IGNORE
+		c_vbox.add_child(icon_lbl)
+
+		var title_lbl = Label.new()
+		title_lbl.text = c["title"]
+		title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		title_lbl.add_theme_font_size_override("font_size", 18)
+		title_lbl.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+		title_lbl.mouse_filter = MOUSE_FILTER_IGNORE
+		c_vbox.add_child(title_lbl)
+
+		var sub_lbl = Label.new()
+		sub_lbl.text = c["sub"]
+		sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sub_lbl.add_theme_font_size_override("font_size", 11)
+		sub_lbl.add_theme_color_override("font_color", Color(c["border_color"].r, c["border_color"].g, c["border_color"].b, 0.85))
+		sub_lbl.mouse_filter = MOUSE_FILTER_IGNORE
+		c_vbox.add_child(sub_lbl)
+
+		card_btn.add_child(c_vbox)
+
+		if c["id"] == "quests":
+			quest_nav_btn = card_btn
+			var badge = PanelContainer.new()
+			badge.custom_minimum_size = Vector2(16, 16)
+			badge.position = Vector2(184, 12)
+			var b_sb = StyleBoxFlat.new()
+			b_sb.bg_color = Color(1.0, 0.2, 0.2, 1.0)
+			b_sb.corner_radius_top_left = 8
+			b_sb.corner_radius_top_right = 8
+			b_sb.corner_radius_bottom_right = 8
+			b_sb.corner_radius_bottom_left = 8
+			b_sb.shadow_color = Color(1.0, 0.2, 0.2, 0.7)
+			b_sb.shadow_size = 6
+			badge.add_theme_stylebox_override("panel", b_sb)
+			badge.mouse_filter = MOUSE_FILTER_IGNORE
+			_quest_badge_dot = badge
+			card_btn.add_child(badge)
+			_update_quest_nav_indicator()
+
+		var action_fn = c["action"]
+		card_btn.pressed.connect(func():
+			AudioManager.play_card_select()
+			action_fn.call()
+		)
+		grid.add_child(card_btn)
+
+func _build_four_game_modes() -> void:
+	pass
+
+func _build_hero_stage() -> void:
+	pass
+
+func _build_bottom_nav_dock() -> void:
+	pass
+
+func _style_round_icon_button(btn: Button, radius: int) -> void:
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var normal = StyleBoxFlat.new()
+	normal.bg_color = Color(0.10, 0.12, 0.20, 0.85)
+	normal.border_width_left = 1
+	normal.border_width_top = 1
+	normal.border_width_right = 1
+	normal.border_width_bottom = 1
+	normal.border_color = Color(0.3, 0.45, 0.65, 0.6)
+	normal.corner_radius_top_left = radius
+	normal.corner_radius_top_right = radius
+	normal.corner_radius_bottom_right = radius
+	normal.corner_radius_bottom_left = radius
+
+	var hover = normal.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(0.18, 0.22, 0.35, 0.95)
+	hover.border_color = Color(0.2, 0.85, 1.0, 0.9)
+
+	btn.add_theme_stylebox_override("normal", normal)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", hover)
+	btn.add_theme_stylebox_override("focus", hover)
+	btn.add_theme_font_size_override("font_size", 18)
+	btn.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+
+func _style_glass_action_button(btn: Button, radius: int, border_col: Color) -> void:
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var normal = StyleBoxFlat.new()
+	normal.bg_color = Color(0.08, 0.10, 0.16, 0.88)
+	normal.border_width_left = 1
+	normal.border_width_top = 1
+	normal.border_width_right = 1
+	normal.border_width_bottom = 1
+	normal.border_color = border_col
+	normal.corner_radius_top_left = radius
+	normal.corner_radius_top_right = radius
+	normal.corner_radius_bottom_right = radius
+	normal.corner_radius_bottom_left = radius
+	normal.shadow_color = Color(border_col.r, border_col.g, border_col.b, 0.3)
+	normal.shadow_size = 6
+
+	var hover = normal.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(0.14, 0.18, 0.28, 0.95)
+	hover.shadow_size = 10
+	hover.shadow_color = Color(border_col.r, border_col.g, border_col.b, 0.6)
+
+	btn.add_theme_stylebox_override("normal", normal)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", hover)
+	btn.add_theme_stylebox_override("focus", hover)
+	btn.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+	btn.add_theme_font_size_override("font_size", 12)
 
 func _style_bronze_drum_cta(btn: Button) -> void:
 	var normal = StyleBoxFlat.new()
-	normal.bg_color = Color(0.70, 0.12, 0.08, 0.96) # Rich royal vermilion
+	normal.bg_color = Color(0.70, 0.12, 0.08, 0.96)
 	normal.border_width_left = 2
 	normal.border_width_top = 2
 	normal.border_width_right = 2
 	normal.border_width_bottom = 2
-	normal.border_color = Color(1.0, 0.86, 0.35, 1.0) # Bright gold
+	normal.border_color = Color(1.0, 0.86, 0.35, 1.0)
 	normal.corner_radius_top_left = 18
 	normal.corner_radius_top_right = 18
 	normal.corner_radius_bottom_right = 18
@@ -739,11 +1219,7 @@ func _select_mode(mode_id: String, icon_str: String, title_str: String) -> void:
 	AudioManager.play_card_select()
 	current_selected_mode = mode_id
 	if is_instance_valid(mode_title_lbl):
-		mode_title_lbl.text = title_str.to_upper()
-	if is_instance_valid(mode_selector_btn):
-		var icon_node = mode_selector_btn.find_child("ModeIcon", true, false) as Label
-		if icon_node:
-			icon_node.text = icon_str
+		mode_title_lbl.text = title_str
 	if is_instance_valid(mode_drawer_panel):
 		mode_drawer_panel.visible = false
 
@@ -764,6 +1240,14 @@ func _trigger_hero_interaction() -> void:
 	if is_instance_valid(hero_dialogue_bubble):
 		hero_dialogue_bubble.visible = true
 		hero_dialogue_bubble.modulate.a = 1.0
+		if is_instance_valid(hero_dialogue_label):
+			var quotes = [
+				"Nam quốc sơn hà Nam đế cư!",
+				"Quyết chiến vì giang sơn Đại Việt!",
+				"Tướng quân đã sẵn sàng xuất trận chưa?",
+				"Phá Tống bình Chiêm, uy danh thiên cổ!"
+			]
+			hero_dialogue_label.text = quotes[randi() % quotes.size()]
 		var tw = create_tween()
 		tw.tween_property(hero_dialogue_bubble, "scale", Vector2(1.05, 1.05), 0.15)
 		tw.tween_property(hero_dialogue_bubble, "scale", Vector2(1.0, 1.0), 0.15)
@@ -793,55 +1277,6 @@ func _style_secondary_mode_button(btn: Button) -> void:
 	btn.add_theme_color_override("font_color", Color(0.95, 0.92, 0.85, 1.0))
 	btn.add_theme_font_size_override("font_size", 12)
 
-func _build_bottom_nav_dock() -> void:
-	var dock_panel = Panel.new()
-	dock_panel.custom_minimum_size = Vector2(1280, 64)
-	dock_panel.set_anchors_preset(PRESET_BOTTOM_WIDE)
-	dock_panel.offset_top = -64
-
-	var dock_style = StyleBoxFlat.new()
-	dock_style.bg_color = Color(0.06, 0.04, 0.08, 0.94) # Regal Dark Lacquer
-	dock_style.border_width_top = 2
-	dock_style.border_color = COLOR_GOLD_PRIMARY
-	dock_style.shadow_color = COLOR_SHADOW_DEEP
-	dock_style.shadow_size = 8
-	dock_style.shadow_offset = Vector2(0, -3)
-	dock_panel.add_theme_stylebox_override("panel", dock_style)
-	add_child(dock_panel)
-
-	var dock_hbox = HBoxContainer.new()
-	dock_hbox.set_anchors_preset(PRESET_FULL_RECT)
-	dock_hbox.offset_left = 32
-	dock_hbox.offset_right = -32
-	dock_hbox.offset_top = 8
-	dock_hbox.offset_bottom = -8
-	dock_hbox.add_theme_constant_override("separation", 14)
-	dock_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	dock_panel.add_child(dock_hbox)
-
-	var nav_items = [
-		{"icon": "🎖️", "title": "DANH TƯỚNG", "action": func(): _show_fullscreen_heroes()},
-		{"icon": "⛩️", "title": "THẦN ĐIỆN", "action": func(): _show_fullscreen_than_dien()},
-		{"icon": "🏆", "title": "BẢNG VÀNG", "action": func(): _show_modal("BẢNG PHONG THẦN", _build_leaderboard_content())},
-		{"icon": "📜", "title": "NHIỆM VỤ", "is_quest": true, "action": func(): _open_quests_modal()},
-		{"icon": "🎒", "title": "TÚI ĐỒ", "action": func(): _open_inventory_modal()},
-	]
-
-	for item in nav_items:
-		var btn = Button.new()
-		btn.size_flags_horizontal = SIZE_EXPAND_FILL
-		btn.custom_minimum_size = Vector2(180, 44)
-		btn.text = "%s  %s" % [item["icon"], item["title"]]
-		_style_white_gold_button(btn, 8, 5, Vector2(0, 3))
-		btn.pressed.connect(func():
-			AudioManager.play_card_select()
-			item["action"].call()
-		)
-		if item.get("is_quest", false):
-			quest_nav_btn = btn
-		dock_hbox.add_child(btn)
-	_update_quest_nav_indicator()
-
 func _on_social_connection_established() -> void:
 	NetworkClient.register_social_profile()
 	NetworkClient.request_friend_list()
@@ -864,7 +1299,7 @@ func _on_social_error(message: String) -> void:
 
 func _update_friend_nav_indicator() -> void:
 	if is_instance_valid(friend_nav_btn):
-		friend_nav_btn.text = "🤝 BẠN BÈ" if _social_incoming.is_empty() else "🤝 BẠN BÈ (%d)" % _social_incoming.size()
+		friend_nav_btn.text = "🤝" if _social_incoming.is_empty() else "🤝(%d)" % _social_incoming.size()
 
 func _normalize_vietnamese(text: String) -> String:
 	var s = text.to_lower().strip_edges()
@@ -1287,7 +1722,7 @@ func _load_user_data() -> void:
 			player_name_label.text = name_str
 
 		if is_instance_valid(level_badge_label):
-			level_badge_label.text = " CẤP %d " % AuthManager.current_level
+			level_badge_label.text = "Lv.%d" % AuthManager.current_level
 
 		var mil_info = AuthManager.get_military_rank_info()
 		if is_instance_valid(rank_label):
@@ -1311,15 +1746,10 @@ func _load_user_data() -> void:
 			ticket_label.text = "%s Vé" % _format_number(current_hero_tickets)
 
 		# Cập nhật ảnh Danh Tướng trung tâm theo tướng sở hữu/chọn
-		if is_instance_valid(hero_sprite):
-			var active_slug = "tran_hung_dao"
-			if AuthManager.current_generals.size() > 0:
-				active_slug = str(AuthManager.current_generals[0]).to_lower()
-			var hero_trans_path = "res://assets/heroes_transparent/%s.png" % active_slug
-			if ResourceLoader.exists(hero_trans_path):
-				hero_sprite.texture = load(hero_trans_path)
-			elif ResourceLoader.exists("res://assets/ui/%s.png" % active_slug):
-				hero_sprite.texture = load("res://assets/ui/%s.png" % active_slug)
+		var active_slug = _active_hero_slug
+		if AuthManager.current_generals.size() > 0:
+			active_slug = str(AuthManager.current_generals[0]).to_lower()
+		_select_hero_by_slug(active_slug)
 		_update_quest_nav_indicator()
 		_refresh_inventory_content()
 
@@ -2278,7 +2708,7 @@ void fragment() {
 		img.custom_minimum_size = Vector2(0, 120)
 		img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		var tex = HeroDatabase.get_avatar_texture(avatar_path)
+		var tex = HeroDatabase.get_avatar_texture(avatar_path, hid)
 		if tex:
 			img.texture = tex
 		if not is_owned:
@@ -2356,12 +2786,28 @@ void fragment() {
 					skills_text += " " + str(sk.get("name", "")) + " " + str(sk.get("desc", ""))
 		hero_card_records.append({
 			"card": card,
+			"img_node": img,
 			"name": hname,
 			"faction": faction,
 			"skills": skills_text,
 			"id": str(hid),
 			"is_owned": is_owned
 		})
+
+	if HeroDatabase and HeroDatabase.has_signal("skin_equipped"):
+		var on_skin_equipped = func(ch_hid: int, _s_id: String):
+			for item in hero_card_records:
+				if int(item.get("id", 0)) == ch_hid:
+					var c_img = item.get("img_node")
+					if is_instance_valid(c_img):
+						var updated_tex = HeroDatabase.get_avatar_texture("", ch_hid)
+						if updated_tex:
+							c_img.texture = updated_tex
+		HeroDatabase.skin_equipped.connect(on_skin_equipped)
+		fs.tree_exiting.connect(func():
+			if HeroDatabase and HeroDatabase.has_signal("skin_equipped") and HeroDatabase.skin_equipped.is_connected(on_skin_equipped):
+				HeroDatabase.skin_equipped.disconnect(on_skin_equipped)
+		)
 
 	hero_search_input.text_changed.connect(func(query_text: String):
 		var q = query_text.strip_edges()
@@ -2524,10 +2970,14 @@ void fragment() {
 		popup_bg.material = gray_mat_bg
 	portrait_box.add_child(popup_bg)
 
+	var hid = int(hero.get("id", 0))
+	var hero_skins = HeroDatabase.get_hero_skins(hid) if HeroDatabase else []
+	var cur_equipped_skin = HeroDatabase.get_equipped_skin_id(hid) if HeroDatabase else "default"
+
 	var big_img = TextureRect.new()
 	big_img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	big_img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	var tex = HeroDatabase.get_avatar_texture(str(hero.get("avatarPath", "")))
+	var tex = HeroDatabase.get_avatar_texture(str(hero.get("avatarPath", "")), hid)
 	if tex:
 		big_img.texture = tex
 	if not is_owned:
@@ -2552,6 +3002,43 @@ void fragment() {
 	name_lbl.add_theme_font_size_override("font_size", 18)
 	name_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5, 1.0) if is_owned else Color(0.75, 0.78, 0.82, 1.0))
 	left_col.add_child(name_lbl)
+
+	# Active Skin Badge on Left Column
+	var skin_badge_panel = PanelContainer.new()
+	var sbp_style = StyleBoxFlat.new()
+	sbp_style.bg_color = Color(0.16, 0.13, 0.06, 0.9)
+	sbp_style.border_color = Color(0.95, 0.82, 0.35, 0.75)
+	sbp_style.border_width_left = 1
+	sbp_style.border_width_top = 1
+	sbp_style.border_width_right = 1
+	sbp_style.border_width_bottom = 1
+	sbp_style.corner_radius_top_left = 6
+	sbp_style.corner_radius_top_right = 6
+	sbp_style.corner_radius_bottom_right = 6
+	sbp_style.corner_radius_bottom_left = 6
+	sbp_style.content_margin_left = 8
+	sbp_style.content_margin_right = 8
+	sbp_style.content_margin_top = 3
+	sbp_style.content_margin_bottom = 3
+	skin_badge_panel.add_theme_stylebox_override("panel", sbp_style)
+
+	var skin_badge_lbl = Label.new()
+	skin_badge_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	skin_badge_lbl.add_theme_font_size_override("font_size", 11)
+	skin_badge_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.55, 1.0))
+	skin_badge_panel.add_child(skin_badge_lbl)
+	left_col.add_child(skin_badge_panel)
+
+	var update_skin_badge_text = func():
+		var eq_id = HeroDatabase.get_equipped_skin_id(hid) if HeroDatabase else "default"
+		var s_name = "Trang Phục Mặc Định"
+		for s in hero_skins:
+			if s.get("id", "") == eq_id:
+				s_name = s.get("name", "Mặc Định")
+				break
+		skin_badge_lbl.text = "✨ Đang mang: %s" % s_name
+
+	update_skin_badge_text.call()
 
 	var faction_lbl = Label.new()
 	faction_lbl.text = "Triều đại: %s" % str(hero.get("faction", "Đại Việt"))
@@ -2607,19 +3094,32 @@ void fragment() {
 	own_panel.add_child(own_lbl)
 	left_col.add_child(own_panel)
 
-	# --- RIGHT COLUMN (Skills List) ---
+	# --- RIGHT COLUMN (Tabs: Kỹ Năng & Ngoại Trang) ---
 	var right_col = VBoxContainer.new()
 	right_col.size_flags_horizontal = SIZE_EXPAND_FILL
 	right_col.size_flags_vertical = SIZE_EXPAND_FILL
 	right_col.add_theme_constant_override("separation", 10)
 	content_hbox.add_child(right_col)
 
-	var skill_sec_title = Label.new()
-	skill_sec_title.text = "⚔️ KỸ NĂNG VÕ TƯỚNG"
-	skill_sec_title.add_theme_font_size_override("font_size", 16)
-	skill_sec_title.add_theme_color_override("font_color", Color(1.0, 0.88, 0.42, 1.0))
-	right_col.add_child(skill_sec_title)
+	# Tab Switcher Header
+	var tab_hbox = HBoxContainer.new()
+	tab_hbox.add_theme_constant_override("separation", 12)
+	right_col.add_child(tab_hbox)
 
+	var tab_skills_btn = Button.new()
+	tab_skills_btn.text = "⚔️ KỸ NĂNG VÕ TƯỚNG"
+	tab_skills_btn.custom_minimum_size = Vector2(175, 38)
+	tab_skills_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	tab_hbox.add_child(tab_skills_btn)
+
+	var tab_skins_btn = Button.new()
+	var skin_count_text = " (%d)" % hero_skins.size() if hero_skins.size() > 1 else ""
+	tab_skins_btn.text = "✨ NGOẠI TRANG%s" % skin_count_text
+	tab_skins_btn.custom_minimum_size = Vector2(175, 38)
+	tab_skins_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	tab_hbox.add_child(tab_skins_btn)
+
+	# Container for Skills
 	var skill_scroll = ScrollContainer.new()
 	skill_scroll.size_flags_horizontal = SIZE_EXPAND_FILL
 	skill_scroll.size_flags_vertical = SIZE_EXPAND_FILL
@@ -2630,6 +3130,321 @@ void fragment() {
 	skill_list.size_flags_horizontal = SIZE_EXPAND_FILL
 	skill_list.add_theme_constant_override("separation", 10)
 	skill_scroll.add_child(skill_list)
+
+	# Container for Skins
+	var skin_scroll = ScrollContainer.new()
+	skin_scroll.size_flags_horizontal = SIZE_EXPAND_FILL
+	skin_scroll.size_flags_vertical = SIZE_EXPAND_FILL
+	skin_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	skin_scroll.visible = false
+	right_col.add_child(skin_scroll)
+
+	var skin_list = VBoxContainer.new()
+	skin_list.size_flags_horizontal = SIZE_EXPAND_FILL
+	skin_list.add_theme_constant_override("separation", 12)
+	skin_scroll.add_child(skin_list)
+
+	var style_tab_active = func(btn: Button):
+		var sb = StyleBoxFlat.new()
+		sb.bg_color = Color(0.20, 0.16, 0.08, 0.95)
+		sb.border_color = Color(1.0, 0.85, 0.35, 1.0)
+		sb.border_width_left = 1
+		sb.border_width_top = 1
+		sb.border_width_right = 1
+		sb.border_width_bottom = 2
+		sb.corner_radius_top_left = 8
+		sb.corner_radius_top_right = 8
+		sb.content_margin_left = 12
+		sb.content_margin_right = 12
+		sb.content_margin_top = 6
+		sb.content_margin_bottom = 6
+		btn.add_theme_stylebox_override("normal", sb)
+		btn.add_theme_stylebox_override("hover", sb)
+		btn.add_theme_stylebox_override("pressed", sb)
+		btn.add_theme_color_override("font_color", Color(1.0, 0.92, 0.55, 1.0))
+		btn.add_theme_font_size_override("font_size", 14)
+
+	var style_tab_inactive = func(btn: Button):
+		var sb = StyleBoxFlat.new()
+		sb.bg_color = Color(0.08, 0.09, 0.13, 0.8)
+		sb.border_color = Color(0.35, 0.38, 0.45, 0.4)
+		sb.border_width_left = 1
+		sb.border_width_top = 1
+		sb.border_width_right = 1
+		sb.border_width_bottom = 1
+		sb.corner_radius_top_left = 8
+		sb.corner_radius_top_right = 8
+		sb.content_margin_left = 12
+		sb.content_margin_right = 12
+		sb.content_margin_top = 6
+		sb.content_margin_bottom = 6
+		btn.add_theme_stylebox_override("normal", sb)
+		btn.add_theme_stylebox_override("hover", sb)
+		btn.add_theme_stylebox_override("pressed", sb)
+		btn.add_theme_color_override("font_color", Color(0.65, 0.68, 0.75, 0.8))
+		btn.add_theme_font_size_override("font_size", 13)
+
+	var switch_to_tab = func(tab_name: String):
+		AudioManager.play_card_select()
+		if tab_name == "skills":
+			skill_scroll.visible = true
+			skin_scroll.visible = false
+			style_tab_active.call(tab_skills_btn)
+			style_tab_inactive.call(tab_skins_btn)
+		else:
+			skill_scroll.visible = false
+			skin_scroll.visible = true
+			style_tab_active.call(tab_skins_btn)
+			style_tab_inactive.call(tab_skills_btn)
+
+	style_tab_active.call(tab_skills_btn)
+	style_tab_inactive.call(tab_skins_btn)
+	tab_skills_btn.pressed.connect(func(): switch_to_tab.call("skills"))
+	tab_skins_btn.pressed.connect(func(): switch_to_tab.call("skins"))
+
+	var skin_card_buttons: Array[Dictionary] = []
+
+	var refresh_skin_buttons = func():
+		var current_eq_id = HeroDatabase.get_equipped_skin_id(hid) if HeroDatabase else "default"
+		for item in skin_card_buttons:
+			var s_id = item["id"]
+			var btn_node: Button = item["btn"]
+			var is_current = (s_id == current_eq_id)
+			var is_owned_skin = HeroDatabase.is_skin_owned(hid, s_id) if HeroDatabase else false
+			if is_current:
+				btn_node.text = "✨ ĐANG MANG"
+				btn_node.disabled = true
+				var b_style = StyleBoxFlat.new()
+				b_style.bg_color = Color(0.12, 0.32, 0.18, 0.95)
+				b_style.border_color = Color(0.4, 0.9, 0.6, 1.0)
+				b_style.border_width_left = 1
+				b_style.border_width_top = 1
+				b_style.border_width_right = 1
+				b_style.border_width_bottom = 1
+				b_style.corner_radius_top_left = 6
+				b_style.corner_radius_top_right = 6
+				b_style.corner_radius_bottom_right = 6
+				b_style.corner_radius_bottom_left = 6
+				btn_node.add_theme_stylebox_override("disabled", b_style)
+				btn_node.add_theme_color_override("font_disabled_color", Color(0.65, 1.0, 0.8, 1.0))
+			elif not is_owned_skin:
+				btn_node.text = "🔒 CHƯA SỞ HỮU"
+				btn_node.disabled = true
+				var b_style = StyleBoxFlat.new()
+				b_style.bg_color = Color(0.12, 0.13, 0.17, 0.85)
+				b_style.border_color = Color(0.35, 0.38, 0.45, 0.5)
+				b_style.border_width_left = 1
+				b_style.border_width_top = 1
+				b_style.border_width_right = 1
+				b_style.border_width_bottom = 1
+				b_style.corner_radius_top_left = 6
+				b_style.corner_radius_top_right = 6
+				b_style.corner_radius_bottom_right = 6
+				b_style.corner_radius_bottom_left = 6
+				btn_node.add_theme_stylebox_override("disabled", b_style)
+				btn_node.add_theme_color_override("font_disabled_color", Color(0.65, 0.68, 0.74, 0.7))
+			else:
+				btn_node.text = "👑 MANG TRANG PHỤC"
+				btn_node.disabled = false
+				var b_style = StyleBoxFlat.new()
+				b_style.bg_color = Color(0.35, 0.22, 0.08, 0.95)
+				b_style.border_color = Color(0.95, 0.75, 0.30, 0.9)
+				b_style.border_width_left = 1
+				b_style.border_width_top = 1
+				b_style.border_width_right = 1
+				b_style.border_width_bottom = 1
+				b_style.corner_radius_top_left = 6
+				b_style.corner_radius_top_right = 6
+				b_style.corner_radius_bottom_right = 6
+				b_style.corner_radius_bottom_left = 6
+				var b_hover = b_style.duplicate()
+				b_hover.bg_color = Color(0.55, 0.35, 0.12, 1.0)
+				btn_node.add_theme_stylebox_override("normal", b_style)
+				btn_node.add_theme_stylebox_override("hover", b_hover)
+				btn_node.add_theme_stylebox_override("pressed", b_hover)
+				btn_node.add_theme_color_override("font_color", Color(1.0, 0.95, 0.85, 1.0))
+
+	for sk in hero_skins:
+		var s_id = str(sk.get("id", ""))
+		var s_name = str(sk.get("name", ""))
+		var s_tier = str(sk.get("tier", "Cơ Bản"))
+		var s_desc = str(sk.get("desc", ""))
+		var is_skin_rare = (s_tier == "Hiếm")
+		var is_skin_mythic = (s_tier == "Thần Thoại")
+		var is_owned_skin = HeroDatabase.is_skin_owned(hid, s_id) if HeroDatabase else false
+
+		var sc_panel = PanelContainer.new()
+		sc_panel.size_flags_horizontal = SIZE_EXPAND_FILL
+		var sc_style = StyleBoxFlat.new()
+		sc_style.bg_color = Color(0.07, 0.08, 0.12, 0.95)
+		if is_skin_rare:
+			sc_style.border_color = Color(0.68, 0.42, 0.96, 0.75)
+		elif is_skin_mythic:
+			sc_style.border_color = Color(0.85, 0.72, 0.32, 0.6)
+		else:
+			sc_style.border_color = Color(0.35, 0.38, 0.45, 0.4)
+		sc_style.border_width_left = 2
+		sc_style.border_width_top = 1
+		sc_style.border_width_right = 1
+		sc_style.border_width_bottom = 1
+		sc_style.corner_radius_top_left = 8
+		sc_style.corner_radius_top_right = 8
+		sc_style.corner_radius_bottom_right = 8
+		sc_style.corner_radius_bottom_left = 8
+		sc_style.content_margin_left = 12
+		sc_style.content_margin_right = 12
+		sc_style.content_margin_top = 10
+		sc_style.content_margin_bottom = 10
+		sc_panel.add_theme_stylebox_override("panel", sc_style)
+
+		var sc_hbox = HBoxContainer.new()
+		sc_hbox.add_theme_constant_override("separation", 14)
+		sc_panel.add_child(sc_hbox)
+
+		# Thumbnail Preview
+		var thumb_box = PanelContainer.new()
+		thumb_box.custom_minimum_size = Vector2(72, 72)
+		thumb_box.clip_contents = true
+		var tb_style = StyleBoxFlat.new()
+		tb_style.bg_color = Color(0.04, 0.05, 0.08, 0.8)
+		if is_skin_rare:
+			tb_style.border_color = Color(0.68, 0.42, 0.96, 0.7)
+		elif is_skin_mythic:
+			tb_style.border_color = Color(0.85, 0.75, 0.35, 0.6)
+		else:
+			tb_style.border_color = Color(0.4, 0.45, 0.5, 0.4)
+		tb_style.border_width_left = 1
+		tb_style.border_width_top = 1
+		tb_style.border_width_right = 1
+		tb_style.border_width_bottom = 1
+		tb_style.corner_radius_top_left = 6
+		tb_style.corner_radius_top_right = 6
+		tb_style.corner_radius_bottom_right = 6
+		tb_style.corner_radius_bottom_left = 6
+		thumb_box.add_theme_stylebox_override("panel", tb_style)
+
+		var thumb_img = TextureRect.new()
+		thumb_img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		thumb_img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		thumb_img.custom_minimum_size = Vector2(72, 72)
+		var s_tex = HeroDatabase.get_skin_texture(hid, s_id) if HeroDatabase else null
+		if s_tex:
+			thumb_img.texture = s_tex
+		thumb_box.add_child(thumb_img)
+		sc_hbox.add_child(thumb_box)
+
+		# Info VBox
+		var sc_info = VBoxContainer.new()
+		sc_info.size_flags_horizontal = SIZE_EXPAND_FILL
+		sc_info.add_theme_constant_override("separation", 4)
+		sc_hbox.add_child(sc_info)
+
+		var title_row = HBoxContainer.new()
+		var s_name_lbl = Label.new()
+		s_name_lbl.text = s_name
+		s_name_lbl.add_theme_font_size_override("font_size", 15)
+		if is_skin_rare:
+			s_name_lbl.add_theme_color_override("font_color", Color(0.88, 0.76, 1.0, 1.0))
+		elif is_skin_mythic:
+			s_name_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.42, 1.0))
+		else:
+			s_name_lbl.add_theme_color_override("font_color", Color(0.9, 0.92, 0.95, 1.0))
+		title_row.add_child(s_name_lbl)
+
+		var tier_lbl = Label.new()
+		tier_lbl.text = "〔 %s 〕" % s_tier
+		tier_lbl.add_theme_font_size_override("font_size", 11)
+		if is_skin_rare:
+			tier_lbl.add_theme_color_override("font_color", Color(0.80, 0.48, 1.0, 1.0))
+		elif is_skin_mythic:
+			tier_lbl.add_theme_color_override("font_color", Color(1.0, 0.55, 0.25, 1.0))
+		else:
+			tier_lbl.add_theme_color_override("font_color", Color(0.65, 0.75, 0.85, 0.85))
+		title_row.add_child(tier_lbl)
+		sc_info.add_child(title_row)
+
+		var s_desc_lbl = Label.new()
+		s_desc_lbl.text = s_desc
+		s_desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		s_desc_lbl.size_flags_horizontal = SIZE_EXPAND_FILL
+		s_desc_lbl.add_theme_font_size_override("font_size", 12)
+		s_desc_lbl.add_theme_color_override("font_color", Color(0.82, 0.85, 0.90, 0.85))
+		sc_info.add_child(s_desc_lbl)
+
+		if not is_owned_skin:
+			var lock_hint = Label.new()
+			lock_hint.text = "🔒 Chỉ tài khoản Admin Appwrite mới có quyền mang ngoại trang này"
+			lock_hint.add_theme_font_size_override("font_size", 10)
+			lock_hint.add_theme_color_override("font_color", Color(0.85, 0.65, 0.45, 0.85))
+			sc_info.add_child(lock_hint)
+
+		# Action Button on the Right
+		var action_btn = Button.new()
+		action_btn.custom_minimum_size = Vector2(160, 38)
+		action_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		action_btn.add_theme_font_size_override("font_size", 12)
+		sc_hbox.add_child(action_btn)
+
+		var target_sid = s_id
+		var preview_action = func():
+			var cur_tex = HeroDatabase.get_skin_texture(hid, target_sid) if HeroDatabase else null
+			if cur_tex:
+				var tw_img = big_img.create_tween()
+				tw_img.tween_property(big_img, "modulate:a", 0.4, 0.08)
+				tw_img.tween_callback(func():
+					big_img.texture = cur_tex
+				)
+				tw_img.tween_property(big_img, "modulate:a", 1.0, 0.12)
+
+		action_btn.pressed.connect(func():
+			AudioManager.play_card_select()
+			if HeroDatabase and HeroDatabase.is_skin_owned(hid, target_sid):
+				HeroDatabase.equip_skin(hid, target_sid)
+			preview_action.call()
+			update_skin_badge_text.call()
+			refresh_skin_buttons.call()
+		)
+
+		# Click card thumbnail or preview to preview portrait on the left
+		var preview_click = Button.new()
+		preview_click.set_anchors_preset(PRESET_FULL_RECT)
+		preview_click.flat = true
+		preview_click.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		preview_click.pressed.connect(func():
+			preview_action.call()
+		)
+		thumb_box.add_child(preview_click)
+
+		skin_card_buttons.append({
+			"id": s_id,
+			"btn": action_btn,
+			"panel": sc_panel
+		})
+		skin_list.add_child(sc_panel)
+
+	if hero_skins.size() <= 1:
+		var notice_p = PanelContainer.new()
+		var np_s = StyleBoxFlat.new()
+		np_s.bg_color = Color(0.10, 0.11, 0.16, 0.7)
+		np_s.corner_radius_top_left = 6
+		np_s.corner_radius_top_right = 6
+		np_s.corner_radius_bottom_right = 6
+		np_s.corner_radius_bottom_left = 6
+		np_s.content_margin_left = 12
+		np_s.content_margin_right = 12
+		np_s.content_margin_top = 10
+		np_s.content_margin_bottom = 10
+		notice_p.add_theme_stylebox_override("panel", np_s)
+
+		var notice_lbl = Label.new()
+		notice_lbl.text = "✨ Các bộ Ngoại Trang cho danh tướng này đang được xưởng đúc triều đình kiến tạo..."
+		notice_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		notice_lbl.add_theme_font_size_override("font_size", 12)
+		notice_lbl.add_theme_color_override("font_color", Color(0.70, 0.72, 0.78, 0.7))
+		notice_p.add_child(notice_lbl)
+		skin_list.add_child(notice_p)
+
+	refresh_skin_buttons.call()
 
 	var skills = hero.get("skills", [])
 	if skills is Array and not skills.is_empty():

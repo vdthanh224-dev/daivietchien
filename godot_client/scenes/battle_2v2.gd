@@ -4970,7 +4970,7 @@ func _on_card_play_btn_clicked() -> void:
 		_execute_slash_attack_action(tgt["seat"], selected_card_ui, c_info, lien_targets, lien_cost_id, is_wine, slash_dmg, elem, "", null)
 
 	elif c_name == "Bánh Chưng":
-		var p_gen = generals_data[my_seat]
+		p_gen = generals_data[my_seat]
 		if p_gen["hp"] >= p_gen["max_hp"]:
 			desc_text.text = "⚠️ Máu của bạn đã đầy (%d/%d)!" % [p_gen["hp"], p_gen["max_hp"]]
 			return
@@ -5378,7 +5378,7 @@ func _on_card_play_btn_clicked() -> void:
 			_execute_harvest(my_seat)
 
 	elif _is_dai_hong_thuy_name(c_name):
-		var p_gen = generals_data[my_seat]
+		p_gen = generals_data[my_seat]
 		p_gen["has_dai_hong_thuy"] = true
 		p_gen["has_lightning"] = true # Legacy state alias.
 		if p_gen.has("avatar_node") and is_instance_valid(p_gen["avatar_node"]):
@@ -5421,7 +5421,7 @@ func _on_card_play_btn_clicked() -> void:
 		_add_log("⏳ Bạn đặt Cẩm Nang Trì Hoãn [%s] vào khu phán xét của %s (Ghế %d)!" % [c_name, tgt["name"], tgt["seat"]])
 
 	elif c_name in ["Kiếm Thuận Thiên", "Song Cung Mường Nhạ", "Nỏ Thần Kim Quy", "Trường Đao Nam Sơn", "Thương Ngâu Lãng Bạc", "Súng Thần Công Hồ Triều", "Hỏa Mai Tây Sơn", "Liêm Đao Đống Đa", "Đoản Đao Lam Sơn"]:
-		var p_gen = generals_data[my_seat]
+		p_gen = generals_data[my_seat]
 		p_gen["equipped_weapon"] = c_name
 		_record_local_equipment_card(c_info)
 		if p_gen.has("avatar_node") and is_instance_valid(p_gen["avatar_node"]):
@@ -5437,7 +5437,7 @@ func _on_card_play_btn_clicked() -> void:
 		_add_log("🗡️ Bạn đã trang bị Vũ Khí: [%s]!" % c_name)
 
 	elif c_name in ["Giáp Đồng Sơn Vi", "Khiên Mây Bện", "Áo Bào Hoàng Tộc", "Giáp Tây Sơn"]:
-		var p_gen = generals_data[my_seat]
+		p_gen = generals_data[my_seat]
 		p_gen["equipped_armor"] = c_name
 		_record_local_equipment_card(c_info)
 		if c_name == "Áo Bào Hoàng Tộc":
@@ -5455,7 +5455,7 @@ func _on_card_play_btn_clicked() -> void:
 		_add_log("🛡️ Bạn đã trang bị Áo Giáp: [%s]!" % c_name)
 
 	elif "Voi Chiến" in c_name or "Ngựa Trắng" in c_name or "Thuyền Bạch Đằng" in c_name or c_name in ["Voi Chiến Đại Việt", "Ngựa Trắng Thuần Nông"]:
-		var p_gen = generals_data[my_seat]
+		p_gen = generals_data[my_seat]
 		var slot_type = "def_horse" if ("Voi Chiến" in c_name) else "off_horse"
 		if not await _resolve_local_bai_coc_action(my_seat, my_seat):
 			_discard_player_card(selected_card_ui)

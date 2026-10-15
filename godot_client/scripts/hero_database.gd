@@ -5,11 +5,404 @@ extends Node
 # - Weekly Free Rotation (Resets 00:00 Monday UTC+7)
 # - Owned generals filter from AuthManager
 
+signal skin_equipped(hero_id: int, skin_id: String)
+
 var all_heroes: Array[Dictionary] = []
 var hero_dict: Dictionary = {}
+var equipped_skins: Dictionary = {}
+
+const EQUIPPED_SKINS_SAVE_PATH = "user://equipped_skins.json"
+
+const HERO_SKINS_DATA: Dictionary = {
+	1: [
+		{
+			"id": "skin_cao_lo",
+			"name": "Kim Quy Thần Cơ",
+			"tier": "Hiếm",
+			"desc": "Cánh cơ giới hoàng kim, Nỏ Thần hóa cỗ máy Thần Kim Quy bắn tia sét laser vàng chói lọi.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_cao_lo.png"
+		}
+	],
+	2: [
+		{
+			"id": "skin_dao_han",
+			"name": "Ngọc Lôi Thần Xạ",
+			"tier": "Hiếm",
+			"desc": "Đôi cánh đại bàng ngọc bích sải rộng sau lưng, thần cung bích ngọc phóng lôi tiễn.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_dao_han.png"
+		}
+	],
+	3: [
+		{
+			"id": "skin_thi_sach",
+			"name": "Chu Diên Nghĩa Khí",
+			"tier": "Hiếm",
+			"desc": "Bạch Ngọc Long Kiếm phóng ra luồng kiếm quang chính khí rực rỡ xé tan bóng tối.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_thi_sach.png"
+		}
+	],
+	4: [
+		{
+			"id": "skin_le_chan",
+			"name": "Hải Tần Nữ Soái",
+			"tier": "Hiếm",
+			"desc": "Đứng giữa vòng xoáy sóng thần đại dương cuộn trào, song kiếm nước chém tan cuồng phong.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_le_chan.png"
+		}
+	],
+	5: [
+		{
+			"id": "skin_thanh_thien",
+			"name": "Tử Lôi Chiến Thần",
+			"tier": "Hiếm",
+			"desc": "Đôi cánh sấm sét tím ma mị sau lưng, cầu lôi điện tím và thương sét xé toạc không gian.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_thanh_thien.png"
+		}
+	],
+	6: [
+		{
+			"id": "skin_bat_nan",
+			"name": "Bạch Liên Kiếm Vũ",
+			"tier": "Hiếm",
+			"desc": "Lơ lửng trên đài sen hồng phát quang, múa song kiếm tạo bão hoa sen xoay tròn tuyệt mỹ.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_bat_nan.png"
+		}
+	],
+	7: [
+		{
+			"id": "skin_nang_noi",
+			"name": "Liệt Hỏa Tiên Phong",
+			"tier": "Hiếm",
+			"desc": "Cánh Phượng Hoàng rực cháy toàn thân, hỏa thương phóng luồng dung nham thiêng bùng nổ.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_nang_noi.png"
+		}
+	],
+	8: [
+		{
+			"id": "skin_trieu_quoc_dat",
+			"name": "Cửu Chân Hổ Tướng",
+			"tier": "Hiếm",
+			"desc": "Linh ảnh Bạch Hổ/Hoàng Kim Hổ khổng lồ gầm thét sau lưng, đại đao lửa cuồng nộ.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_trieu_quoc_dat.png"
+		}
+	],
+	9: [
+		{
+			"id": "skin_ba_trieu",
+			"name": "Kình Hải Nữ Vương",
+			"tier": "Hiếm",
+			"desc": "Cưỡi Thần Tượng Bạch Mao một ngà bọc giáp vàng đạp trên đỉnh sóng thần, gươm vàng trảm ba đào.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_ba_trieu.png"
+		}
+	],
+	10: [
+		{
+			"id": "skin_ly_bi",
+			"name": "Vạn Xuân Khai Quốc",
+			"tier": "Hiếm",
+			"desc": "Thần Long Hoàng Kim 5 móng khổng lồ uốn lượn uy nghiêm, Khai Quốc Thần Kiếm và Ngọc Tỉ phát sáng.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_ly_bi.png"
+		}
+	],
+	11: [
+		{
+			"id": "skin_trieu_tuc",
+			"name": "Khai Quốc Nguyên Lão",
+			"tier": "Hiếm",
+			"desc": "Cắm thương tạo vết nứt địa chấn dung nham cùng trận đồ cổ tự hộ quốc chấn động mặt đất.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_trieu_tuc.png"
+		}
+	],
+	12: [
+		{
+			"id": "skin_tinh_thieu",
+			"name": "Thái Phó Bát Quái",
+			"tier": "Hiếm",
+			"desc": "Bay lơ lửng trên Trận đồ Bát Quái 3D phát sáng, các thẻ tre bát quái quay vòng như đại trận.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_tinh_thieu.png"
+		}
+	],
+	13: [
+		{
+			"id": "skin_pham_tu",
+			"name": "Trấn Quốc Hộ Pháp",
+			"tier": "Hiếm",
+			"desc": "Titan Hộ Pháp hắc kim dung nham, rìu chiến khổng lồ giáng xuống phát ra sấm sét hoàng kim xé đất.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_pham_tu.png"
+		}
+	],
+	14: [
+		{
+			"id": "skin_trieu_quang_phuc",
+			"name": "Dạ Trạch Thần Long",
+			"tier": "Hiếm",
+			"desc": "Thức tỉnh Rồng Xanh lôi điện đầm Dạ Trạch khổng lồ bay lượn sau lưng, đao rồng chém sương mù.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_trieu_quang_phuc.png"
+		}
+	],
+	15: [
+		{
+			"id": "skin_phung_hung",
+			"name": "Bố Cái Hàng Hổ",
+			"tier": "Hiếm",
+			"desc": "Mũ đầu hổ dũng mãnh, đại chùy thiên thạch bốc cháy rừng rực cùng luồng hỏa diễm mãnh hổ.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_phung_hung.png"
+		}
+	],
+	16: [
+		{
+			"id": "skin_phung_hai",
+			"name": "Bạt Sơn Khí Cái",
+			"tier": "Hiếm",
+			"desc": "Thân hình đồng đúc vác nguyên chiếc chiến thuyền bọc đồng trên vai, vung chùy xích kinh thiên.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_phung_hai.png"
+		}
+	],
+	17: [
+		{
+			"id": "skin_mai_thuc_loan",
+			"name": "Hắc Đế Sa Nam",
+			"tier": "Hiếm",
+			"desc": "Hắc bào hoàng kim, Hắc Long hộ thể cuộn trào lửa đỏ, Hắc Kim Trảm Long Đao rực cháy tàn tro ma mị.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_mai_thuc_loan.png"
+		}
+	],
+	18: [
+		{
+			"id": "skin_khuc_thua_du",
+			"name": "Khai Mở Giang Sơn",
+			"tier": "Hiếm",
+			"desc": "Triều phục lam ngọc dát vàng, nâng cao Ngọc Ấn Tiết Độ Sứ phát ánh sáng giải phóng non sông thái bình.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_khuc_thua_du.png"
+		}
+	],
+	19: [
+		{
+			"id": "skin_khuc_hao",
+			"name": "Bình Đạo Khoan Nhân",
+			"tier": "Hiếm",
+			"desc": "Bạch bào thêu mây vàng thanh nhã, sớ tre hộ tịch bay bổng phóng cổ tự hoàng kim, quạt lông hạc lan tỏa linh khí.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_khuc_hao.png"
+		}
+	],
+	20: [
+		{
+			"id": "skin_duong_dinh_nghe",
+			"name": "Đại La Hộ Quốc",
+			"tier": "Hiếm",
+			"desc": "Khôi giáp hổ phù bạc trắng rực rỡ, hồn thiêng 3.000 nghĩa tử trợ chiến, vung ngân thương chém tan xiềng xích đô hộ.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_duong_dinh_nghe.png"
+		}
+	],
+	21: [
+		{
+			"id": "skin_kieu_cong_tien",
+			"name": "Phong Châu Kiêu Hùng",
+			"tier": "Hiếm",
+			"desc": "Chiến giáp lông quạ đen gai góc, loan đao trăng máu hắc ám cuộn xoáy khói đen tử khí ma mị.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_kieu_cong_tien.png"
+		}
+	],
+	22: [
+		{
+			"id": "skin_ngo_quyen",
+			"name": "Bạch Đằng Thần Vương",
+			"tier": "Hiếm",
+			"desc": "Đạp trên mũi chiến thuyền rồng lướt sóng thần, vung kiếm sấm sét chỉ huy bãi cọc nhọn bọc sắt chôn vùi vạn chiến thuyền.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_ngo_quyen.png"
+		}
+	],
+	23: [
+		{
+			"id": "skin_duong_tam_kha",
+			"name": "Bình Vương Bá Đạo",
+			"tier": "Hiếm",
+			"desc": "Khôi giáp hắc kim bá vương ngút trời, đại huyết kích giáng xuống bổ nứt mặt đất phun trào dung nham.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_duong_tam_kha.png"
+		}
+	],
+	24: [
+		{
+			"id": "skin_ngo_xuong_ngap",
+			"name": "Thiên Sách Thần Tướng",
+			"tier": "Hiếm",
+			"desc": "Chiến giáp thiên thanh viền bạc cao quý, Thiên Sách Thần Kiếm tỏa pháp trận ánh sáng vàng bảo hộ.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_ngo_xuong_ngap.png"
+		}
+	],
+	25: [
+		{
+			"id": "skin_ngo_xuong_van",
+			"name": "Nam Tấn Trấn Quốc",
+			"tier": "Hiếm",
+			"desc": "Hoàng kim chiến giáp sáng chói lọi, song kiếm rồng vàng tung hoành chém ra luồng nhật quang thái dương dẹp loạn.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_ngo_xuong_van.png"
+		}
+	],
+	26: [
+		{
+			"id": "skin_do_canh_thac",
+			"name": "Đỗ Động Mãnh Hổ",
+			"tier": "Hiếm",
+			"desc": "Mũ nanh hổ hung hãn, giáp da hổ rực lửa, song chùy gai sắt nung đỏ rực bốc cháy hỏa diễm cuồng bạo.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_do_canh_thac.png"
+		}
+	],
+	27: [
+		{
+			"id": "skin_kieu_thuan",
+			"name": "Cương Thành Lệnh Công",
+			"tier": "Hiếm",
+			"desc": "Giáp đá thạch ngọc vững như bàn thạch, đại thuẫn cương nham khổng lồ phát hào quang hộ thành bất khả xâm phạm.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_kieu_thuan.png"
+		}
+	],
+	28: [
+		{
+			"id": "skin_nguyen_sieu",
+			"name": "Tây Phù Liệt Tướng",
+			"tier": "Hiếm",
+			"desc": "Khôi giáp đại bàng bạc ròng, vung đại đao lưỡi liềm bốc lửa chiến cuồng phong cuốn phăng sóng gió sông Hồng.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_nguyen_sieu.png"
+		}
+	],
+	29: [
+		{
+			"id": "skin_la_duong",
+			"name": "Tế Giang Du Kích",
+			"tier": "Hiếm",
+			"desc": "Thân pháp phi thân giữa bãi lau sậy phát sáng, thiết thương móc câu và phi tiêu sấm sét xuất quỷ nhập thần.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_la_duong.png"
+		}
+	],
+	30: [
+		{
+			"id": "skin_dinh_bo_linh",
+			"name": "Vạn Thắng Minh Hoàng",
+			"tier": "Hiếm",
+			"desc": "Hoàng bào Rồng Vàng tối thượng, cờ lau hóa Thần Kiếm Vạn Thắng rực ánh thái dương, Kim Long hộ thể chầu ngọc tỉ.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_dinh_bo_linh.png"
+		}
+	],
+	31: [
+		{
+			"id": "skin_dinh_lien",
+			"name": "Nam Việt Khai Triều",
+			"tier": "Hiếm",
+			"desc": "Hoàng tử lam kim quý phái, giương Thần Cung Nam Việt phóng tiễn quang sao băng vàng rực rỡ xé toạc màn đêm.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_dinh_lien.png"
+		}
+	],
+	32: [
+		{
+			"id": "skin_dinh_dien",
+			"name": "Tận Trung Tiết Nghĩa",
+			"tier": "Hiếm",
+			"desc": "Thiết giáp Long Phù uy nghiêm, hai tay cắm đại kỳ Quốc Công thêu chữ vàng chấn hưng triều cương, khiên trung kiên bất diệt.",
+			"texture_path": "res://assets/heroes_skins_transparent/skin_dinh_dien.png"
+		}
+	]
+}
 
 func _ready() -> void:
+	_load_equipped_skins()
 	_init_all_heroes()
+
+func _load_equipped_skins() -> void:
+	equipped_skins.clear()
+	if FileAccess.file_exists(EQUIPPED_SKINS_SAVE_PATH):
+		var file = FileAccess.open(EQUIPPED_SKINS_SAVE_PATH, FileAccess.READ)
+		if file:
+			var txt = file.get_as_text()
+			var json = JSON.new()
+			if json.parse(txt) == OK and json.data is Dictionary:
+				for k in json.data.keys():
+					equipped_skins[int(k)] = str(json.data[k])
+
+func _save_equipped_skins() -> void:
+	var file = FileAccess.open(EQUIPPED_SKINS_SAVE_PATH, FileAccess.WRITE)
+	if file:
+		var save_dict = {}
+		for k in equipped_skins.keys():
+			save_dict[str(k)] = equipped_skins[k]
+		file.store_string(JSON.stringify(save_dict))
+
+func get_hero_skins(hero_id: int) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var hero = get_hero(hero_id)
+	var default_avatar = str(hero.get("avatarPath", ""))
+	var base_name = default_avatar.get_file()
+	var default_tex_path = "res://assets/heroes_transparent/" + base_name
+	if not ResourceLoader.exists(default_tex_path):
+		default_tex_path = default_avatar
+
+	result.append({
+		"id": "default",
+		"name": "Trang Phục Mặc Định",
+		"tier": "Cơ Bản",
+		"desc": "Ngoại trang anh hào nguyên bản của %s." % str(hero.get("name", "danh tướng")),
+		"texture_path": default_tex_path
+	})
+
+	if HERO_SKINS_DATA.has(hero_id):
+		for sk in HERO_SKINS_DATA[hero_id]:
+			result.append(sk.duplicate())
+
+	return result
+
+func is_skin_owned(_hero_id: int, skin_id: String) -> bool:
+	if skin_id == "default" or skin_id == "":
+		return true
+	# Ngoài người có label admin appwrite ra thì chưa sở hữu
+	var root = Engine.get_main_loop() as SceneTree
+	if root and root.root:
+		var auth = root.root.get_node_or_null("AuthManager")
+		if auth and auth.has_method("is_admin"):
+			return auth.is_admin()
+	return false
+
+func get_equipped_skin_id(hero_id: int) -> String:
+	var s_id = str(equipped_skins.get(hero_id, "default"))
+	if not is_skin_owned(hero_id, s_id):
+		return "default"
+	return s_id
+
+func equip_skin(hero_id: int, skin_id: String) -> void:
+	if not is_skin_owned(hero_id, skin_id):
+		return
+	equipped_skins[hero_id] = skin_id
+	_save_equipped_skins()
+	skin_equipped.emit(hero_id, skin_id)
+
+func get_skin_texture(hero_id: int, skin_id: String) -> Texture2D:
+	if skin_id == "default" or skin_id == "":
+		var hero = get_hero(hero_id)
+		var avatar_path = str(hero.get("avatarPath", ""))
+		var base_name = avatar_path.get_file()
+		var trans_path = "res://assets/heroes_transparent/" + base_name
+		if ResourceLoader.exists(trans_path):
+			return load(trans_path) as Texture2D
+		if ResourceLoader.exists(avatar_path):
+			return load(avatar_path) as Texture2D
+		return null
+
+	var skins = HERO_SKINS_DATA.get(hero_id, [])
+	for sk in skins:
+		if sk.get("id", "") == skin_id:
+			var path = str(sk.get("texture_path", ""))
+			if ResourceLoader.exists(path):
+				return load(path) as Texture2D
+	return null
+
+func get_hero_id_by_avatar_path(avatar_path: String) -> int:
+	var base = avatar_path.get_file().get_basename().to_lower()
+	for hid in hero_dict:
+		var h = hero_dict[hid]
+		var h_slug = str(h.get("slug", "")).to_lower()
+		var h_avatar = str(h.get("avatarPath", "")).get_file().get_basename().to_lower()
+		if base == h_slug or base == h_avatar:
+			return hid
+	return 0
 
 func get_hero(id: int) -> Dictionary:
 	if hero_dict.has(id):
@@ -144,7 +537,18 @@ func get_available_pick_heroes() -> Array[Dictionary]:
 func get_all_heroes() -> Array[Dictionary]:
 	return all_heroes
 
-func get_avatar_texture(avatar_path: String) -> Texture2D:
+func get_avatar_texture(avatar_path: String, hero_id: int = 0) -> Texture2D:
+	var hid = hero_id
+	if hid <= 0 and avatar_path != "":
+		hid = get_hero_id_by_avatar_path(avatar_path)
+
+	if hid > 0:
+		var eq_skin_id = get_equipped_skin_id(hid)
+		if eq_skin_id != "" and eq_skin_id != "default":
+			var skin_tex = get_skin_texture(hid, eq_skin_id)
+			if skin_tex:
+				return skin_tex
+
 	if avatar_path != "":
 		var base_name = avatar_path.get_file()
 		var trans_path = "res://assets/heroes_transparent/" + base_name
