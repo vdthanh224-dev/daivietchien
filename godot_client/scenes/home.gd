@@ -901,16 +901,38 @@ func _build_15day_event_content() -> Control:
 	b_vbox.add_child(desc_lbl)
 
 	var time_lbl = Label.new()
-	time_lbl.text = "⏳ Thời gian sự kiện: 15 ngày | Còn lại: 14 ngày 23 giờ 59 phút"
 	time_lbl.add_theme_font_size_override("font_size", 11)
 	time_lbl.add_theme_color_override("font_color", Color(0.25, 0.88, 1.0, 1.0))
 	b_vbox.add_child(time_lbl)
+
+	var update_countdown = func():
+		if not is_instance_valid(time_lbl):
+			return
+		var now_unix = int(Time.get_unix_time_from_system())
+		var end_unix = 1793466000 # 00:00:00 01/11/2026 GMT+7
+		var diff = end_unix - now_unix
+		if diff <= 0:
+			time_lbl.text = "🏁 Mùa giải 15 ngày đã khép lại (00:00 01/11/2026)! Triều đình đang tổng kết và trao thưởng."
+			time_lbl.add_theme_color_override("font_color", Color(1.0, 0.45, 0.45, 1.0))
+		else:
+			var d = diff / 86400
+			var h = (diff % 86400) / 3600
+			var m = (diff % 3600) / 60
+			var s = diff % 60
+			time_lbl.text = "⏳ Kết thúc: 00:00 ngày 01/11/2026 • Còn lại: %d ngày %02d giờ %02d phút %02d giây" % [d, h, m, s]
+
+	update_countdown.call()
+	var cd_timer = Timer.new()
+	cd_timer.wait_time = 1.0
+	cd_timer.autostart = true
+	cd_timer.timeout.connect(update_countdown)
+	container.add_child(cd_timer)
 
 	b_margin.add_child(b_vbox)
 	banner.add_child(b_margin)
 	container.add_child(banner)
 
-	# 2. Treasure Chest Container (Hình Cái Hộp / Rương Báu Phần Thưởng)
+	# 2. Treasure Chest Container (Icon Hộp Phần Thưởng Thu Nhỏ - Bấm Để Mở Xem Chi Tiết)
 	var chest_box = PanelContainer.new()
 	var cb_style = StyleBoxFlat.new()
 	cb_style.bg_color = Color(0.14, 0.09, 0.05, 0.98) # Gỗ lim sơn son thếp vàng
@@ -929,70 +951,79 @@ func _build_15day_event_content() -> Control:
 	chest_box.add_theme_stylebox_override("panel", cb_style)
 
 	var cb_vbox = VBoxContainer.new()
-	cb_vbox.add_theme_constant_override("separation", 10)
+	cb_vbox.add_theme_constant_override("separation", 6)
 
-	# Nắp / Tiêu đề của Hộp Rương (Chest Lid Bar)
-	var chest_lid = PanelContainer.new()
-	var cl_style = StyleBoxFlat.new()
-	cl_style.bg_color = Color(0.25, 0.16, 0.08, 1.0)
-	cl_style.border_width_bottom = 2
-	cl_style.border_color = Color(0.96, 0.78, 0.28, 0.8)
-	cl_style.corner_radius_top_left = 12
-	cl_style.corner_radius_top_right = 12
-	chest_lid.add_theme_stylebox_override("panel", cl_style)
+	# Nút bấm hình Hộp quà / Rương báu
+	var chest_btn = Button.new()
+	chest_btn.flat = true
+	chest_btn.custom_minimum_size = Vector2(0, 56)
 
 	var cl_margin = MarginContainer.new()
 	cl_margin.add_theme_constant_override("margin_left", 14)
 	cl_margin.add_theme_constant_override("margin_right", 14)
 	cl_margin.add_theme_constant_override("margin_top", 8)
 	cl_margin.add_theme_constant_override("margin_bottom", 8)
+	cl_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var cl_hbox = HBoxContainer.new()
-	cl_hbox.add_theme_constant_override("separation", 10)
+	cl_hbox.add_theme_constant_override("separation", 12)
+	cl_hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	var chest_ico = TextureRect.new()
-	chest_ico.custom_minimum_size = Vector2(24, 24)
-	chest_ico.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	chest_ico.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	var t_tex = load("res://assets/ui/icon_treasure.png")
-	if t_tex:
-		chest_ico.texture = t_tex
-		cl_hbox.add_child(chest_ico)
-	else:
-		var c_emoji = Label.new()
-		c_emoji.text = "📦"
-		c_emoji.add_theme_font_size_override("font_size", 18)
-		cl_hbox.add_child(c_emoji)
+	var c_emoji = Label.new()
+	c_emoji.text = "🎁"
+	c_emoji.add_theme_font_size_override("font_size", 24)
+	c_emoji.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	cl_hbox.add_child(c_emoji)
+
+	var cl_text_vbox = VBoxContainer.new()
+	cl_text_vbox.add_theme_constant_override("separation", 2)
+	cl_text_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var cl_title = Label.new()
-	cl_title.text = "RƯƠNG BÁU PHẦN THƯỞNG MÙA GIẢI (TOP 10 ĐUA HẠNG 2v2)"
+	cl_title.text = "RƯƠNG BÁU PHẦN THƯỞNG MÙA GIẢI (TOP 1 - 10)"
 	cl_title.add_theme_font_size_override("font_size", 13)
 	cl_title.add_theme_color_override("font_color", Color(1.0, 0.88, 0.35, 1.0))
-	cl_hbox.add_child(cl_title)
+	cl_text_vbox.add_child(cl_title)
+
+	var cl_sub = Label.new()
+	cl_sub.text = "👉 Nhấp vào hộp quà để mở xem chi tiết các Top được thưởng gì"
+	cl_sub.add_theme_font_size_override("font_size", 11)
+	cl_sub.add_theme_color_override("font_color", Color(0.85, 0.88, 0.95, 0.85))
+	cl_text_vbox.add_child(cl_sub)
+	cl_hbox.add_child(cl_text_vbox)
 
 	var cl_spacer = Control.new()
 	cl_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cl_spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cl_hbox.add_child(cl_spacer)
 
 	var cl_status = Label.new()
-	cl_status.text = "🔒 Niêm phong Hoàng Cung • Mở sau 15 ngày"
-	cl_status.add_theme_font_size_override("font_size", 11)
+	cl_status.text = "🔍 XEM PHẦN THƯỞNG ▾"
+	cl_status.add_theme_font_size_override("font_size", 12)
 	cl_status.add_theme_color_override("font_color", Color(0.35, 0.90, 0.50, 1.0))
+	cl_status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	cl_hbox.add_child(cl_status)
 
 	cl_margin.add_child(cl_hbox)
-	chest_lid.add_child(cl_margin)
-	cb_vbox.add_child(chest_lid)
+	chest_btn.add_child(cl_margin)
+	cb_vbox.add_child(chest_btn)
 
-	# Thân hộp rương (Chest Body Content)
+	# Thân hộp rương (Thu nhỏ mặc định, ấn vào mới mở ra)
 	var cb_margin = MarginContainer.new()
 	cb_margin.add_theme_constant_override("margin_left", 14)
 	cb_margin.add_theme_constant_override("margin_right", 14)
 	cb_margin.add_theme_constant_override("margin_top", 4)
 	cb_margin.add_theme_constant_override("margin_bottom", 12)
+	cb_margin.visible = false # Mặc định thu nhỏ trong hộp
 
 	var cb_content_vbox = VBoxContainer.new()
 	cb_content_vbox.add_theme_constant_override("separation", 8)
+
+	var div_line = HSeparator.new()
+	var d_style = StyleBoxLine.new()
+	d_style.color = Color(0.96, 0.78, 0.28, 0.4)
+	div_line.add_theme_stylebox_override("separator", d_style)
+	cb_content_vbox.add_child(div_line)
 
 	var rewards_grid = GridContainer.new()
 	rewards_grid.columns = 2
@@ -1076,7 +1107,7 @@ func _build_15day_event_content() -> Control:
 	cb_content_vbox.add_child(rewards_grid)
 
 	var chest_hint = Label.new()
-	chest_hint.text = "💡 Rương báu sẽ được trao tự động qua Hòm Thư cho Top 10 Tướng Quân sau khi mùa giải 15 ngày khép lại."
+	chest_hint.text = "💡 Rương báu sẽ được trao tự động qua Hòm Thư cho Top 10 Tướng Quân sau khi mùa giải 15 ngày khép lại vào 00:00 01/11/2026."
 	chest_hint.add_theme_font_size_override("font_size", 10)
 	chest_hint.add_theme_color_override("font_color", Color(0.85, 0.78, 0.65, 0.85))
 	cb_content_vbox.add_child(chest_hint)
@@ -1085,6 +1116,22 @@ func _build_15day_event_content() -> Control:
 	cb_vbox.add_child(cb_margin)
 	chest_box.add_child(cb_vbox)
 	container.add_child(chest_box)
+
+	# Bấm vào hộp để mở ra / đóng lại
+	chest_btn.pressed.connect(func():
+		AudioManager.play_card_select()
+		cb_margin.visible = not cb_margin.visible
+		if cb_margin.visible:
+			c_emoji.text = "✨📦"
+			cl_sub.text = "Đang mở hộp: Danh sách phần thưởng dự kiến trao lúc 00:00 01/11/2026"
+			cl_status.text = "▲ THU GỌN"
+			cl_status.add_theme_color_override("font_color", Color(1.0, 0.85, 0.35, 1.0))
+		else:
+			c_emoji.text = "🎁"
+			cl_sub.text = "👉 Nhấp vào hộp quà để mở xem chi tiết các Top được thưởng gì"
+			cl_status.text = "🔍 XEM PHẦN THƯỞNG ▾"
+			cl_status.add_theme_color_override("font_color", Color(0.35, 0.90, 0.50, 1.0))
+	)
 
 	# 3. Your Current Rank Status (Theo Bậc và Sao như Bảng Xếp Hạng)
 	var my_status_card = PanelContainer.new()
