@@ -585,6 +585,129 @@ function createTestState(heroIds = ["HERO_41", "HERO_42", "HERO_43", "HERO_44"])
   assert.equal(p2.hand.length, 1);
   assert.equal(state.actionHistory.some(a => a.type === "GIAI_ACH_DRAW" && a.casterSeat === 2), true);
 
+  // 6. Thang Mộc + Can Gián interaction:
+  // When Lý Đạo Thành (HERO_42 with Can Gián and a RED card) is present,
+  // Thang Mộc prompts Lý Đạo Thành with AWAIT_CAN_GIAN to discard 1 Red card to cancel the delayed scroll!
+  {
+    const tmState = createTestState(["HERO_1", "HERO_46", "HERO_42", "HERO_4"]);
+    const toHienThanh = tmState.players[1]; // seat 2
+    const lyDaoThanh = tmState.players[2];  // seat 3
+    toHienThanh.isAI = false;
+    lyDaoThanh.isAI = false;
+    toHienThanh.hand = [];
+    lyDaoThanh.hand = [
+      { id: "RED_CARD_CG", name: "Đào", suit: "Heart", rank: 9, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH },
+      { id: "BLACK_CARD_CG", name: "Trảm", suit: "Spade", rank: 7, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }
+    ];
+
+    tmState._deck = [
+      { id: "TM_D1", name: "Trảm", suit: "Spade", rank: 2, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
+      { id: "TM_D2", name: "Trảm", suit: "Spade", rank: 3, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }
+    ];
+
+    tmState.phase = "PLAY";
+    tmState.turnSeat = 1;
+    tmState.players[0].hand = [];
+    const endTurnRes = handleEndTurn(tmState, 1);
+    assert.equal(endTurnRes.success, true);
+    assert.equal(tmState.phase, "AWAIT_THANG_MOC");
+    assert.equal(tmState.waitingTargetSeat, 2);
+
+    // Tô Hiến Thành activates Thang Mộc with Trầm Ảo Sa Bẫy
+    const tmActivate = handleRespondAction(tmState, 2, true, CARD_SUBTYPES.ACEDIA);
+    assert.equal(tmActivate.success, true);
+    // Tô Hiến Thành drew 2 cards
+    assert.equal(toHienThanh.hand.length, 2);
+    // Because Lý Đạo Thành has CAN_GIAN and a Red card, phase is now AWAIT_CAN_GIAN for Lý Đạo Thành (seat 3)!
+    assert.equal(tmState.phase, "AWAIT_CAN_GIAN");
+    assert.equal(tmState.waitingTargetSeat, 3);
+    assert.equal(tmState.pendingCanGian?.sourceType, "THANG_MOC");
+    assert.equal(tmState.pendingCanGian?.targetSeat, 2);
+    assert.equal(tmState.pendingCanGian?.card?.subType, CARD_SUBTYPES.ACEDIA);
+
+    // Subcase 6A: Lý Đạo Thành accepts Can Gián using red card -> scroll canceled and discarded!
+    const cgAccept = handleRespondAction(tmState, 3, true, "RED_CARD_CG");
+    assert.equal(cgAccept.success, true);
+    // Lý Đạo Thành discarded the red card
+    assert.equal(lyDaoThanh.hand.some(c => c.id === "RED_CARD_CG"), false);
+    // Tô Hiến Thành's judgement zone has 0 cards (the scroll was canceled!)
+    assert.equal((toHienThanh.judgements || []).length, 0);
+    // Tô Hiến Thành drew 2 cards from Thang Mộc + 2 cards from turn start = 4 cards
+    assert.equal(toHienThanh.hand.length, 4);
+    assert.equal(tmState.turnSeat, 2);
+    // Turn successfully resumed/advanced
+    assert.notEqual(tmState.phase, "AWAIT_CAN_GIAN");
+  }
+
+  // Subcase 6B: Lý Đạo Thành declines Can Gián -> scroll attached to Tô Hiến Thành!
+  {
+    const tmState = createTestState(["HERO_1", "HERO_46", "HERO_42", "HERO_4"]);
+    const toHienThanh = tmState.players[1]; // seat 2
+    const lyDaoThanh = tmState.players[2];  // seat 3
+    toHienThanh.isAI = false;
+    lyDaoThanh.isAI = false;
+    toHienThanh.hand = [];
+    lyDaoThanh.hand = [
+      { id: "RED_CARD_CG2", name: "Đào", suit: "Heart", rank: 9, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH }
+    ];
+
+    tmState._deck = [
+      { id: "TM_D3", name: "Trảm", suit: "Spade", rank: 2, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
+      { id: "TM_D4", name: "Trảm", suit: "Spade", rank: 3, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }
+    ];
+
+    tmState.phase = "PLAY";
+    tmState.turnSeat = 1;
+    tmState.players[0].hand = [];
+    handleEndTurn(tmState, 1);
+    assert.equal(tmState.phase, "AWAIT_THANG_MOC");
+
+    handleRespondAction(tmState, 2, true, CARD_SUBTYPES.SUPPLY_SHORTAGE);
+    assert.equal(tmState.phase, "AWAIT_CAN_GIAN");
+    assert.equal(tmState.waitingTargetSeat, 3);
+
+    // Lý Đạo Thành declines Can Gián
+    const cgDecline = handleRespondAction(tmState, 3, false, null);
+    assert.equal(cgDecline.success, true);
+    // Lý Đạo Thành kept his red card
+    assert.equal(lyDaoThanh.hand.length, 1);
+    // Tô Hiến Thành's judgement zone has the scroll attached!
+    assert.equal((toHienThanh.judgements || []).length, 1);
+    assert.equal(toHienThanh.judgements[0].subType, CARD_SUBTYPES.SUPPLY_SHORTAGE);
+    // Turn advanced
+    assert.notEqual(tmState.phase, "AWAIT_CAN_GIAN");
+  }
+
+  // Subcase 6C: Lý Đạo Thành has NO red card -> Thang Mộc attaches directly without prompting Can Gián
+  {
+    const tmState = createTestState(["HERO_1", "HERO_46", "HERO_42", "HERO_4"]);
+    const toHienThanh = tmState.players[1]; // seat 2
+    const lyDaoThanh = tmState.players[2];  // seat 3
+    toHienThanh.isAI = false;
+    lyDaoThanh.isAI = false;
+    toHienThanh.hand = [];
+    lyDaoThanh.hand = [
+      { id: "BLACK_CARD_ONLY", name: "Trảm", suit: "Spade", rank: 8, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }
+    ];
+
+    tmState._deck = [
+      { id: "TM_D5", name: "Trảm", suit: "Spade", rank: 2, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
+      { id: "TM_D6", name: "Trảm", suit: "Spade", rank: 3, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }
+    ];
+
+    tmState.phase = "PLAY";
+    tmState.turnSeat = 1;
+    tmState.players[0].hand = [];
+    handleEndTurn(tmState, 1);
+    assert.equal(tmState.phase, "AWAIT_THANG_MOC");
+
+    // Tô Hiến Thành chooses scroll, Can Gián not triggered because Ly Dao Thanh has no Red card
+    handleRespondAction(tmState, 2, true, CARD_SUBTYPES.ACEDIA);
+    assert.notEqual(tmState.phase, "AWAIT_CAN_GIAN");
+    assert.equal((toHienThanh.judgements || []).length, 1);
+    assert.equal(toHienThanh.judgements[0].subType, CARD_SUBTYPES.ACEDIA);
+  }
+
   console.log("✅ Hero 46: Tô Hiến Thành (Thiết Diện, Thang Mộc, Giải Ách) OK");
 }
 

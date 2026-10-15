@@ -4899,6 +4899,39 @@ function executeReplayedScroll(state, card, casterSeat, preferredTargetSeat = 0,
   return startNullifyChain(state, card, casterSeat, targetSeat);
 }
 
+export function resumeAfterThangMoc(state, originalTurnSeat) {
+  resetWaitingState(state);
+  if (originalTurnSeat) {
+    state.turnSeat = originalTurnSeat;
+  }
+  const nextThangMoc = state.players.find((cand) =>
+    isLivingPlayer(cand) && cand.seat !== originalTurnSeat && heroHasSkill(cand, "THANG_MOC") && !cand.usedSkills?.ThangMocTurnResolved
+    && getAvailableThangMocScrolls(state, cand.seat).length > 0
+  );
+  if (nextThangMoc) {
+    nextThangMoc.usedSkills = nextThangMoc.usedSkills || {};
+    nextThangMoc.usedSkills.ThangMocTurnResolved = true;
+    state.phase = "AWAIT_THANG_MOC";
+    state.waitingTargetSeat = nextThangMoc.seat;
+    state.waitingReactionType = "THANG_MOC";
+    state.waitingTimer = 40;
+    state.timerStartAt = Date.now();
+    state.thangMocCasterSeat = originalTurnSeat;
+    state.pendingThangMoc = {
+      casterSeat: originalTurnSeat,
+      targetSeat: nextThangMoc.seat,
+      availableScrolls: getAvailableThangMocScrolls(state, nextThangMoc.seat)
+    };
+    recordAction(state, {
+      type: "THANG_MOC_PROMPT",
+      casterSeat: nextThangMoc.seat,
+      description: `📜 <b>${nextThangMoc.generalName}</b> có thể kích hoạt [Thang Mộc] vào cuối lượt của ${state.players.find((p) => p.seat === originalTurnSeat)?.generalName || originalTurnSeat}: rút 2 lá bài và tự gài 1 Cẩm Nang Trì Hoãn lên bản thân.`
+    });
+    return { success: true, state };
+  }
+  return advanceTurn(state);
+}
+
 export function handleRespondAction(state, respondentSeat, accepted, cardId, targetCardId = null, cardIds = null, targetSeat = null, payload = null) {
   if (state.status === "FINISHED") return { error: "Trận đấu đã kết thúc" };
   respondentSeat = Number(respondentSeat);
@@ -4966,6 +4999,9 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         skillActivations: [{ name: "Can Gián", seat: respondentSeat }],
         description: `📜 <b>${respondent.generalName}</b> kích hoạt [Can Gián], bỏ ${formatCardText(discarded)} để hủy bỏ hoàn toàn cẩm nang ${formatCardText(pending?.card)}!`
       });
+      if (pending?.sourceType === "THANG_MOC") {
+        return resumeAfterThangMoc(state, pending.originalTurnSeat);
+      }
       resetWaitingState(state);
       return { success: true, state };
     }
@@ -4987,6 +5023,9 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
           description: `⚡ <b>${respondent.generalName}</b> không can gián; cẩm nang trì hoãn ${formatCardText(pending.card)} đã gài vào khu phán xét của <b>${attachTarget.generalName}</b>!`
         });
       }
+    }
+    if (pending?.sourceType === "THANG_MOC") {
+      return resumeAfterThangMoc(state, pending.originalTurnSeat);
     }
     resetWaitingState(state);
     return { success: true, state };
@@ -5081,6 +5120,39 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
           attachedBySeat: respondentSeat,
           desc: chosen.name
         };
+
+        const canGianPlayer = state.players.find(p => isLivingPlayer(p) && heroHasSkill(p, "CAN_GIAN") && (p.hand || []).some(c => cardColor(c.suit) === "RED"));
+        if (canGianPlayer) {
+          state.pendingCanGian = {
+            card: delayCard,
+            casterSeat: respondentSeat,
+            targetSeat: respondentSeat,
+            sourceType: "THANG_MOC",
+            originalTurnSeat
+          };
+          state.phase = "AWAIT_CAN_GIAN";
+          state.waitingTargetSeat = canGianPlayer.seat;
+          state.waitingReactionType = "CAN_GIAN";
+          state.waitingTimer = 40;
+          state.timerStartAt = Date.now();
+          recordAction(state, {
+            type: "THANG_MOC_ATTACH_PROMPT",
+            casterSeat: respondentSeat,
+            cardId: delayCard.id,
+            cardName: delayCard.name,
+            skillActivations: [{ name: "Thang Mộc", seat: respondentSeat }],
+            description: `📜 <b>${respondent.generalName}</b> kích hoạt [Thang Mộc], rút 2 lá bài và chọn gài <b>${delayCard.name}</b>!`
+          });
+          recordAction(state, {
+            type: "AWAIT_CAN_GIAN",
+            targetSeat: canGianPlayer.seat,
+            cardId: delayCard.id,
+            cardName: delayCard.name,
+            description: `📜 Chờ <b>${canGianPlayer.generalName}</b> quyết định kích hoạt [Can Gián] đối với cẩm nang ${formatCardText(delayCard)}!`
+          });
+          return { success: true, state };
+        }
+
         respondent.judgements = respondent.judgements || [];
         respondent.judgements.push(delayCard);
         recordAction(state, {
@@ -5099,36 +5171,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         description: `📜 ${respondent.generalName} không kích hoạt [Thang Mộc].`
       });
     }
-    resetWaitingState(state);
-    if (originalTurnSeat) {
-      state.turnSeat = originalTurnSeat;
-    }
-    const nextThangMoc = state.players.find((cand) =>
-      isLivingPlayer(cand) && cand.seat !== originalTurnSeat && heroHasSkill(cand, "THANG_MOC") && !cand.usedSkills?.ThangMocTurnResolved
-      && getAvailableThangMocScrolls(state, cand.seat).length > 0
-    );
-    if (nextThangMoc) {
-      nextThangMoc.usedSkills = nextThangMoc.usedSkills || {};
-      nextThangMoc.usedSkills.ThangMocTurnResolved = true;
-      state.phase = "AWAIT_THANG_MOC";
-      state.waitingTargetSeat = nextThangMoc.seat;
-      state.waitingReactionType = "THANG_MOC";
-      state.waitingTimer = 40;
-      state.timerStartAt = Date.now();
-      state.thangMocCasterSeat = originalTurnSeat;
-      state.pendingThangMoc = {
-        casterSeat: originalTurnSeat,
-        targetSeat: nextThangMoc.seat,
-        availableScrolls: getAvailableThangMocScrolls(state, nextThangMoc.seat)
-      };
-      recordAction(state, {
-        type: "THANG_MOC_PROMPT",
-        casterSeat: nextThangMoc.seat,
-        description: `📜 <b>${nextThangMoc.generalName}</b> có thể kích hoạt [Thang Mộc] vào cuối lượt của ${state.players.find((p) => p.seat === originalTurnSeat)?.generalName || originalTurnSeat}: rút 2 lá bài và tự gài 1 Cẩm Nang Trì Hoãn lên bản thân.`
-      });
-      return { success: true, state };
-    }
-    return advanceTurn(state);
+    return resumeAfterThangMoc(state, originalTurnSeat);
   }
 
   if (state.phase === "AWAIT_DAN_CAU") {

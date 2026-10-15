@@ -13497,7 +13497,7 @@ func _show_thang_moc_modal(caster_seat: int, available_scrolls: Array) -> void:
 	card_pick_confirm_btn.disabled = false
 	card_pick_cancel_btn.text = "TỪ CHỐI"
 	card_pick_cancel_btn.visible = true
-	card_pick_status_lbl.text = "👉 Bấm chọn trực tiếp 1 Cẩm Nang để kích hoạt ngay (hoặc bấm [TỪ CHỐI])"
+	card_pick_status_lbl.text = "👉 Chọn 1 Cẩm Nang Trì Hoãn rồi bấm [XÁC NHẬN] (hoặc bấm [TỪ CHỐI])"
 
 	if card_pick_equip_scroll:
 		card_pick_equip_scroll.visible = false
@@ -13575,7 +13575,6 @@ func _show_thang_moc_modal(caster_seat: int, available_scrolls: Array) -> void:
 			first_opt = opt
 		btn.pressed.connect(func():
 			_select_card_pick_option(opt)
-			_on_card_pick_confirmed()
 		)
 		card_pick_options_hbox.add_child(btn)
 
@@ -13583,7 +13582,7 @@ func _show_thang_moc_modal(caster_seat: int, available_scrolls: Array) -> void:
 		selected_card_pick_option = first_opt
 		card_pick_confirm_btn.text = first_opt["confirm_text"]
 		card_pick_confirm_btn.disabled = false
-		card_pick_status_lbl.text = "👉 Đã chọn: %s (Bấm cẩm nang để kích hoạt ngay)" % first_opt.get("label", "")
+		card_pick_status_lbl.text = "👉 Đã chọn: %s (Bấm [Xác nhận] để kích hoạt)" % first_opt.get("label", "")
 		if first_opt.has("button") and is_instance_valid(first_opt["button"]):
 			var active_st = first_opt["button"].get_theme_stylebox("normal") as StyleBoxFlat
 			if active_st:
@@ -13939,7 +13938,12 @@ func _select_card_pick_option(opt: Dictionary) -> void:
 	if opt.get("type", "") not in ["thang_moc", "dai_viet_color"]:
 		_layout_card_pick_hand(opt.get("button", null))
 
-	card_pick_status_lbl.text = "👉 Đã chọn: %s" % opt.get("label", "")
+	if opt.has("confirm_text"):
+		card_pick_confirm_btn.text = str(opt["confirm_text"])
+	if card_pick_effect_type == "THANG_MOC":
+		card_pick_status_lbl.text = "👉 Đã chọn: %s (Bấm [Xác nhận] để kích hoạt)" % opt.get("label", "")
+	else:
+		card_pick_status_lbl.text = "👉 Đã chọn: %s" % opt.get("label", "")
 	card_pick_confirm_btn.disabled = false
 
 func _layout_card_pick_hand(selected_btn: Control = null) -> void:
