@@ -31,8 +31,10 @@ const COLOR_SHADOW_DEEP = Color(0.0, 0.0, 0.0, 0.75)
 @onready var dev_tester_btn: Button = $TopBarUtilities/RightGroup/DevTesterBtn
 @onready var user_account_btn: Button = $TopBarUtilities/RightGroup/UserAccountBtn
 
-# Center Auth Card
+# Center Auth Card & Mobile Input
+@onready var title_brand_center: VBoxContainer = $TitleBrandCenter
 @onready var center_auth_card: PanelContainer = $CenterAuthCard
+@onready var drum_header: VBoxContainer = $CenterAuthCard/VBox/DrumHeader
 @onready var tab_track: PanelContainer = $CenterAuthCard/VBox/TabTrack
 @onready var tab_highlight: Panel = $CenterAuthCard/VBox/TabTrack/TabHighlight
 @onready var tab_login_btn: Button = $CenterAuthCard/VBox/TabTrack/TabBar/TabLoginBtn
@@ -44,6 +46,7 @@ const COLOR_SHADOW_DEEP = Color(0.0, 0.0, 0.0, 0.75)
 @onready var toggle_pass_btn: Button = $CenterAuthCard/VBox/Form/PassGroup/Box/HBox/TogglePassBtn
 @onready var status_lbl: Label = $CenterAuthCard/VBox/StatusLabel
 @onready var submit_btn: Button = $CenterAuthCard/VBox/SubmitBtn
+@onready var guest_hbox: HBoxContainer = $CenterAuthCard/VBox/GuestHBox
 @onready var quick_guest_btn: Button = $CenterAuthCard/VBox/GuestHBox/QuickGuestBtn
 
 # Modals Layer
@@ -60,6 +63,10 @@ var is_register_mode: bool = false
 var is_password_visible: bool = false
 var active_tester_index: int = 1
 var tab_tween: Tween = null
+var is_keyboard_mode: bool = false
+var card_tween: Tween = null
+var default_card_offset_top: float = -220.0
+var default_card_offset_bottom: float = 290.0
 
 func _ready() -> void:
 	# 1. Ẩn tất cả modals lúc ban đầu
@@ -137,16 +144,30 @@ func _ready() -> void:
 
 	call_deferred("_init_tab_highlight")
 
-	# 8. Phát nhạc nền
+	# 8. Cấu hình bàn phím ảo & cơ chế tự động dịch chuyển chống che ô nhập trên Mobile
+	_setup_mobile_keyboard_handling()
+
+	# 9. Đảm bảo toàn bộ cỡ chữ trong giao diện AuthLogin được scale chuẩn Mobile (135%)
+	if is_instance_valid(UIScaleManager):
+		UIScaleManager.apply_to_scene(self)
+
+	# 10. Phát nhạc nền
 	if AudioManager:
 		AudioManager.call_deferred("play_bgm", "bgm_battle")
 
-	# 9. Chụp màn hình tự động kiểm thử
+	# 11. Chụp màn hình tự động kiểm thử
 	if "--screenshot" in OS.get_cmdline_user_args() or "--screenshot" in OS.get_cmdline_args():
 		await get_tree().create_timer(1.2).timeout
 		var tex = get_viewport().get_texture()
 		var img = tex.get_image() if tex else null
 		if img: img.save_png("res://auth_screenshot.png")
+
+		email_input.grab_focus()
+		_apply_keyboard_focus_shift(true)
+		await get_tree().create_timer(0.4).timeout
+		var tex_focus = get_viewport().get_texture()
+		var img_focus = tex_focus.get_image() if tex_focus else null
+		if img_focus: img_focus.save_png("res://auth_screenshot_focus.png")
 
 		_open_notice_modal()
 		await get_tree().create_timer(0.4).timeout
@@ -154,7 +175,7 @@ func _ready() -> void:
 		var img_notice = tex_notice.get_image() if tex_notice else null
 		if img_notice: img_notice.save_png("res://auth_screenshot_notice.png")
 
-		print("[Screenshot] Đã lưu auth_screenshot.png, auth_screenshot_notice.png!")
+		print("[Screenshot] Đã lưu auth_screenshot.png, auth_screenshot_focus.png, auth_screenshot_notice.png!")
 		get_tree().quit()
 
 # --- ANIMATION & LIVING MOTION ---
@@ -273,6 +294,14 @@ func set_register_mode(register: bool) -> void:
 		tw.tween_property(name_group, "modulate:a", 0.0, 0.15).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
 		tw.tween_callback(func(): name_group.visible = false)
 		email_input.grab_focus()
+
+	if is_keyboard_mode:
+		var target_top: float = -304.0
+		var estimated_h: float = 330.0 if is_register_mode else 275.0
+		if card_tween and card_tween.is_valid():
+			card_tween.kill()
+		card_tween = create_tween()
+		card_tween.tween_property(center_auth_card, "offset_bottom", target_top + estimated_h, 0.2).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 	if AudioManager:
 		AudioManager.play_sfx("sfx_card_select", -5.0)
@@ -450,6 +479,138 @@ func _update_ping_display(ping_ms: int) -> void:
 		ping_label.text = "📶 %dms" % ping_ms
 		ping_label.add_theme_color_override("font_color", Color("#EF4444"))
 
+# --- FONT SCALING HELPERS (135% MOBILE DEFAULT) ---
+
+func _scale_font(size: int) -> int:
+	if is_instance_valid(UIScaleManager):
+		return UIScaleManager.scale_font(size)
+	return size
+
+func _apply_node_font(ctrl: Control, base_size: int, prop: String = "font_size") -> void:
+	if not is_instance_valid(ctrl):
+		return
+	if is_instance_valid(UIScaleManager):
+		UIScaleManager.scale_node_font(ctrl, base_size, prop)
+	else:
+		ctrl.add_theme_font_size_override(prop, base_size)
+
+# --- MOBILE KEYBOARD & INPUT ADAPTIVE SHIFT ---
+
+func _setup_mobile_keyboard_handling() -> void:
+	default_card_offset_top = center_auth_card.offset_top
+	default_card_offset_bottom = center_auth_card.offset_bottom
+
+	# Thiết lập kiểu bàn phím ảo chuyên dụng cho di động
+	name_input.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_DEFAULT
+	email_input.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_EMAIL_ADDRESS
+	pass_input.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_PASSWORD
+
+	# Phím Enter/Done trên bàn phím tự động nhảy sang ô tiếp theo
+	name_input.text_submitted.connect(func(_new_text): email_input.grab_focus())
+	email_input.text_submitted.connect(func(_new_text): pass_input.grab_focus())
+	pass_input.text_submitted.connect(func(_new_text): _on_submit_pressed())
+
+	# Lắng nghe sự kiện lấy nét để dịch chuyển khung giao diện lên cao, không bị bàn phím che
+	name_input.focus_entered.connect(_on_input_focus_entered)
+	email_input.focus_entered.connect(_on_input_focus_entered)
+	pass_input.focus_entered.connect(_on_input_focus_entered)
+
+	name_input.focus_exited.connect(_on_input_focus_exited)
+	email_input.focus_exited.connect(_on_input_focus_exited)
+	pass_input.focus_exited.connect(_on_input_focus_exited)
+
+func _get_virtual_keyboard_height() -> int:
+	if DisplayServer.has_feature(DisplayServer.FEATURE_VIRTUAL_KEYBOARD):
+		return DisplayServer.virtual_keyboard_get_height()
+	return 0
+
+func _has_any_input_focus() -> bool:
+	return (is_instance_valid(name_input) and name_input.has_focus()) or \
+	       (is_instance_valid(email_input) and email_input.has_focus()) or \
+	       (is_instance_valid(pass_input) and pass_input.has_focus())
+
+func _on_input_focus_entered() -> void:
+	if UIScaleManager.is_mobile_mode() or _get_virtual_keyboard_height() > 0 or UIScaleManager.is_mobile_device():
+		_apply_keyboard_focus_shift(true)
+
+func _on_input_focus_exited() -> void:
+	call_deferred("_check_focus_after_exit")
+
+func _check_focus_after_exit() -> void:
+	if not is_instance_valid(self) or not is_inside_tree():
+		return
+	if _has_any_input_focus():
+		return
+	_apply_keyboard_focus_shift(false)
+
+func _apply_keyboard_focus_shift(enable: bool) -> void:
+	if is_keyboard_mode == enable:
+		return
+	is_keyboard_mode = enable
+
+	if card_tween and card_tween.is_valid():
+		card_tween.kill()
+	card_tween = create_tween().set_parallel(true)
+
+	if enable:
+		# 1. Ẩn biểu tượng trống đồng to và nút Chơi khách để thu gọn chiều dọc
+		if is_instance_valid(drum_header):
+			drum_header.visible = false
+		if is_instance_valid(guest_hbox):
+			guest_hbox.visible = false
+
+		# 2. Làm mờ tiêu đề game trên cùng để card trượt lên không bị đè chữ
+		if is_instance_valid(title_brand_center):
+			card_tween.tween_property(title_brand_center, "modulate:a", 0.0, 0.18).set_trans(Tween.TRANS_CUBIC)
+
+		# 3. Trượt khung nhập lên sát phía trên (ngay dưới thanh TopBar tại Y=56px)
+		# Viewport cao 720, tâm Y=360 => offset_top = 56 - 360 = -304px
+		var target_top: float = -304.0
+		var estimated_h: float = 330.0 if is_register_mode else 275.0
+		var target_bottom: float = target_top + estimated_h
+
+		card_tween.tween_property(center_auth_card, "offset_top", target_top, 0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		card_tween.tween_property(center_auth_card, "offset_bottom", target_bottom, 0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	else:
+		# Phục hồi hiển thị đầy đủ khi ẩn bàn phím
+		if is_instance_valid(drum_header):
+			drum_header.visible = true
+		if is_instance_valid(guest_hbox):
+			guest_hbox.visible = true
+
+		if is_instance_valid(title_brand_center):
+			card_tween.tween_property(title_brand_center, "modulate:a", 1.0, 0.22).set_trans(Tween.TRANS_CUBIC)
+
+		var target_bottom: float = default_card_offset_bottom
+		if is_register_mode:
+			target_bottom = default_card_offset_bottom + 50.0
+
+		card_tween.tween_property(center_auth_card, "offset_top", default_card_offset_top, 0.25).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		card_tween.tween_property(center_auth_card, "offset_bottom", target_bottom, 0.25).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+func _process(_delta: float) -> void:
+	var kb_h = _get_virtual_keyboard_height()
+	if kb_h > 0 and not is_keyboard_mode:
+		_apply_keyboard_focus_shift(true)
+	elif kb_h == 0 and is_keyboard_mode and not _has_any_input_focus() and not UIScaleManager.is_mobile_device():
+		_apply_keyboard_focus_shift(false)
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed:
+		_handle_outside_tap(event.position)
+	elif event is InputEventScreenTouch and event.pressed:
+		_handle_outside_tap(event.position)
+
+func _handle_outside_tap(pos: Vector2) -> void:
+	if not _has_any_input_focus():
+		return
+	if is_instance_valid(center_auth_card):
+		var rect = center_auth_card.get_global_rect()
+		if not rect.has_point(pos):
+			get_viewport().gui_release_focus()
+			DisplayServer.virtual_keyboard_hide()
+			_apply_keyboard_focus_shift(false)
+
 # --- DEV HELPERS ---
 
 # ID duy nhất của laptop nhà phát triển (OS.get_unique_id())
@@ -521,7 +682,7 @@ func _style_glass_action_button(btn: Button, radius: int = 14, border_col: Color
 	btn.add_theme_stylebox_override("focus", hover)
 	btn.add_theme_color_override("font_color", Color(1.0, 0.92, 0.65, 1.0))
 	btn.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 0.85, 1.0))
-	btn.add_theme_font_size_override("font_size", 11)
+	_apply_node_font(btn, 11)
 
 func _style_bronze_drum_cta(btn: Button) -> void:
 	if not btn: return
@@ -560,7 +721,7 @@ func _style_bronze_drum_cta(btn: Button) -> void:
 	btn.add_theme_stylebox_override("hover", hover)
 	btn.add_theme_stylebox_override("pressed", pressed)
 	btn.add_theme_stylebox_override("focus", hover)
-	btn.add_theme_font_size_override("font_size", 14)
+	_apply_node_font(btn, 14)
 	btn.add_theme_color_override("font_color", Color(1.0, 0.98, 0.92, 1.0))
 	btn.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0, 1.0))
 
@@ -635,7 +796,7 @@ func _setup_form_input_styling(group: Control, line_edit: LineEdit) -> void:
 	var lbl = group.get_node_or_null("Label") as Label
 	if lbl:
 		lbl.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
-		lbl.add_theme_font_size_override("font_size", 11)
+		_apply_node_font(lbl, 11)
 		lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 		lbl.add_theme_constant_override("shadow_offset_y", 1)
 
@@ -674,7 +835,7 @@ func _setup_form_input_styling(group: Control, line_edit: LineEdit) -> void:
 	if line_edit:
 		line_edit.add_theme_color_override("font_color", COLOR_TEXT_DARK)
 		line_edit.add_theme_color_override("font_placeholder_color", Color(0.55, 0.50, 0.42, 0.8))
-		line_edit.add_theme_font_size_override("font_size", 13)
+		_apply_node_font(line_edit, 13)
 
 func _apply_royal_home_styling() -> void:
 	# 1. Background image & Dark Overlay
@@ -768,17 +929,17 @@ func _apply_royal_home_styling() -> void:
 		logo_text.add_theme_color_override("font_outline_color", Color(0.28, 0.14, 0.03, 1.0))
 		logo_text.add_theme_constant_override("outline_size", 6)
 		logo_text.add_theme_constant_override("shadow_offset_y", 3)
-		logo_text.add_theme_font_size_override("font_size", 34)
+		_apply_node_font(logo_text, 34)
 
 	var sub_text = get_node_or_null("TitleBrandCenter/Subtitle") as Label
 	if sub_text:
 		sub_text.add_theme_color_override("font_color", Color(0.92, 0.82, 0.60, 1.0))
 		sub_text.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.85))
-		sub_text.add_theme_font_size_override("font_size", 11)
+		_apply_node_font(sub_text, 11)
 
 	# 5. Center Auth Card Styling (Imperial Dark Lacquer with Golden Royal Border)
 	if center_auth_card:
-		center_auth_card.custom_minimum_size = Vector2(460, 530)
+		center_auth_card.custom_minimum_size = Vector2(460, 0)
 		var card_s = StyleBoxFlat.new()
 		card_s.bg_color = Color(0.08, 0.06, 0.11, 0.97)
 		card_s.border_width_left = 2
@@ -835,7 +996,7 @@ func _apply_royal_home_styling() -> void:
 			c_title.name = "CardTitle"
 			c_title.text = "CHIẾN ĐÌNH KHỞI SỰ"
 			c_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			c_title.add_theme_font_size_override("font_size", 16)
+			_apply_node_font(c_title, 16)
 			c_title.add_theme_color_override("font_color", Color(1.0, 0.88, 0.38, 1.0))
 			c_title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 			drum_hdr.add_child(c_title)
@@ -877,10 +1038,10 @@ func _apply_royal_home_styling() -> void:
 
 	if tab_login_btn:
 		tab_login_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		tab_login_btn.add_theme_font_size_override("font_size", 12)
+		_apply_node_font(tab_login_btn, 12)
 	if tab_register_btn:
 		tab_register_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		tab_register_btn.add_theme_font_size_override("font_size", 12)
+		_apply_node_font(tab_register_btn, 12)
 
 	# 8. Form Inputs (Name, Email, Pass)
 	_setup_form_input_styling(name_group, name_input)
@@ -889,8 +1050,8 @@ func _apply_royal_home_styling() -> void:
 
 	if toggle_pass_btn:
 		_style_white_gold_button(toggle_pass_btn, 4, 2, Vector2(0, 1))
-		toggle_pass_btn.add_theme_font_size_override("font_size", 10)
-		toggle_pass_btn.custom_minimum_size = Vector2(46, 26)
+		_apply_node_font(toggle_pass_btn, 11)
+		toggle_pass_btn.custom_minimum_size = Vector2(50, 30)
 
 	# 9. Submit & Quick Guest Buttons
 	if submit_btn:
@@ -900,7 +1061,7 @@ func _apply_royal_home_styling() -> void:
 	if quick_guest_btn:
 		_style_white_gold_button(quick_guest_btn, 10, 6, Vector2(0, 3))
 		quick_guest_btn.custom_minimum_size = Vector2(0, 38)
-		quick_guest_btn.add_theme_font_size_override("font_size", 12)
+		_apply_node_font(quick_guest_btn, 12)
 		quick_guest_btn.add_theme_color_override("font_color", Color(1.0, 0.90, 0.60, 1.0))
 
 	# 10. Modals Styling (Notice Modal & Dev Tester Drawer)
@@ -976,4 +1137,4 @@ func _apply_royal_home_styling() -> void:
 	if notice_text:
 		notice_text.add_theme_color_override("font_color", Color(0.75, 0.70, 0.62, 0.8))
 		notice_text.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
-		notice_text.add_theme_font_size_override("font_size", 10)
+		_apply_node_font(notice_text, 10)

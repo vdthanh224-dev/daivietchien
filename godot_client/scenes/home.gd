@@ -8007,8 +8007,8 @@ func _build_settings_content() -> Control:
 
 	var scale_options = [
 		{"label": "Chuẩn PC (100%)", "scale": 1.0},
-		{"label": "Mobile (125%)", "scale": 1.25},
-		{"label": "Chữ Lớn (135%)", "scale": 1.35},
+		{"label": "Mobile Vừa (125%)", "scale": 1.25},
+		{"label": "Mặc Định Mobile (135%)", "scale": 1.35},
 	]
 
 	var current_s = UIScaleManager.current_scale if is_instance_valid(UIScaleManager) else 1.0

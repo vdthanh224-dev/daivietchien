@@ -11,9 +11,10 @@ const SETTINGS_SECTION: String = "display"
 const SETTINGS_KEY: String = "ui_scale"
 
 # Các mức tỉ lệ chuẩn
-const SCALE_PC: float = 1.0           # 100% (Mặc định máy tính)
-const SCALE_MOBILE_NORMAL: float = 1.25 # 125% (Tiêu chuẩn Mobile dễ nhìn)
-const SCALE_MOBILE_LARGE: float = 1.35  # 135% (Chữ lớn cho màn hình nhỏ hoặc mắt kém)
+const SCALE_PC: float = 1.0             # 100% (Mặc định máy tính)
+const SCALE_MOBILE_MEDIUM: float = 1.25 # 125% (Mobile vừa)
+const SCALE_MOBILE_LARGE: float = 1.35  # 135% (Mặc định Mobile - Chữ lớn dễ đọc)
+const SCALE_MOBILE_NORMAL: float = 1.35 # 135% (Mặc định Mobile chuẩn theo yêu cầu)
 
 # Tỉ lệ hiện tại
 var current_scale: float = 1.0
@@ -33,7 +34,20 @@ func _ready() -> void:
 ## Kiểm tra có đang chạy trên thiết bị di động thực tế không
 func is_mobile_device() -> bool:
 	var os_name = OS.get_name().to_lower()
-	return os_name == "android" or os_name == "ios"
+	if os_name == "android" or os_name == "ios":
+		return true
+	if OS.has_feature("mobile") or OS.has_feature("android") or OS.has_feature("ios"):
+		return true
+	if OS.has_feature("web_android") or OS.has_feature("web_ios"):
+		return true
+	if os_name == "web":
+		if OS.has_feature("web"):
+			var is_mobile_ua = JavaScriptBridge.eval("/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)")
+			if is_mobile_ua == true:
+				return true
+	if DisplayServer.is_touchscreen_available() and (os_name != "windows" and os_name != "macos" and os_name != "linux"):
+		return true
+	return false
 
 ## Kiểm tra chế độ Mobile (thiết bị di động hoặc người dùng đang chọn scale > 1.0)
 func is_mobile_mode() -> bool:
@@ -42,11 +56,17 @@ func is_mobile_mode() -> bool:
 ## Khởi tạo giá trị tỉ lệ từ file cấu hình người dùng hoặc tự động nhận diện
 func _init_scale() -> void:
 	var saved_scale = _load_saved_scale()
-	if saved_scale > 0.0:
-		current_scale = saved_scale
+	if is_mobile_device():
+		# Mobile mặc định là chữ lớn 135% (1.35).
+		# Nếu chưa có cấu hình hoặc đang lưu mức cũ 1.25, tự động nâng lên 1.35
+		if saved_scale <= 0.0 or is_equal_approx(saved_scale, 1.25):
+			current_scale = SCALE_MOBILE_LARGE
+			_save_scale(current_scale)
+		else:
+			current_scale = saved_scale
 	else:
-		if is_mobile_device():
-			current_scale = SCALE_MOBILE_NORMAL
+		if saved_scale > 0.0:
+			current_scale = saved_scale
 		else:
 			current_scale = SCALE_PC
 
@@ -151,3 +171,10 @@ func _apply_theme_scale() -> void:
 			theme.default_font_size = scale_font(16)
 			theme.set_font_size("font_size", "Label", scale_font(16))
 			theme.set_font_size("font_size", "Button", scale_font(16))
+
+## Áp dụng scale cho toàn bộ node trong một scene
+func apply_to_scene(root_node: Node) -> void:
+	if not is_instance_valid(root_node):
+		return
+	_apply_scale_to_subtree(root_node)
+
