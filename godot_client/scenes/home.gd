@@ -445,20 +445,23 @@ func _build_top_header() -> void:
 	mail_btn.custom_minimum_size = Vector2(42, 42)
 	mail_btn.text = "✉️"
 	_style_round_icon_button(mail_btn, 14)
-	mail_btn.pressed.connect(func(): _show_modal("HÒM THƯ TRIỀU ĐÌNH", _build_mail_content()))
+	mail_btn.pressed.connect(func():
+		AudioManager.play_card_select()
+		_open_mailbox_modal()
+	)
 
-	var mail_dot = PanelContainer.new()
-	mail_dot.custom_minimum_size = Vector2(10, 10)
-	mail_dot.position = Vector2(28, 4)
+	mail_badge = PanelContainer.new()
+	mail_badge.custom_minimum_size = Vector2(10, 10)
+	mail_badge.position = Vector2(28, 4)
 	var m_dot_sb = StyleBoxFlat.new()
 	m_dot_sb.bg_color = Color(1.0, 0.2, 0.2, 1.0)
 	m_dot_sb.corner_radius_top_left = 5
 	m_dot_sb.corner_radius_top_right = 5
 	m_dot_sb.corner_radius_bottom_right = 5
 	m_dot_sb.corner_radius_bottom_left = 5
-	mail_dot.add_theme_stylebox_override("panel", m_dot_sb)
-	mail_dot.mouse_filter = MOUSE_FILTER_IGNORE
-	mail_btn.add_child(mail_dot)
+	mail_badge.add_theme_stylebox_override("panel", m_dot_sb)
+	mail_badge.mouse_filter = MOUSE_FILTER_IGNORE
+	mail_btn.add_child(mail_badge)
 
 	header_hbox.add_child(mail_btn)
 
@@ -2200,6 +2203,7 @@ func _load_user_data() -> void:
 		_select_hero_by_slug(active_slug)
 		_update_quest_nav_indicator()
 		_refresh_inventory_content()
+		_update_mail_badge()
 
 # --- Ambient Particle Embers ---
 func _start_ambient_effects() -> void:
@@ -7976,69 +7980,429 @@ func _build_shop_content() -> Control:
 
 	return root
 
+# --- Mailbox System ---
+func _update_mail_badge() -> void:
+	if not is_instance_valid(mail_badge):
+		return
+	var has_unclaimed = false
+	if AuthManager:
+		if not AuthManager.is_mail_deleted("tan_thu_gift") and not AuthManager.is_mail_claimed("tan_thu_gift"):
+			has_unclaimed = true
+	mail_badge.visible = has_unclaimed
+
+func _open_mailbox_modal() -> void:
+	_show_modal("HỘP THƯ TRIỀU ĐÌNH", _build_mail_content())
+
+func _open_mail_detail(mail_id: String) -> void:
+	_show_modal("HỘP THƯ TRIỀU ĐÌNH", _build_mail_detail(mail_id))
+
+func _get_all_system_mails() -> Array[Dictionary]:
+	var list: Array[Dictionary] = [
+		{
+			"id": "tan_thu_gift",
+			"title": "Quà Tân Thủ Tướng Quân",
+			"from": "Triều Đình Đại Việt",
+			"date": "2026-10-15",
+			"sub": "Chiếu chỉ ban tặng bổng lộc tân chiến tướng",
+			"content": "Kính gửi Tướng Quân dũng mãnh,\n\nTriều đình vô cùng hân hoan đón chào Tướng Quân đã gia nhập chiến trường Đại Việt Chiến! Non sông gấm vóc ngàn đời đang cần những bậc hào kiệt dốc lòng gìn giữ non sông xã tắc.\n\nĐể trợ lực cho Tướng Quân bước vào những trận đấu oanh liệt đầu tiên, Triều đình xin ban tặng bổng lộc khởi đầu:\n• 5.000 Bạc để chiêu binh mãi mã, chuẩn bị quân nhu.\n• 1 Vé Triệu Hồi Danh Tướng để chiêu hiền đãi sĩ nơi sa trường.\n\nChúc Tướng Quân mưu lược xuất chúng, bách chiến bách thắng!",
+			"rewards": [
+				{"icon": "🥈", "name": "Bạc", "amount": 5000, "text": "+5.000 Bạc"},
+				{"icon": "🎫", "name": "Vé Triệu Hồi", "amount": 1, "text": "x1 Vé Triệu Hồi Tướng"}
+			]
+		}
+	]
+	return list
+
 func _build_mail_content() -> Control:
 	var container = VBoxContainer.new()
-	container.add_theme_constant_override("separation", 8)
+	container.size_flags_horizontal = SIZE_EXPAND_FILL
+	container.add_theme_constant_override("separation", 10)
 
-	var letters = [
-		{"from": "Triều Đình Đại Việt", "sub": "Chiếu chỉ ban tặng bổng lộc tân chiến tướng", "gift": "🥈 5,000 Bạc"},
-		{"from": "Hệ Thống 2v2", "sub": "Thưởng mùa giải Hoàng Triều Khởi Đấu", "gift": "🥈 2,000 Bạc"},
-	]
+	var all_mails = _get_all_system_mails()
+	var visible_mails: Array[Dictionary] = []
+	for m in all_mails:
+		if AuthManager and AuthManager.is_mail_deleted(m["id"]):
+			continue
+		visible_mails.append(m)
 
-	for l in letters:
+	if visible_mails.is_empty():
+		var empty_box = PanelContainer.new()
+		var eb_style = StyleBoxFlat.new()
+		eb_style.bg_color = Color(0.12, 0.09, 0.16, 0.85)
+		eb_style.border_width_left = 1
+		eb_style.border_width_top = 1
+		eb_style.border_width_right = 1
+		eb_style.border_width_bottom = 1
+		eb_style.border_color = Color(COLOR_GOLD_PRIMARY.r, COLOR_GOLD_PRIMARY.g, COLOR_GOLD_PRIMARY.b, 0.4)
+		eb_style.corner_radius_top_left = 10
+		eb_style.corner_radius_top_right = 10
+		eb_style.corner_radius_bottom_right = 10
+		eb_style.corner_radius_bottom_left = 10
+		empty_box.add_theme_stylebox_override("panel", eb_style)
+		empty_box.custom_minimum_size = Vector2(0, 220)
+
+		var ev = VBoxContainer.new()
+		ev.alignment = BoxContainer.ALIGNMENT_CENTER
+		ev.size_flags_horizontal = SIZE_EXPAND_FILL
+		ev.size_flags_vertical = SIZE_EXPAND_FILL
+		ev.add_theme_constant_override("separation", 8)
+
+		var icon = Label.new()
+		icon.text = "📭"
+		icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		icon.add_theme_font_size_override("font_size", 42)
+		ev.add_child(icon)
+
+		var lbl = Label.new()
+		lbl.text = "HỘP THƯ TRỐNG"
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.add_theme_font_size_override("font_size", 16)
+		lbl.add_theme_color_override("font_color", COLOR_GOLD_PRIMARY)
+		ev.add_child(lbl)
+
+		var desc = Label.new()
+		desc.text = "Tướng Quân hiện không có bức thư nào mới từ Triều đình."
+		desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		desc.add_theme_font_size_override("font_size", 13)
+		desc.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+		ev.add_child(desc)
+
+		empty_box.add_child(ev)
+		container.add_child(empty_box)
+		return container
+
+	for m in visible_mails:
+		var mail_id = m["id"]
+		var is_claimed = AuthManager.is_mail_claimed(mail_id) if AuthManager else false
+
 		var panel = PanelContainer.new()
 		var ps = StyleBoxFlat.new()
-		ps.bg_color = Color(0.96, 0.95, 0.91, 1.0)
+		ps.bg_color = Color(0.13, 0.10, 0.17, 0.95)
 		ps.border_width_left = 2
-		ps.border_color = COLOR_GOLD_PRIMARY
-		ps.corner_radius_top_left = 6
-		ps.corner_radius_bottom_left = 6
+		ps.border_width_top = 1
+		ps.border_width_right = 1
+		ps.border_width_bottom = 1
+		ps.border_color = COLOR_GOLD_PRIMARY if not is_claimed else Color(0.4, 0.35, 0.45, 0.7)
+		ps.corner_radius_top_left = 8
+		ps.corner_radius_top_right = 8
+		ps.corner_radius_bottom_right = 8
+		ps.corner_radius_bottom_left = 8
 		ps.shadow_color = COLOR_SHADOW
 		ps.shadow_size = 4
 		ps.shadow_offset = Vector2(0, 2)
 		panel.add_theme_stylebox_override("panel", ps)
 
+		var margin = MarginContainer.new()
+		margin.add_theme_constant_override("margin_left", 14)
+		margin.add_theme_constant_override("margin_right", 14)
+		margin.add_theme_constant_override("margin_top", 10)
+		margin.add_theme_constant_override("margin_bottom", 10)
+
 		var row = HBoxContainer.new()
-		row.offset_left = 14
-		row.offset_right = -14
-		row.offset_top = 8
-		row.offset_bottom = -8
-		row.add_theme_constant_override("separation", 12)
+		row.add_theme_constant_override("separation", 14)
 
 		var icon = Label.new()
-		icon.text = "✉️"
-		icon.add_theme_font_size_override("font_size", 18)
+		icon.text = "🎁" if not is_claimed else "📩"
+		icon.add_theme_font_size_override("font_size", 24)
+		icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		row.add_child(icon)
 
 		var v = VBoxContainer.new()
 		v.size_flags_horizontal = SIZE_EXPAND_FILL
+		v.add_theme_constant_override("separation", 4)
+
+		var title_row = HBoxContainer.new()
+		title_row.add_theme_constant_override("separation", 8)
+
+		var title_lbl = Label.new()
+		title_lbl.text = m["title"]
+		title_lbl.add_theme_font_size_override("font_size", 14)
+		title_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT if not is_claimed else COLOR_TEXT_DARK)
+		title_row.add_child(title_lbl)
+
+		var badge_lbl = Label.new()
+		badge_lbl.text = "[Chưa nhận]" if not is_claimed else "[Đã nhận]"
+		badge_lbl.add_theme_font_size_override("font_size", 11)
+		badge_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.4, 1.0) if not is_claimed else COLOR_TEXT_MUTED)
+		title_row.add_child(badge_lbl)
+		v.add_child(title_row)
 
 		var sub_lbl = Label.new()
-		sub_lbl.text = l["sub"]
-		sub_lbl.add_theme_font_size_override("font_size", 13)
-		sub_lbl.add_theme_color_override("font_color", COLOR_TEXT_DARK)
+		sub_lbl.text = "Người gửi: %s | Đính kèm: 5.000 Bạc + 1 Vé Triệu Hồi" % m["from"]
+		sub_lbl.add_theme_font_size_override("font_size", 12)
+		sub_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
 		v.add_child(sub_lbl)
 
-		var from_lbl = Label.new()
-		from_lbl.text = "Gửi từ: %s | Phần thưởng: %s" % [l["from"], l["gift"]]
-		from_lbl.add_theme_font_size_override("font_size", 11)
-		from_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
-		v.add_child(from_lbl)
 		row.add_child(v)
 
-		var r_btn = Button.new()
-		r_btn.custom_minimum_size = Vector2(100, 34)
-		r_btn.text = "NHẬN →"
-		_style_white_gold_button(r_btn, 6, 3, Vector2(0, 2))
-		r_btn.pressed.connect(func():
-			AudioManager.play_parry()
-			r_btn.text = "ĐÃ NHẬN"
-			r_btn.disabled = true
+		var view_btn = Button.new()
+		view_btn.custom_minimum_size = Vector2(110, 36)
+		view_btn.text = "XEM THƯ →"
+		_style_white_gold_button(view_btn, 6, 3, Vector2(0, 2))
+		view_btn.pressed.connect(func():
+			if _touch_scroll_is_dragging or (Time.get_ticks_msec() - _touch_drag_finished_msec < 180):
+				return
+			AudioManager.play_card_select()
+			_open_mail_detail(mail_id)
 		)
-		row.add_child(r_btn)
+		row.add_child(view_btn)
 
-		panel.add_child(row)
+		margin.add_child(row)
+		panel.add_child(margin)
+
+		panel.gui_input.connect(func(event: InputEvent):
+			if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+				if _touch_scroll_is_dragging or (Time.get_ticks_msec() - _touch_drag_finished_msec < 180):
+					return
+				AudioManager.play_card_select()
+				_open_mail_detail(mail_id)
+		)
+
 		container.add_child(panel)
+
+	return container
+
+func _build_mail_detail(mail_id: String) -> Control:
+	var container = VBoxContainer.new()
+	container.size_flags_horizontal = SIZE_EXPAND_FILL
+	container.add_theme_constant_override("separation", 12)
+
+	var all_mails = _get_all_system_mails()
+	var target_mail: Dictionary = {}
+	for m in all_mails:
+		if m["id"] == mail_id:
+			target_mail = m
+			break
+
+	if target_mail.is_empty():
+		_open_mailbox_modal()
+		return container
+
+	var is_claimed = AuthManager.is_mail_claimed(mail_id) if AuthManager else false
+
+	# 1. Navigation Top Bar: Back button & Status
+	var top_nav = HBoxContainer.new()
+	top_nav.add_theme_constant_override("separation", 10)
+
+	var back_btn = Button.new()
+	back_btn.text = "← DANH SÁCH THƯ"
+	back_btn.custom_minimum_size = Vector2(150, 34)
+	_style_white_gold_button(back_btn, 6, 2, Vector2(0, 1))
+	back_btn.pressed.connect(func():
+		AudioManager.play_card_select()
+		_open_mailbox_modal()
+	)
+	top_nav.add_child(back_btn)
+
+	var nav_spacer = Control.new()
+	nav_spacer.size_flags_horizontal = SIZE_EXPAND_FILL
+	top_nav.add_child(nav_spacer)
+
+	var status_lbl = Label.new()
+	status_lbl.text = "Trạng thái: Đã nhận" if is_claimed else "Trạng thái: Chưa nhận"
+	status_lbl.add_theme_font_size_override("font_size", 12)
+	status_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.4, 1.0) if not is_claimed else COLOR_TEXT_MUTED)
+	top_nav.add_child(status_lbl)
+
+	container.add_child(top_nav)
+
+	# 2. Divider line
+	var div = ColorRect.new()
+	div.custom_minimum_size = Vector2(0, 1)
+	div.color = Color(COLOR_GOLD_PRIMARY.r, COLOR_GOLD_PRIMARY.g, COLOR_GOLD_PRIMARY.b, 0.4)
+	container.add_child(div)
+
+	# 3. Mail Header
+	var header_vbox = VBoxContainer.new()
+	header_vbox.add_theme_constant_override("separation", 4)
+
+	var title_lbl = Label.new()
+	title_lbl.text = "📜 " + str(target_mail["title"]).to_upper()
+	title_lbl.add_theme_font_size_override("font_size", 16)
+	title_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+	header_vbox.add_child(title_lbl)
+
+	var meta_lbl = Label.new()
+	meta_lbl.text = "Người gửi: %s  |  Thời gian: Hoàng Triều Khởi Đấu" % target_mail["from"]
+	meta_lbl.add_theme_font_size_override("font_size", 12)
+	meta_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+	header_vbox.add_child(meta_lbl)
+
+	container.add_child(header_vbox)
+
+	# 4. Mail Content Body
+	var body_panel = PanelContainer.new()
+	var bp_style = StyleBoxFlat.new()
+	bp_style.bg_color = Color(0.09, 0.07, 0.12, 0.9)
+	bp_style.border_width_left = 1
+	bp_style.border_width_top = 1
+	bp_style.border_width_right = 1
+	bp_style.border_width_bottom = 1
+	bp_style.border_color = Color(COLOR_GOLD_PRIMARY.r, COLOR_GOLD_PRIMARY.g, COLOR_GOLD_PRIMARY.b, 0.3)
+	bp_style.corner_radius_top_left = 8
+	bp_style.corner_radius_top_right = 8
+	bp_style.corner_radius_bottom_right = 8
+	bp_style.corner_radius_bottom_left = 8
+	body_panel.add_theme_stylebox_override("panel", bp_style)
+
+	var body_margin = MarginContainer.new()
+	body_margin.add_theme_constant_override("margin_left", 14)
+	body_margin.add_theme_constant_override("margin_right", 14)
+	body_margin.add_theme_constant_override("margin_top", 12)
+	body_margin.add_theme_constant_override("margin_bottom", 12)
+
+	var content_lbl = Label.new()
+	content_lbl.text = target_mail["content"]
+	content_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content_lbl.add_theme_font_size_override("font_size", 13)
+	content_lbl.add_theme_color_override("font_color", COLOR_TEXT_DARK)
+	content_lbl.add_theme_constant_override("line_spacing", 4)
+	body_margin.add_child(content_lbl)
+	body_panel.add_child(body_margin)
+
+	container.add_child(body_panel)
+
+	# 5. Attachments Box
+	var attach_panel = PanelContainer.new()
+	var ap_style = StyleBoxFlat.new()
+	ap_style.bg_color = Color(0.14, 0.11, 0.18, 0.9)
+	ap_style.border_width_left = 1
+	ap_style.border_width_top = 1
+	ap_style.border_width_right = 1
+	ap_style.border_width_bottom = 1
+	ap_style.border_color = COLOR_GOLD_PRIMARY
+	ap_style.corner_radius_top_left = 8
+	ap_style.corner_radius_top_right = 8
+	ap_style.corner_radius_bottom_right = 8
+	ap_style.corner_radius_bottom_left = 8
+	attach_panel.add_theme_stylebox_override("panel", ap_style)
+
+	var attach_margin = MarginContainer.new()
+	attach_margin.add_theme_constant_override("margin_left", 14)
+	attach_margin.add_theme_constant_override("margin_right", 14)
+	attach_margin.add_theme_constant_override("margin_top", 10)
+	attach_margin.add_theme_constant_override("margin_bottom", 10)
+
+	var attach_vbox = VBoxContainer.new()
+	attach_vbox.add_theme_constant_override("separation", 8)
+
+	var attach_title = Label.new()
+	attach_title.text = "🎁 VẬT PHẨM ĐÍNH KÈM"
+	attach_title.add_theme_font_size_override("font_size", 12)
+	attach_title.add_theme_color_override("font_color", COLOR_GOLD_PRIMARY)
+	attach_vbox.add_child(attach_title)
+
+	var items_hbox = HBoxContainer.new()
+	items_hbox.add_theme_constant_override("separation", 16)
+
+	for r in target_mail.get("rewards", []):
+		var item_card = PanelContainer.new()
+		var ic_style = StyleBoxFlat.new()
+		ic_style.bg_color = Color(0.20, 0.16, 0.25, 0.9)
+		ic_style.border_width_left = 1
+		ic_style.border_width_top = 1
+		ic_style.border_width_right = 1
+		ic_style.border_width_bottom = 1
+		ic_style.border_color = COLOR_GOLD_BORDER
+		ic_style.corner_radius_top_left = 6
+		ic_style.corner_radius_top_right = 6
+		ic_style.corner_radius_bottom_right = 6
+		ic_style.corner_radius_bottom_left = 6
+		item_card.add_theme_stylebox_override("panel", ic_style)
+		item_card.custom_minimum_size = Vector2(160, 50)
+
+		var ic_margin = MarginContainer.new()
+		ic_margin.add_theme_constant_override("margin_left", 10)
+		ic_margin.add_theme_constant_override("margin_right", 10)
+		ic_margin.add_theme_constant_override("margin_top", 6)
+		ic_margin.add_theme_constant_override("margin_bottom", 6)
+
+		var item_row = HBoxContainer.new()
+		item_row.add_theme_constant_override("separation", 10)
+
+		var item_icon = Label.new()
+		item_icon.text = r["icon"]
+		item_icon.add_theme_font_size_override("font_size", 20)
+		item_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		item_row.add_child(item_icon)
+
+		var item_info = VBoxContainer.new()
+		item_info.add_theme_constant_override("separation", 2)
+
+		var item_name = Label.new()
+		item_name.text = r["text"]
+		item_name.add_theme_font_size_override("font_size", 13)
+		item_name.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+		item_info.add_child(item_name)
+
+		var item_sub = Label.new()
+		item_sub.text = r["name"]
+		item_sub.add_theme_font_size_override("font_size", 10)
+		item_sub.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+		item_info.add_child(item_sub)
+
+		item_row.add_child(item_info)
+		ic_margin.add_child(item_row)
+		item_card.add_child(ic_margin)
+		items_hbox.add_child(item_card)
+
+	attach_vbox.add_child(items_hbox)
+	attach_margin.add_child(attach_vbox)
+	attach_panel.add_child(attach_margin)
+	container.add_child(attach_panel)
+
+	# 6. Action Button (NHẬN THƯ or XÓA THƯ)
+	var action_box = HBoxContainer.new()
+	action_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	action_box.custom_minimum_size = Vector2(0, 48)
+
+	if not is_claimed:
+		var claim_btn = Button.new()
+		claim_btn.text = "🎁 NHẬN THƯ"
+		claim_btn.custom_minimum_size = Vector2(220, 44)
+		_style_bronze_drum_cta(claim_btn)
+		claim_btn.pressed.connect(func():
+			if AuthManager:
+				var claim_res = AuthManager.claim_mail_reward(mail_id)
+				AudioManager.play_victory()
+				_load_user_data()
+				_update_mail_badge()
+				_open_mail_detail(mail_id)
+		)
+		action_box.add_child(claim_btn)
+	else:
+		var del_btn = Button.new()
+		del_btn.text = "🗑️ XÓA THƯ"
+		del_btn.custom_minimum_size = Vector2(180, 42)
+		var del_style = StyleBoxFlat.new()
+		del_style.bg_color = Color(0.24, 0.08, 0.10, 0.95)
+		del_style.border_width_left = 2
+		del_style.border_width_top = 2
+		del_style.border_width_right = 2
+		del_style.border_width_bottom = 2
+		del_style.border_color = Color(0.9, 0.3, 0.3, 0.9)
+		del_style.corner_radius_top_left = 8
+		del_style.corner_radius_top_right = 8
+		del_style.corner_radius_bottom_right = 8
+		del_style.corner_radius_bottom_left = 8
+		del_btn.add_theme_stylebox_override("normal", del_style)
+		var del_hover = del_style.duplicate()
+		del_hover.bg_color = Color(0.35, 0.10, 0.12, 1.0)
+		del_btn.add_theme_stylebox_override("hover", del_hover)
+		del_btn.add_theme_stylebox_override("pressed", del_hover)
+		del_btn.add_theme_color_override("font_color", Color(1.0, 0.85, 0.85, 1.0))
+		del_btn.add_theme_font_size_override("font_size", 13)
+
+		del_btn.pressed.connect(func():
+			if AuthManager:
+				AuthManager.delete_mail(mail_id)
+				AudioManager.play_parry()
+				_update_mail_badge()
+				_open_mailbox_modal()
+		)
+		action_box.add_child(del_btn)
+
+	container.add_child(action_box)
 
 	return container
 
