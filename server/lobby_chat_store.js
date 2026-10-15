@@ -1,4 +1,4 @@
-export const LOBBY_CHAT_HISTORY_LIMIT = 100;
+export const LOBBY_CHAT_HISTORY_LIMIT = 50;
 export const LOBBY_CHAT_DOCUMENT_TYPE = "LOBBY_CHAT_MESSAGE_V1";
 
 // The existing Appwrite collection also holds namespaced leaderboard records.
@@ -75,7 +75,7 @@ export function createLobbyChatStore({ request, documentsPath, limit = LOBBY_CHA
         throw new Error(`Cannot save lobby message (${response?.status || "offline"})`);
       }
       // A cleanup failure must not turn a successfully saved message into an
-      // apparent send failure. Reads always return at most the newest 100.
+      // apparent send failure. Reads always respect the history limit.
       try { await prune(); } catch (error) { onCleanupError(error); }
       return normalized;
     }),

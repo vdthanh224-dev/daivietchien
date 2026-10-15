@@ -27,19 +27,20 @@ const sandbox = {
     upgradeWebSocket(request) { return { socket: request.socket, response: {} }; },
   },
 };
-source += "\nglobalThis.chatTests = { rooms, lobbyChatSockets };";
+source += "\nglobalThis.chatTests = { rooms, lobbyChatSockets, waitLobby: () => lobbyChatQueue };";
 vm.runInNewContext(source, sandbox, { filename: "server.js" });
 const { rooms, lobbyChatSockets } = sandbox.chatTests;
-async function connect(userId) {
+async function connect(userId, appHandler = handler, tests = sandbox.chatTests) {
   const socket = {
     readyState: 1, messages: [],
     send(message) { this.messages.push(JSON.parse(message)); },
     close() { this.readyState = 3; this.onclose(); },
   };
-  await handler({ headers: new Headers({ upgrade: "websocket" }), socket });
+  await appHandler({ headers: new Headers({ upgrade: "websocket" }), socket });
   socket.action = async (payload) => {
     socket.onmessage({ data: JSON.stringify(payload) });
     await new Promise((resolve) => setImmediate(resolve));
+    await tests.waitLobby();
   };
   if (userId) await socket.action({ action: "SOCIAL_REGISTER", userId, userName: `Tên ${userId}` });
   return socket;
@@ -127,4 +128,43 @@ assert(!lobbyChatSockets.has(c));
 await guest.action(null);
 assert(last(guest, "ERROR"));
 assert.deepEqual(errors, []);
+
+// The actual server must restore 50 lobby messages with all in-memory maps
+// recreated. Battle history deliberately remains temporary and capped at 50.
+for (let i = 0; i < 110; i++) {
+  testNow += 1100;
+  await send(a, `Lobby ${i}`);
+}
+await subscribe(a);
+assert.equal(last(a, "CHAT_HISTORY").historyLimit, 50);
+const persisted = last(a, "CHAT_HISTORY").messages;
+assert.equal(persisted.length, 50);
+assert.equal(persisted[0].text, "Lobby 60");
+assert.equal(persisted.at(-1).text, "Lobby 109");
+let restartedHandler;
+const restartedSandbox = { ...sandbox, Deno: { ...sandbox.Deno, serve(_options, callback) { restartedHandler = callback; } } };
+vm.runInNewContext(source, restartedSandbox, { filename: "server-restarted.js" });
+const reconnected = await connect("a", restartedHandler, restartedSandbox.chatTests);
+await subscribe(reconnected);
+assert.deepEqual(last(reconnected, "CHAT_HISTORY").messages, persisted);
+assert.equal(restartedSandbox.chatTests.rooms.size, 0, "Battle rooms are not persisted with lobby chat");
+
+chatDb.failWrites = true;
+testNow += 1100;
+await send(reconnected, "Must not be acknowledged as sent");
+assert.equal(count(reconnected), 0);
+assert.match(last(reconnected, "CHAT_ERROR").error, /Chưa lưu/);
+chatDb.failWrites = false;
+await subscribe(reconnected);
+assert.deepEqual(last(reconnected, "CHAT_HISTORY").messages, persisted);
+chatDb.failReads = true;
+const historiesBefore = reconnected.messages.filter((m) => m.type === "CHAT_HISTORY").length;
+await subscribe(reconnected);
+assert.match(last(reconnected, "CHAT_ERROR").error, /Chưa tải/);
+assert.equal(reconnected.messages.filter((m) => m.type === "CHAT_HISTORY").length, historiesBefore, "Storage errors must not erase cached history with an empty snapshot");
+chatDb.failReads = false;
+await send(reconnected, "Recovered after a storage error");
+assert.equal(count(reconnected), 1);
+assert.equal(last(reconnected, "CHAT_MESSAGE").text, "Recovered after a storage error");
 console.log("PASS: lobby broadcast/history, identity, room isolation, stale sockets, limits, cooldown, cleanup and malformed payloads");
+console.log("PASS: server restart restores 50 lobby messages; failed storage never broadcasts a false acknowledgment or empty history");

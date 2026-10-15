@@ -570,7 +570,7 @@ function sendSocialError(socket, error) {
 }
 
 function sendChatError(socket, channel, error) {
-  socket.send(JSON.stringify({ type: "CHAT_ERROR", channel, error }));
+  if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "CHAT_ERROR", channel, error }));
 }
 
 async function handleChat(socket, payload, currentRoomId, currentSeat) {
