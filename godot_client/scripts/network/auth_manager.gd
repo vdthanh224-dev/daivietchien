@@ -26,6 +26,7 @@ var current_silver: int = 5000
 var current_gold: int = 0
 var current_generals: Array = ["ly_thuong_kiet"]
 var current_hero_tickets: int = 0
+var current_skin_tickets: int = 0
 var checkin_7day_claimed: Array = []
 var last_checkin_date: String = ""
 var current_2v2_points: int = 1200
@@ -199,6 +200,21 @@ func consume_hero_tickets(amount: int) -> bool:
 	if current_hero_tickets < amount:
 		return false
 	current_hero_tickets -= amount
+	save_session()
+	save_profile_to_appwrite()
+	profile_updated.emit()
+	return true
+
+func add_skin_tickets(amount: int) -> void:
+	current_skin_tickets += amount
+	save_session()
+	save_profile_to_appwrite()
+	profile_updated.emit()
+
+func consume_skin_tickets(amount: int) -> bool:
+	if current_skin_tickets < amount:
+		return false
+	current_skin_tickets -= amount
 	save_session()
 	save_profile_to_appwrite()
 	profile_updated.emit()
@@ -449,6 +465,10 @@ func fetch_profile_from_appwrite(on_completed: Callable = Callable()) -> void:
 					else:
 						current_hero_tickets = 0
 						needs_init_on_appwrite = true
+					if data.has("skinTickets"):
+						current_skin_tickets = int(data["skinTickets"])
+					else:
+						current_skin_tickets = 0
 					if data.has("checkin7DayClaimed"):
 						var c_val = data["checkin7DayClaimed"]
 						if c_val is String and c_val != "":
@@ -510,6 +530,7 @@ func save_profile_to_appwrite(on_completed: Callable = Callable()) -> void:
 			"silver": current_silver,
 			"gold": current_gold,
 			"heroTickets": current_hero_tickets,
+			"skinTickets": current_skin_tickets,
 			"checkin7DayClaimed": JSON.stringify(checkin_7day_claimed),
 			"lastCheckinDate": last_checkin_date,
 			"dailyQuestsData": JSON.stringify(daily_quests_data),
@@ -568,6 +589,8 @@ func get_leaderboard_player_data() -> Dictionary:
 		"military_tier": tier_info.get("tier", 1),
 		"military_name": tier_info.get("name", "Tân Binh"),
 		"military_badge": tier_info.get("badge", "🔰"),
+		"hero_tickets": current_hero_tickets,
+		"skin_tickets": current_skin_tickets,
 		"rank_index": current_2v2_rank_index,
 		"rank_name": rank_name,
 		"rank_stars": current_2v2_stars,
@@ -679,6 +702,7 @@ func reset_to_defaults() -> void:
 	current_silver = 5000
 	current_gold = 0
 	current_hero_tickets = 0
+	current_skin_tickets = 0
 	checkin_7day_claimed.clear()
 	last_checkin_date = ""
 	current_generals = ["ly_thuong_kiet"]
@@ -990,6 +1014,7 @@ func save_session() -> void:
 			"silver": current_silver,
 			"gold": current_gold,
 			"heroTickets": current_hero_tickets,
+			"skinTickets": current_skin_tickets,
 			"checkin7DayClaimed": checkin_7day_claimed,
 			"lastCheckinDate": last_checkin_date,
 			"generals": current_generals,
@@ -1064,6 +1089,7 @@ func load_saved_session() -> void:
 					current_silver = int(data.get("silver", 5000))
 					current_gold = int(data.get("gold", 0))
 					current_hero_tickets = int(data.get("heroTickets", 0))
+					current_skin_tickets = int(data.get("skinTickets", 0))
 					var saved_claimed = data.get("checkin7DayClaimed", [])
 					if saved_claimed is Array:
 						checkin_7day_claimed = saved_claimed
