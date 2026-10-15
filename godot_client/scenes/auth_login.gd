@@ -977,4 +977,3 @@ func _apply_royal_home_styling() -> void:
 		notice_text.add_theme_color_override("font_color", Color(0.75, 0.70, 0.62, 0.8))
 		notice_text.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 		notice_text.add_theme_font_size_override("font_size", 10)
-
