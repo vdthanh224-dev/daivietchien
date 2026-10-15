@@ -76,7 +76,9 @@ const HERO_SKILL_ACTIONS := {
 	"THAI_BINH_TRIGGERED": {"name": "Thái Bình"},
 	"THAN_CHINH_BONUS_SLASH": {"name": "Thân Chinh"},
 	"PHAT_CHAM_HEAL": {"name": "Phạt Chăm"},
-	"GIAI_ACH_DRAW": {"name": "Giải Ách"}
+	"GIAI_ACH_DRAW": {"name": "Giải Ách"},
+	"TIEN_THOAI_ACTIVATED": {"name": "Tiến Thoái"},
+	"NAM_QUOC_SON_HA_BUFF": {"name": "Nam Quốc Sơn Hà"}
 }
 const IMPLEMENTED_HERO_SKILL_NAMES := [
 	"Chế Nỏ", "Liên Châu", "Xạ Thuẫn", "Phù Trấn", "Hịch Nghĩa", "Uất Khí",
@@ -87,7 +89,7 @@ const IMPLEMENTED_HERO_SKILL_NAMES := [
 	"Vạn An", "Đế Nghiệp", "Khoan Giản", "Chính Thống", "Khoan Hòa", "Cải Cách", "Thiên Cảm", "Nam Tấn", "Bình Sạn", "Cát Cứ", "Cố Thủ", "Hồi Hồ", "Phòng Duyện", "Liệt Chiến", "Tây Phu", "Nghĩa Tử", "Dưỡng Binh",
 	"Tế Giang", "Ưu Thiếp", "Cờ Lau", "Thu Phục", "Vạn Thắng", "Trữ Quân", "Cột Kinh", "Trung Tiết", "Cận Vệ",
 	"Định Quốc", "Tận Trung", "Bao Lăm", "Trấn Thủ", "Phá Tống", "Thân Chinh", "Trao Bào", "Nhiếp Chính", "Bạo Nộ", "Ngọa Triều", "Phò Tá", "Mưu Định", "Dời Đô", "Thái Bình", "Phạt Chăm",
-	"Thang Mộc", "Giải Ách"
+	"Thang Mộc", "Giải Ách", "Tiến Thoái", "Nam Quốc Sơn Hà"
 ]
 
 # UI Node References
@@ -259,6 +261,7 @@ var local_turn_dealt_damage: bool = false
 var lap_lang_triggered_this_turn: bool = false
 var is_targeting_drum_skill: bool = false
 var is_targeting_ho_phu_skill: bool = false
+var selected_nam_quoc_targets: Array[int] = []
 var borrow_sword_owner_seat: int = -1
 var borrow_sword_target_seat: int = -1
 var is_game_over: bool = false
@@ -1914,6 +1917,7 @@ func _init_generals_from_draft() -> void:
 			"ao_bao_charges": 0,
 			"che_no_active": false,
 			"suc_soi_turns_remaining": 0,
+			"nam_quoc_son_ha_range_buff": 0,
 			"hp_synced": false
 		}
 		_refresh_local_skill_buttons(s_num)
@@ -2056,6 +2060,8 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 			buttons.append({"id": "dinh_trieu", "text": "📜 ĐÃ DÙNG ĐỊNH TRIỀU", "description": "Định Triều chỉ dùng 1 lần mỗi lượt.", "disabled": true})
 		else:
 			buttons.append({"id": "dinh_trieu", "text": "📜 ĐỊNH TRIỀU", "description": "Giai đoạn ra bài: đưa 1 lá Cẩm Nang trên tay cho 1 người khác, rồi rút 1 lá.", "selected": is_targeting_dinh_trieu})
+	if seat == my_seat and (int(g.get("hero_id", 0)) == 47 or _hero_has_skill(g, "tien_thoai")):
+		buttons.append({"id": "tien_thoai", "text": "⚡ TIẾN THOÁI", "description": "Hoán chuyển Trảm ⟷ Đỡ trên tay để sử dụng."})
 	var treasure = str(g.get("equipped_treasure", ""))
 	if seat == my_seat and treasure == "Trống Đồng Đông Sơn":
 		var drum_used := bool(g.get("diem_trong_used", false)) or ("DiemTrong" in (g.get("used_skills_keys", []) as Array))
@@ -2430,18 +2436,7 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 			card_play_btn.visible = true
 			desc_text.text = "🥁 [TRỐNG ĐỒNG ĐÔNG SƠN - ĐIỂM TRỐNG]: Hãy chọn 1 Tướng trên bàn để kích hoạt! Mục tiêu phải chọn bỏ 1 lá bài hoặc lộ toàn bộ bài trên tay."
 		return
-	var skill_name = ""
-	var skills = HeroDatabase.get_hero_skills(int(g.get("hero_id", h_data.get("id", 0))))
-	if skills is Array and not skills.is_empty() and skills[0] is Dictionary:
-		skill_name = str(skills[0].get("name", ""))
-	if is_network_mode and s_num == my_seat and NetworkClient and NetworkClient.is_connected_to_server:
-		if "Chế Nỏ" in skill_name or "Chế Nỏ" in h_name:
-			NetworkClient.send_toggle_skill(skill_name if not skill_name.is_empty() else "Chế Nỏ")
-		else:
-			NetworkClient.send_use_skill(skill_name if not skill_name.is_empty() else h_name, selected_target_seat if selected_target_seat > 0 else 0)
-
-		# 1. Lý Thường Kiệt (ID 47 - Tiến Thoái): Biến Trảm thành Đỡ và ngược lại
-	if (h_id == 47 or "Lý Thường Kiệt" in h_name) and s_num == my_seat:
+	if s_num == my_seat and (skill_key == "tien_thoai" or (skill_key.is_empty() and (h_id == 47 or "Lý Thường Kiệt" in h_name or _hero_has_skill(g, "tien_thoai")))):
 		var converted_count = 0
 		var sample_card_info: Dictionary = {}
 		var sample_from := ""
@@ -2482,6 +2477,8 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 			var morph_to = sample_to if sample_to != "" else "Đỡ"
 			_animate_tien_thoai_morph(my_seat, morph_from, morph_to, "Lý Thường Kiệt hoán chuyển %d lá %s ⟷ %s!" % [converted_count, morph_from, morph_to], sample_card_info)
 			_add_log("✨ [TIẾN THOÁI] Lý Thường Kiệt đã hoán chuyển %d lá Trảm ⟷ Đỡ trên tay!" % converted_count)
+			if is_network_mode and NetworkClient and NetworkClient.is_connected_to_server:
+				NetworkClient.send_use_skill("Tiến Thoái", 0)
 			if is_waiting_dodge:
 				_set_reaction_hand_focus(true, current_reaction_required_type, dodge_attacker_seat if is_current_reaction_slash else 0, current_reaction_allow_dodge_as_slash, is_current_reaction_slash)
 				_select_dodge_card(null)
@@ -2489,6 +2486,21 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 				_update_action_btn()
 		else:
 			desc_text.text = "💡 [Tiến Thoái]: Không có lá Trảm hoặc Đỡ nào trên tay để hoán đổi!"
+		return
+
+	if s_num == my_seat and skill_key == "nam_quoc_son_ha":
+		desc_text.text = "📜 [NAM QUỐC SƠN HÀ]: Khi bạn Trảm gây sát thương, bạn có thể chọn tùy ý số lượng người để tăng 1 tầm đánh trong vòng 1 lượt."
+		return
+
+	var skill_name = ""
+	var skills = HeroDatabase.get_hero_skills(int(g.get("hero_id", h_data.get("id", 0))))
+	if skills is Array and not skills.is_empty() and skills[0] is Dictionary:
+		skill_name = str(skills[0].get("name", ""))
+	if is_network_mode and s_num == my_seat and NetworkClient and NetworkClient.is_connected_to_server:
+		if "Chế Nỏ" in skill_name or "Chế Nỏ" in h_name:
+			NetworkClient.send_toggle_skill(skill_name if not skill_name.is_empty() else "Chế Nỏ")
+		else:
+			NetworkClient.send_use_skill(skill_name if not skill_name.is_empty() else h_name, selected_target_seat if selected_target_seat > 0 else 0)
 	else:
 		var skill_desc = ""
 		if skills is Array and not skills.is_empty() and (skills[0] is Dictionary):
@@ -3242,6 +3254,24 @@ func _on_general_avatar_clicked(seat_num: int) -> void:
 
 	var g = generals_data.get(seat_num, null)
 	if not g or not g["is_alive"]:
+		return
+	if current_server_phase == "AWAIT_NAM_QUOC_SON_HA" and current_waiting_seat == my_seat:
+		var target_idx = selected_nam_quoc_targets.find(seat_num)
+		if target_idx >= 0:
+			selected_nam_quoc_targets.remove_at(target_idx)
+			if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
+				g["avatar_node"].set_target_highlight(false)
+		else:
+			selected_nam_quoc_targets.append(seat_num)
+			if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
+				g["avatar_node"].set_target_highlight(true)
+		AudioManager.play_card_select()
+		if selected_nam_quoc_targets.size() > 0:
+			card_play_btn.text = "⚔️ TĂNG TẦM: %d TƯỚNG (+1 TẦM)" % selected_nam_quoc_targets.size()
+		else:
+			card_play_btn.text = "📜 TĂNG TẦM: TẤT CẢ ĐỒNG MINH (+1 TẦM)"
+		card_play_btn.visible = true
+		card_play_btn.disabled = false
 		return
 	if is_targeting_nghich_y:
 		var nghich_active_card = NetworkClient.last_state.get("activeCard", {}) if NetworkClient and NetworkClient.last_state is Dictionary else {}
@@ -4230,6 +4260,20 @@ func _resolve_local_hich_tuong_si(target_seat: int) -> void:
 			_add_log("📣 %s không có bài để nhận [SỤC SÔI]." % target.get("name", "Mục tiêu"))
 
 func _on_card_play_btn_clicked() -> void:
+	if current_server_phase == "AWAIT_NAM_QUOC_SON_HA" and current_waiting_seat == my_seat:
+		var targets_str = ""
+		if selected_nam_quoc_targets.size() > 0:
+			var str_seats: Array[String] = []
+			for s in selected_nam_quoc_targets:
+				str_seats.append(str(s))
+			targets_str = ",".join(str_seats)
+		else:
+			targets_str = "all"
+		NetworkClient.send_respond_action(true, targets_str)
+		_clear_nam_quoc_son_ha_selection()
+		card_play_btn.disabled = true
+		end_turn_btn.disabled = true
+		return
 	if current_server_phase == "AWAIT_CHINH_THONG_TARGET" and current_waiting_seat == my_seat:
 		if selected_target_seat <= 0:
 			desc_text.text = "⚠️ [CHÍNH THỐNG] cần chọn 1 người khác."
@@ -5860,6 +5904,14 @@ func _clear_uat_khi_selection() -> void:
 			target["avatar_node"].set_target_highlight(false)
 	uat_khi_target_seat = -1
 
+func _clear_nam_quoc_son_ha_selection() -> void:
+	for seat_num in selected_nam_quoc_targets:
+		if generals_data.has(seat_num) and generals_data[seat_num].has("avatar_node"):
+			var av = generals_data[seat_num]["avatar_node"]
+			if is_instance_valid(av):
+				av.set_target_highlight(false)
+	selected_nam_quoc_targets.clear()
+
 func _begin_uat_khi_prompt() -> void:
 	_clear_uat_khi_selection()
 	uat_khi_pending = true
@@ -6212,6 +6264,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		var server_is_alive = bool(p.get("isAlive", g.get("is_alive", true)))
 		var was_alive = bool(g.get("is_alive", true))
 		g["suc_soi_turns_remaining"] = max(0, int(p.get("sucSoiTurnsRemaining", g.get("suc_soi_turns_remaining", 0))))
+		g["nam_quoc_son_ha_range_buff"] = max(0, int(p.get("namQuocSonHaRangeBuff", g.get("nam_quoc_son_ha_range_buff", 0))))
 		g["extra_slash_limit"] = max(0, int(p.get("extraSlashLimit", g.get("extra_slash_limit", 0))))
 		if seat == my_seat and g["extra_slash_limit"] > 0:
 			g["than_chinh_slash_bonus"] = true
@@ -6436,8 +6489,10 @@ func _apply_network_game_state(state: Dictionary) -> void:
 	elif server_waiting_seat != harvest_waiting_seat:
 		harvest_choice_sent = false
 		harvest_modal_signature = ""
+	if server_phase != "AWAIT_NAM_QUOC_SON_HA" and not selected_nam_quoc_targets.is_empty():
+		_clear_nam_quoc_son_ha_selection()
 	var keep_reaction_hand_selection = server_waiting_seat == my_seat and (is_waiting_dodge or is_waiting_thuy_trieu_rut_give or is_waiting_song_cung or server_phase in ["AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_THU_PHAP_DISCARD", "AWAIT_NGHICH_Y", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_THAN_CHINH_LE_HOAN"])
-	if server_phase not in ["PLAY", "DISCARD", "AWAIT_HUYNH_TRUONG", "AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_THU_PHAP_DISCARD", "AWAIT_NGHICH_Y", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_THAN_CHINH_LE_HOAN"] or (server_phase == "DISCARD" and server_waiting_seat != my_seat):
+	if server_phase not in ["PLAY", "DISCARD", "AWAIT_HUYNH_TRUONG", "AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_THU_PHAP_DISCARD", "AWAIT_NGHICH_Y", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NAM_QUOC_SON_HA"] or (server_phase == "DISCARD" and server_waiting_seat != my_seat):
 		card_play_btn.visible = false
 		if not keep_reaction_hand_selection:
 			_clear_normal_hand_selection()
@@ -6445,7 +6500,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			_set_reaction_hand_focus(false)
 			if dodge_card_selector_scroll and is_instance_valid(dodge_card_selector_scroll):
 				dodge_card_selector_scroll.visible = false
-	if server_phase not in ["PLAY", "DISCARD", "AWAIT_HUYNH_TRUONG", "AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_THU_PHAP_DISCARD", "AWAIT_NGHICH_Y", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_THAN_CHINH_LE_HOAN"]:
+	if server_phase not in ["PLAY", "DISCARD", "AWAIT_HUYNH_TRUONG", "AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_THU_PHAP_DISCARD", "AWAIT_NGHICH_Y", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NAM_QUOC_SON_HA"]:
 		is_player_turn = false
 		is_discard_phase = false
 		card_play_btn.visible = false
@@ -6843,6 +6898,28 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			else:
 				turn_indicator.text = "⏳ ĐANG CHỜ %s QUYẾT ĐỊNH (%ds)..." % [wait_name, server_waiting_timer]
 				desc_text.text = "⏳ Đang chờ %s phản hồi..." % wait_name
+
+	elif server_phase == "AWAIT_NAM_QUOC_SON_HA":
+		is_player_turn = false
+		if server_waiting_seat == my_seat:
+			card_play_btn.visible = true
+			card_play_btn.disabled = false
+			end_turn_btn.visible = true
+			end_turn_btn.disabled = false
+			end_turn_btn.text = "BỎ QUA"
+			if selected_nam_quoc_targets.size() > 0:
+				card_play_btn.text = "⚔️ TĂNG TẦM: %d TƯỚNG (+1 TẦM)" % selected_nam_quoc_targets.size()
+			else:
+				card_play_btn.text = "📜 TĂNG TẦM: TẤT CẢ ĐỒNG MINH (+1 TẦM)"
+			turn_indicator.text = "📜 NAM QUỐC SƠN HÀ: CHỌN MỤC TIÊU TĂNG TẦM (%ds)" % server_waiting_timer
+			desc_text.text = "📜 [Nam Quốc Sơn Hà]: Nhấp vào các tướng trên bàn để chọn ai được tăng 1 tầm đánh trong 1 lượt, rồi nhấn nút Xác nhận (hoặc nhấn nút luôn để tăng tầm cho toàn đội, hoặc Bỏ qua)."
+		else:
+			card_play_btn.visible = false
+			end_turn_btn.visible = false
+			var wait_gen = generals_data.get(server_waiting_seat, {})
+			var wait_name = wait_gen.get("name", "Ghế %d" % server_waiting_seat) if wait_gen is Dictionary else "Ghế %d" % server_waiting_seat
+			turn_indicator.text = "📜 ĐANG CHỜ %s CHỌN MỤC TIÊU NAM QUỐC SƠN HÀ (%ds)..." % [wait_name.to_upper(), server_waiting_timer]
+			desc_text.text = "📜 %s đang chọn mục tiêu để tăng 1 tầm đánh theo [Nam Quốc Sơn Hà]..." % wait_name
 
 	elif server_phase == "AWAIT_THU_PHAP_DISCARD":
 		is_player_turn = false
@@ -8422,6 +8499,24 @@ func _on_network_action_received(delta: Dictionary) -> void:
 	elif act_type == "GIAI_ACH_DRAW":
 		_animate_showcase_card("Giải Ách", str(delta.get("description", "Giải Ách: Thoát khỏi cẩm nang trì hoãn, rút 1 lá bài!")))
 		AudioManager.play_skill()
+	elif act_type == "TIEN_THOAI_ACTIVATED":
+		var c_seat = int(delta.get("casterSeat", 0))
+		var c_name = generals_data.get(c_seat, {}).get("name", "Lý Thường Kiệt")
+		if c_seat != my_seat:
+			_animate_tien_thoai_morph(c_seat, "Trảm", "Đỡ", "%s kích hoạt [Tiến Thoái] hoán đổi Trảm ⟷ Đỡ!" % c_name)
+		AudioManager.play_skill()
+	elif act_type == "NAM_QUOC_SON_HA_BUFF":
+		var c_seat = int(delta.get("casterSeat", 0))
+		var c_name = generals_data.get(c_seat, {}).get("name", "Lý Thường Kiệt")
+		var target_seats = delta.get("targetSeats", [])
+		if target_seats is Array:
+			var target_int_seats: Array[int] = []
+			for s in target_seats:
+				target_int_seats.append(int(s))
+			if not target_int_seats.is_empty():
+				_play_smart_card_rays("Nam Quốc Sơn Hà", c_seat, target_int_seats)
+		_animate_showcase_card("Nam Quốc Sơn Hà", str(delta.get("description", "%s kích hoạt [Nam Quốc Sơn Hà] tăng 1 tầm đánh!" % c_name)))
+		AudioManager.play_skill()
 	elif act_type in ["OAI_NHUOC_DISCARD", "DUNG_NUOC_TRIGGERED", "TUNG_NGHIA_DRAW", "VAN_SACH_TRIGGERED", "HAN_LAM_KEEP", "HAN_LAM_BOTTOM", "TRUNG_KIEN_TRIGGERED"]:
 		var skill_effect_names = {
 			"OAI_NHUOC_DISCARD": "Oai Nhược",
@@ -9763,7 +9858,7 @@ func _get_attack_range(seat_num: int) -> int:
 			base_range += _get_weapon_range(str(weapon_name))
 	elif not weapon_names.is_empty():
 		base_range = _get_weapon_range(str(weapon_names[0]))
-	return base_range + (1 if int(generals_data[seat_num].get("suc_soi_turns_remaining", 0)) > 0 else 0)
+	return base_range + (1 if int(generals_data[seat_num].get("suc_soi_turns_remaining", 0)) > 0 else 0) + int(generals_data[seat_num].get("nam_quoc_son_ha_range_buff", 0))
 
 func _get_weapon_range(weapon_name: String) -> int:
 	if "Súng Thần Công" in weapon_name: return 5
@@ -11793,6 +11888,12 @@ func _on_end_turn_btn_clicked() -> void:
 			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
 		selected_target_seat = -1
 		card_play_btn.visible = false
+		end_turn_btn.disabled = true
+		return
+	if current_server_phase == "AWAIT_NAM_QUOC_SON_HA" and current_waiting_seat == my_seat:
+		_clear_nam_quoc_son_ha_selection()
+		NetworkClient.send_respond_action(false, "")
+		card_play_btn.disabled = true
 		end_turn_btn.disabled = true
 		return
 	if current_server_phase in ["AWAIT_CHINH_THONG_TARGET", "AWAIT_KHOAN_HOA", "AWAIT_XUNG_VUONG_TARGET"] and current_waiting_seat == my_seat:

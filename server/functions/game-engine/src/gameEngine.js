@@ -247,6 +247,7 @@ export function hydrateGameState(rawState, roomId = "") {
         : (hydrateCard(rawPlayer.anTichCard) ? [hydrateCard(rawPlayer.anTichCard)] : []),
       turnsTaken: Math.max(0, Number(rawPlayer.turnsTaken) || 0),
       sucSoiTurnsRemaining: Math.max(0, Number(rawPlayer.sucSoiTurnsRemaining) || 0),
+      namQuocSonHaRangeBuff: Math.max(0, Number(rawPlayer.namQuocSonHaRangeBuff) || 0),
       aoBaoCharges: Number.isFinite(Number(rawPlayer.aoBaoCharges))
         ? Math.max(0, Math.min(2, Number(rawPlayer.aoBaoCharges)))
         : 2,
@@ -557,6 +558,7 @@ export function initGame(roomId, playersInput, modeId = "2v2") {
       anTichCards: [],
       turnsTaken: 0,
       sucSoiTurnsRemaining: 0,
+      namQuocSonHaRangeBuff: 0,
       aoBaoCharges: 2,
       hand: hand,
       equipments: [],
@@ -766,6 +768,7 @@ function buildStateDelta(state) {
       maxHp: p.maxHp,
       handCount: p.hand ? p.hand.length : 0,
       sucSoiTurnsRemaining: Math.max(0, Number(p.sucSoiTurnsRemaining) || 0),
+      namQuocSonHaRangeBuff: Math.max(0, Number(p.namQuocSonHaRangeBuff) || 0),
       extraSlashLimit: Math.max(0, Number(p.extraSlashLimit) || 0),
       isWineBuffActive: !!p.isWineBuffActive,
       wineUsedThisTurn: !!p.wineUsedThisTurn,
@@ -1370,8 +1373,49 @@ function startNextNhiepChinhPrompt(state) {
   return true;
 }
 
+function startNextNamQuocSonHaPrompt(state) {
+  state.namQuocSonHaQueue = (state.namQuocSonHaQueue || []).filter(({ seat }) => {
+    const player = state.players.find((candidate) => candidate.seat === seat);
+    return isLivingPlayer(player) && heroHasSkill(player, "NAM_QUOC_SON_HA");
+  });
+  if (!state.namQuocSonHaQueue || state.namQuocSonHaQueue.length === 0) return false;
+  const next = state.namQuocSonHaQueue[0];
+  const owner = state.players.find((player) => player.seat === next.seat);
+  if (!owner) return false;
+
+  if (owner.isAI) {
+    state.namQuocSonHaQueue.shift();
+    const allies = state.players.filter(p => isLivingPlayer(p) && (p.seat === owner.seat || p.team === owner.team || (owner.isAlly && p.isAlly)));
+    const buffed = allies.length > 0 ? allies : [owner];
+    for (const p of buffed) {
+      p.namQuocSonHaRangeBuff = (Number(p.namQuocSonHaRangeBuff) || 0) + 1;
+    }
+    recordAction(state, {
+      type: "NAM_QUOC_SON_HA_BUFF",
+      casterSeat: owner.seat,
+      targetSeats: buffed.map(p => p.seat),
+      skillActivations: [{ name: "Nam Quốc Sơn Hà", seat: owner.seat }],
+      description: `⚔️ <b>${owner.generalName}</b> kích hoạt [Nam Quốc Sơn Hà], tăng 1 tầm đánh cho ${buffed.map(p => p.generalName).join(", ")} trong 1 lượt!`
+    });
+    return false;
+  }
+
+  state.phase = "AWAIT_NAM_QUOC_SON_HA";
+  state.waitingTargetSeat = next.seat;
+  state.waitingReactionType = "NAM_QUOC_SON_HA";
+  state.waitingTimer = 25;
+  state.timerStartAt = Date.now();
+  recordAction(state, {
+    type: "NAM_QUOC_SON_HA_PROMPT",
+    casterSeat: next.seat,
+    skillActivations: [{ name: "Nam Quốc Sơn Hà", seat: next.seat }],
+    description: `📜 <b>${owner.generalName}</b> kích hoạt [Nam Quốc Sơn Hà], hãy chọn mục tiêu để tăng 1 tầm đánh trong 1 lượt (hoặc Bỏ qua)!`
+  });
+  return true;
+}
+
 function startPendingDamageSkillPrompt(state) {
-  return startNextKhoiBinhPrompt(state) || startNextHuynhTruongPrompt(state) || startNextCotKinhPrompt(state) || startNextNhiepChinhPrompt(state);
+  return startNextKhoiBinhPrompt(state) || startNextHuynhTruongPrompt(state) || startNextCotKinhPrompt(state) || startNextNhiepChinhPrompt(state) || startNextNamQuocSonHaPrompt(state);
 }
 
 function isTienPhongFirstTurn(player) {
@@ -6336,6 +6380,67 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     return { success: true, state };
   }
 
+  if (state.phase === "AWAIT_NAM_QUOC_SON_HA") {
+    const pending = state.namQuocSonHaQueue?.[0];
+    if (state.waitingTargetSeat !== respondentSeat || !pending || pending.seat !== respondentSeat || !heroHasSkill(respondent, "NAM_QUOC_SON_HA")) {
+      return { error: "Không phải lượt kích hoạt Nam Quốc Sơn Hà của bạn" };
+    }
+    state.namQuocSonHaQueue.shift();
+    if (accepted) {
+      let targetSeatsList = [];
+      if (Array.isArray(cardIds) && cardIds.length > 0) {
+        targetSeatsList = cardIds.map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= 4);
+      } else if (typeof cardId === "string" && cardId.includes(",")) {
+        targetSeatsList = cardId.split(",").map(s => Number(s.trim())).filter(n => Number.isInteger(n) && n >= 1 && n <= 4);
+      } else if (Number(targetCardId || cardId) > 0) {
+        targetSeatsList = [Number(targetCardId || cardId)];
+      } else if (Number(targetSeat) > 0) {
+        targetSeatsList = [Number(targetSeat)];
+      }
+
+      if (targetSeatsList.length === 0 || cardId === "all" || cardId === "allies") {
+        const allies = state.players.filter(p => isLivingPlayer(p) && (p.seat === respondent.seat || p.team === respondent.team || (respondent.isAlly && p.isAlly)));
+        targetSeatsList = allies.map(p => p.seat);
+      }
+
+      const validBuffed = [];
+      for (const seatNum of targetSeatsList) {
+        const p = state.players.find(cand => cand.seat === seatNum && isLivingPlayer(cand));
+        if (p) {
+          p.namQuocSonHaRangeBuff = (Number(p.namQuocSonHaRangeBuff) || 0) + 1;
+          validBuffed.push(p);
+        }
+      }
+
+      if (validBuffed.length > 0) {
+        recordAction(state, {
+          type: "NAM_QUOC_SON_HA_BUFF",
+          casterSeat: respondent.seat,
+          targetSeats: validBuffed.map(p => p.seat),
+          skillActivations: [{ name: "Nam Quốc Sơn Hà", seat: respondent.seat }],
+          description: `⚔️ <b>${respondent.generalName}</b> kích hoạt [Nam Quốc Sơn Hà], tăng 1 tầm đánh cho ${validBuffed.map(p => p.generalName).join(", ")} trong 1 lượt!`
+        });
+      }
+    } else {
+      recordAction(state, {
+        type: "NAM_QUOC_SON_HA_DECLINED",
+        casterSeat: respondent.seat,
+        description: `⚔️ <b>${respondent.generalName}</b> không chọn tăng tầm đánh theo [Nam Quốc Sơn Hà].`
+      });
+    }
+
+    resetWaitingState(state, false);
+    if (startPendingDamageSkillPrompt(state)) {
+      refreshLastDelta(state);
+      return { success: true, state };
+    }
+    const resume = resumeAfterUatKhi(state);
+    if (resume) return resume;
+    resetWaitingState(state);
+    refreshLastDelta(state);
+    return { success: true, state };
+  }
+
   // --- 0. PHẢN HỒI CHUỖI DIỆU KẾ PHÁ MƯU (AWAIT_NULLIFY) ---
   if (state.phase === "AWAIT_NULLIFY" && state.nullifyChain) {
     const chain = state.nullifyChain;
@@ -7654,17 +7759,23 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
     }
   }
   if (finalDamage > 0 && isDirectSlashDamage && attacker && heroHasSkill(attacker, "NAM_QUOC_SON_HA")) {
-    const allies = state.players.filter(p => isLivingPlayer(p) && (p.seat === attacker.seat || p.team === attacker.team || (attacker.isAlly && p.isAlly)));
-    const buffed = allies.length > 0 ? allies : [attacker];
-    for (const p of buffed) {
-      p.namQuocSonHaRangeBuff = (Number(p.namQuocSonHaRangeBuff) || 0) + 1;
+    if (attacker.isAI) {
+      const allies = state.players.filter(p => isLivingPlayer(p) && (p.seat === attacker.seat || p.team === attacker.team || (attacker.isAlly && p.isAlly)));
+      const buffed = allies.length > 0 ? allies : [attacker];
+      for (const p of buffed) {
+        p.namQuocSonHaRangeBuff = (Number(p.namQuocSonHaRangeBuff) || 0) + 1;
+      }
+      recordAction(state, {
+        type: "NAM_QUOC_SON_HA_BUFF",
+        casterSeat: attacker.seat,
+        targetSeats: buffed.map(p => p.seat),
+        skillActivations: [{ name: "Nam Quốc Sơn Hà", seat: attacker.seat }],
+        description: `⚔️ <b>${attacker.generalName}</b> kích hoạt [Nam Quốc Sơn Hà], tăng 1 tầm đánh cho ${buffed.map(p => p.generalName).join(", ")} trong 1 lượt!`
+      });
+    } else {
+      state.namQuocSonHaQueue = state.namQuocSonHaQueue || [];
+      state.namQuocSonHaQueue.push({ seat: attacker.seat });
     }
-    recordAction(state, {
-      type: "NAM_QUOC_SON_HA_BUFF",
-      casterSeat: attacker.seat,
-      skillActivations: [{ name: "Nam Quốc Sơn Hà", seat: attacker.seat }],
-      description: `⚔️ <b>${attacker.generalName}</b> kích hoạt [Nam Quốc Sơn Hà], tăng 1 tầm đánh cho toàn đội trong 1 lượt!`
-    });
   }
   const causedByOther = (attacker && attacker.seat !== target.seat)
     || (options?.singleTargetScrollCasterSeat && options.singleTargetScrollCasterSeat !== target.seat)
@@ -9247,6 +9358,10 @@ export function handleAIReaction(state, aiSeat) {
     return handleRespondAction(state, aiSeat, true, null, null, null, ally ? ally.seat : aiSeat);
   }
 
+  if (state.phase === "AWAIT_NAM_QUOC_SON_HA" && state.waitingTargetSeat === aiSeat) {
+    return handleRespondAction(state, aiSeat, true, "all");
+  }
+
   if (state.phase === "AWAIT_BORROW_SWORD" && state.waitingTargetSeat === aiSeat) {
     const forcedTargetSeat = Number(state.activeCard?.forcedTargetSeat) || 0;
     const forcedTarget = state.players.find((player) => player.seat === forcedTargetSeat);
@@ -9594,7 +9709,7 @@ export function tickGameState(state, connectedSeats = null) {
         } else if (["AWAIT_DAN_CAU", "AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_CAN_GIAN", "AWAIT_THANG_MOC", "AWAIT_TRUNG_KIEN",
 			"AWAIT_CHINH_THONG_TARGET", "AWAIT_CHINH_THONG_GIVE", "AWAIT_KHOAN_HOA", "AWAIT_NGHIA_TU",
 			"AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_UAT_KHI_TARGET",
-			"AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_MUU_DINH_CHOICE", "AWAIT_NGHICH_Y"].includes(state.phase)) {
+			"AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_MUU_DINH_CHOICE", "AWAIT_NGHICH_Y", "AWAIT_NAM_QUOC_SON_HA"].includes(state.phase)) {
 			handleRespondAction(state, waitingSeat, false, null);
         } else if (state.phase === "DISCARD") {
           const discardCount = Math.max(0, (waitingPlayer?.hand?.length || 0) - getHandLimit(waitingPlayer));
@@ -9948,6 +10063,7 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
       isAiTakeover: p.isAiTakeover === true,
       isAlive: p.isAlive !== false,
       sucSoiTurnsRemaining: Math.max(0, Number(p.sucSoiTurnsRemaining) || 0),
+      namQuocSonHaRangeBuff: Math.max(0, Number(p.namQuocSonHaRangeBuff) || 0),
       isWineBuffActive: !!p.isWineBuffActive,
       wineUsedThisTurn: !!p.wineUsedThisTurn,
       hasAnTich: (p.anTichCards || []).length > 0,
@@ -10070,6 +10186,30 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
   if (norm.includes("thang mộc") || norm.includes("thang moc") || norm.includes("thang_moc") || norm === "thang_moc") {
     if (state.phase !== "AWAIT_THANG_MOC") return { error: "Không phải thời điểm dùng Thang Mộc" };
     return handleRespondAction(state, seat, true, cardId);
+  }
+
+  if (norm.includes("tiến thoái") || norm.includes("tien thoai") || norm === "tien_thoai") {
+    if (!heroHasSkill(player, "TIEN_THOAI")) return { error: "Chỉ Lý Thường Kiệt mới có kỹ năng Tiến Thoái" };
+    recordAction(state, {
+      type: "TIEN_THOAI_ACTIVATED",
+      casterSeat: seat,
+      skillActivations: [{ name: "Tiến Thoái", seat }],
+      description: `⚡ <b>${player.generalName}</b> kích hoạt [Tiến Thoái], hoán đổi Trảm ⟷ Đỡ!`
+    });
+    refreshLastDelta(state);
+    return { success: true, state };
+  }
+
+  if (norm.includes("nam quốc sơn hà") || norm.includes("nam quoc son ha") || norm === "nam_quoc_son_ha") {
+    if (!heroHasSkill(player, "NAM_QUOC_SON_HA")) return { error: "Chỉ Lý Thường Kiệt mới có kỹ năng Nam Quốc Sơn Hà" };
+    if (state.phase === "AWAIT_NAM_QUOC_SON_HA" && state.waitingTargetSeat === seat) {
+      let targetsStr = String(targetSeat || "");
+      if (extraData?.targetSeats && Array.isArray(extraData.targetSeats)) {
+        targetsStr = extraData.targetSeats.join(",");
+      }
+      return handleRespondAction(state, seat, true, targetsStr);
+    }
+    return { error: "Nam Quốc Sơn Hà chỉ kích hoạt khi bạn Trảm gây sát thương" };
   }
 
   if (norm.includes("cơ biến") || norm.includes("co bien") || norm === "co_bien") {

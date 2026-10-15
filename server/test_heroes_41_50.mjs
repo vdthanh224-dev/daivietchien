@@ -752,7 +752,11 @@ function createTestState(heroIds = ["HERO_41", "HERO_42", "HERO_43", "HERO_44"])
   const respRes = handleRespondAction(state, 2, false, null);
   assert.equal(respRes.success, true);
   assert.equal(state.players[1].hp, 3);
-  // Nam Quốc Sơn Hà triggered! P1 and ally gain +1 attack range
+  // Nam Quốc Sơn Hà prompt triggered for human player P1!
+  assert.equal(state.phase, "AWAIT_NAM_QUOC_SON_HA");
+  assert.equal(state.waitingTargetSeat, 1);
+  const nqRes = handleRespondAction(state, 1, true, "1");
+  assert.equal(nqRes.success, true);
   assert.equal(p1.namQuocSonHaRangeBuff >= 1, true);
 
   // Tiến Thoái reverse: P2 slashes P1 (Lý Thường Kiệt), P1 dodges using a Slash card!
