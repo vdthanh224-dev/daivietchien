@@ -8693,6 +8693,14 @@ export function handleAIStep(state, aiSeat) {
     return handlePlayCard(state, aiSeat, phuDe.id, phuDeTarget.seat);
   }
 
+  if (heroHasSkill(ai, "DINH_TRIEU") && !ai.usedSkills?.DinhTrieu) {
+    const ally = state.players.find(p => isLivingPlayer(p) && p.seat !== aiSeat && areTeammatesInState(state, aiSeat, p.seat));
+    const scrollCard = (ai.hand || []).find(c => c.category === CARD_CATEGORIES.INSTANT_SCROLL || c.category === CARD_CATEGORIES.DELAYED_SCROLL);
+    if (ally && scrollCard) {
+      return handleUseSkill(state, aiSeat, "Định Triều", ally.seat, scrollCard.id);
+    }
+  }
+
   // D. Cẩm nang trì hoãn và Đại Hồng Thủy
   const delayed = ai.hand.find((card) => card.subType === CARD_SUBTYPES.DAI_HONG_THUY);
   if (delayed) {

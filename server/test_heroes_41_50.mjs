@@ -9,6 +9,7 @@ import {
   handleDiscardCards,
   applyDamageToPlayer,
   sanitizeGameStateForClient,
+  handleAIStep,
   handleAIReaction,
   executeFallbackReactionForSeat,
   tickGameState
@@ -229,6 +230,21 @@ function createTestState(heroIds = ["HERO_41", "HERO_42", "HERO_43", "HERO_44"])
   assert.equal(useRes.success, true);
   assert.equal(p2.hand.some(c => c.id === "DRAW_P2"), true);
   assert.equal(state.players[2].hand.some(c => c.id === "SCROLL_P2"), true);
+
+  // AI Bot test: P2 (as AI) uses Định Triều to give scroll to ally (P4)
+  p2.isAI = true;
+  delete p2.usedSkills?.DinhTrieu;
+  p2.hand = [{ id: "AI_SCROLL", name: "Trầm Ảo Sa Bẫy", suit: "Heart", rank: 13, category: CARD_CATEGORIES.DELAYED_SCROLL, subType: CARD_SUBTYPES.ACEDIA }];
+  state.players[3].hand = [];
+  state._deck = [{ id: "AI_DRAW", name: "Trảm", suit: "Heart", rank: 6, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }];
+  state.phase = "PLAY";
+  state.turnSeat = 2;
+  const aiTurnRes = handleAIStep(state, 2);
+  assert.equal(aiTurnRes.success, true);
+  assert.equal(state.players[3].hand.some(c => c.id === "AI_SCROLL"), true);
+  assert.equal(p2.hand.some(c => c.id === "AI_DRAW"), true);
+  assert.equal(p2.usedSkills?.DinhTrieu, true);
+
   console.log("✅ Hero 42: Lý Đạo Thành (Can Gián & Định Triều) OK");
 }
 

@@ -249,6 +249,7 @@ var is_targeting_binh_san: bool = false
 var is_targeting_tay_phu: bool = false
 var is_targeting_dinh_quoc: bool = false
 var is_targeting_trao_bao: bool = false
+var is_targeting_dinh_trieu: bool = false
 var selected_two_card_skill_nodes: Array[Control] = []
 var is_targeting_chinh_thong: bool = false
 var is_targeting_khoan_hoa: bool = false
@@ -2049,14 +2050,12 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 			buttons.append({"id": "doi_do", "text": "🏯 ĐÃ DÙNG DỜI ĐÔ", "description": "Dời Đô chỉ dùng 1 lần mỗi lượt.", "disabled": true})
 		else:
 			buttons.append({"id": "doi_do", "text": "🏯 DỜI ĐÔ", "description": "Bỏ toàn bộ bài trên tay: rút lại + 1 lá, chọn tối đa 4 người mỗi người rút 1 lá."})
-	if seat == my_seat and _hero_has_skill(g, "thang_moc"):
-		var is_thang_moc_waiting = (current_server_phase == "AWAIT_THANG_MOC" and current_waiting_seat == my_seat)
-		buttons.append({
-			"id": "thang_moc",
-			"text": "📜 THANG MỘC",
-			"description": "Vào cuối lượt người khác: rút 2 lá bài và tự gài 1 Cẩm Nang Trì Hoãn.",
-			"selected": is_thang_moc_waiting
-		})
+	if seat == my_seat and _hero_has_skill(g, "dinh_trieu"):
+		var dinh_trieu_used = "DinhTrieu" in (g.get("used_skills_keys", []) as Array)
+		if dinh_trieu_used:
+			buttons.append({"id": "dinh_trieu", "text": "📜 ĐÃ DÙNG ĐỊNH TRIỀU", "description": "Định Triều chỉ dùng 1 lần mỗi lượt.", "disabled": true})
+		else:
+			buttons.append({"id": "dinh_trieu", "text": "📜 ĐỊNH TRIỀU", "description": "Giai đoạn ra bài: đưa 1 lá Cẩm Nang trên tay cho 1 người khác, rồi rút 1 lá.", "selected": is_targeting_dinh_trieu})
 	var treasure = str(g.get("equipped_treasure", ""))
 	if seat == my_seat and treasure == "Trống Đồng Đông Sơn":
 		var drum_used := bool(g.get("diem_trong_used", false)) or ("DiemTrong" in (g.get("used_skills_keys", []) as Array))
@@ -2079,7 +2078,7 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 		avatar.set_skill_button_selected("dinh_quoc", is_targeting_dinh_quoc)
 		avatar.set_skill_button_selected("trao_bao", is_targeting_trao_bao)
 		avatar.set_skill_button_selected("trac_lac", is_using_trac_lac)
-		avatar.set_skill_button_selected("thang_moc", current_server_phase == "AWAIT_THANG_MOC" and current_waiting_seat == my_seat)
+		avatar.set_skill_button_selected("dinh_trieu", is_targeting_dinh_trieu)
 	if avatar.has_method("set_treasure_skill_selected"):
 		avatar.set_treasure_skill_selected(is_targeting_drum_skill or is_targeting_ho_phu_skill)
 	_relayout_hand_cards()
@@ -2101,6 +2100,8 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 	if s_num == my_seat and skill_key != "trao_bao" and is_targeting_trao_bao:
 		is_targeting_trao_bao = false
 		_clear_trao_bao_equipped_previews()
+	if s_num == my_seat and skill_key != "dinh_trieu" and is_targeting_dinh_trieu:
+		is_targeting_dinh_trieu = false
 	var g = generals_data[s_num]
 	var h_data = g.get("hero_data", {})
 	if not (h_data is Dictionary):
@@ -2108,23 +2109,7 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 	var h_id = int(h_data.get("id", 0))
 	var h_name = g.get("name", "")
 	if s_num == my_seat and skill_key == "thang_moc":
-		if current_server_phase == "AWAIT_THANG_MOC" and current_waiting_seat == my_seat:
-			reaction_submission_pending = false
-			card_pick_submission_pending = false
-			if not card_pick_modal.visible or card_pick_effect_type != "THANG_MOC":
-				var thang_moc_data = latest_server_state.get("pendingThangMoc", {}) if latest_server_state.get("pendingThangMoc") is Dictionary else {}
-				var caster_s = int(thang_moc_data.get("casterSeat", current_turn_seat))
-				var available_scrolls = thang_moc_data.get("availableScrolls", [])
-				_show_thang_moc_modal(caster_s, available_scrolls)
-			else:
-				if selected_card_pick_option.is_empty():
-					var first_child = card_pick_options_hbox.get_child(0) if card_pick_options_hbox.get_child_count() > 0 else null
-					if first_child and first_child is Button:
-						first_child.emit_signal("pressed")
-						return
-				_on_card_pick_confirmed()
-		else:
-			desc_text.text = "📜 [THANG MỘC]: Vào cuối lượt của người chơi khác, bạn có thể rút 2 lá bài và tự gài 1 Cẩm Nang Trì Hoãn lên bản thân."
+		desc_text.text = "📜 [THANG MỘC]: Vào cuối lượt của người chơi khác, bạn có thể rút 2 lá bài và tự gài 1 Cẩm Nang Trì Hoãn lên bản thân."
 		return
 	if s_num == my_seat and skill_key == "an_tich":
 		if current_server_phase != "AWAIT_SLASH_DEFENSE" or current_waiting_seat != my_seat or int(g.get("an_tich_count", 0)) <= 0:
@@ -2337,6 +2322,7 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 			return
 		is_targeting_dinh_quoc = not is_targeting_dinh_quoc
 		is_targeting_trao_bao = false
+		is_targeting_dinh_trieu = false
 		_clear_trao_bao_equipped_previews()
 		_clear_hung_suc_equipped_weapon_previews()
 		selected_target_seat = -1
@@ -2354,6 +2340,7 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 			return
 		is_targeting_trao_bao = not is_targeting_trao_bao
 		is_targeting_dinh_quoc = false
+		is_targeting_dinh_trieu = false
 		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
 		selected_target_seat = -1
@@ -2367,6 +2354,33 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 		else:
 			_clear_trao_bao_equipped_previews()
 			desc_text.text = "👑 Đã hủy chọn [TRAO BÀO]."
+		_refresh_local_skill_buttons(s_num)
+		_update_action_btn()
+		return
+	if s_num == my_seat and skill_key == "dinh_trieu":
+		if not is_player_turn or (is_network_mode and current_server_phase != "PLAY"):
+			desc_text.text = "⚠️ [ĐỊNH TRIỀU] chỉ dùng trong Giai đoạn Ra bài của bạn."
+			return
+		var dinh_trieu_used = "DinhTrieu" in (g.get("used_skills_keys", []) as Array)
+		if dinh_trieu_used:
+			desc_text.text = "⚠️ [ĐỊNH TRIỀU] Bạn đã dùng Định Triều trong lượt này rồi."
+			return
+		is_targeting_dinh_trieu = not is_targeting_dinh_trieu
+		is_targeting_trao_bao = false
+		is_targeting_dinh_quoc = false
+		_clear_trao_bao_equipped_previews()
+		_clear_hung_suc_equipped_weapon_previews()
+		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
+			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
+		selected_target_seat = -1
+		if selected_card_ui and is_instance_valid(selected_card_ui):
+			selected_card_ui.set_selected(false)
+			selected_card_ui = null
+		if is_targeting_dinh_trieu:
+			desc_text.text = "📜 [ĐỊNH TRIỀU] Chọn 1 lá Bài Cẩm Nang trên tay và 1 người chơi để trao bài."
+			turn_indicator.text = "📜 ĐỊNH TRIỀU: CHỌN CẨM NANG VÀ NGƯỜI NHẬN"
+		else:
+			desc_text.text = "📜 Đã hủy chọn [ĐỊNH TRIỀU]."
 		_refresh_local_skill_buttons(s_num)
 		_update_action_btn()
 		return
@@ -2973,6 +2987,26 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 		desc_text.text = "👑 [TRAO BÀO] Đã chọn [%s]%s. Chọn 1 người chơi nhận bài." % [c_name, " (Đang mang)" if card_node.has_meta("trao_bao_equipped_preview") else ""]
 		_update_action_btn()
 		return
+	if is_targeting_dinh_trieu:
+		var is_scroll = int(c_info.get("cat", c_info.get("category", -1))) in [2, 3] or _is_scroll_card_name(str(c_info.get("name", "")))
+		if not is_scroll:
+			desc_text.text = "⚠️ [ĐỊNH TRIỀU] chỉ chọn lá Bài Cẩm Nang trên tay."
+			return
+		if selected_card_ui == card_node:
+			selected_card_ui.set_selected(false)
+			selected_card_ui = null
+			desc_text.text = "📜 [ĐỊNH TRIỀU] Chọn 1 lá Bài Cẩm Nang trên tay và 1 người chơi để trao bài."
+			_update_action_btn()
+			return
+		if selected_card_ui and is_instance_valid(selected_card_ui) and selected_card_ui != card_node:
+			selected_card_ui.set_selected(false)
+		selected_card_ui = card_node
+		card_node.set_selected(true)
+		AudioManager.play_card_select()
+		var c_name_dt = c_info.get("name", "")
+		desc_text.text = "📜 [ĐỊNH TRIỀU] Đã chọn [%s]. Chọn 1 người chơi nhận bài." % c_name_dt
+		_update_action_btn()
+		return
 	if is_targeting_binh_san:
 		if int(c_info.get("cat", c_info.get("category", -1))) != 1 and not card_node.has_meta("hung_suc_equipped_preview"):
 			desc_text.text = "⚠️ [BÌNH SẠN] chỉ bỏ được lá trang bị."
@@ -3326,7 +3360,7 @@ func _on_general_avatar_clicked(seat_num: int) -> void:
 		_update_action_btn()
 		return
 
-	if is_targeting_bat_na or is_targeting_hung_suc or is_targeting_van_an or is_targeting_binh_san or is_targeting_tay_phu or is_targeting_dinh_quoc or is_targeting_trao_bao or huynh_truong_pending:
+	if is_targeting_bat_na or is_targeting_hung_suc or is_targeting_van_an or is_targeting_binh_san or is_targeting_tay_phu or is_targeting_dinh_quoc or is_targeting_trao_bao or is_targeting_dinh_trieu or huynh_truong_pending:
 		if seat_num == my_seat:
 			desc_text.text = "⚠️ Kỹ năng này phải chọn một người khác."
 			return
@@ -3835,6 +3869,22 @@ func _update_action_btn() -> void:
 			card_play_btn.text = "👑 TRAO BÀO: CHỌN TRANG BỊ..."
 		else:
 			card_play_btn.text = "👑 TRAO BÀO: CHỌN TRANG BỊ VÀ MỤC TIÊU"
+		return
+	if is_targeting_dinh_trieu:
+		var dt_target_valid = selected_target_seat > 0 and selected_target_seat != my_seat and generals_data.has(selected_target_seat) and generals_data[selected_target_seat].get("is_alive", false)
+		var dt_card_info = _get_card_info_from_ui(selected_card_ui) if selected_card_ui != null and is_instance_valid(selected_card_ui) else {}
+		var dt_card_valid = not dt_card_info.is_empty() and (int(dt_card_info.get("cat", dt_card_info.get("category", -1))) in [2, 3] or _is_scroll_card_name(str(dt_card_info.get("name", ""))))
+		card_play_btn.visible = true
+		card_play_btn.disabled = not (dt_target_valid and dt_card_valid)
+		var card_name_str = str(dt_card_info.get("name", "CẨM NANG"))
+		if dt_target_valid and dt_card_valid:
+			card_play_btn.text = "📜 ĐỊNH TRIỀU [%s] → %s" % [card_name_str.to_upper(), generals_data[selected_target_seat]["name"].to_upper()]
+		elif dt_card_valid:
+			card_play_btn.text = "📜 ĐỊNH TRIỀU: CHỌN NGƯỜI NHẬN..."
+		elif dt_target_valid:
+			card_play_btn.text = "📜 ĐỊNH TRIỀU: CHỌN CẨM NANG..."
+		else:
+			card_play_btn.text = "📜 ĐỊNH TRIỀU: CHỌN CẨM NANG VÀ NGƯỜI NHẬN"
 		return
 	if is_targeting_ho_phu_skill:
 		var ho_phu_target_valid = selected_target_seat > 0 and selected_target_seat != my_seat and generals_data.has(selected_target_seat) and generals_data[selected_target_seat].get("is_alive", false)
@@ -4513,6 +4563,29 @@ func _on_card_play_btn_clicked() -> void:
 			_execute_local_trao_bao(selected_target_seat, selected_card_ui, tb_card)
 		is_targeting_trao_bao = false
 		_clear_trao_bao_equipped_previews()
+		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
+			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
+		selected_target_seat = -1
+		selected_card_ui = null
+		_refresh_local_skill_buttons(my_seat)
+		card_play_btn.disabled = true
+		return
+
+	if is_targeting_dinh_trieu:
+		if selected_target_seat <= 0 or selected_card_ui == null or not is_instance_valid(selected_card_ui):
+			desc_text.text = "⚠️ [ĐỊNH TRIỀU] cần chọn 1 lá Bài Cẩm Nang và 1 người chơi nhận bài."
+			return
+		var dt_card = _get_card_info_from_ui(selected_card_ui)
+		var is_dt_scroll = int(dt_card.get("cat", dt_card.get("category", -1))) in [2, 3] or _is_scroll_card_name(str(dt_card.get("name", "")))
+		if not is_dt_scroll:
+			desc_text.text = "⚠️ [ĐỊNH TRIỀU] chỉ đưa được lá Bài Cẩm Nang trên tay."
+			return
+		var card_id_to_send := str(dt_card.get("id", ""))
+		if is_network_mode:
+			NetworkClient.send_use_skill("Định Triều", selected_target_seat, card_id_to_send)
+		else:
+			_execute_local_dinh_trieu(selected_target_seat, selected_card_ui, dt_card)
+		is_targeting_dinh_trieu = false
 		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
 		selected_target_seat = -1
@@ -8224,6 +8297,18 @@ func _on_network_action_received(delta: Dictionary) -> void:
 	elif act_type == "TRAO_BAO_RESOLVED":
 		_animate_showcase_card("Trao Bào", str(delta.get("description", "Trao Bào đã được hoàn tất.")))
 		AudioManager.play_skill()
+	elif act_type == "DINH_TRIEU_RESOLVED":
+		if caster_seat == my_seat:
+			is_targeting_dinh_trieu = false
+			if selected_target_seat > 0 and generals_data.has(selected_target_seat):
+				generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
+			selected_target_seat = -1
+			selected_card_ui = null
+			_refresh_local_skill_buttons(my_seat)
+			card_play_btn.visible = false
+		_play_smart_card_rays("Định Triều", caster_seat, [target_seat])
+		_animate_showcase_card("Định Triều", str(delta.get("description", "Định Triều đã được hoàn tất.")), played_card if not played_card.is_empty() else _get_showcase_card_info(card_name))
+		AudioManager.play_skill()
 	elif act_type == "HUNG_SUC_TRIGGERED":
 		hung_suc_submission_pending = false
 		is_targeting_hung_suc = false
@@ -11626,6 +11711,9 @@ func _on_end_turn_btn_clicked() -> void:
 		is_targeting_trao_bao = false
 		_clear_trao_bao_equipped_previews()
 		_refresh_local_skill_buttons(my_seat)
+	if is_targeting_dinh_trieu:
+		is_targeting_dinh_trieu = false
+		_refresh_local_skill_buttons(my_seat)
 	if excess > 0:
 		_enter_discard_phase(excess)
 		if is_network_mode:
@@ -11645,6 +11733,8 @@ func _on_player_turn_timeout() -> void:
 	if is_targeting_trao_bao:
 		is_targeting_trao_bao = false
 		_clear_trao_bao_equipped_previews()
+	if is_targeting_dinh_trieu:
+		is_targeting_dinh_trieu = false
 	var p_gen = generals_data[my_seat]
 	var hand_limit = _get_general_hand_limit(p_gen)
 	var auto_discard_ids: Array = []
@@ -11690,6 +11780,7 @@ func _finish_player_end_turn(send_network_end_turn: bool = true) -> void:
 	is_targeting_co_bien = false
 	is_targeting_dinh_quoc = false
 	is_targeting_trao_bao = false
+	is_targeting_dinh_trieu = false
 	is_using_trac_lac = false
 	hung_suc_submission_pending = false
 	_clear_hung_suc_equipped_weapon_previews()
@@ -15310,6 +15401,27 @@ func _execute_local_trao_bao(target_seat: int, card_ui_node: Control, card_info:
 		target["name"],
 		target["name"],
 		generals_data[my_seat]["name"]
+	])
+	AudioManager.play_skill()
+
+func _execute_local_dinh_trieu(target_seat: int, card_ui_node: Control, card_info: Dictionary) -> void:
+	if not generals_data.has(target_seat) or not generals_data.has(my_seat):
+		return
+	if card_ui_node != null and is_instance_valid(card_ui_node):
+		_discard_player_card(card_ui_node)
+	var target = generals_data[target_seat]
+	var drawn_card = _draw_card_from_pile()
+	_add_card_to_player_hand(drawn_card)
+	var my_g = generals_data[my_seat]
+	var used_arr = my_g.get("used_skills_keys", []) as Array
+	if not ("DinhTrieu" in used_arr):
+		used_arr.append("DinhTrieu")
+		my_g["used_skills_keys"] = used_arr
+	_animate_showcase_card("Định Triều", "Đưa cẩm nang [%s] cho %s!" % [card_info.get("name", "Cẩm Nang"), target.get("name", "Đồng đội")])
+	_add_log("📜 [ĐỊNH TRIỀU] %s đưa cẩm nang [%s] cho %s và rút 1 lá bài." % [
+		my_g["name"],
+		card_info.get("name", "Cẩm Nang"),
+		target["name"]
 	])
 	AudioManager.play_skill()
 
