@@ -2373,7 +2373,11 @@ func _show_modal(title_text: String, content_node: Node) -> void:
 			modal_panel.custom_minimum_size = Vector2(600, 470)
 			if is_instance_valid(modal_scroll):
 				modal_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		elif title_text == "BẢNG PHONG THẦN" or title_text.begins_with("SỰ KIỆN") or title_text == "TRÂN BẢO CÁC":
+		elif title_text == "TRÂN BẢO CÁC":
+			modal_panel.custom_minimum_size = Vector2(1100, 640)
+			if is_instance_valid(modal_scroll):
+				modal_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		elif title_text == "BẢNG PHONG THẦN" or title_text.begins_with("SỰ KIỆN"):
 			modal_panel.custom_minimum_size = Vector2(880, 560)
 			if is_instance_valid(modal_scroll):
 				modal_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
@@ -7372,8 +7376,10 @@ func _build_inventory_content() -> Control:
 
 func _build_shop_content() -> Control:
 	var root = VBoxContainer.new()
-	root.custom_minimum_size = Vector2(840, 520)
-	root.add_theme_constant_override("separation", 12)
+	root.custom_minimum_size = Vector2(1040, 560)
+	root.size_flags_horizontal = SIZE_EXPAND_FILL
+	root.size_flags_vertical = SIZE_EXPAND_FILL
+	root.add_theme_constant_override("separation", 10)
 
 	# 1. Top Balance & Treasury Bar (Thanh Ngân Khố Hoàng Gia)
 	var balance_panel = PanelContainer.new()
@@ -7390,17 +7396,17 @@ func _build_shop_content() -> Control:
 	bp_style.corner_radius_bottom_left = 10
 	bp_style.content_margin_left = 16
 	bp_style.content_margin_right = 16
-	bp_style.content_margin_top = 10
-	bp_style.content_margin_bottom = 10
+	bp_style.content_margin_top = 8
+	bp_style.content_margin_bottom = 8
 	bp_style.shadow_color = Color(0.95, 0.70, 0.20, 0.25)
-	bp_style.shadow_size = 10
-	bp_style.shadow_offset = Vector2(0, 3)
+	bp_style.shadow_size = 8
+	bp_style.shadow_offset = Vector2(0, 2)
 	balance_panel.add_theme_stylebox_override("panel", bp_style)
 	root.add_child(balance_panel)
 
 	var b_hbox = HBoxContainer.new()
 	b_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	b_hbox.add_theme_constant_override("separation", 24)
+	b_hbox.add_theme_constant_override("separation", 28)
 	balance_panel.add_child(b_hbox)
 
 	var s_val_lbl = Label.new()
@@ -7436,21 +7442,21 @@ func _build_shop_content() -> Control:
 	sp_style.border_width_right = 1
 	sp_style.border_width_bottom = 1
 	sp_style.border_color = Color(0.35, 0.30, 0.45, 0.60)
-	sp_style.corner_radius_top_left = 8
-	sp_style.corner_radius_top_right = 8
-	sp_style.corner_radius_bottom_right = 8
-	sp_style.corner_radius_bottom_left = 8
+	sp_style.corner_radius_top_left = 6
+	sp_style.corner_radius_top_right = 6
+	sp_style.corner_radius_bottom_right = 6
+	sp_style.corner_radius_bottom_left = 6
 	sp_style.content_margin_left = 12
 	sp_style.content_margin_right = 12
-	sp_style.content_margin_top = 6
-	sp_style.content_margin_bottom = 6
+	sp_style.content_margin_top = 5
+	sp_style.content_margin_bottom = 5
 	status_panel.add_theme_stylebox_override("panel", sp_style)
 	root.add_child(status_panel)
 
 	var status_lbl = Label.new()
 	status_lbl.text = "🏛️ Trân Bảo Các Triều Đình: Nơi cung ứng Lệnh Bài Triệu Hồi Danh Tướng & Lệnh Phù Trang Phục Thần Điện."
 	status_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	status_lbl.add_theme_font_size_override("font_size", 12)
+	status_lbl.add_theme_font_size_override("font_size", 11)
 	status_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
 	status_panel.add_child(status_lbl)
 
@@ -7474,14 +7480,15 @@ func _build_shop_content() -> Control:
 
 	# 3. Scroll Container for Shop Items
 	var scroll = ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(840, 390)
+	scroll.custom_minimum_size = Vector2(1040, 440)
+	scroll.size_flags_horizontal = SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	root.add_child(scroll)
 
 	var scroll_vbox = VBoxContainer.new()
 	scroll_vbox.size_flags_horizontal = SIZE_EXPAND_FILL
-	scroll_vbox.add_theme_constant_override("separation", 20)
+	scroll_vbox.add_theme_constant_override("separation", 14)
 	scroll.add_child(scroll_vbox)
 
 	# --- MỤC 1: VÉ TRIỆU HỒI DANH TƯỚNG (THẦN ĐIỆN) ---
@@ -7494,14 +7501,14 @@ func _build_shop_content() -> Control:
 	s1_style.corner_radius_bottom_left = 6
 	s1_style.content_margin_left = 12
 	s1_style.content_margin_right = 12
-	s1_style.content_margin_top = 6
-	s1_style.content_margin_bottom = 6
+	s1_style.content_margin_top = 5
+	s1_style.content_margin_bottom = 5
 	sec1_header.add_theme_stylebox_override("panel", s1_style)
 
 	var s1_hbox = HBoxContainer.new()
 	var sec1_lbl = Label.new()
 	sec1_lbl.text = "🎫 LỆNH BÀI TRIỆU HỒI DANH TƯỚNG (THẦN ĐIỆN)"
-	sec1_lbl.add_theme_font_size_override("font_size", 14)
+	sec1_lbl.add_theme_font_size_override("font_size", 13)
 	sec1_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.35, 1.0))
 	s1_hbox.add_child(sec1_lbl)
 
@@ -7519,8 +7526,8 @@ func _build_shop_content() -> Control:
 
 	var grid_tickets = GridContainer.new()
 	grid_tickets.columns = 3
-	grid_tickets.add_theme_constant_override("h_separation", 14)
-	grid_tickets.add_theme_constant_override("v_separation", 14)
+	grid_tickets.add_theme_constant_override("h_separation", 12)
+	grid_tickets.add_theme_constant_override("v_separation", 8)
 	scroll_vbox.add_child(grid_tickets)
 
 	var hero_packs = [
@@ -7541,11 +7548,11 @@ func _build_shop_content() -> Control:
 			"id": "hero_pack_5",
 			"name": "5 Vé Triệu Hồi",
 			"icon": "🎟️",
-			"badge": "🔥 TIẾT KIỆM 10.000 BẠC",
+			"badge": "🔥 TIẾT KIỆM 10K",
 			"badge_color": Color(1.0, 0.60, 0.20, 1.0),
 			"badge_bg": Color(0.28, 0.10, 0.05, 0.95),
 			"sub": "Đủ 1 lượt Quay 5 Tướng liên hoàn",
-			"strike": "Gốc: 195.000 Bạc",
+			"strike": "Gốc: 195.000",
 			"cost_silver": 185000,
 			"tickets": 5,
 			"cost_desc": "185.000 Bạc"
@@ -7554,11 +7561,11 @@ func _build_shop_content() -> Control:
 			"id": "hero_pack_10",
 			"name": "10 Vé Triệu Hồi",
 			"icon": "⛩️",
-			"badge": "👑 TIẾT KIỆM 30.000 BẠC",
+			"badge": "👑 TIẾT KIỆM 30K",
 			"badge_color": Color(1.0, 0.85, 0.25, 1.0),
 			"badge_bg": Color(0.30, 0.20, 0.05, 0.95),
 			"sub": "Đại gói chiêu binh khai sáng triều đại",
-			"strike": "Gốc: 390.000 Bạc",
+			"strike": "Gốc: 390.000",
 			"cost_silver": 360000,
 			"tickets": 10,
 			"cost_desc": "360.000 Bạc"
@@ -7567,7 +7574,8 @@ func _build_shop_content() -> Control:
 
 	for hp in hero_packs:
 		var card = PanelContainer.new()
-		card.custom_minimum_size = Vector2(264, 204)
+		card.custom_minimum_size = Vector2(330, 86)
+		card.size_flags_horizontal = SIZE_EXPAND_FILL
 		var cs = StyleBoxFlat.new()
 		cs.bg_color = Color(0.14, 0.10, 0.07, 0.96)
 		cs.border_width_left = 1
@@ -7575,25 +7583,36 @@ func _build_shop_content() -> Control:
 		cs.border_width_right = 1
 		cs.border_width_bottom = 1
 		cs.border_color = Color(0.96, 0.78, 0.28, 0.85)
-		cs.corner_radius_top_left = 12
-		cs.corner_radius_top_right = 12
-		cs.corner_radius_bottom_right = 12
-		cs.corner_radius_bottom_left = 12
-		cs.shadow_color = Color(0.95, 0.65, 0.15, 0.20)
-		cs.shadow_size = 10
-		cs.shadow_offset = Vector2(0, 3)
-		cs.content_margin_left = 14
-		cs.content_margin_right = 14
-		cs.content_margin_top = 10
-		cs.content_margin_bottom = 12
+		cs.corner_radius_top_left = 8
+		cs.corner_radius_top_right = 8
+		cs.corner_radius_bottom_right = 8
+		cs.corner_radius_bottom_left = 8
+		cs.shadow_color = Color(0.95, 0.65, 0.15, 0.15)
+		cs.shadow_size = 5
+		cs.shadow_offset = Vector2(0, 2)
+		cs.content_margin_left = 10
+		cs.content_margin_right = 10
+		cs.content_margin_top = 6
+		cs.content_margin_bottom = 6
 		card.add_theme_stylebox_override("panel", cs)
 
-		var cv = VBoxContainer.new()
-		cv.alignment = BoxContainer.ALIGNMENT_CENTER
-		cv.add_theme_constant_override("separation", 5)
-		card.add_child(cv)
+		var chbox = HBoxContainer.new()
+		chbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		chbox.add_theme_constant_override("separation", 10)
+		card.add_child(chbox)
 
-		# Badge Row
+		# Left: Icon & Badge
+		var left_vbox = VBoxContainer.new()
+		left_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		left_vbox.custom_minimum_size = Vector2(64, 0)
+		left_vbox.add_theme_constant_override("separation", 2)
+
+		var icon = Label.new()
+		icon.text = hp["icon"]
+		icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		icon.add_theme_font_size_override("font_size", 22)
+		left_vbox.add_child(icon)
+
 		var b_panel = PanelContainer.new()
 		var bps = StyleBoxFlat.new()
 		bps.bg_color = hp["badge_bg"]
@@ -7602,72 +7621,72 @@ func _build_shop_content() -> Control:
 		bps.border_width_right = 1
 		bps.border_width_bottom = 1
 		bps.border_color = hp["badge_color"]
-		bps.corner_radius_top_left = 6
-		bps.corner_radius_top_right = 6
-		bps.corner_radius_bottom_right = 6
-		bps.corner_radius_bottom_left = 6
-		bps.content_margin_left = 8
-		bps.content_margin_right = 8
-		bps.content_margin_top = 2
-		bps.content_margin_bottom = 2
+		bps.corner_radius_top_left = 4
+		bps.corner_radius_top_right = 4
+		bps.corner_radius_bottom_right = 4
+		bps.corner_radius_bottom_left = 4
+		bps.content_margin_left = 4
+		bps.content_margin_right = 4
+		bps.content_margin_top = 1
+		bps.content_margin_bottom = 1
 		b_panel.add_theme_stylebox_override("panel", bps)
 
 		var badge = Label.new()
 		badge.text = hp["badge"]
 		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		badge.add_theme_font_size_override("font_size", 10)
+		badge.add_theme_font_size_override("font_size", 8)
 		badge.add_theme_color_override("font_color", hp["badge_color"])
 		b_panel.add_child(badge)
-		cv.add_child(b_panel)
+		left_vbox.add_child(b_panel)
+		chbox.add_child(left_vbox)
 
-		# Icon
-		var icon = Label.new()
-		icon.text = hp["icon"]
-		icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		icon.add_theme_font_size_override("font_size", 34)
-		cv.add_child(icon)
+		# Center: Name, Subtitle, Price
+		var mid_vbox = VBoxContainer.new()
+		mid_vbox.size_flags_horizontal = SIZE_EXPAND_FILL
+		mid_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		mid_vbox.add_theme_constant_override("separation", 2)
 
-		# Title
 		var tname = Label.new()
 		tname.text = hp["name"]
-		tname.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		tname.add_theme_font_size_override("font_size", 15)
+		tname.add_theme_font_size_override("font_size", 13)
 		tname.add_theme_color_override("font_color", Color(1.0, 0.92, 0.70, 1.0))
-		cv.add_child(tname)
+		mid_vbox.add_child(tname)
 
-		# Subtitle
 		var sub_l = Label.new()
 		sub_l.text = hp["sub"]
-		sub_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		sub_l.add_theme_font_size_override("font_size", 10)
+		sub_l.add_theme_font_size_override("font_size", 9)
 		sub_l.add_theme_color_override("font_color", Color(0.80, 0.80, 0.85, 0.75))
-		cv.add_child(sub_l)
+		sub_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		mid_vbox.add_child(sub_l)
 
-		# Strike-through / Price Row
-		var price_vbox = VBoxContainer.new()
-		price_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-		price_vbox.add_theme_constant_override("separation", 1)
-
-		if hp["strike"] != "":
-			var strike_lbl = Label.new()
-			strike_lbl.text = hp["strike"]
-			strike_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			strike_lbl.add_theme_font_size_override("font_size", 10)
-			strike_lbl.add_theme_color_override("font_color", Color(0.65, 0.60, 0.60, 0.8))
-			price_vbox.add_child(strike_lbl)
+		var price_hbox = HBoxContainer.new()
+		price_hbox.add_theme_constant_override("separation", 6)
 
 		var price_lbl = Label.new()
 		price_lbl.text = "🪙 %s" % hp["cost_desc"]
-		price_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		price_lbl.add_theme_font_size_override("font_size", 13)
+		price_lbl.add_theme_font_size_override("font_size", 11)
 		price_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.25, 1.0))
-		price_vbox.add_child(price_lbl)
-		cv.add_child(price_vbox)
+		price_hbox.add_child(price_lbl)
 
-		# Buy Button
+		if hp["strike"] != "":
+			var strike_lbl = Label.new()
+			strike_lbl.text = "(%s)" % hp["strike"]
+			strike_lbl.add_theme_font_size_override("font_size", 8.5)
+			strike_lbl.add_theme_color_override("font_color", Color(0.65, 0.60, 0.60, 0.8))
+			price_hbox.add_child(strike_lbl)
+
+		mid_vbox.add_child(price_hbox)
+		chbox.add_child(mid_vbox)
+
+		# Right: Buy Button
+		var right_vbox = VBoxContainer.new()
+		right_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		right_vbox.custom_minimum_size = Vector2(76, 0)
+
 		var buy_btn = Button.new()
-		buy_btn.text = "MUA NGAY"
-		buy_btn.custom_minimum_size = Vector2(0, 34)
+		buy_btn.text = "MUA"
+		buy_btn.custom_minimum_size = Vector2(76, 30)
+		buy_btn.add_theme_font_size_override("font_size", 11)
 		buy_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		_style_bronze_drum_cta(buy_btn)
 
@@ -7704,7 +7723,9 @@ func _build_shop_content() -> Control:
 				status_lbl.text = "✅ Mua thành công %s! (+%d Vé Triệu Hồi Tướng)" % [item_name, item_tickets_gain]
 				status_lbl.add_theme_color_override("font_color", Color(0.25, 0.85, 0.45, 1.0))
 		)
-		cv.add_child(buy_btn)
+		right_vbox.add_child(buy_btn)
+		chbox.add_child(right_vbox)
+
 		grid_tickets.add_child(card)
 
 	# --- MỤC 2: VÉ TRIỆU HỒI TRANG PHỤC / SKIN (THẦN ĐIỆN) ---
@@ -7717,14 +7738,14 @@ func _build_shop_content() -> Control:
 	s2_style.corner_radius_bottom_left = 6
 	s2_style.content_margin_left = 12
 	s2_style.content_margin_right = 12
-	s2_style.content_margin_top = 6
-	s2_style.content_margin_bottom = 6
+	s2_style.content_margin_top = 5
+	s2_style.content_margin_bottom = 5
 	sec2_header.add_theme_stylebox_override("panel", s2_style)
 
 	var s2_hbox = HBoxContainer.new()
 	var sec2_lbl = Label.new()
 	sec2_lbl.text = "👘 LỆNH PHÙ TRIỆU HỒI TRANG PHỤC (QUAY SKIN THẦN ĐIỆN)"
-	sec2_lbl.add_theme_font_size_override("font_size", 14)
+	sec2_lbl.add_theme_font_size_override("font_size", 13)
 	sec2_lbl.add_theme_color_override("font_color", Color(0.92, 0.70, 1.0, 1.0))
 	s2_hbox.add_child(sec2_lbl)
 
@@ -7742,8 +7763,8 @@ func _build_shop_content() -> Control:
 
 	var grid_skins = GridContainer.new()
 	grid_skins.columns = 3
-	grid_skins.add_theme_constant_override("h_separation", 14)
-	grid_skins.add_theme_constant_override("v_separation", 14)
+	grid_skins.add_theme_constant_override("h_separation", 12)
+	grid_skins.add_theme_constant_override("v_separation", 8)
 	scroll_vbox.add_child(grid_skins)
 
 	var skin_packs = [
@@ -7764,11 +7785,11 @@ func _build_shop_content() -> Control:
 			"id": "skin_pack_5",
 			"name": "5 Vé Trang Phục",
 			"icon": "🎴",
-			"badge": "🔥 TIẾT KIỆM 10.000 BẠC",
+			"badge": "🔥 TIẾT KIỆM 10K",
 			"badge_color": Color(1.0, 0.55, 0.35, 1.0),
 			"badge_bg": Color(0.30, 0.10, 0.12, 0.95),
 			"sub": "Đủ 1 lượt Quay 5 Skin liên hoàn",
-			"strike": "Gốc: 295.000 Bạc",
+			"strike": "Gốc: 295.000",
 			"cost_silver": 285000,
 			"tickets": 5,
 			"cost_desc": "285.000 Bạc"
@@ -7777,11 +7798,11 @@ func _build_shop_content() -> Control:
 			"id": "skin_pack_10",
 			"name": "10 Vé Trang Phục",
 			"icon": "✨",
-			"badge": "👑 TIẾT KIỆM 40.000 BẠC",
+			"badge": "👑 TIẾT KIỆM 40K",
 			"badge_color": Color(1.0, 0.85, 0.25, 1.0),
 			"badge_bg": Color(0.32, 0.18, 0.38, 0.95),
 			"sub": "Đại gói thu thập trọn bộ chiến bào thần thoại",
-			"strike": "Gốc: 590.000 Bạc",
+			"strike": "Gốc: 590.000",
 			"cost_silver": 550000,
 			"tickets": 10,
 			"cost_desc": "550.000 Bạc"
@@ -7790,7 +7811,8 @@ func _build_shop_content() -> Control:
 
 	for sp in skin_packs:
 		var card = PanelContainer.new()
-		card.custom_minimum_size = Vector2(264, 204)
+		card.custom_minimum_size = Vector2(330, 86)
+		card.size_flags_horizontal = SIZE_EXPAND_FILL
 		var cs = StyleBoxFlat.new()
 		cs.bg_color = Color(0.12, 0.08, 0.18, 0.96)
 		cs.border_width_left = 1
@@ -7798,25 +7820,36 @@ func _build_shop_content() -> Control:
 		cs.border_width_right = 1
 		cs.border_width_bottom = 1
 		cs.border_color = Color(0.78, 0.45, 0.98, 0.85)
-		cs.corner_radius_top_left = 12
-		cs.corner_radius_top_right = 12
-		cs.corner_radius_bottom_right = 12
-		cs.corner_radius_bottom_left = 12
-		cs.shadow_color = Color(0.75, 0.35, 0.95, 0.20)
-		cs.shadow_size = 10
-		cs.shadow_offset = Vector2(0, 3)
-		cs.content_margin_left = 14
-		cs.content_margin_right = 14
-		cs.content_margin_top = 10
-		cs.content_margin_bottom = 12
+		cs.corner_radius_top_left = 8
+		cs.corner_radius_top_right = 8
+		cs.corner_radius_bottom_right = 8
+		cs.corner_radius_bottom_left = 8
+		cs.shadow_color = Color(0.75, 0.35, 0.95, 0.15)
+		cs.shadow_size = 5
+		cs.shadow_offset = Vector2(0, 2)
+		cs.content_margin_left = 10
+		cs.content_margin_right = 10
+		cs.content_margin_top = 6
+		cs.content_margin_bottom = 6
 		card.add_theme_stylebox_override("panel", cs)
 
-		var cv = VBoxContainer.new()
-		cv.alignment = BoxContainer.ALIGNMENT_CENTER
-		cv.add_theme_constant_override("separation", 5)
-		card.add_child(cv)
+		var chbox = HBoxContainer.new()
+		chbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		chbox.add_theme_constant_override("separation", 10)
+		card.add_child(chbox)
 
-		# Badge Row
+		# Left: Icon & Badge
+		var left_vbox = VBoxContainer.new()
+		left_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		left_vbox.custom_minimum_size = Vector2(64, 0)
+		left_vbox.add_theme_constant_override("separation", 2)
+
+		var icon = Label.new()
+		icon.text = sp["icon"]
+		icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		icon.add_theme_font_size_override("font_size", 22)
+		left_vbox.add_child(icon)
+
 		var b_panel = PanelContainer.new()
 		var bps = StyleBoxFlat.new()
 		bps.bg_color = sp["badge_bg"]
@@ -7825,72 +7858,72 @@ func _build_shop_content() -> Control:
 		bps.border_width_right = 1
 		bps.border_width_bottom = 1
 		bps.border_color = sp["badge_color"]
-		bps.corner_radius_top_left = 6
-		bps.corner_radius_top_right = 6
-		bps.corner_radius_bottom_right = 6
-		bps.corner_radius_bottom_left = 6
-		bps.content_margin_left = 8
-		bps.content_margin_right = 8
-		bps.content_margin_top = 2
-		bps.content_margin_bottom = 2
+		bps.corner_radius_top_left = 4
+		bps.corner_radius_top_right = 4
+		bps.corner_radius_bottom_right = 4
+		bps.corner_radius_bottom_left = 4
+		bps.content_margin_left = 4
+		bps.content_margin_right = 4
+		bps.content_margin_top = 1
+		bps.content_margin_bottom = 1
 		b_panel.add_theme_stylebox_override("panel", bps)
 
 		var badge = Label.new()
 		badge.text = sp["badge"]
 		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		badge.add_theme_font_size_override("font_size", 10)
+		badge.add_theme_font_size_override("font_size", 8)
 		badge.add_theme_color_override("font_color", sp["badge_color"])
 		b_panel.add_child(badge)
-		cv.add_child(b_panel)
+		left_vbox.add_child(b_panel)
+		chbox.add_child(left_vbox)
 
-		# Icon
-		var icon = Label.new()
-		icon.text = sp["icon"]
-		icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		icon.add_theme_font_size_override("font_size", 34)
-		cv.add_child(icon)
+		# Center: Name, Subtitle, Price
+		var mid_vbox = VBoxContainer.new()
+		mid_vbox.size_flags_horizontal = SIZE_EXPAND_FILL
+		mid_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		mid_vbox.add_theme_constant_override("separation", 2)
 
-		# Title
 		var tname = Label.new()
 		tname.text = sp["name"]
-		tname.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		tname.add_theme_font_size_override("font_size", 15)
+		tname.add_theme_font_size_override("font_size", 13)
 		tname.add_theme_color_override("font_color", Color(0.95, 0.85, 1.0, 1.0))
-		cv.add_child(tname)
+		mid_vbox.add_child(tname)
 
-		# Subtitle
 		var sub_l = Label.new()
 		sub_l.text = sp["sub"]
-		sub_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		sub_l.add_theme_font_size_override("font_size", 10)
+		sub_l.add_theme_font_size_override("font_size", 9)
 		sub_l.add_theme_color_override("font_color", Color(0.85, 0.80, 0.90, 0.75))
-		cv.add_child(sub_l)
+		sub_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		mid_vbox.add_child(sub_l)
 
-		# Strike-through / Price Row
-		var price_vbox = VBoxContainer.new()
-		price_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-		price_vbox.add_theme_constant_override("separation", 1)
-
-		if sp["strike"] != "":
-			var strike_lbl = Label.new()
-			strike_lbl.text = sp["strike"]
-			strike_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			strike_lbl.add_theme_font_size_override("font_size", 10)
-			strike_lbl.add_theme_color_override("font_color", Color(0.65, 0.60, 0.65, 0.8))
-			price_vbox.add_child(strike_lbl)
+		var price_hbox = HBoxContainer.new()
+		price_hbox.add_theme_constant_override("separation", 6)
 
 		var price_lbl = Label.new()
 		price_lbl.text = "🪙 %s" % sp["cost_desc"]
-		price_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		price_lbl.add_theme_font_size_override("font_size", 13)
+		price_lbl.add_theme_font_size_override("font_size", 11)
 		price_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.25, 1.0))
-		price_vbox.add_child(price_lbl)
-		cv.add_child(price_vbox)
+		price_hbox.add_child(price_lbl)
 
-		# Buy Button
+		if sp["strike"] != "":
+			var strike_lbl = Label.new()
+			strike_lbl.text = "(%s)" % sp["strike"]
+			strike_lbl.add_theme_font_size_override("font_size", 8.5)
+			strike_lbl.add_theme_color_override("font_color", Color(0.65, 0.60, 0.65, 0.8))
+			price_hbox.add_child(strike_lbl)
+
+		mid_vbox.add_child(price_hbox)
+		chbox.add_child(mid_vbox)
+
+		# Right: Buy Button
+		var right_vbox = VBoxContainer.new()
+		right_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		right_vbox.custom_minimum_size = Vector2(76, 0)
+
 		var buy_btn = Button.new()
-		buy_btn.text = "MUA NGAY"
-		buy_btn.custom_minimum_size = Vector2(0, 34)
+		buy_btn.text = "MUA"
+		buy_btn.custom_minimum_size = Vector2(76, 30)
+		buy_btn.add_theme_font_size_override("font_size", 11)
 		buy_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 		var btn_sb = StyleBoxFlat.new()
@@ -7900,10 +7933,10 @@ func _build_shop_content() -> Control:
 		btn_sb.border_width_right = 1
 		btn_sb.border_width_bottom = 1
 		btn_sb.border_color = Color(0.85, 0.50, 1.0, 0.9)
-		btn_sb.corner_radius_top_left = 8
-		btn_sb.corner_radius_top_right = 8
-		btn_sb.corner_radius_bottom_right = 8
-		btn_sb.corner_radius_bottom_left = 8
+		btn_sb.corner_radius_top_left = 6
+		btn_sb.corner_radius_top_right = 6
+		btn_sb.corner_radius_bottom_right = 6
+		btn_sb.corner_radius_bottom_left = 6
 
 		var btn_hover = btn_sb.duplicate() as StyleBoxFlat
 		btn_hover.bg_color = Color(0.38, 0.16, 0.50, 1.0)
@@ -7948,7 +7981,9 @@ func _build_shop_content() -> Control:
 				status_lbl.text = "✅ Mua thành công %s! (+%d Vé Trang Phục)" % [item_name, item_tickets_gain]
 				status_lbl.add_theme_color_override("font_color", Color(0.35, 0.90, 0.50, 1.0))
 		)
-		cv.add_child(buy_btn)
+		right_vbox.add_child(buy_btn)
+		chbox.add_child(right_vbox)
+
 		grid_skins.add_child(card)
 
 	# 4. Bottom Navigation Action Row
@@ -7959,7 +7994,7 @@ func _build_shop_content() -> Control:
 
 	var go_than_dien_btn = Button.new()
 	go_than_dien_btn.text = "⛩️ ĐẾN THẦN ĐIỆN CHIÊU MỘ NGAY"
-	go_than_dien_btn.custom_minimum_size = Vector2(280, 42)
+	go_than_dien_btn.custom_minimum_size = Vector2(280, 38)
 	_style_bronze_drum_cta(go_than_dien_btn)
 	go_than_dien_btn.pressed.connect(func():
 		AudioManager.play_card_select()
@@ -7970,7 +8005,7 @@ func _build_shop_content() -> Control:
 
 	var go_inv_btn = Button.new()
 	go_inv_btn.text = "🎒 MỞ TÚI ĐỒ KIỂM TRA"
-	go_inv_btn.custom_minimum_size = Vector2(220, 42)
+	go_inv_btn.custom_minimum_size = Vector2(220, 38)
 	_style_secondary_mode_button(go_inv_btn)
 	go_inv_btn.pressed.connect(func():
 		AudioManager.play_card_select()
