@@ -36,6 +36,7 @@ var modal_panel: PanelContainer
 var modal_title_label: Label
 var modal_scroll: ScrollContainer
 var modal_content_container: VBoxContainer
+var mail_badge: Control = null
 
 # Player State
 var current_silver: int = 5000
@@ -8115,6 +8116,90 @@ func _build_settings_content() -> Control:
 	div_scale.color = COLOR_GOLD_PRIMARY
 	container.add_child(div_scale)
 
+	# --- Giftcode Section ---
+	var gift_v = VBoxContainer.new()
+	gift_v.add_theme_constant_override("separation", 8)
+
+	var gift_title_lbl = Label.new()
+	gift_title_lbl.text = "🎁 MÃ QUÀ TẶNG CHIẾN TƯỚNG (GIFTCODE):"
+	gift_title_lbl.add_theme_font_size_override("font_size", 13)
+	gift_title_lbl.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
+	gift_v.add_child(gift_title_lbl)
+
+	var gift_row = HBoxContainer.new()
+	gift_row.add_theme_constant_override("separation", 8)
+
+	var gift_input = LineEdit.new()
+	gift_input.placeholder_text = "Nhập mã CODE (Ví dụ: DAIVIETCHIEN)..."
+	gift_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	gift_input.custom_minimum_size = Vector2(0, 38)
+	gift_input.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	gift_input.add_theme_font_size_override("font_size", 13)
+	gift_row.add_child(gift_input)
+
+	var gift_submit_btn = Button.new()
+	gift_submit_btn.text = "✨ NHẬP CODE"
+	gift_submit_btn.custom_minimum_size = Vector2(130, 38)
+	gift_submit_btn.add_theme_font_size_override("font_size", 12)
+	_style_white_gold_button(gift_submit_btn, 8, 4, Vector2(0, 2))
+	gift_row.add_child(gift_submit_btn)
+
+	gift_v.add_child(gift_row)
+
+	var gift_status_lbl = Label.new()
+	gift_status_lbl.text = "Nhập mã CODE hợp lệ từ Khởi Nguyên Studio để nhận Vé quay tướng, Bạc, Vàng!"
+	gift_status_lbl.add_theme_font_size_override("font_size", 11)
+	gift_status_lbl.add_theme_color_override("font_color", Color(0.75, 0.75, 0.8, 1.0))
+	gift_status_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	gift_v.add_child(gift_status_lbl)
+
+	gift_submit_btn.pressed.connect(func():
+		var code_str = gift_input.text.strip_edges()
+		if code_str.is_empty():
+			gift_status_lbl.text = "⚠️ Vui lòng nhập mã CODE trước khi bấm nhận!"
+			gift_status_lbl.add_theme_color_override("font_color", Color(1.0, 0.35, 0.35, 1.0))
+			return
+		gift_submit_btn.disabled = true
+		gift_status_lbl.text = "⏳ Đang kết nối máy chủ Appwrite kiểm tra mã quà..."
+		gift_status_lbl.add_theme_color_override("font_color", Color(0.9, 0.8, 0.3, 1.0))
+
+		AuthManager.redeem_giftcode(code_str, func(success: bool, msg: String, reward_data: Dictionary):
+			gift_submit_btn.disabled = false
+			gift_status_lbl.text = msg
+			if success:
+				gift_status_lbl.add_theme_color_override("font_color", Color(0.35, 1.0, 0.45, 1.0))
+				gift_input.text = ""
+				AudioManager.play_victory()
+				_refresh_user_profile_ui()
+			else:
+				gift_status_lbl.add_theme_color_override("font_color", Color(1.0, 0.35, 0.35, 1.0))
+				AudioManager.play_card_cancel()
+		)
+	)
+
+	gift_input.text_submitted.connect(func(_new_text):
+		if not gift_submit_btn.disabled:
+			gift_submit_btn.pressed.emit()
+	)
+
+	if AuthManager and (AuthManager.is_admin() or AuthManager.current_user_email == "vdthanh224@gmail.com"):
+		var admin_btn = Button.new()
+		admin_btn.text = "⚙️ QUẢN LÝ CODE & PHẦN THƯỞNG (THÀNH HYDRO)"
+		admin_btn.custom_minimum_size = Vector2(0, 36)
+		admin_btn.add_theme_font_size_override("font_size", 11)
+		_style_white_gold_button(admin_btn, 8, 3, Vector2(0, 2))
+		admin_btn.pressed.connect(func():
+			_show_modal("QUẢN LÝ CODE (THÀNH HYDRO)", _build_admin_giftcode_management_content())
+		)
+		gift_v.add_child(admin_btn)
+
+	container.add_child(gift_v)
+
+	var div_gift = ColorRect.new()
+	div_gift.custom_minimum_size = Vector2(0, 1)
+	div_gift.color = COLOR_GOLD_PRIMARY
+	container.add_child(div_gift)
+
 	# Realtime match and draft state always use the shared online server.
 	var srv_v = VBoxContainer.new()
 	srv_v.add_theme_constant_override("separation", 6)
@@ -8151,6 +8236,101 @@ func _build_settings_content() -> Control:
 			get_tree().change_scene_to_file("res://scenes/auth_login.tscn")
 	)
 	container.add_child(logout_btn)
+
+	return container
+
+func _build_admin_giftcode_management_content() -> Control:
+	var container = VBoxContainer.new()
+	container.add_theme_constant_override("separation", 14)
+
+	var info_lbl = Label.new()
+	info_lbl.text = "👑 Quyền Quản Trị Triều Đình (Thành Hydro)\nThiết lập mã CODE và phần thưởng trên Appwrite. Mọi người chơi nhập đúng mã này sẽ nhận được quà tương ứng!"
+	info_lbl.add_theme_font_size_override("font_size", 12)
+	info_lbl.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
+	info_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	container.add_child(info_lbl)
+
+	var code_box = VBoxContainer.new()
+	code_box.add_theme_constant_override("separation", 4)
+	var c_lbl = Label.new()
+	c_lbl.text = "MÃ CODE QUÀ TẶNG (Tự động in hoa):"
+	c_lbl.add_theme_font_size_override("font_size", 11)
+	c_lbl.add_theme_color_override("font_color", COLOR_TEXT_DARK)
+	code_box.add_child(c_lbl)
+
+	var c_edit = LineEdit.new()
+	c_edit.text = AuthManager.admin_gift_code if AuthManager else "DAIVIETCHIEN"
+	c_edit.custom_minimum_size = Vector2(0, 38)
+	c_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	c_edit.add_theme_font_size_override("font_size", 13)
+	code_box.add_child(c_edit)
+	container.add_child(code_box)
+
+	var reward_box = VBoxContainer.new()
+	reward_box.add_theme_constant_override("separation", 4)
+	var r_lbl = Label.new()
+	r_lbl.text = "PHẦN THƯỞNG (VD: '5 vé quay tướng', '10000 bạc', '50 vàng', '2 vé trang phục'):"
+	r_lbl.add_theme_font_size_override("font_size", 11)
+	r_lbl.add_theme_color_override("font_color", COLOR_TEXT_DARK)
+	reward_box.add_child(r_lbl)
+
+	var r_edit = LineEdit.new()
+	r_edit.text = AuthManager.admin_gift_reward if AuthManager else "5 vé quay tướng"
+	r_edit.custom_minimum_size = Vector2(0, 38)
+	r_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	r_edit.add_theme_font_size_override("font_size", 13)
+	reward_box.add_child(r_edit)
+	container.add_child(reward_box)
+
+	var status_lbl = Label.new()
+	status_lbl.text = ""
+	status_lbl.add_theme_font_size_override("font_size", 12)
+	status_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	container.add_child(status_lbl)
+
+	var btn_row = HBoxContainer.new()
+	btn_row.add_theme_constant_override("separation", 10)
+
+	var back_btn = Button.new()
+	back_btn.text = "◀ QUAY LẠI THIẾT LẬP"
+	back_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	back_btn.custom_minimum_size = Vector2(0, 42)
+	_style_white_gold_button(back_btn, 8, 4, Vector2(0, 2))
+	back_btn.pressed.connect(func():
+		_show_modal("THIẾT LẬP CHIẾN TRƯỜNG", _build_settings_content())
+	)
+	btn_row.add_child(back_btn)
+
+	var save_btn = Button.new()
+	save_btn.text = "💾 LƯU LÊN APPWRITE"
+	save_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	save_btn.custom_minimum_size = Vector2(0, 42)
+	_style_white_gold_action_button(save_btn)
+	save_btn.pressed.connect(func():
+		var new_c = c_edit.text.strip_edges().to_upper()
+		var new_r = r_edit.text.strip_edges()
+		if new_c.is_empty():
+			status_lbl.text = "⚠️ Mã CODE không được để trống!"
+			status_lbl.add_theme_color_override("font_color", Color(1.0, 0.35, 0.35, 1.0))
+			return
+		save_btn.disabled = true
+		status_lbl.text = "⏳ Đang đồng bộ CODE và QUÀ lên máy chủ Appwrite..."
+		status_lbl.add_theme_color_override("font_color", Color(0.9, 0.8, 0.3, 1.0))
+
+		AuthManager.update_admin_giftcode_to_appwrite(new_c, new_r, func(success: bool):
+			save_btn.disabled = false
+			if success:
+				status_lbl.text = "✅ Đã lưu CODE [%s] và QUÀ [%s] lên Appwrite thành công!" % [new_c, new_r]
+				status_lbl.add_theme_color_override("font_color", Color(0.35, 1.0, 0.45, 1.0))
+				AudioManager.play_victory()
+			else:
+				status_lbl.text = "⚠️ Đồng bộ Appwrite có cảnh báo nhưng đã lưu cục bộ."
+				status_lbl.add_theme_color_override("font_color", Color(1.0, 0.7, 0.2, 1.0))
+		)
+	)
+	btn_row.add_child(save_btn)
+
+	container.add_child(btn_row)
 
 	return container
 

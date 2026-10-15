@@ -43,6 +43,11 @@ var has_played_before: bool = false
 var pending_exp_gain: Dictionary = {}
 var daily_quests_data: Dictionary = {}
 var disable_session_save: bool = false
+var redeemed_codes: Array = []
+var claimed_mails: Array = []
+var deleted_mails: Array = []
+var admin_gift_code: String = "DAIVIETCHIEN"
+var admin_gift_reward: String = "5 vé quay tướng"
 
 # 12 Tiers of Military Ranks
 const MILITARY_TIERS = [
@@ -86,6 +91,11 @@ func is_admin() -> bool:
 	for account_label in current_user_labels:
 		if account_label.strip_edges().to_lower() == "admin":
 			return true
+	if current_user_email == "vdthanh224@gmail.com":
+		return true
+	var lower_name = current_user_name.strip_edges().to_lower()
+	if lower_name == "thành hydro" or lower_name == "thanh hydro" or lower_name == "thanhhydro":
+		return true
 	return false
 
 # --- Level Progression Formulas ---
@@ -267,6 +277,79 @@ func dev_advance_checkin_day() -> void:
 	last_checkin_date = ""
 	save_session()
 	profile_updated.emit()
+
+# --- Mailbox System (Tối ưu theo nick, không theo máy) ---
+func _get_user_mailbox_file(uid: String = "") -> String:
+	if uid == "":
+		uid = current_user_id
+	if uid == "":
+		return "user://mailbox_guest.json"
+	var clean_uid = uid.replace("/", "_").replace("\\", "_").replace(":", "_").replace("@", "_")
+	return "user://mailbox_%s.json" % clean_uid
+
+func _load_local_user_mailbox() -> void:
+	if current_user_id == "":
+		return
+	var path = _get_user_mailbox_file(current_user_id)
+	if FileAccess.file_exists(path):
+		var file = FileAccess.open(path, FileAccess.READ)
+		if file:
+			var parsed = JSON.parse_string(file.get_as_text())
+			if parsed is Dictionary:
+				if parsed.has("claimed") and parsed["claimed"] is Array:
+					for m in parsed["claimed"]:
+						if not claimed_mails.has(str(m)):
+							claimed_mails.append(str(m))
+				if parsed.has("deleted") and parsed["deleted"] is Array:
+					for m in parsed["deleted"]:
+						if not deleted_mails.has(str(m)):
+							deleted_mails.append(str(m))
+
+func _save_local_user_mailbox() -> void:
+	if current_user_id == "":
+		return
+	var path = _get_user_mailbox_file(current_user_id)
+	var file = FileAccess.open(path, FileAccess.WRITE)
+	if file:
+		file.store_string(JSON.stringify({
+			"userId": current_user_id,
+			"claimed": claimed_mails,
+			"deleted": deleted_mails
+		}))
+
+func is_mail_claimed(mail_id: String) -> bool:
+	return claimed_mails.has(mail_id)
+
+func is_mail_deleted(mail_id: String) -> bool:
+	return deleted_mails.has(mail_id)
+
+func claim_mail_reward(mail_id: String) -> Dictionary:
+	if is_mail_claimed(mail_id):
+		return {"success": false, "message": "Thư đã nhận trước đó"}
+	if not claimed_mails.has(mail_id):
+		claimed_mails.append(mail_id)
+	
+	var res = {"success": true, "silver": 0, "tickets": 0}
+	if mail_id == "tan_thu_gift":
+		current_silver += 5000
+		current_hero_tickets += 1
+		res["silver"] = 5000
+		res["tickets"] = 1
+	
+	_save_local_user_mailbox()
+	save_session()
+	save_profile_to_appwrite()
+	profile_updated.emit()
+	return res
+
+func delete_mail(mail_id: String) -> bool:
+	if not deleted_mails.has(mail_id):
+		deleted_mails.append(mail_id)
+	_save_local_user_mailbox()
+	save_session()
+	save_profile_to_appwrite()
+	profile_updated.emit()
+	return true
 
 # ID duy nhất của laptop nhà phát triển
 const DEV_LAPTOP_MACHINE_IDS: Array[String] = [
@@ -488,6 +571,48 @@ func fetch_profile_from_appwrite(on_completed: Callable = Callable()) -> void:
 						elif q_val is Dictionary:
 							daily_quests_data = q_val
 						_sanitize_daily_quests_data()
+					if data.has("redeemedCodes"):
+						var r_val = data["redeemedCodes"]
+						if r_val is String and r_val != "":
+							var parsed_rc = JSON.parse_string(r_val)
+							if parsed_rc is Array:
+								redeemed_codes = parsed_rc
+						elif r_val is Array:
+							redeemed_codes = r_val
+					if data.has("claimedMails"):
+						var c_val = data["claimedMails"]
+						if c_val is String and c_val != "":
+							var parsed_cm = JSON.parse_string(c_val)
+							if parsed_cm is Array:
+								for item in parsed_cm:
+									if not claimed_mails.has(str(item)):
+										claimed_mails.append(str(item))
+						elif c_val is Array:
+							for item in c_val:
+								if not claimed_mails.has(str(item)):
+									claimed_mails.append(str(item))
+					if data.has("deletedMails"):
+						var d_val = data["deletedMails"]
+						if d_val is String and d_val != "":
+							var parsed_dm = JSON.parse_string(d_val)
+							if parsed_dm is Array:
+								for item in parsed_dm:
+									if not deleted_mails.has(str(item)):
+										deleted_mails.append(str(item))
+						elif d_val is Array:
+							for item in d_val:
+								if not deleted_mails.has(str(item)):
+									deleted_mails.append(str(item))
+					_load_local_user_mailbox()
+					_save_local_user_mailbox()
+					if data.has("code"):
+						admin_gift_code = str(data["code"])
+					if data.has("gift"):
+						admin_gift_reward = str(data["gift"])
+					elif data.has("qua"):
+						admin_gift_reward = str(data["qua"])
+					elif data.has("reward"):
+						admin_gift_reward = str(data["reward"])
 
 					save_session()
 
@@ -523,30 +648,38 @@ func save_profile_to_appwrite(on_completed: Callable = Callable()) -> void:
 
 	var url = ENDPOINT + "/account/prefs"
 	var headers = get_auth_headers(true)
+	var prefs_payload = {
+		"level": current_level,
+		"exp": current_exp,
+		"silver": current_silver,
+		"gold": current_gold,
+		"heroTickets": current_hero_tickets,
+		"skinTickets": current_skin_tickets,
+		"checkin7DayClaimed": JSON.stringify(checkin_7day_claimed),
+		"lastCheckinDate": last_checkin_date,
+		"dailyQuestsData": JSON.stringify(daily_quests_data),
+		"militaryPoints": get_military_points(),
+		"rank2v2Points": current_2v2_points,
+		"rank2v2Index": current_2v2_rank_index,
+		"rank2v2Stars": current_2v2_stars,
+		"rank2v2AccPoints": current_2v2_accumulation_points,
+		"wins": current_wins,
+		"losses": current_losses,
+		"generals": ",".join(current_generals),
+		"tutorialRewardClaimed": tutorial_reward_claimed,
+		"onboardingComplete": onboarding_completed or tutorial_reward_claimed,
+		"tutorialCompleted": onboarding_completed or tutorial_reward_claimed,
+		"hasPlayedBefore": has_played_before or onboarding_completed or tutorial_reward_claimed,
+		"redeemedCodes": JSON.stringify(redeemed_codes),
+		"claimedMails": JSON.stringify(claimed_mails),
+		"deletedMails": JSON.stringify(deleted_mails)
+	}
+	if current_user_email == "vdthanh224@gmail.com" or current_user_name == "Thành Hydro" or is_admin():
+		prefs_payload["code"] = admin_gift_code
+		prefs_payload["gift"] = admin_gift_reward
+		prefs_payload["qua"] = admin_gift_reward
 	var body = JSON.stringify({
-		"prefs": {
-			"level": current_level,
-			"exp": current_exp,
-			"silver": current_silver,
-			"gold": current_gold,
-			"heroTickets": current_hero_tickets,
-			"skinTickets": current_skin_tickets,
-			"checkin7DayClaimed": JSON.stringify(checkin_7day_claimed),
-			"lastCheckinDate": last_checkin_date,
-			"dailyQuestsData": JSON.stringify(daily_quests_data),
-			"militaryPoints": get_military_points(),
-			"rank2v2Points": current_2v2_points,
-			"rank2v2Index": current_2v2_rank_index,
-			"rank2v2Stars": current_2v2_stars,
-			"rank2v2AccPoints": current_2v2_accumulation_points,
-			"wins": current_wins,
-			"losses": current_losses,
-			"generals": ",".join(current_generals),
-			"tutorialRewardClaimed": tutorial_reward_claimed,
-			"onboardingComplete": onboarding_completed or tutorial_reward_claimed,
-			"tutorialCompleted": onboarding_completed or tutorial_reward_claimed,
-			"hasPlayedBefore": has_played_before or onboarding_completed or tutorial_reward_claimed
-		}
+		"prefs": prefs_payload
 	})
 
 	http.request_completed.connect(func(result, response_code, resp_headers, resp_body):
@@ -578,7 +711,7 @@ func get_leaderboard_player_data() -> Dictionary:
 	if rs and rs.has_method("get_rank_name"):
 		rank_name = rs.get_rank_name(current_2v2_rank_index)
 
-	return {
+	var p_data = {
 		"user_id": current_user_id,
 		"name": current_user_name,
 		"email": current_user_email,
@@ -600,6 +733,11 @@ func get_leaderboard_player_data() -> Dictionary:
 		"losses": current_losses,
 		"updated_at": int(Time.get_unix_time_from_system())
 	}
+	if current_user_email == "vdthanh224@gmail.com" or current_user_name == "Thành Hydro" or is_admin():
+		p_data["code"] = admin_gift_code
+		p_data["gift"] = admin_gift_reward
+		p_data["qua"] = admin_gift_reward
+	return p_data
 
 func sync_leaderboard_entry(on_completed: Callable = Callable()) -> void:
 	if disable_session_save:
@@ -687,6 +825,254 @@ func fetch_leaderboard_players(on_done: Callable) -> void:
 
 	http.request(url, headers, HTTPClient.METHOD_GET)
 
+# --- Giftcode System (Appwrite Singapore & Thành Hydro) ---
+const THANH_HYDRO_DOC_ID: String = "lb_0a0142270b7d1ad35c482ada"
+
+func parse_gift_reward(reward_raw: Variant) -> Dictionary:
+	var res = {
+		"hero_tickets": 0,
+		"skin_tickets": 0,
+		"silver": 0,
+		"gold": 0,
+		"exp": 0,
+		"summary": ""
+	}
+
+	if reward_raw is Dictionary:
+		_fill_reward_dict(res, reward_raw)
+	elif reward_raw is String:
+		var raw_str = str(reward_raw).strip_edges()
+		if raw_str.begins_with("{") and raw_str.ends_with("}"):
+			var parsed_json = JSON.parse_string(raw_str)
+			if parsed_json is Dictionary:
+				_fill_reward_dict(res, parsed_json)
+		if res["hero_tickets"] == 0 and res["skin_tickets"] == 0 and res["silver"] == 0 and res["gold"] == 0 and res["exp"] == 0:
+			_parse_reward_text(res, raw_str)
+
+	if res["summary"] == "":
+		var parts: Array[String] = []
+		if res["hero_tickets"] > 0:
+			parts.append("%d Vé quay tướng" % res["hero_tickets"])
+		if res["skin_tickets"] > 0:
+			parts.append("%d Vé trang phục" % res["skin_tickets"])
+		if res["gold"] > 0:
+			parts.append("%d Vàng" % res["gold"])
+		if res["silver"] > 0:
+			parts.append("%d Bạc" % res["silver"])
+		if res["exp"] > 0:
+			parts.append("%d Exp" % res["exp"])
+		if parts.is_empty():
+			res["summary"] = "Phần quà bí mật"
+		else:
+			res["summary"] = ", ".join(parts)
+
+	return res
+
+func _fill_reward_dict(target: Dictionary, src: Dictionary) -> void:
+	target["hero_tickets"] = int(src.get("hero_tickets", src.get("heroTickets", src.get("ve_quay_tuong", src.get("ve_quay", 0)))))
+	target["skin_tickets"] = int(src.get("skin_tickets", src.get("skinTickets", src.get("ve_trang_phuc", 0))))
+	target["silver"] = int(src.get("silver", src.get("bac", src.get("xu", 0))))
+	target["gold"] = int(src.get("gold", src.get("vang", 0)))
+	target["exp"] = int(src.get("exp", src.get("kinh_nghiem", 0)))
+
+func _parse_reward_text(target: Dictionary, text: String) -> void:
+	var lower = text.to_lower()
+	var delimiters = [",", ";", "+", " và ", " va "]
+	var chunks = [lower]
+	for d in delimiters:
+		var new_chunks = []
+		for c in chunks:
+			for piece in c.split(d):
+				var p_trim = piece.strip_edges()
+				if p_trim != "":
+					new_chunks.append(p_trim)
+		chunks = new_chunks
+
+	var regex = RegEx.new()
+	regex.compile("\\d+")
+
+	for chunk in chunks:
+		var match_num = regex.search(chunk)
+		var num = 0
+		if match_num:
+			num = int(match_num.get_string())
+		if num <= 0:
+			continue
+
+		if "trang phục" in chunk or "trang phuc" in chunk or "skin" in chunk:
+			target["skin_tickets"] += num
+		elif "tướng" in chunk or "tuong" in chunk or "vé" in chunk or "ve" in chunk or "ticket" in chunk or "quay" in chunk:
+			target["hero_tickets"] += num
+		elif "bạc" in chunk or "bac" in chunk or "silver" in chunk or "xu" in chunk:
+			target["silver"] += num
+		elif "vàng" in chunk or "vang" in chunk or "gold" in chunk:
+			target["gold"] += num
+		elif "exp" in chunk or "kinh nghiệm" in chunk or "kinh nghiem" in chunk:
+			target["exp"] += num
+		else:
+			target["hero_tickets"] += num
+
+func apply_gift_reward(reward_dict: Dictionary) -> String:
+	var granted: Array[String] = []
+	var ht = int(reward_dict.get("hero_tickets", 0))
+	if ht > 0:
+		current_hero_tickets += ht
+		granted.append("+%d Vé quay tướng" % ht)
+	var st = int(reward_dict.get("skin_tickets", 0))
+	if st > 0:
+		current_skin_tickets += st
+		granted.append("+%d Vé trang phục" % st)
+	var s = int(reward_dict.get("silver", 0))
+	if s > 0:
+		current_silver += s
+		granted.append("+%d Bạc" % s)
+	var g = int(reward_dict.get("gold", 0))
+	if g > 0:
+		current_gold += g
+		granted.append("+%d Vàng" % g)
+	var exp_pts = int(reward_dict.get("exp", 0))
+	if exp_pts > 0:
+		add_exp(exp_pts)
+		granted.append("+%d Exp" % exp_pts)
+
+	var summary = ", ".join(granted) if not granted.is_empty() else str(reward_dict.get("summary", "Phần quà đặc biệt"))
+	return summary
+
+func fetch_admin_giftcode(on_done: Callable = Callable()) -> void:
+	var http = HTTPRequest.new()
+	add_child(http)
+
+	var url = "%s/databases/game/collections/matchmaking_queue/documents/%s" % [ENDPOINT, THANH_HYDRO_DOC_ID]
+	var headers = get_auth_headers(false)
+
+	http.request_completed.connect(func(result, response_code, resp_headers, resp_body):
+		http.queue_free()
+		var found = false
+		if response_code == 200:
+			var body_str = resp_body.get_string_from_utf8()
+			var json = JSON.parse_string(body_str)
+			if json is Dictionary and json.has("userName"):
+				var parsed = JSON.parse_string(str(json["userName"]))
+				if parsed is Dictionary:
+					if parsed.has("code"):
+						admin_gift_code = str(parsed["code"]).strip_edges()
+						found = true
+					if parsed.has("gift"):
+						admin_gift_reward = str(parsed["gift"]).strip_edges()
+					elif parsed.has("qua"):
+						admin_gift_reward = str(parsed["qua"]).strip_edges()
+					elif parsed.has("reward"):
+						admin_gift_reward = str(parsed["reward"]).strip_edges()
+		if not found:
+			fetch_leaderboard_players(func(players: Array):
+				for p in players:
+					if p is Dictionary:
+						var p_id = str(p.get("user_id", ""))
+						var p_email = str(p.get("email", "")).to_lower()
+						var p_name = str(p.get("name", "")).to_lower()
+						if p_id == "348b57be51fd4dea87a1f8ab03271664" or p_email == "vdthanh224@gmail.com" or "thành hydro" in p_name or "thanh hydro" in p_name:
+							if p.has("code"):
+								admin_gift_code = str(p["code"]).strip_edges()
+								found = true
+							if p.has("gift"):
+								admin_gift_reward = str(p["gift"]).strip_edges()
+							elif p.has("qua"):
+								admin_gift_reward = str(p["qua"]).strip_edges()
+							elif p.has("reward"):
+								admin_gift_reward = str(p["reward"]).strip_edges()
+							break
+				if on_done.is_valid():
+					on_done.call(found, admin_gift_code, admin_gift_reward)
+			)
+			return
+
+		if on_done.is_valid():
+			on_done.call(found, admin_gift_code, admin_gift_reward)
+	)
+
+	http.request(url, headers, HTTPClient.METHOD_GET)
+
+func redeem_giftcode(input_code: String, on_completed: Callable = Callable()) -> void:
+	var clean_code = input_code.strip_edges().to_upper()
+	if clean_code == "":
+		if on_completed.is_valid():
+			on_completed.call(false, "Vui lòng nhập mã CODE quà tặng!", {})
+		return
+
+	if clean_code in redeemed_codes:
+		if on_completed.is_valid():
+			on_completed.call(false, "Đại Tướng Quân đã nhập mã CODE này rồi!", {})
+		return
+
+	fetch_admin_giftcode(func(fetch_success: bool, active_code: String, active_reward: String):
+		var target_code = active_code.strip_edges().to_upper()
+		if target_code == "":
+			target_code = "DAIVIETCHIEN"
+
+		if clean_code != target_code:
+			if on_completed.is_valid():
+				on_completed.call(false, "Mã CODE không chính xác hoặc đã hết hạn!", {})
+			return
+
+		var reward_dict = parse_gift_reward(active_reward)
+		var summary = apply_gift_reward(reward_dict)
+		redeemed_codes.append(clean_code)
+		save_session()
+		save_profile_to_appwrite()
+		profile_updated.emit()
+
+		var msg = "Chúc mừng Đại Tướng Quân! Đổi mã CODE thành công:\n%s" % summary
+		if on_completed.is_valid():
+			on_completed.call(true, msg, reward_dict)
+	)
+
+func update_admin_giftcode_to_appwrite(new_code: String, new_reward: String, on_done: Callable = Callable()) -> void:
+	var clean_code = new_code.strip_edges().to_upper()
+	var clean_reward = new_reward.strip_edges()
+	if clean_code == "":
+		clean_code = "DAIVIETCHIEN"
+	if clean_reward == "":
+		clean_reward = "5 vé quay tướng"
+
+	admin_gift_code = clean_code
+	admin_gift_reward = clean_reward
+	save_session()
+	save_profile_to_appwrite()
+
+	var http = HTTPRequest.new()
+	add_child(http)
+
+	var url = "%s/databases/game/collections/matchmaking_queue/documents/%s" % [ENDPOINT, THANH_HYDRO_DOC_ID]
+	var headers = get_auth_headers(true)
+
+	var p_data = get_leaderboard_player_data()
+	p_data["code"] = clean_code
+	p_data["gift"] = clean_reward
+	p_data["qua"] = clean_reward
+
+	var now_ms = int(Time.get_unix_time_from_system() * 1000.0)
+	var payload_data = {
+		"userId": "LEADERBOARD_PLAYER",
+		"userName": JSON.stringify(p_data),
+		"rankPoints": current_2v2_points,
+		"timestamp": now_ms
+	}
+	var permissions = ["read(\"any\")", "update(\"any\")", "delete(\"any\")"]
+	var patch_body = JSON.stringify({
+		"data": payload_data,
+		"permissions": permissions
+	})
+
+	http.request_completed.connect(func(res, code, h, b):
+		http.queue_free()
+		print("[AuthManager] Đã cập nhật CODE và QUÀ lên Appwrite, mã: ", code)
+		if on_done.is_valid():
+			on_done.call(code == 200 or code == 201)
+	)
+
+	http.request(url, headers, HTTPClient.METHOD_PATCH, patch_body)
+
+
 
 func reset_to_defaults() -> void:
 	current_user_name = "Đại Tướng Quân"
@@ -716,6 +1102,9 @@ func reset_to_defaults() -> void:
 	onboarding_completed = false
 	pending_exp_gain.clear()
 	daily_quests_data.clear()
+	redeemed_codes.clear()
+	claimed_mails.clear()
+	deleted_mails.clear()
 	save_session()
 
 # --- Authentication Logic ---
@@ -859,6 +1248,7 @@ func _handle_login_response(result: int, response_code: int, headers: PackedStri
 				reset_to_defaults()
 
 			current_user_id = new_uid
+			_load_local_user_mailbox()
 			session_secret = data.get("secret", "")
 			current_user_email = fallback_email
 			is_logged_in = true
@@ -1028,11 +1418,17 @@ func save_session() -> void:
 			"hasPlayedBefore": has_played_before,
 			"dailyQuestsData": daily_quests_data,
 			"labels": Array(current_user_labels),
-			"onboardingComplete": (onboarding_completed or tutorial_reward_claimed)
+			"onboardingComplete": (onboarding_completed or tutorial_reward_claimed),
+			"redeemedCodes": redeemed_codes,
+			"claimedMails": claimed_mails,
+			"deletedMails": deleted_mails,
+			"adminGiftCode": admin_gift_code,
+			"adminGiftReward": admin_gift_reward
 		}
 		if current_user_email != "":
 			data["onboarding_" + current_user_email] = 2 if (onboarding_completed or tutorial_reward_claimed) else 0
 		file.store_string(JSON.stringify(data))
+	_save_local_user_mailbox()
 
 func should_show_onboarding() -> bool:
 	if current_user_email == "": return false
@@ -1123,6 +1519,23 @@ func load_saved_session() -> void:
 						onboarding_completed = true
 					if session_secret != "" or session_cookie != "" or fallback_cookies != "":
 						is_logged_in = true
+					var saved_rc = data.get("redeemedCodes", [])
+					if saved_rc is Array:
+						redeemed_codes.clear()
+						for rc in saved_rc:
+							redeemed_codes.append(str(rc))
+					admin_gift_code = str(data.get("adminGiftCode", admin_gift_code))
+					admin_gift_reward = str(data.get("adminGiftReward", admin_gift_reward))
+					var saved_claimed_m = data.get("claimedMails", [])
+					if saved_claimed_m is Array:
+						for cm in saved_claimed_m:
+							if not claimed_mails.has(str(cm)):
+								claimed_mails.append(str(cm))
+					var saved_del_m = data.get("deletedMails", [])
+					if saved_del_m is Array:
+						for dm in saved_del_m:
+							if not deleted_mails.has(str(dm)):
+								deleted_mails.append(str(dm))
 
 	if current_user_id == "":
 		current_user_id = "u_" + str(Time.get_unix_time_from_system()).replace(".", "") + "_" + str(randi() % 10000)
@@ -1130,6 +1543,7 @@ func load_saved_session() -> void:
 	if current_user_name == "":
 		current_user_name = "Đại Tướng Quân"
 		save_session()
+	_load_local_user_mailbox()
 
 func _sanitize_daily_quests_data() -> void:
 	if not (daily_quests_data is Dictionary) or daily_quests_data.is_empty():
