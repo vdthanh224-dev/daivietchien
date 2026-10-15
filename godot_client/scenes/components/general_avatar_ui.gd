@@ -75,6 +75,11 @@ var defeated_overlay: ColorRect = null
 var defeated_label: Label = null
 var is_defeated: bool = false
 var distance_label: Label = null
+var bottom_info_container: VBoxContainer = null
+var player_name_label: Label = null
+var player_name: String = ""
+var is_self_player: bool = false
+var is_ally_player: bool = false
 var near_death_tween: Tween = null
 var near_death_halo: ReferenceRect = null
 var skill_buttons: Array[Button] = []
@@ -132,24 +137,49 @@ func _ready() -> void:
 	_build_depth_rim()
 
 func _build_distance_label() -> void:
+	if is_instance_valid(bottom_info_container):
+		return
+
+	bottom_info_container = VBoxContainer.new()
+	bottom_info_container.name = "BottomInfoContainer"
+	bottom_info_container.anchor_left = 0.5
+	bottom_info_container.anchor_right = 0.5
+	bottom_info_container.anchor_top = 1.0
+	bottom_info_container.anchor_bottom = 1.0
+	bottom_info_container.offset_left = -90
+	bottom_info_container.offset_right = 90
+	bottom_info_container.offset_top = 3
+	bottom_info_container.offset_bottom = 48
+	bottom_info_container.alignment = BoxContainer.ALIGNMENT_BEGIN
+	bottom_info_container.add_theme_constant_override("separation", 1)
+	bottom_info_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bottom_info_container.z_index = 30
+	add_child(bottom_info_container)
+
 	distance_label = Label.new()
 	distance_label.name = "DistanceLabel"
-	distance_label.anchor_left = 0.5
-	distance_label.anchor_right = 0.5
-	distance_label.anchor_top = 1.0
-	distance_label.anchor_bottom = 1.0
-	distance_label.offset_left = -78
-	distance_label.offset_right = 78
-	distance_label.offset_top = 3
-	distance_label.offset_bottom = 22
 	distance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	distance_label.add_theme_font_size_override("font_size", 11)
-	distance_label.add_theme_color_override("font_color", Color(0.9, 0.84, 0.55, 1.0))
+	distance_label.add_theme_color_override("font_color", Color(0.92, 0.84, 0.55, 1.0))
 	distance_label.add_theme_color_override("font_outline_color", Color(0.03, 0.04, 0.08, 1.0))
 	distance_label.add_theme_constant_override("outline_size", 3)
-	distance_label.mouse_filter = MOUSE_FILTER_IGNORE
-	distance_label.z_index = 30
-	add_child(distance_label)
+	distance_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	distance_label.visible = false
+	bottom_info_container.add_child(distance_label)
+
+	player_name_label = Label.new()
+	player_name_label.name = "PlayerNameLabel"
+	player_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	player_name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	player_name_label.clip_text = true
+	player_name_label.custom_minimum_size = Vector2(180, 0)
+	player_name_label.add_theme_font_size_override("font_size", 11)
+	player_name_label.add_theme_color_override("font_color", Color(0.95, 0.92, 0.85, 1.0))
+	player_name_label.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.06, 1.0))
+	player_name_label.add_theme_constant_override("outline_size", 3)
+	player_name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	player_name_label.visible = false
+	bottom_info_container.add_child(player_name_label)
 
 func set_distance_label(distance: int) -> void:
 	if displayed_distance == distance:
@@ -158,6 +188,31 @@ func set_distance_label(distance: int) -> void:
 	if distance_label:
 		distance_label.visible = distance > 0
 		distance_label.text = "Khoảng cách: %d" % distance if distance > 0 else ""
+
+func set_player_name(p_name: String, is_self: bool = false, is_ally: bool = false) -> void:
+	player_name = p_name.strip_edges()
+	is_self_player = is_self
+	is_ally_player = is_ally
+	if not is_instance_valid(player_name_label):
+		return
+	if player_name.is_empty():
+		player_name_label.visible = false
+		player_name_label.text = ""
+		return
+
+	player_name_label.visible = true
+	if is_self:
+		if not player_name.ends_with("(Bạn)") and player_name != "Bạn" and player_name != "Tôi":
+			player_name_label.text = "%s (Bạn)" % player_name
+		else:
+			player_name_label.text = player_name
+		player_name_label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.55, 1.0))
+	elif is_ally:
+		player_name_label.text = player_name
+		player_name_label.add_theme_color_override("font_color", Color(0.65, 0.90, 1.0, 1.0))
+	else:
+		player_name_label.text = player_name
+		player_name_label.add_theme_color_override("font_color", Color(0.95, 0.88, 0.85, 1.0))
 
 func _build_depth_rim() -> void:
 	var light_rim = Panel.new()
@@ -1402,7 +1457,7 @@ func _display_next_skill_banner() -> void:
 		call_deferred("_display_next_skill_banner")
 	)
 
-func setup_general(p_id: String, p_name: String, p_faction: String = "Trần", p_hp: int = 4, p_max_hp: int = 4, p_role: String = "", p_seat: int = 0) -> void:
+func setup_general(p_id: String, p_name: String, p_faction: String = "Trần", p_hp: int = 4, p_max_hp: int = 4, p_role: String = "", p_seat: int = 0, p_player_name: String = "", p_is_self: bool = false, p_is_ally: bool = false) -> void:
 	general_id = p_id
 	_refresh_mount_labels()
 	if is_instance_valid(name_label):
@@ -1459,6 +1514,8 @@ func setup_general(p_id: String, p_name: String, p_faction: String = "Trần", p
 
 	update_hp(current_hp, max_hp, true)
 	update_hand_count(hand_count)
+	if not p_player_name.is_empty():
+		set_player_name(p_player_name, p_is_self, p_is_ally)
 
 const LOTUS_FULL_TEX = preload("res://assets/ui/lotus_full.png")
 const LOTUS_EMPTY_TEX = preload("res://assets/ui/lotus_empty.png")

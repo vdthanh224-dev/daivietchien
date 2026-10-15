@@ -1872,8 +1872,19 @@ func _init_generals_from_draft() -> void:
 		var role_code := str(slot_data.get("role", ""))
 		var role_str = ("VƯƠNG" if role_code == "KING" else "?") if is_dynasty else ("RỒNG" if is_drag else "PHƯỢNG")
 
+		var slot_user_name := str(slot_data.get("userName", "")).strip_edges()
+		if is_p:
+			if slot_user_name.is_empty():
+				slot_user_name = my_name
+			if slot_user_name.is_empty():
+				slot_user_name = "Bạn"
+		else:
+			if slot_user_name.is_empty():
+				slot_user_name = "Chiến Tướng %d" % s_num
+		var is_ally: bool = (is_drag == my_team_is_dragon) if not is_dynasty else false
+
 		var avatar_node = seat_to_avatar[s_num]
-		avatar_node.setup_general(slug, h_name, h_faction, h_hp, h_hp, role_str, s_num)
+		avatar_node.setup_general(slug, h_name, h_faction, h_hp, h_hp, role_str, s_num, slot_user_name, is_p, is_ally)
 
 		# Explicitly verify portrait texture
 		var trans_path = "res://assets/heroes_transparent/" + slug + ".png"
@@ -1901,9 +1912,10 @@ func _init_generals_from_draft() -> void:
 			"isAI": is_ai,
 			"isDragon": is_drag,
 			"role": role_code,
-				"name": h_name,
-				"hero_id": int(hero_info.get("id", s_num)),
-				"faction": h_faction,
+			"name": h_name,
+			"player_name": slot_user_name,
+			"hero_id": int(hero_info.get("id", s_num)),
+			"faction": h_faction,
 			"hp": h_hp,
 			"max_hp": h_hp,
 			"hand_count": 0,
@@ -6264,6 +6276,12 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
 			if g["avatar_node"].has_method("set_ai_takeover"):
 				g["avatar_node"].set_ai_takeover(p_is_takeover)
+		var p_user_name := str(p.get("userName", "")).strip_edges()
+		if not p_user_name.is_empty() and g.get("player_name", "") != p_user_name:
+			g["player_name"] = p_user_name
+			if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
+				var is_ally = g.get("isDragon", false) == my_team_is_dragon
+				g["avatar_node"].set_player_name(p_user_name, seat == my_seat, is_ally)
 		if seat == my_seat and not p_is_takeover:
 			_show_reconnect_banner(false)
 		g["che_no_active"] = _is_server_skill_active(p, "Chế Nỏ")

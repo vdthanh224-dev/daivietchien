@@ -57,13 +57,15 @@ func _ready() -> void:
 	AudioManager.play_bgm("bgm_battle")
 
 	# 1. Khởi tạo Tướng Lý Thường Kiệt (Người chơi - Góc dưới phải)
-	player_avatar.setup_general("ly_thuong_kiet", "Lý Thường Kiệt", "Khác", 4, 4, "BẠN")
+	var my_tut_name = AuthManager.current_user_name if AuthManager and not AuthManager.current_user_name.is_empty() else "Bạn"
+	player_avatar.setup_general("ly_thuong_kiet", "Lý Thường Kiệt", "Khác", 4, 4, "BẠN", 1, my_tut_name, true, true)
 	player_avatar.set_skill("⚡ TIẾN THOÁI")
 	player_avatar.skill_clicked.connect(_on_player_skill_clicked)
 	player_avatar.info_clicked.connect(func(): _show_general_info_modal("player"))
 
 	# 2. Khởi tạo Tướng Thủ Lĩnh Sơn Tặc (Boss - Trên cùng giữa)
-	boss_avatar.setup_general("thu_linh_son_tac", "Thủ Lĩnh Sơn Tặc", "Sơn Tặc", 3, 3, "ĐỐI THỦ")
+	boss_avatar.setup_general("thu_linh_son_tac", "Thủ Lĩnh Sơn Tặc", "Sơn Tặc", 3, 3, "ĐỐI THỦ", 2, "Sơn Tặc (AI)", false, false)
+	boss_avatar.set_distance_label(1)
 	boss_avatar.clicked.connect(_on_boss_avatar_clicked)
 	boss_avatar.info_clicked.connect(func(): _show_general_info_modal("boss"))
 

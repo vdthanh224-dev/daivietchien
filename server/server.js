@@ -1176,6 +1176,7 @@ function finishDraftAndStartBattle(roomId, room) {
   const battlePlayers = draft.slots.map((slot) => ({
     seat: slot.seat,
     userId: slot.userId,
+    userName: slot.userName || "",
     heroId: `HERO_${slot.heroId}`,
     generalName: slot.heroName || getHeroName(slot.heroId),
     maxHp: slot.maxHp,

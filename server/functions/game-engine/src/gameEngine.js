@@ -10085,6 +10085,7 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
     players: state.players.map(p => ({
       seat: p.seat,
       userId: p.userId,
+      userName: p.userName || "",
       heroId: p.heroId,
       generalName: p.generalName,
       maxHp: p.maxHp,
