@@ -1,12 +1,12 @@
-res://resources/themes/royal_gold_theme.tres::cdf26b75bafd18f180a59ea4bc781aa9::1791130245::res://.godot/exported/133200997/export-eb2e1ce05653a091bfe287d8f4f30f96-royal_gold_theme.res
+res://resources/themes/royal_gold_theme.tres::e54bdb752f9ca49353a884bfc6656fbd::1792086844::res://.godot/exported/133200997/export-eb2e1ce05653a091bfe287d8f4f30f96-royal_gold_theme.res
 res://scenes/components/card_ui.tscn::bdff8722f4089298488c621c5d124f7d::1790524400::res://.godot/exported/133200997/export-27d4b7b2aa6270487128cd8112dace11-card_ui.scn
-res://scenes/components/general_avatar_ui.tscn::85083b9c171b3777a1067ef3116d9817::1790934376::res://.godot/exported/133200997/export-cd0fbfbb2ae7488ddf541c820f30a0aa-general_avatar_ui.scn
+res://scenes/components/general_avatar_ui.tscn::d5baa82165929c3bcb8d2b112e855014::1792061079::res://.godot/exported/133200997/export-cd0fbfbb2ae7488ddf541c820f30a0aa-general_avatar_ui.scn
 res://scenes/components/general_seat_ui.tscn::e6454ed85f16d85153144f823eac5fc0::1788448590::res://.godot/exported/133200997/export-86b4c7d10a32963a107e2b6939e921a1-general_seat_ui.scn
 res://scenes/components/onboarding_modal.tscn::54233708eeb025605f2f737c6eead14d::1791388137::res://.godot/exported/133200997/export-e46582d6cd0152277318ae71e323bc52-onboarding_modal.scn
-res://scenes/auth_login.tscn::5a5a190bc1b72eff3f09609c593fe89b::1791130518::res://.godot/exported/133200997/export-3cc290d537fcfaff59e86ab751377281-auth_login.scn
+res://scenes/auth_login.tscn::e4f3d7beacff62e63fa2aed86bdbc8d1::1792061151::res://.godot/exported/133200997/export-3cc290d537fcfaff59e86ab751377281-auth_login.scn
 res://scenes/main_game.tscn::eba291466027b0572fc8a63859039e26::1788504906::res://.godot/exported/133200997/export-3a689a07f84009fde038ac878f1ae44a-main_game.scn
-res://scenes/tutorial_battle.tscn::9637052f7d7478b6f15f1cae10f404bd::1791388137::res://.godot/exported/133200997/export-a605e91f3f7f790dfe2a7abdea98251b-tutorial_battle.scn
-res://scenes/battle_2v2.tscn::f85eda7ee9b6f1327bf3059df4c89f90::1791388137::res://.godot/exported/133200997/export-0a6e6f1ff6783ef85fea46085548102d-battle_2v2.scn
+res://scenes/tutorial_battle.tscn::6b380aa4ca540fa6a525a4a72dfb9ba2::1792061960::res://.godot/exported/133200997/export-a605e91f3f7f790dfe2a7abdea98251b-tutorial_battle.scn
+res://scenes/battle_2v2.tscn::396e5645140916d0c1fbe42dea3e2400::1792061960::res://.godot/exported/133200997/export-0a6e6f1ff6783ef85fea46085548102d-battle_2v2.scn
 res://scenes/hero_select.tscn::8eaadd0451746afcc8f50af44c8c9eee::1788491761::res://.godot/exported/133200997/export-7c99ffce561b92a25de1c27feca32ae7-hero_select.scn
 res://scenes/home.tscn::ca405e649a6e06f28a6b297ac77ebb33::1788481939::res://.godot/exported/133200997/export-faa7347222d3a64766e63b75d2ad9c6a-home.scn
 res://resources/themes/app_font.tres::62621f13adf02cd0619b6c4c0b9f8502::1791130206::res://.godot/exported/133200997/export-1760e606875a2cfe044a0aa766b4f0c3-app_font.res

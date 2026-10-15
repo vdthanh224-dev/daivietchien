@@ -45,6 +45,7 @@ var daily_quests_data: Dictionary = {}
 var disable_session_save: bool = false
 var redeemed_codes: Array = []
 var claimed_mails: Array = []
+var claimed_match_rewards: Dictionary = {}
 var deleted_mails: Array = []
 var admin_gift_code: String = "DAIVIETCHIEN"
 var admin_gift_reward: String = "5 vé quay tướng"
@@ -241,6 +242,44 @@ const SEVEN_DAY_REWARDS = [
 	{"day": 7, "tickets": 7, "silver": 7000, "title": "Đại Định Giang Sơn (Thần Thưởng)"},
 ]
 
+# --- 7-Day Login Rewards (Đảm bảo đúng 7 ngày đầu, không quay vòng, độc lập theo nick) ---
+func _get_user_checkin_file(uid: String = "") -> String:
+	if uid == "":
+		uid = current_user_id
+	if uid == "":
+		return "user://checkin_guest.json"
+	var clean_uid = uid.replace("/", "_").replace("\\", "_").replace(":", "_").replace("@", "_")
+	return "user://checkin_%s.json" % clean_uid
+
+func _load_local_user_checkin() -> void:
+	if current_user_id == "":
+		return
+	var path = _get_user_checkin_file(current_user_id)
+	if FileAccess.file_exists(path):
+		var file = FileAccess.open(path, FileAccess.READ)
+		if file:
+			var parsed = JSON.parse_string(file.get_as_text())
+			if parsed is Dictionary:
+				if parsed.has("claimed") and parsed["claimed"] is Array:
+					for d in parsed["claimed"]:
+						var d_int = int(d)
+						if d_int >= 1 and d_int <= 7 and not checkin_7day_claimed.has(d_int):
+							checkin_7day_claimed.append(d_int)
+				if parsed.has("last_date") and last_checkin_date == "":
+					last_checkin_date = str(parsed["last_date"])
+
+func _save_local_user_checkin() -> void:
+	if current_user_id == "":
+		return
+	var path = _get_user_checkin_file(current_user_id)
+	var file = FileAccess.open(path, FileAccess.WRITE)
+	if file:
+		file.store_string(JSON.stringify({
+			"userId": current_user_id,
+			"claimed": checkin_7day_claimed,
+			"last_date": last_checkin_date
+		}))
+
 func is_checkin_day_claimed(day_num: int) -> bool:
 	return checkin_7day_claimed.has(day_num)
 
@@ -248,33 +287,67 @@ func can_claim_checkin_today() -> bool:
 	var today = Time.get_date_string_from_system()
 	if last_checkin_date == today:
 		return false
+	# Đủ 7 ngày là xong, không có ngày thứ 8 và không bao giờ lặp lại
 	return checkin_7day_claimed.size() < 7
 
 func get_next_checkin_day() -> int:
 	return clampi(checkin_7day_claimed.size() + 1, 1, 7)
 
 func claim_7day_reward(day_num: int) -> Dictionary:
+	# 1. Giới hạn nghiêm ngặt chỉ từ ngày 1 đến ngày 7
+	if day_num < 1 or day_num > 7:
+		print("[AuthManager] Ngày điểm danh không hợp lệ: ", day_num)
+		return {"success": false, "message": "Chỉ có quà điểm danh từ ngày 1 đến ngày 7!"}
+
+	# 2. Đã nhận đủ 7 ngày thì hoàn tất vĩnh viễn cho nick này, tuyệt đối không lặp lại vòng mới
+	if checkin_7day_claimed.size() >= 7:
+		print("[AuthManager] Nick này đã hoàn thành trọn vẹn 7 ngày điểm danh tân thủ!")
+		return {"success": false, "message": "Đã hoàn thành toàn bộ 7 ngày điểm danh tân thủ!"}
+
+	# 3. Ngày này đã nhận rồi thì không cho nhận lại
+	if checkin_7day_claimed.has(day_num):
+		print("[AuthManager] Phần thưởng ngày %d đã nhận rồi!" % day_num)
+		return {"success": false, "message": "Phần thưởng ngày này đã được nhận trước đó!"}
+
+	# 4. Bắt buộc nhận tuần tự theo ngày tiếp theo (không nhảy ngày)
+	var expected_day = get_next_checkin_day()
+	if day_num != expected_day:
+		print("[AuthManager] Chưa tới lượt nhận ngày %d, lượt tiếp theo là ngày %d" % [day_num, expected_day])
+		return {"success": false, "message": "Chưa đến lượt nhận quà ngày này!"}
+
+	# 5. Mỗi ngày thực tế chỉ điểm danh 1 lần
+	var today = Time.get_date_string_from_system()
+	if last_checkin_date == today:
+		print("[AuthManager] Hôm nay đã điểm danh rồi!")
+		return {"success": false, "message": "Hôm nay Đại Tướng Quân đã điểm danh rồi!"}
+
+	# Hợp lệ -> Thêm vào danh sách và cộng thưởng
+	checkin_7day_claimed.append(day_num)
+	last_checkin_date = today
+
 	var tickets = day_num
 	var silver = day_num * 1000
-	if not checkin_7day_claimed.has(day_num):
-		checkin_7day_claimed.append(day_num)
-	last_checkin_date = Time.get_date_string_from_system()
 	current_hero_tickets += tickets
 	current_silver += silver
+
+	_save_local_user_checkin()
 	save_session()
 	save_profile_to_appwrite()
 	profile_updated.emit()
-	return {"day": day_num, "tickets": tickets, "silver": silver}
+	print("[AuthManager] Điểm danh thành công Ngày %d! (+%d Vé, +%d Bạc) Tiến trình: %d/7" % [day_num, tickets, silver, checkin_7day_claimed.size()])
+	return {"success": true, "day": day_num, "tickets": tickets, "silver": silver}
 
 func dev_reset_7day_checkin() -> void:
 	checkin_7day_claimed.clear()
 	last_checkin_date = ""
+	_save_local_user_checkin()
 	save_session()
 	save_profile_to_appwrite()
 	profile_updated.emit()
 
 func dev_advance_checkin_day() -> void:
 	last_checkin_date = ""
+	_save_local_user_checkin()
 	save_session()
 	profile_updated.emit()
 
@@ -605,6 +678,8 @@ func fetch_profile_from_appwrite(on_completed: Callable = Callable()) -> void:
 									deleted_mails.append(str(item))
 					_load_local_user_mailbox()
 					_save_local_user_mailbox()
+					_load_local_user_checkin()
+					_save_local_user_checkin()
 					if data.has("code"):
 						admin_gift_code = str(data["code"])
 					if data.has("gift"):
@@ -1104,6 +1179,7 @@ func reset_to_defaults() -> void:
 	daily_quests_data.clear()
 	redeemed_codes.clear()
 	claimed_mails.clear()
+	claimed_match_rewards.clear()
 	deleted_mails.clear()
 	save_session()
 
@@ -1249,6 +1325,7 @@ func _handle_login_response(result: int, response_code: int, headers: PackedStri
 
 			current_user_id = new_uid
 			_load_local_user_mailbox()
+			_load_local_user_checkin()
 			session_secret = data.get("secret", "")
 			current_user_email = fallback_email
 			is_logged_in = true
@@ -1379,12 +1456,43 @@ func get_save_path() -> String:
 		for arg in all_args:
 			if arg.begins_with("--seat=") or arg.begins_with("--tester="):
 				var val = arg.split("=")[1].to_int()
-				if val >= 1 and val <= 4:
+				if val >= 1 and val <= 8:
 					inst = val
 					break
 	if inst > 1:
 		return "user://auth_session_%d.json" % inst
 	return "user://auth_session.json"
+
+func claim_match_reward(result: Dictionary, mode_id: String, stake_recorded: bool = false, stake_amount: int = 0) -> bool:
+	var match_id := str(result.get("matchId", ""))
+	if match_id.is_empty() or claimed_match_rewards.has(match_id):
+		return false
+	var is_win := bool(result.get("isWinner", false))
+	claimed_match_rewards[match_id] = true
+	current_silver += 150 if is_win else 75
+	if is_win:
+		current_wins += 1
+	else:
+		current_losses += 1
+	if mode_id == "2v2":
+		var star_delta := RankSystem.WIN_STARS if is_win else RankSystem.LOSE_STARS
+		if stake_recorded:
+			star_delta = RankSystem.WIN_STARS + stake_amount if is_win else 0
+		var rank_result = RankSystem.process_match_result_adjusted(is_win, current_2v2_rank_index, current_2v2_stars,
+			current_2v2_accumulation_points, star_delta,
+			RankSystem.WIN_ACCUMULATION_POINTS if is_win else RankSystem.LOSE_ACCUMULATION_POINTS)
+		current_2v2_rank_index = rank_result.rank_index
+		current_2v2_stars = rank_result.stars
+		current_2v2_accumulation_points = rank_result.accumulation_points
+		current_2v2_entry_stake_room_id = ""
+		current_2v2_entry_stake_amount = 0
+	if DailyQuestSystem:
+		DailyQuestSystem.record_progress("battle", 1)
+		if is_win:
+			DailyQuestSystem.record_progress("win", 1)
+	# add_exp saves the complete updated profile and the claim marker together.
+	add_exp(20 if is_win else 12)
+	return true
 
 func save_session() -> void:
 	if disable_session_save:
@@ -1421,6 +1529,7 @@ func save_session() -> void:
 			"onboardingComplete": (onboarding_completed or tutorial_reward_claimed),
 			"redeemedCodes": redeemed_codes,
 			"claimedMails": claimed_mails,
+			"claimedMatchRewards": claimed_match_rewards,
 			"deletedMails": deleted_mails,
 			"adminGiftCode": admin_gift_code,
 			"adminGiftReward": admin_gift_reward
@@ -1429,6 +1538,7 @@ func save_session() -> void:
 			data["onboarding_" + current_user_email] = 2 if (onboarding_completed or tutorial_reward_claimed) else 0
 		file.store_string(JSON.stringify(data))
 	_save_local_user_mailbox()
+	_save_local_user_checkin()
 
 func should_show_onboarding() -> bool:
 	if current_user_email == "": return false
@@ -1503,6 +1613,8 @@ func load_saved_session() -> void:
 					current_2v2_accumulation_points = int(data.get("rank2v2AccPoints", 0))
 					current_wins = max(0, int(data.get("wins", 0)))
 					current_losses = max(0, int(data.get("losses", 0)))
+					var saved_match_rewards = data.get("claimedMatchRewards", {})
+					claimed_match_rewards = saved_match_rewards if saved_match_rewards is Dictionary else {}
 					tutorial_reward_claimed = bool(data.get("tutorialRewardClaimed", false))
 					has_played_before = bool(data.get("hasPlayedBefore", data.get("tutorialCompleted", false)))
 					var saved_labels = data.get("labels", [])
@@ -1544,6 +1656,7 @@ func load_saved_session() -> void:
 		current_user_name = "Đại Tướng Quân"
 		save_session()
 	_load_local_user_mailbox()
+	_load_local_user_checkin()
 
 func _sanitize_daily_quests_data() -> void:
 	if not (daily_quests_data is Dictionary) or daily_quests_data.is_empty():

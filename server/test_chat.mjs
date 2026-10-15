@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
+import { createAppwriteChatFixture } from "./test_helpers/appwrite_chat_fixture.mjs";
 
 // Run the actual Render WebSocket handlers with isolated connections and no network.
 const modules = [];
@@ -12,13 +13,14 @@ for (const [statement, names, path] of [...source.matchAll(/^import\s+\{([\s\S]*
 let handler;
 const errors = [];
 let testNow = Date.now();
+const chatDb = createAppwriteChatFixture();
 class TestDate extends Date { static now() { return testNow; } }
 const sandbox = {
   modules, URL, Response, TextEncoder, structuredClone, crypto, Date: TestDate,
   console: { log() {}, warn() {}, error: (...args) => errors.push(args.join(" ")) },
   WebSocket: { OPEN: 1, CLOSED: 3 },
   setInterval() {}, setTimeout() {}, clearInterval() {}, clearTimeout() {},
-  async fetch() { return new Response(JSON.stringify({ documents: [] }), { status: 200 }); },
+  fetch: chatDb.request,
   Deno: {
     env: { get() {} },
     serve(_options, callback) { handler = callback; },

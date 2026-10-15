@@ -123,7 +123,8 @@ function createTestState() {
   state.turnSeat = 1;
   state.slashesUsedThisTurn = 1; // Already slashed, so extra slash or non-essential black card will be cycled
   p1.hand = [
-    { id: "AI_BLACK_DODGE", name: "Đỡ", suit: "Spade", rank: 2, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE }
+    { id: "AI_BLACK_DODGE", name: "Đỡ", suit: "Spade", rank: 2, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE },
+    { id: "AI_SPENT_SLASH", name: "Trảm", suit: "Spade", rank: 4, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }
   ];
   state._deck = [
     { id: "AI_NEW_CARD", name: "Lá Mới", suit: "Heart", rank: 9, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH }
@@ -133,6 +134,7 @@ function createTestState() {
   assert.equal(aiStep.success, true);
   assert.equal(state.lastAction.type, "CO_BIEN_TRIGGERED");
   assert.equal(p1.hand.some(c => c.id === "AI_NEW_CARD"), true);
+  assert.equal(p1.hand.some(c => c.id === "AI_BLACK_DODGE"), true, "AI giữ lá Đỡ cuối cùng khi đổi bài");
   console.log("✅ AI Cao Lỗ: Tự động dùng Cơ Biến chu chuyển bài Đen thành công");
 }
 

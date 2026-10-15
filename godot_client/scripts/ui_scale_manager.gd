@@ -1,23 +1,9 @@
 extends Node
 
-## UIScaleManager - Quản lý tự động tỉ lệ chữ và giao diện (Adaptive UI & Font Scale)
-## Tự động phát hiện môi trường Mobile (Android/iOS) hoặc màn hình mật độ DPI cao
-## để nhân tỉ lệ font chữ giúp dễ đọc trên điện thoại (như Redmi 12) mà không làm vỡ layout.
-
-signal scale_changed(new_scale: float)
-
-const SETTINGS_FILE: String = "user://ui_settings.cfg"
-const SETTINGS_SECTION: String = "display"
-const SETTINGS_KEY: String = "ui_scale"
-
-# Các mức tỉ lệ chuẩn
-const SCALE_PC: float = 1.0             # 100% (Mặc định máy tính)
-const SCALE_MOBILE_MEDIUM: float = 1.25 # 125% (Mobile vừa)
-const SCALE_MOBILE_LARGE: float = 1.35  # 135% (Mặc định Mobile - Chữ lớn dễ đọc)
-const SCALE_MOBILE_NORMAL: float = 1.35 # 135% (Mặc định Mobile chuẩn theo yêu cầu)
-
-# Tỉ lệ hiện tại
-var current_scale: float = 1.0
+## Dùng giao diện Mobile 135% ngay từ lúc khởi động trên mọi thiết bị.
+## Không đọc lựa chọn scale cũ để các bản cài đặt trước cũng nhận mặc định này.
+const DEFAULT_SCALE: float = 1.35
+var current_scale: float = DEFAULT_SCALE
 
 # Sàn cỡ chữ tối thiểu trên thiết bị di động (tránh các cỡ chữ 8, 9, 10px quá nhỏ)
 const MIN_FONT_SIZE_MOBILE: int = 12
@@ -49,41 +35,12 @@ func is_mobile_device() -> bool:
 		return true
 	return false
 
-## Kiểm tra chế độ Mobile (thiết bị di động hoặc người dùng đang chọn scale > 1.0)
+## Bố cục Mobile được dùng cùng mức chữ mặc định 135%.
 func is_mobile_mode() -> bool:
 	return is_mobile_device() or current_scale > 1.0
 
-## Khởi tạo giá trị tỉ lệ từ file cấu hình người dùng hoặc tự động nhận diện
 func _init_scale() -> void:
-	var saved_scale = _load_saved_scale()
-	if is_mobile_device():
-		# Mobile mặc định là chữ lớn 135% (1.35).
-		# Nếu chưa có cấu hình hoặc đang lưu mức cũ 1.25, tự động nâng lên 1.35
-		if saved_scale <= 0.0 or is_equal_approx(saved_scale, 1.25):
-			current_scale = SCALE_MOBILE_LARGE
-			_save_scale(current_scale)
-		else:
-			current_scale = saved_scale
-	else:
-		if saved_scale > 0.0:
-			current_scale = saved_scale
-		else:
-			current_scale = SCALE_PC
-
-func _load_saved_scale() -> float:
-	if not FileAccess.file_exists(SETTINGS_FILE):
-		return -1.0
-	var config = ConfigFile.new()
-	var err = config.load(SETTINGS_FILE)
-	if err == OK:
-		return float(config.get_value(SETTINGS_SECTION, SETTINGS_KEY, -1.0))
-	return -1.0
-
-func _save_scale(scale_val: float) -> void:
-	var config = ConfigFile.new()
-	var _err = config.load(SETTINGS_FILE)
-	config.set_value(SETTINGS_SECTION, SETTINGS_KEY, scale_val)
-	config.save(SETTINGS_FILE)
+	current_scale = DEFAULT_SCALE
 
 ## Hàm tính cỡ chữ theo tỉ lệ hiện tại
 func scale_font(base_size: int) -> int:
@@ -101,16 +58,30 @@ func scale_node_font(ctrl: Control, base_size: int, property_name: String = "fon
 	ctrl.set_meta("_base_" + property_name, base_size)
 	ctrl.add_theme_font_size_override(property_name, scale_font(base_size))
 
-## Đổi tỉ lệ và cập nhật toàn bộ cây giao diện ngay lập tức
-func set_scale_factor(new_scale: float) -> void:
-	if is_equal_approx(current_scale, new_scale):
-		return
-	current_scale = new_scale
-	_save_scale(new_scale)
-	_apply_theme_scale()
-	_apply_scale_to_subtree(get_tree().root)
-	scale_changed.emit(current_scale)
-	print("[UIScaleManager] Đã áp dụng tỉ lệ UI mới: %.0f%%" % (current_scale * 100.0))
+## Cache StyleBoxEmpty dùng chung tránh cấp phát bộ nhớ nhiều lần
+var _shared_empty_stylebox: StyleBoxEmpty = null
+
+func get_empty_stylebox() -> StyleBoxEmpty:
+	if _shared_empty_stylebox == null:
+		_shared_empty_stylebox = StyleBoxEmpty.new()
+	return _shared_empty_stylebox
+
+## Hàm dùng chung toàn cục để thiết lập bất kỳ Button nào (nút overlay thẻ tướng, nút rương quà, nút flat...)
+## khi click hoặc ở trạng thái đang chọn (focus/pressed) KHÔNG BAO GIỜ bị đổi màu trắng hoặc phủ viền trắng.
+func style_transparent_button(btn: Button, keep_pointer_cursor: bool = true) -> Button:
+	if not is_instance_valid(btn):
+		return btn
+	btn.flat = true
+	btn.focus_mode = Control.FOCUS_NONE
+	if keep_pointer_cursor:
+		btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var empty_sb = get_empty_stylebox()
+	btn.add_theme_stylebox_override("normal", empty_sb)
+	btn.add_theme_stylebox_override("hover", empty_sb)
+	btn.add_theme_stylebox_override("pressed", empty_sb)
+	btn.add_theme_stylebox_override("focus", empty_sb)
+	btn.add_theme_stylebox_override("disabled", empty_sb)
+	return btn
 
 ## Lắng nghe khi có node mới thêm vào scene tree
 func _on_node_added(node: Node) -> void:
@@ -151,6 +122,22 @@ func _apply_scale_to_control(ctrl: Control) -> void:
 					base_size = ctrl.get_theme_font_size(prop)
 					ctrl.set_meta(meta_k, base_size)
 				ctrl.add_theme_font_size_override(prop, scale_font(base_size))
+
+	# Tự động bảo vệ tất cả các nút dạng flat trong toàn bộ game:
+	# Tắt focus và gán StyleBoxEmpty cho focus/pressed/hover để không bao giờ bị phủ trắng khi nhấp hoặc chọn
+	if ctrl is Button and ctrl.flat:
+		ctrl.focus_mode = Control.FOCUS_NONE
+		var empty_sb = get_empty_stylebox()
+		if not ctrl.has_theme_stylebox_override("focus"):
+			ctrl.add_theme_stylebox_override("focus", empty_sb)
+		if not ctrl.has_theme_stylebox_override("pressed"):
+			ctrl.add_theme_stylebox_override("pressed", empty_sb)
+		if not ctrl.has_theme_stylebox_override("hover"):
+			ctrl.add_theme_stylebox_override("hover", empty_sb)
+		if not ctrl.has_theme_stylebox_override("normal"):
+			ctrl.add_theme_stylebox_override("normal", empty_sb)
+		if not ctrl.has_theme_stylebox_override("disabled"):
+			ctrl.add_theme_stylebox_override("disabled", empty_sb)
 
 ## Đệ quy cập nhật toàn bộ subtree
 func _apply_scale_to_subtree(node: Node) -> void:

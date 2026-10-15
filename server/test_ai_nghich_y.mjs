@@ -69,7 +69,7 @@ console.log("=== Testing AI Kiều Công Tiễn (Nghịch Ý) ===");
   console.log("✅ Test 2: AI Nghịch Ý từ chối chuyển sang đồng đội và nhận đòn Trảm thành công");
 }
 
-// Test 3: AI Kiều Công Tiễn phản ứng real-time trong tickGameState (sau 1.5s) không bị kẹt game
+// Test 3: AI Kiều Công Tiễn phản ứng real-time trong tickGameState sau 2.5s
 {
   const state = initGame("test-kct-tick-realtime", [
     { seat: 1, heroId: "HERO_1", isAI: false },
@@ -86,13 +86,13 @@ console.log("=== Testing AI Kiều Công Tiễn (Nghịch Ý) ===");
   handlePlayCard(state, 1, slash.id, 2);
   assert.equal(state.phase, "AWAIT_NGHICH_Y");
 
-  // Giả lập trôi qua 2s
-  state.timerStartAt = Date.now() - 2000;
+  // Giả lập trôi qua hơn thời gian suy nghĩ 2.5s
+  state.timerStartAt = Date.now() - 2600;
   const tickRes = tickGameState(state);
   assert.equal(tickRes?.changed, true);
   assert.equal(state.phase, "AWAIT_SLASH_DEFENSE", "Game loop không bị treo, đã chuyển phase");
   assert.equal(state.waitingTargetSeat, 3);
-  console.log("✅ Test 3: tickGameState tự động phản ứng cho AI sau 1.5s không bị đơ kẹt");
+  console.log("✅ Test 3: tickGameState tự động phản ứng cho AI sau 2.5s không bị đơ kẹt");
 }
 
 // Test 4: Người chơi điều khiển Kiều Công Tiễn bị timeout (40s) được tickGameState xử lý trơn tru

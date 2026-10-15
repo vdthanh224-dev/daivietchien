@@ -2,6 +2,10 @@ import { createDeck, createDeck150, createFullDeck104, isSlash, isDodge, isPeach
 import { getHeroById, heroHasSkill, normalizeHeroId, isTwelveWarlords } from './heroes.js';
 import { cardRequiresTarget, findEquipmentByRule, firstEquipmentHook } from './cardRegistry.js';
 import { getModeRules, getModeSeatOrder, requireModeRules } from './modeRegistry.js';
+import { aiCardKeepValue, aiEquipmentValue, buildAiTurnPlans } from "./aiPolicy.js";
+
+// Give every AI-controlled action the same deliberate thinking window.
+export const AI_THINK_DELAY_MS = 2500;
 
 // Cache bộ bài chuẩn để tra cứu subType theo ID
 let _deckCache = null;
@@ -570,6 +574,7 @@ export function initGame(roomId, playersInput, modeId = "2v2") {
   const initialState = {
     version: 1,
     roomId,
+    matchId: `${roomId}:${Date.now()}`,
     modeId: modeRules.id,
     status: "PLAYING", // "PLAYING" | "FINISHED"
     turnSeat: 1,
@@ -1041,6 +1046,47 @@ function hasWeaponRange(state, fromSeat, toSeat) {
   return distance <= range + (isSucSoiActive(from) ? 1 : 0) + (Number(from.namQuocSonHaRangeBuff) || 0);
 }
 
+// Rank targets using the current board instead of taking the first living seat.
+// This keeps AI decisions useful in both team and dynasty games.
+function aiTargetScore(state, ai, target, purpose = "attack") {
+  if (!ai || !target || !isLivingPlayer(target) || areTeammatesInState(state, ai.seat, target.seat)) return -Infinity;
+  let score = 0;
+  const missingHp = Math.max(0, (Number(target.maxHp) || 4) - (Number(target.hp) || 0));
+  const handSize = (target.hand || []).length;
+  const equipmentCount = (target.equipments || []).length;
+  const judgementCount = (target.judgements || []).length;
+
+  if (target.hp <= 1) score += 1000;
+  score += missingHp * 45;
+  score += equipmentCount * (purpose === "disrupt" ? 55 : 18);
+  score += Math.min(handSize, 5) * (purpose === "disrupt" ? 24 : 5);
+  score += judgementCount * (purpose === "disrupt" ? 45 : 10);
+  score -= Math.max(0, getDistance(state, ai.seat, target.seat) - 1) * 12;
+
+  if (String(state.modeId || "").startsWith("dynasty_")) {
+    if (ai.role === "REBEL") {
+      // Removing the king is the rebel's win condition, so it outranks a
+      // convenient low-HP target unless the king is protected by range.
+      score += target.role === "KING" ? 1800 : target.role === "SPY" ? 20 : 5;
+    } else if (ai.role === "SPY") {
+      const nonKingEnemies = state.players.filter((player) =>
+        isLivingPlayer(player) && player.seat !== ai.seat && player.role !== "KING"
+      ).length;
+      score += target.role === "KING" && nonKingEnemies > 1 ? -180 : (target.role === "KING" ? 160 : 70);
+    } else if (ai.role === "KING" || ai.role === "LOYALIST") {
+      score += target.role === "REBEL" ? 170 : target.role === "SPY" ? 145 : 0;
+    }
+  }
+  return score;
+}
+
+function selectBestAiTarget(state, ai, candidates, purpose = "attack") {
+  return (candidates || [])
+    .filter((target) => isLivingPlayer(target) && !areTeammatesInState(state, ai.seat, target.seat))
+    .map((target) => ({ target, score: aiTargetScore(state, ai, target, purpose) }))
+    .sort((left, right) => right.score - left.score || left.target.seat - right.target.seat)[0]?.target || null;
+}
+
 function hasBachDangBoat(player) {
   return !!findEquipmentByRule(player, 'thuyen_bach_dang');
 }
@@ -1389,7 +1435,7 @@ function startNextNamQuocSonHaPrompt(state) {
 
   if (owner.isAI) {
     state.namQuocSonHaQueue.shift();
-    const allies = state.players.filter(p => isLivingPlayer(p) && (p.seat === owner.seat || p.team === owner.team || (owner.isAlly && p.isAlly)));
+    const allies = state.players.filter(p => isLivingPlayer(p) && areTeammatesInState(state, owner.seat, p.seat));
     const buffed = allies.length > 0 ? allies : [owner];
     for (const p of buffed) {
       p.namQuocSonHaRangeBuff = (Number(p.namQuocSonHaRangeBuff) || 0) + 1;
@@ -2600,7 +2646,7 @@ function resolveBaiCocAction(state, continuation, nullified) {
         singleTargetScrollCasterSeat: Number(trap?.attachedBySeat) || 0
       });
       if (state.phase === "AWAIT_NGHIA_TU") state.pendingAfterUatKhi = { type: "RESET_WAITING" };
-      if (!['AWAIT_NEAR_DEATH', 'AWAIT_UAT_KHI', 'AWAIT_TRUNG_KIEN', 'AWAIT_NGHIA_TU'].includes(state.phase)) resetWaitingState(state);
+      if (state.phase === "PLAY") resetWaitingState(state);
       checkGameOver(state);
       refreshLastDelta(state);
       return { success: true, state, damageResult };
@@ -4523,7 +4569,7 @@ function continueSlashDamageAfterUatKhi(state, targetSeat, finalDamage, fallback
       }
     }
   }
-  if (state.phase !== "AWAIT_NEAR_DEATH" && state.phase !== "AWAIT_THAN_CHINH_LE_HOAN" && (!state.targetCardSelection || state.phase !== "AWAIT_TARGET_CARD")) {
+  if (state.phase === "PLAY") {
     if (!continueLienChau(state)) resetWaitingState(state);
   }
   checkGameOver(state);
@@ -4538,6 +4584,8 @@ function continueSlashDamageAfterUatKhi(state, targetSeat, finalDamage, fallback
 * KhÃ´i phá»¥c láº¡i luá»“ng game sau khi pha Háº¥p Há»“i (Near Death) káº¿t thÃºc (cá»©u sá»‘ng hoáº·c cháº¿t)
 */
 function resolveNearDeathResume(state) {
+    state.phase = "PLAY";
+    state.waitingReactionType = "NONE";
     state.waitingTargetSeat = 0;
     state.waitingTimer = 0;
     state.nearDeathAskerQueue = [];
@@ -4555,7 +4603,7 @@ function resolveNearDeathResume(state) {
 
     if (state.pendingChainSpread) {
       const chainResult = continueChainSpread(state);
-      if (state.phase === "AWAIT_NEAR_DEATH") return chainResult;
+      if (state.phase !== "PLAY") return chainResult || { success: true, state };
     }
 
     if (state.turnStart) {
@@ -4657,7 +4705,7 @@ function continueChainSpread(state) {
     });
 
     const result = applyDamageToPlayer(state, peer.seat, pending.damage, "sát thương xích lan truyền", pending.element);
-    if (result.enteredNearDeath || state.phase === "AWAIT_NGHIA_TU") {
+    if (state.phase !== "PLAY") {
       if (state.phase === "AWAIT_NGHIA_TU") state.pendingAfterUatKhi = { type: "CHAIN" };
       return { success: true, state };
     }
@@ -4682,7 +4730,7 @@ function resumeAfterUatKhi(state) {
 
   if (state.pendingChainSpread) {
     const chainResult = continueChainSpread(state);
-    if (state.phase === "AWAIT_NEAR_DEATH" || state.phase === "AWAIT_UAT_KHI") {
+    if (state.phase !== "PLAY") {
       state.pendingAfterUatKhi = pending;
       return chainResult || { success: true, state };
     }
@@ -4904,7 +4952,7 @@ function resumeNghiaTuDamage(state, pending, preventedDamage = 0) {
       pending.options
     );
   }
-  if (!["AWAIT_NEAR_DEATH", "AWAIT_UAT_KHI", "AWAIT_KHOI_BINH", "AWAIT_HUYNH_TRUONG", "AWAIT_TRUNG_KIEN"].includes(state.phase)) {
+  if (state.phase === "PLAY") {
     const resumed = resumeAfterUatKhi(state);
     if (!resumed) resetWaitingState(state);
   }
@@ -5159,8 +5207,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       description: `⚔️ <b>${respondent.generalName}</b> không ra Trảm, chịu 1 sát thương từ [Chuyên Chế]!`
     });
     applyDamageToPlayer(state, respondentSeat, 1, "Chuyên Chế", "NORMAL");
-    resetWaitingState(state);
-    state.phase = "PLAY";
+    if (state.phase === "PLAY") resetWaitingState(state);
     return { success: true, state };
   }
 
@@ -5394,8 +5441,10 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       respondent.anTichCards.push(respondent.hand.splice(index, 1)[0]);
       recordAction(state, { type: "AN_TICH_HIDDEN", casterSeat: respondentSeat, skillActivations: [{ name: "Ẩn Tích", seat: respondentSeat }], description: `🌫️ ${respondent.generalName} đặt úp 1 lá làm [Ẩn].` });
     }
+    respondent.usedSkills = respondent.usedSkills || {};
+    respondent.usedSkills.AnTichResolved = true;
     resetWaitingState(state);
-    return { success: true, state };
+    return handleEndTurn(state, respondentSeat);
   }
 
   if (state.phase === "AWAIT_CHINH_THONG_TARGET") {
@@ -5518,7 +5567,8 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     if (!accepted) {
       state.xungVuongDiscardQueue = null;
       state.xungVuongPending = null;
-      return continueTurnStart(state);
+      resetWaitingState(state);
+      return state.turnStart ? continueTurnStart(state) : { success: true, state };
     }
     const target = state.players.find((candidate) => candidate.seat === Number(cardId));
     if (!target || !isLivingPlayer(target) || target.seat === respondentSeat || pending.targets.includes(target.seat)) return { error: "Xưng Vương cần chọn người chơi khác chưa được chọn" };
@@ -5754,7 +5804,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       description: `⚔️ ${respondent.generalName} chọn nhận thêm 1 sát thương từ [Thân Chinh]!`
     });
     applyDamageToPlayer(state, respondentSeat, 1, "Thân Chinh", "NORMAL", false);
-    if (!["AWAIT_NEAR_DEATH", "AWAIT_UAT_KHI", "AWAIT_KHOI_BINH", "AWAIT_HUYNH_TRUONG", "AWAIT_TRUNG_KIEN", "AWAIT_NGHIA_TU", "AWAIT_NHIEP_CHINH"].includes(state.phase)) {
+    if (state.phase === "PLAY") {
       if (!continueLienChau(state)) resetWaitingState(state);
     }
     return { success: true, state };
@@ -6722,7 +6772,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     if (victim) {
       const damageResult = applyDamageToPlayer(state, victim.seat, 1, "Thủy Triều Rút", "WATER");
       if (state.phase === "AWAIT_NGHIA_TU") state.pendingAfterUatKhi = { type: "RESET_WAITING" };
-      if (damageResult?.enteredNearDeath || ["AWAIT_UAT_KHI", "AWAIT_NGHIA_TU"].includes(state.phase)) return { success: true, state };
+      if (state.phase !== "PLAY") return { success: true, state };
     }
     resetWaitingState(state);
     return { success: true, state };
@@ -7781,7 +7831,7 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
   }
   if (finalDamage > 0 && isDirectSlashDamage && attacker && heroHasSkill(attacker, "NAM_QUOC_SON_HA")) {
     if (attacker.isAI) {
-      const allies = state.players.filter(p => isLivingPlayer(p) && (p.seat === attacker.seat || p.team === attacker.team || (attacker.isAlly && p.isAlly)));
+      const allies = state.players.filter(p => isLivingPlayer(p) && areTeammatesInState(state, attacker.seat, p.seat));
       const buffed = allies.length > 0 ? allies : [attacker];
       for (const p of buffed) {
         p.namQuocSonHaRangeBuff = (Number(p.namQuocSonHaRangeBuff) || 0) + 1;
@@ -7981,7 +8031,8 @@ export function handleEndTurn(state, casterSeat) {
     });
   }
 
-  if (isPlayPhase && heroHasSkill(caster, "AN_TICH") && !(caster.anTichCards || []).length && !state.turnDamageDealt && caster.hand.length) {
+  if (isPlayPhase && heroHasSkill(caster, "AN_TICH") && !caster.usedSkills?.AnTichResolved
+      && !(caster.anTichCards || []).length && !state.turnDamageDealt && caster.hand.length) {
     state.phase = "AWAIT_AN_TICH";
     state.waitingTargetSeat = casterSeat;
     state.waitingReactionType = "AN_TICH";
@@ -8416,7 +8467,7 @@ function applyPendingJudgement(state) {
         singleTargetScrollCasterSeat: Number(cardObj.attachedBySeat) || 0
       });
       if (state.phase === "AWAIT_NEAR_DEATH") return;
-      if (["AWAIT_UAT_KHI", "AWAIT_TRUNG_KIEN", "AWAIT_NGHIA_TU"].includes(state.phase)) {
+      if (state.phase !== "PLAY") {
         state.pendingAfterUatKhi = { type: "TURN_START" };
         return;
       }
@@ -8758,9 +8809,36 @@ function advanceTurn(state) {
  * Kiểm tra xem trận đấu đã ngã ngũ chưa (1 trong 2 đội bị hạ gục hết)
  * Lưu ý: Người đang trong Hấp Hối (hp=0 nhưng chưa tử trận) không được tính là đã chết
  */
+function finishMatch(state, winningRole, winningTeamId, winnerLabel, winningSeats) {
+  state.status = "FINISHED";
+  state.winningRole = winningRole;
+  state.winningTeamId = winningTeamId;
+  state.result = {
+    matchId: state.matchId || state.roomId,
+    winningRole, winningTeamId, winnerLabel, winningSeats,
+    finishedAt: Date.now(),
+  };
+  state.waitingTargetSeat = 0;
+  state.waitingTimer = 0;
+  state.turnTimer = 0;
+  recordAction(state, {
+    type: "GAME_OVER", winningRole, winningTeamId, winningTeam: winnerLabel,
+    description: `🏆 <b>TRẬN ĐẤU KẾT THÚC!</b> ${winnerLabel} chiến thắng!`,
+  });
+}
+
+export function getMatchResult(state, requestingSeat) {
+  if (state?.status !== "FINISHED" || !state.result) return null;
+  const player = state.players.find((p) => p.seat === Number(requestingSeat));
+  if (!player) return null;
+  const isWinner = state.result.winningSeats.includes(player.seat);
+  return { ...state.result, isWinner, silver: isWinner ? 150 : 75, exp: isWinner ? 20 : 12 };
+}
+
 function checkGameOver(state) {
+  if (state.status === "FINISHED") return;
   // Nếu đang trong pha Hấp Hối, chưa kết thúc được
-  if (["AWAIT_NEAR_DEATH", "AWAIT_TRUNG_KIEN"].includes(state.phase)) return;
+  if (state.players.some((player) => player.hp <= 0 && player.isAlive !== false)) return;
 
   const modeRules = getModeRulesForState(state);
   if (modeRules.victory === "DYNASTY_ROLES") {
@@ -8773,9 +8851,9 @@ function checkGameOver(state) {
       ? (livingSpy.length === 1 && living.filter((player) => player.role !== "SPY").length === 0 ? "SPY" : "REBELS")
       : (livingRebels.length === 0 && livingSpy.length === 0 ? "KING" : "")
     if (outcome) {
-      state.status = "FINISHED";
-      state.winningRole = outcome;
-      recordAction(state, { type: "GAME_OVER", winningRole: outcome, description: `🏆 <b>TRẬN ĐẤU KẾT THÚC!</b> Phe ${outcome} đã giành chiến thắng!` });
+      const winningRoles = outcome === "KING" ? ["KING", "LOYALIST"] : [outcome === "REBELS" ? "REBEL" : "SPY"];
+      const winnerLabel = outcome === "KING" ? "VUA và Trung Thần" : (outcome === "REBELS" ? "Phản Tặc" : "Nội Gián");
+      finishMatch(state, outcome, "", winnerLabel, state.players.filter((p) => winningRoles.includes(p.role)).map((p) => p.seat));
     }
     return;
   }
@@ -8787,28 +8865,25 @@ function checkGameOver(state) {
   }
 
   if (aliveTeams.size <= 1) {
-    state.status = "FINISHED";
     const [winningTeamId, winner] = aliveTeams.entries().next().value || ["", null];
     const winningTeam = modeRules.victory === "LAST_PLAYER_STANDING"
       ? (winner?.generalName || "Không có người sống sót")
       : (modeRules.teamLabel(winningTeamId) || "Không có đội chiến thắng");
-    recordAction(state, {
-      type: "GAME_OVER",
-      winningTeam,
-      description: `🏆 <b>TRẬN ĐẤU KẾT THÚC!</b> ${winningTeam} ĐÃ GIÀNH CHIẾN THẮNG!`
-    });
+    const winningSeats = state.players.filter((p) => (p.teamId || modeRules.teamForSeat(p.seat)) === winningTeamId).map((p) => p.seat);
+    finishMatch(state, "", winningTeamId, winningTeam, winningSeats);
   }
 }
 
 function shouldFastForwardAiBattle(state) {
   if (!state || state.status === "FINISHED") return false;
-  const living = state.players.filter((player) => isLivingPlayer(player));
-  return living.length > 0 && living.every((player) => player.isAI === true);
+  if (state.fastForwardAiRequested === true) return true;
+  const allInitialPlayersAI = state.players.length > 0 && state.players.every((player) => player.isAI === true);
+  return allInitialPlayersAI;
 }
 
 function fastForwardAiBattle(state) {
   let changed = false;
-  for (let step = 0; step < 512 && state.status !== "FINISHED"; step++) {
+  for (let step = 0; step < 128 && state.status !== "FINISHED"; step++) {
     const beforeVersion = state.version || 0;
     if (state.phase === "AWAIT_JUDGEMENT") {
       applyPendingJudgement(state);
@@ -8816,17 +8891,7 @@ function fastForwardAiBattle(state) {
       const waiting = state.players.find((player) => player.seat === state.waitingTargetSeat);
       const result = waiting ? handleAIReaction(state, waiting.seat) : null;
       if (!result || result.error) {
-        if (state.phase === "AWAIT_NEAR_DEATH" || state.phase === "AWAIT_SLASH_DEFENSE"
-          || state.phase === "AWAIT_BORROW_SWORD" || state.phase === "AWAIT_NULLIFY"
-          || state.phase === "AWAIT_AOE" || state.phase === "AWAIT_DUEL"
-          || state.phase === "AWAIT_NGHICH_Y") {
-          handleRespondAction(state, state.waitingTargetSeat, false, null);
-        } else if (state.phase === "DISCARD") {
-          const discardCount = Math.max(0, (waiting?.hand?.length || 0) - getHandLimit(waiting));
-          handleDiscardCards(state, state.waitingTargetSeat, (waiting?.hand || []).slice(0, discardCount).map((card) => card.id));
-        } else {
-          resetWaitingState(state);
-        }
+        executeFallbackReactionForSeat(state, state.waitingTargetSeat, waiting);
       }
     } else if (state.phase === "DISCARD") {
       const current = state.players.find((player) => player.seat === state.turnSeat);
@@ -8846,7 +8911,7 @@ function fastForwardAiBattle(state) {
     changed = changed || (state.version || 0) !== beforeVersion || state.status === "FINISHED";
     state.timerStartAt = Date.now();
   }
-  return { changed: true, important: true };
+  return { changed, important: changed };
 }
 
 /**
@@ -8855,241 +8920,44 @@ function fastForwardAiBattle(state) {
 export function handleAIStep(state, aiSeat) {
   if (state.status === "FINISHED") return { error: "Trận đấu đã kết thúc" };
   aiSeat = Number(aiSeat);
-  const ai = state.players.find(x => x.seat === aiSeat);
-  if (!ai || ai.hp <= 0) return { error: "Người chơi không hợp lệ" };
+  const ai = state.players.find((p) => p.seat === aiSeat);
+  if (!isLivingPlayer(ai)) return { error: "Người chơi không hợp lệ" };
   if (state.turnSeat !== aiSeat) return { error: "Không phải lượt của AI này" };
-
-
-
-  // 2. Nếu đang ở giai đoạn AWAIT phản ứng từ người khác thì chưa thể ra bài mới
-  if (state.phase !== "PLAY") {
-    return { success: true, state, message: "Đang chờ phản ứng" };
-  }
-
-  // 3. AI tìm lá bài để sử dụng theo thứ tự ưu tiên:
-  // A. Hồi máu nếu HP < MaxHP
-  if (ai.hp < ai.maxHp) {
-    const peach = ai.hand.find(c => c.subType === CARD_SUBTYPES.PEACH);
-    if (peach) {
-      return handlePlayCard(state, aiSeat, peach.id, aiSeat);
+  if (state.phase !== "PLAY") return { error: "AI đang chờ phản ứng" };
+  ai.usedSkills ||= {};
+  // Bound exchange/setup cycles without changing the rules for human players.
+  ai.usedSkills.aiDecisionCount = (ai.usedSkills.aiDecisionCount || 0) + 1;
+  if (ai.usedSkills.aiDecisionCount > 64) return handleEndTurn(state, aiSeat);
+  const living = state.players.filter(isLivingPlayer);
+  const enemies = living.filter((p) => !areTeammatesInState(state, aiSeat, p.seat))
+    .sort((a, b) => aiTargetScore(state, ai, b) - aiTargetScore(state, ai, a));
+  const asSlash = (card) => canUseCardAsSlash(ai, card) && !isSlash(card)
+    ? { ...card, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL } : card;
+  const plans = buildAiTurnPlans(state, ai, {
+    friends: living.filter((p) => areTeammatesInState(state, aiSeat, p.seat)), enemies,
+    distance: (a, b) => getDistance(state, a.seat, b.seat),
+    inRange: (a, b) => hasWeaponRange(state, a.seat, b.seat) && !isDaTrachSlashBlocked(b, { subType: CARD_SUBTYPES.ATTACK_NORMAL }),
+    slashAllowed: hasEquippedZhuge(ai) || isSucSoiActive(ai) || isTienPhongFirstTurn(ai)
+      || state.slashesUsedThisTurn < 1 + (ai.extraSlashLimit || 0),
+    canSlashWith: (card) => canUseCardAsSlash(ai, card),
+    targetScore: (target, purpose) => aiTargetScore(state, ai, target, purpose),
+    validTarget: (card, target) => !validateTarget(state, aiSeat, target.seat, asSlash(card)),
+  });
+  const apply = (board, plan) => plan.kind === "card"
+    ? handlePlayCard(board, aiSeat, plan.cardId, plan.targetSeat, plan.extra)
+    : handleUseSkill(board, aiSeat, plan.kind, plan.targetSeat, plan.cardId, plan.extra);
+  for (const plan of plans.slice(0, 64)) {
+    // Some legal checks have side effects in card/skill handlers. Validate on
+    // an isolated board so a rejected choice cannot spend a card or end a turn.
+    const preview = structuredClone({ ...state, actionHistory: [] });
+    const trial = apply(preview, plan);
+    if (!trial || trial.error || trial.blocked) continue;
+    const result = apply(state, plan);
+    if (result && !result.error) {
+      if (plan.kind === "Cơ Biến") ai.usedSkills.coBienCount = (ai.usedSkills.coBienCount || 0) + 1;
+      return result;
     }
   }
-
-  // B. Rút bài (Dụng Binh Như Thần)
-  const exNihilo = ai.hand.find(c => c.subType === CARD_SUBTYPES.EX_NIHILO);
-  if (exNihilo) {
-    return handlePlayCard(state, aiSeat, exNihilo.id, aiSeat);
-  }
-  const khoNhuc = ai.hand.find((card) => card.subType === CARD_SUBTYPES.KHO_NHUC_KE);
-  if (khoNhuc && ai.hp >= 2) {
-    return handlePlayCard(state, aiSeat, khoNhuc.id, aiSeat);
-  }
-
-  // C. Trang bị vũ khí / giáp / ngựa nếu chưa có
-  const equip = ai.hand.find(c => c.category === CARD_CATEGORIES.EQUIPMENT);
-  if (equip) {
-    const alreadyEquipped = ai.equipments.some(e => e.subType === equip.subType);
-    if (!alreadyEquipped) {
-      return handlePlayCard(state, aiSeat, equip.id, aiSeat);
-    }
-  }
-
-  const enemies = state.players.filter(x => !areTeammatesInState(state, x.seat, aiSeat) && x.hp > 0);
-  const phuDe = ai.hand.find((card) => card.subType === CARD_SUBTYPES.PHU_DE_TRUU_TAN);
-  const phuDeTarget = phuDe ? enemies.find((enemy) => (enemy.equipments || []).length > 0) : null;
-  if (phuDe && phuDeTarget) {
-    return handlePlayCard(state, aiSeat, phuDe.id, phuDeTarget.seat);
-  }
-
-  if (heroHasSkill(ai, "DINH_TRIEU") && !ai.usedSkills?.DinhTrieu) {
-    const ally = state.players.find(p => isLivingPlayer(p) && p.seat !== aiSeat && areTeammatesInState(state, aiSeat, p.seat));
-    const scrollCard = (ai.hand || []).find(c => c.category === CARD_CATEGORIES.INSTANT_SCROLL || c.category === CARD_CATEGORIES.DELAYED_SCROLL);
-    if (ally && scrollCard) {
-      return handleUseSkill(state, aiSeat, "Định Triều", ally.seat, scrollCard.id);
-    }
-  }
-
-  // D. Cẩm nang trì hoãn và Đại Hồng Thủy
-  const delayed = ai.hand.find((card) => card.subType === CARD_SUBTYPES.DAI_HONG_THUY);
-  if (delayed) {
-    return handlePlayCard(state, aiSeat, delayed.id, aiSeat);
-  }
-  const delayedAttack = ai.hand.find((card) =>
-    card.subType === CARD_SUBTYPES.SUPPLY_SHORTAGE || card.subType === CARD_SUBTYPES.ACEDIA || card.subType === CARD_SUBTYPES.BAI_COC_BACH_DANG
-  );
-  const delayedTarget = delayedAttack
-    ? enemies.find((enemy) => {
-      if (heroHasSkill(enemy, "THUY_CHIEN") && delayedAttack.subType === CARD_SUBTYPES.BAI_COC_BACH_DANG) return false;
-      if (heroHasSkill(enemy, "THIEN_CAM") && enemy.hp <= 1) return false;
-      if (enemy.judgements?.some((judgement) => judgement.subType === delayedAttack.subType)) return false;
-      if (delayedAttack.subType === CARD_SUBTYPES.BAI_COC_BACH_DANG) return true;
-      return getDistance(state, aiSeat, enemy.seat) <= 1;
-    })
-    : null;
-  if (delayedAttack && delayedTarget) {
-    return handlePlayCard(state, aiSeat, delayedAttack.id, delayedTarget.seat);
-  }
-
-  const borrowSword = ai.hand.find((card) => card.subType === CARD_SUBTYPES.MUON_GUOM_DIET_DICH);
-  const weaponOwner = borrowSword
-    ? state.players.find((player) => player.seat !== aiSeat && isLivingPlayer(player)
-      && player.equipments?.some((equipment) => equipment.subType === CARD_SUBTYPES.WEAPON)
-      && state.players.some((target) => target.seat !== player.seat && isLivingPlayer(target)
-        && hasWeaponRange(state, player.seat, target.seat)
-        && !isDaTrachSlashBlocked(target, { subType: CARD_SUBTYPES.SLASH })))
-    : null;
-  const forcedTarget = weaponOwner
-    ? state.players.find((player) => player.seat !== weaponOwner.seat && isLivingPlayer(player)
-      && !areTeammatesInState(state, aiSeat, player.seat)
-      && hasWeaponRange(state, weaponOwner.seat, player.seat)
-      && !isDaTrachSlashBlocked(player, { subType: CARD_SUBTYPES.SLASH }))
-    : null;
-  if (borrowSword && weaponOwner && forcedTarget) {
-    return handlePlayCard(state, aiSeat, borrowSword.id, weaponOwner.seat, { targetSeat2: forcedTarget.seat });
-  }
-
-  if (heroHasSkill(ai, "DAN_CAU") && !ai.usedSkills?.DanCau && ai.hand.length >= 2) {
-    const forcedEnemy = enemies.find((enemy) => {
-      const forcedSlashTarget = state.players.find((p) =>
-        p.seat !== enemy.seat && isLivingPlayer(p) &&
-        (!areTeammatesInState(state, aiSeat, p.seat) || p.hp > 1) &&
-        hasWeaponRange(state, enemy.seat, p.seat) &&
-        !isDaTrachSlashBlocked(p, { subType: CARD_SUBTYPES.SLASH })
-      );
-      return forcedSlashTarget != null;
-    });
-
-    if (forcedEnemy) {
-      const forcedSlashTarget = state.players.find((p) =>
-        p.seat !== forcedEnemy.seat && isLivingPlayer(p) &&
-        (!areTeammatesInState(state, aiSeat, p.seat) || p.hp > 1) &&
-        hasWeaponRange(state, forcedEnemy.seat, p.seat) &&
-        !isDaTrachSlashBlocked(p, { subType: CARD_SUBTYPES.SLASH })
-      );
-      const costCard = ai.hand.find((c) => !isPeach(c) && !isWine(c)) || ai.hand[0];
-      if (costCard && forcedSlashTarget) {
-        return handleUseSkill(state, aiSeat, "Dẫn Cầu", forcedEnemy.seat, `${costCard.id}|${forcedSlashTarget.seat}`);
-      }
-    }
-  }
-
-  if (heroHasSkill(ai, "TRIEU_DANG") && !ai.usedSkills?.["Triều Dâng"] && !ai.usedSkills?.trieu_dang) {
-    const enemyWithEquip = enemies.find((e) => (e.equipments || []).length > 0);
-    if (enemyWithEquip) {
-      const equipToDestroy = enemyWithEquip.equipments[0];
-      return handleUseSkill(state, aiSeat, "Triều Dâng", enemyWithEquip.seat, equipToDestroy?.id);
-    }
-  }
-
-  // E. Uống rượu trước khi Trảm nếu có cả Rượu và Trảm (chỉ khi chưa uống Rượu lượt này và còn quyền Trảm)
-  const hasZhuge = hasEquippedZhuge(ai);
-  const maxSlashesAllowed = 1 + (ai.extraSlashLimit || 0);
-  const canSlash = hasZhuge || state.slashesUsedThisTurn < maxSlashesAllowed || isTienPhongFirstTurn(ai);
-  const wine = (!ai.wineUsedThisTurn || heroHasSkill(ai, "BAO_NO")) && (
-    ai.hand.find(c => c.subType === CARD_SUBTYPES.WINE) ||
-    (heroHasSkill(ai, "TRAC_LAC") && ai.hp <= 2 ? ai.hand.find(c => isBlackCardSuit(c.suit) && !isSlash(c) && !isPeach(c)) : null)
-  );
-  const slash = ai.hand.find(c => isSlash(c)) || (heroHasSkill(ai, "TIEN_THOAI") ? ai.hand.find(c => isDodge(c)) : null);
-  const slashTarget = slash
-    ? enemies.find((enemy) => {
-        if (isDaTrachSlashBlocked(enemy, slash)) return false;
-        const waterSlashIgnoresDistance = slash.subType === CARD_SUBTYPES.ATTACK_WATER && hasBachDangBoat(ai);
-        const teGiangIgnoresDistance = heroHasSkill(ai, "TE_GIANG") && !hasHorse(enemy);
-        return waterSlashIgnoresDistance || teGiangIgnoresDistance || hasWeaponRange(state, aiSeat, enemy.seat);
-      }) || null
-    : null;
-
-  if (wine && slash && canSlash && !ai.isWineBuffActive && slashTarget) {
-    if (wine.subType === CARD_SUBTYPES.WINE) {
-      return handlePlayCard(state, aiSeat, wine.id, aiSeat);
-    } else {
-      return handleUseSkill(state, aiSeat, "Trác Lạc", 0, wine.id);
-    }
-  }
-
-  // F. Huyết Chiến nếu có mục tiêu hợp lệ
-  const duel = ai.hand.find((card) => card.subType === CARD_SUBTYPES.DUEL);
-  const duelTarget = enemies.find((enemy) => enemy.hp > 0) || null;
-  if (duel && duelTarget) {
-    return handlePlayCard(state, aiSeat, duel.id, duelTarget.seat);
-  }
-  if (heroHasSkill(ai, "DINH_QUOC") && duelTarget) {
-    const blackCard = ai.hand.find(c => cardColor(c.suit) === "BLACK" && !isPeach(c));
-    if (blackCard) {
-      return handleUseSkill(state, aiSeat, "Định Quốc", duelTarget.seat, blackCard.id);
-    }
-  }
-
-  // G. Đánh Trảm nếu chưa vượt giới hạn
-  if (slash && canSlash && slashTarget) {
-    return handlePlayCard(state, aiSeat, slash.id, slashTarget.seat);
-  }
-
-  if (heroHasSkill(ai, "DOI_DO") && !ai.usedSkills?.doiDoUsed && ai.hand.length <= 2) {
-    const living = state.players.filter(p => isLivingPlayer(p));
-    const allies = living.filter(p => areTeammatesInState(state, aiSeat, p.seat)).map(p => p.seat).slice(0, 4);
-    return handleUseSkill(state, aiSeat, "Dời Đô", 0, allies.join(","), { targetSeats: allies });
-  }
-  if (heroHasSkill(ai, "MUU_DINH") && !ai.usedSkills?.muuDinhUsed) {
-    const ally = state.players.find(p => isLivingPlayer(p) && areTeammatesInState(state, aiSeat, p.seat)) || ai;
-    return handleUseSkill(state, aiSeat, "Mưu Định", ally.seat);
-  }
-  if (heroHasSkill(ai, "TRAO_BAO")) {
-    const damagedAlly = state.players.find(p => isLivingPlayer(p) && p.seat !== aiSeat && areTeammatesInState(state, aiSeat, p.seat) && p.hp < p.maxHp);
-    const equipCard = ai.hand.find(c => c.category === CARD_CATEGORIES.EQUIPMENT) || (ai.equipments && ai.equipments.length > 0 ? ai.equipments[0] : null);
-    if (damagedAlly && equipCard) {
-      return handleUseSkill(state, aiSeat, "Trao Bào", damagedAlly.seat, equipCard.id);
-    }
-  }
-
-  if (heroHasSkill(ai, "CO_BIEN") && (ai.usedSkills?.coBienCount || 0) < 2) {
-    const blackCard = (ai.hand || []).find(c => isBlackCardSuit(c.suit) && !isPeach(c) && (!canSlash || !isSlash(c)));
-    if (blackCard) {
-      if (!ai.usedSkills) ai.usedSkills = {};
-      ai.usedSkills.coBienCount = (ai.usedSkills.coBienCount || 0) + 1;
-      return handleUseSkill(state, aiSeat, "Cơ Biến", 0, blackCard.id);
-    }
-  }
-
-  // H. Cẩm nang diện rộng (Mưa Tên / Bãi Cọc)
-  const aoe = ai.hand.find(c => c.subType === CARD_SUBTYPES.ARROW_RAIN || c.subType === CARD_SUBTYPES.BARBARIAN_INVASION);
-  if (aoe) {
-    return handlePlayCard(state, aiSeat, aoe.id, 0);
-  }
-
-
-
-  // J. Cẩm nang phá bài (Vườn Không / Đột Kích)
-  // Ưu tiên cứu đồng đội khỏi các lá Phán Xét (Trì hoãn)
-  const allies = state.players.filter(x => areTeammatesInState(state, x.seat, aiSeat) && x.hp > 0);
-  const allyNeedHelp = allies.find((ally) => (ally.judgements && ally.judgements.length > 0));
-
-  const snatch = ai.hand.find((card) => card.subType === CARD_SUBTYPES.SNATCH);
-  const dismantle = ai.hand.find((card) => card.subType === CARD_SUBTYPES.DISMANTLE);
-
-  if (allyNeedHelp) {
-    if (dismantle) {
-      return handlePlayCard(state, aiSeat, dismantle.id, allyNeedHelp.seat);
-    }
-    if (snatch && getDistance(state, aiSeat, allyNeedHelp.seat) <= 1) {
-      return handlePlayCard(state, aiSeat, snatch.id, allyNeedHelp.seat);
-    }
-  }
-
-  // Nếu không có đồng đội cần cứu, dùng để phá bài kẻ địch (Chỉ Hand và Equipment)
-  const snatchTarget = enemies.find((enemy) =>
-    getDistance(state, aiSeat, enemy.seat) <= 1 && buildTargetCardOptions(state, enemy.seat, false).length > 0
-  ) || null;
-  if (snatch && snatchTarget) {
-    return handlePlayCard(state, aiSeat, snatch.id, snatchTarget.seat);
-  }
-
-  const dismantleTarget = enemies.find((enemy) => buildTargetCardOptions(state, enemy.seat, false).length > 0) || null;
-  if (dismantle && dismantleTarget) {
-    return handlePlayCard(state, aiSeat, dismantle.id, dismantleTarget.seat);
-  }
-
-  // H. Không còn bài muốn đánh -> Kết thúc lượt
   return handleEndTurn(state, aiSeat);
 }
 
@@ -9102,6 +8970,33 @@ export function handleAIReaction(state, aiSeat) {
   const ai = state.players.find(x => x.seat === aiSeat);
   if (!ai || (ai.hp <= 0 && !["AWAIT_NEAR_DEATH", "AWAIT_UAT_KHI_TARGET"].includes(state.phase))) return { error: "Người chơi không hợp lệ" };
 
+  const friends = state.players.filter((p) => isLivingPlayer(p) && areTeammatesInState(state, aiSeat, p.seat));
+  const allies = friends.filter((p) => p.seat !== aiSeat).sort((a, b) => (a.hp * 2 + a.hand.length) - (b.hp * 2 + b.hand.length));
+  const enemies = state.players.filter((p) => isLivingPlayer(p) && !areTeammatesInState(state, aiSeat, p.seat));
+  const cheapest = (cards) => [...(cards || [])].sort((a, b) => aiCardKeepValue(ai, a, state) - aiCardKeepValue(ai, b, state));
+
+  if (state.phase === "AWAIT_UAT_KHI" && state.waitingTargetSeat === aiSeat) {
+    const target = [...friends].sort((a, b) => a.hand.length - b.hand.length || a.hp - b.hp)[0];
+    return handleUseSkill(state, aiSeat, "Uất Khí", target?.seat || 0);
+  }
+  if (state.phase === "AWAIT_KHOI_BINH" && state.waitingTargetSeat === aiSeat) {
+    const sourceSeat = state.khoiBinhQueue?.[0]?.sourceSeat;
+    return handleRespondAction(state, aiSeat, friends.some((p) => p.seat === sourceSeat) || (ai.hand.length <= 1 && ai.hp <= 2), null);
+  }
+  if (state.phase === "AWAIT_HUYNH_TRUONG" && state.waitingTargetSeat === aiSeat) {
+    const ally = allies[0];
+    const cost = cheapest(ai.hand)[0];
+    return ally && cost ? handleRespondAction(state, aiSeat, true, cost.id, null, null, ally.seat)
+      : handleRespondAction(state, aiSeat, false, null);
+  }
+
+  if (state.phase === "AWAIT_AN_TICH" && state.waitingTargetSeat === aiSeat) {
+    const cost = cheapest(ai.hand)[0];
+    return cost
+      ? handleRespondAction(state, aiSeat, true, cost.id)
+      : handleRespondAction(state, aiSeat, false, null);
+  }
+
   if (state.phase === "AWAIT_DAI_VIET_COLOR" && state.waitingTargetSeat === aiSeat) {
     const colors = ["RED", "WHITE", "YELLOW", "BLACK"];
     colors.sort((left, right) => (ai.hand || []).filter((card) => cardColor(card.suit) === right).length - (ai.hand || []).filter((card) => cardColor(card.suit) === left).length);
@@ -9109,13 +9004,13 @@ export function handleAIReaction(state, aiSeat) {
   }
 
   if (state.phase === "AWAIT_THU_PHAP_DISCARD" && state.waitingTargetSeat === aiSeat) {
-    if (!ai.isAI) {
+    if (!ai.isAI && !ai.isAiTakeover && !ai.isDisconnected) {
       return { error: "Chờ người chơi tự bỏ bài theo Thủ Pháp" };
     }
-    const card = ai.hand?.[0];
+    const card = cheapest(ai.hand)[0];
     return card
       ? handleDiscardCards(state, aiSeat, [card.id])
-      : { error: "Không còn lá để bỏ theo Thủ Pháp" };
+      : handleEndTurn(state, aiSeat);
   }
 
   if (state.phase === "AWAIT_KHUYEN_NONG" && state.waitingTargetSeat === aiSeat) {
@@ -9123,12 +9018,12 @@ export function handleAIReaction(state, aiSeat) {
   }
 
   if (state.phase === "AWAIT_CAN_GIAN" && state.waitingTargetSeat === aiSeat) {
-    if (!ai.isAI) {
+    if (!ai.isAI && !ai.isAiTakeover && !ai.isDisconnected) {
       return handleRespondAction(state, aiSeat, false, null);
     }
     const pending = state.pendingCanGian;
     const isAllyOrSelf = pending && areTeammatesInState(state, pending.targetSeat, aiSeat);
-    const cost = isAllyOrSelf ? (ai.hand || []).find((card) => cardColor(card.suit) === "RED") : null;
+    const cost = isAllyOrSelf ? cheapest(ai.hand).find((card) => cardColor(card.suit) === "RED") : null;
     return cost
       ? handleRespondAction(state, aiSeat, true, cost.id)
       : handleRespondAction(state, aiSeat, false, null);
@@ -9143,19 +9038,21 @@ export function handleAIReaction(state, aiSeat) {
 
   if (state.phase === "AWAIT_BON_PHAN" && state.waitingTargetSeat === aiSeat) {
     const slash = (ai.hand || []).find((card) => isSlash(card));
-    const target = state.players.find((player) => isLivingPlayer(player) && player.seat !== aiSeat);
+    const target = allies[0];
     return slash && target
       ? handleRespondAction(state, aiSeat, true, slash.id, null, null, target.seat)
       : handleRespondAction(state, aiSeat, false, null);
   }
 
   if (state.phase === "AWAIT_THANG_MOC" && state.waitingTargetSeat === aiSeat) {
-    if (!ai.isAI) {
+    if (!ai.isAI && !ai.isAiTakeover && !ai.isDisconnected) {
       return { error: "Chờ người chơi phản hồi Thang Mộc" };
     }
     const available = getAvailableThangMocScrolls(state, aiSeat);
-    return available.length > 0
-      ? handleRespondAction(state, aiSeat, true, available[0].subType)
+    const preferred = [CARD_SUBTYPES.SUPPLY_SHORTAGE, CARD_SUBTYPES.ACEDIA, CARD_SUBTYPES.BAI_COC_BACH_DANG]
+      .map((subType) => available.find((c) => c.subType === subType)).find(Boolean);
+    return preferred
+      ? handleRespondAction(state, aiSeat, true, preferred.subType)
       : handleRespondAction(state, aiSeat, false, null);
   }
 
@@ -9174,13 +9071,15 @@ export function handleAIReaction(state, aiSeat) {
   }
 
   if (state.phase === "AWAIT_CHINH_THONG_TARGET" && state.waitingTargetSeat === aiSeat) {
-    const target = state.players.find((player) => player.seat !== aiSeat && isLivingPlayer(player));
+    const target = [...enemies].sort((a, b) => b.hand.length - a.hand.length)[0];
     return target ? handleUseSkill(state, aiSeat, "Chính Thống", target.seat) : handleRespondAction(state, aiSeat, false, null);
   }
 
   if (state.phase === "AWAIT_CHINH_THONG_GIVE" && state.waitingTargetSeat === aiSeat) {
-    const firstCard = ai.hand?.[0];
-    return firstCard ? handleRespondAction(state, aiSeat, true, firstCard.id) : handleRespondAction(state, aiSeat, false, null);
+    const firstCard = cheapest(ai.hand)[0];
+    const owner = state.chinhThongSelection?.ownerSeat;
+    return firstCard && (friends.some((p) => p.seat === owner) || aiCardKeepValue(ai, firstCard, state) < 45)
+      ? handleRespondAction(state, aiSeat, true, firstCard.id) : handleRespondAction(state, aiSeat, false, null);
   }
 
   if (state.phase === "AWAIT_KHOAN_HOA" && state.waitingTargetSeat === aiSeat) {
@@ -9190,39 +9089,45 @@ export function handleAIReaction(state, aiSeat) {
   }
 
   if (state.phase === "AWAIT_AN_DAN_DUEL" && state.waitingTargetSeat === aiSeat) {
-    const target = state.players.find((player) => player.seat !== aiSeat && isLivingPlayer(player));
+    const target = selectBestAiTarget(state, ai, enemies);
     return target ? handleRespondAction(state, aiSeat, true, String(target.seat)) : handleRespondAction(state, aiSeat, false, null);
   }
 
   if (state.phase === "AWAIT_XUNG_VUONG_TARGET" && state.waitingTargetSeat === aiSeat) {
     const pending = state.xungVuongPending;
-    const target = state.players.find((player) => player.seat !== aiSeat && isLivingPlayer(player) && !pending?.targets?.includes(player.seat) && ((player.hand || []).length + (player.equipments || []).length > 0));
+    const target = selectBestAiTarget(state, ai, enemies.filter((p) => !pending?.targets?.includes(p.seat) && p.hand.length + p.equipments.length > 0), "disrupt");
     return target ? handleRespondAction(state, aiSeat, true, String(target.seat)) : handleRespondAction(state, aiSeat, false, null);
   }
 
   if (state.phase === "AWAIT_NGHIA_TU" && state.waitingTargetSeat === aiSeat) {
     const targetSeat = Number(state.pendingNghiaTu?.targetSeat) || 0;
-    const costs = (ai.hand || []).slice(0, 1);
-    return areTeammatesInState(state, aiSeat, targetSeat) && costs.length === 1
+    const costs = cheapest(ai.hand).slice(0, 1);
+    const target = state.players.find((p) => p.seat === targetSeat);
+    return areTeammatesInState(state, aiSeat, targetSeat) && costs.length === 1 && (ai.hp >= 2 || target?.role === "KING")
       ? handleRespondAction(state, aiSeat, true, null, null, costs.map((card) => card.id))
       : handleRespondAction(state, aiSeat, false, null);
   }
 
   if (state.phase === "AWAIT_OAI_NHUOC" && state.waitingTargetSeat === aiSeat) {
     const caster = state.players.find((player) => player.seat === state.activeCard?.casterSeat);
-    const dodge = ai.hand.find((card) => canUseCardAsDodgeAgainstSlash(ai, card, caster, state.activeCard));
-    const cost = ai.hand.find((card) => card !== dodge);
+    const dodge = cheapest(ai.hand).find((card) => canUseCardAsDodgeAgainstSlash(ai, card, caster, state.activeCard, state));
+    const cost = cheapest(ai.hand).find((card) => card !== dodge);
     return dodge && cost
       ? handleRespondAction(state, aiSeat, true, null, null, [cost.id, dodge.id])
       : handleRespondAction(state, aiSeat, false, null);
   }
 
   if (state.phase === "AWAIT_AN_DAN" && state.waitingTargetSeat === aiSeat) {
-    return handleRespondAction(state, aiSeat, false, null);
+    const useful = buildAnDanOptions(state).some((option) => {
+      const [, from, , to] = option.token.split("|");
+      return friends.some((p) => p.seat === Number(from)) && enemies.some((p) => p.seat === Number(to));
+    });
+    return handleRespondAction(state, aiSeat, useful, null);
   }
 
   if (state.phase === "AWAIT_DA_TRACH_DISCARD" && state.waitingTargetSeat === aiSeat) {
-    return handleRespondAction(state, aiSeat, false, null);
+    const cost = ai.hand.length === 1 ? ai.hand[0] : null;
+    return handleRespondAction(state, aiSeat, !!cost && !isPeach(cost), cost?.id || null);
   }
 
   if (state.phase === "AWAIT_HOA_DAN" && state.waitingTargetSeat === aiSeat) {
@@ -9231,33 +9136,41 @@ export function handleAIReaction(state, aiSeat) {
 
   if (state.phase === "AWAIT_DUNG_NUOC" && state.waitingTargetSeat === aiSeat) {
     const hasHeartDiscard = state._discard.some((card) => card.suit === "Heart");
-    return handleRespondAction(state, aiSeat, ai.hp < ai.maxHp || hasHeartDiscard, null);
+    return handleRespondAction(state, aiSeat, ai.hp < ai.maxHp && (ai.hp <= 2 || hasHeartDiscard), null);
   }
 
   if (state.phase === "AWAIT_THU_MUC" && state.waitingTargetSeat === aiSeat) {
-    const cost = ai.hand.find((card) => ["RED", "WHITE"].includes(cardColor(card.suit)));
+    const cost = cheapest(ai.hand).find((card) => ["RED", "WHITE"].includes(cardColor(card.suit)));
     return cost
       ? handleRespondAction(state, aiSeat, true, cost.id)
       : handleRespondAction(state, aiSeat, false, null);
   }
 
   if (state.phase === "AWAIT_HAN_LAM" && state.waitingTargetSeat === aiSeat) {
-    return handleRespondAction(state, aiSeat, true, null);
+    const revealed = state._deck?.at(-1);
+    return handleRespondAction(state, aiSeat, !revealed || aiCardKeepValue(ai, revealed, state) >= 30, null);
   }
 
   if (state.phase === "AWAIT_VAN_SACH" && state.waitingTargetSeat === aiSeat) {
     if (!ai.hand?.length) return handleRespondAction(state, aiSeat, false, null);
-    const discard = ai.hand.find(c => c.category !== CARD_CATEGORIES.BASIC) || ai.hand[0];
+    const discard = cheapest(ai.hand)[0];
     const lastScroll = state.pendingVanSach?.lastScroll?.card || ai.usedSkills?.VanSachLastScroll?.card;
-    if (lastScroll) {
-      return handleRespondAction(state, aiSeat, true, discard.id, "RECAST", null, 0, { choice: "RECAST", recast: true });
+    const lastTarget = state.pendingVanSach?.lastScroll?.targetSeat || ai.usedSkills?.VanSachLastScroll?.targetSeat || 0;
+    const beneficial = lastScroll && [CARD_SUBTYPES.EX_NIHILO, CARD_SUBTYPES.IRON_CHAIN].includes(lastScroll.subType);
+    if (lastScroll && (beneficial || enemies.some((p) => p.seat === lastTarget))) {
+      const preview = structuredClone({ ...state, actionHistory: [] });
+      const trial = handleRespondAction(preview, aiSeat, true, discard.id, "RECAST", null, lastTarget, { choice: "RECAST", recast: true });
+      if (trial && !trial.error) return handleRespondAction(state, aiSeat, true, discard.id, "RECAST", null, lastTarget, { choice: "RECAST", recast: true });
     }
-    return handleRespondAction(state, aiSeat, true, discard.id, "DRAW", null, 0, { choice: "DRAW" });
+    return aiCardKeepValue(ai, discard, state) < 55
+      ? handleRespondAction(state, aiSeat, true, discard.id, "DRAW", null, 0, { choice: "DRAW" }) : handleRespondAction(state, aiSeat, false, null);
   }
 
   if (state.phase === "AWAIT_TRUNG_KIEN" && state.waitingTargetSeat === aiSeat) {
     const victimSeat = Number(state.pendingNearDeath?.targetSeat) || 0;
-    return handleRespondAction(state, aiSeat, areTeammatesInState(state, aiSeat, victimSeat), null);
+    const victim = state.players.find((p) => p.seat === victimSeat);
+    const canSurvive = ai.hp > 1 || ai.hand.some((c) => isPeach(c) || isWine(c));
+    return handleRespondAction(state, aiSeat, areTeammatesInState(state, aiSeat, victimSeat) && (canSurvive || victim?.role === "KING"), null);
   }
 
   if (state.phase === "AWAIT_TRU_QUAN" && state.waitingTargetSeat === aiSeat) {
@@ -9276,7 +9189,7 @@ export function handleAIReaction(state, aiSeat) {
   if (state.phase === "AWAIT_TRUNG_TIET" && state.waitingTargetSeat === aiSeat) {
     const victimSeat = Number(state.pendingNearDeath?.targetSeat) || 0;
     const isAlly = areTeammatesInState(state, aiSeat, victimSeat);
-    const shouldHelp = (isAlly && ai.hp >= 2) || (ai.hp >= 3);
+    const shouldHelp = isAlly && ai.hp >= 2;
     return handleRespondAction(state, aiSeat, shouldHelp, null);
   }
 
@@ -9286,11 +9199,10 @@ export function handleAIReaction(state, aiSeat) {
     const enemiesInRange = state.players.filter((p) =>
       isLivingPlayer(p) && p.seat !== aiSeat && p.seat !== slashCaster &&
       !areTeammatesInState(state, aiSeat, p.seat) && hasWeaponRange(state, aiSeat, p.seat)
+      && !isDaTrachSlashBlocked(p, { subType: CARD_SUBTYPES.ATTACK_NORMAL })
     );
     const hand = ai.hand || [];
-    const costCard = hand.find(c => !isPeach(c) && !isDodge(c))
-      || hand.find(c => !isPeach(c))
-      || hand[0];
+    const costCard = cheapest(hand)[0];
 
     if (enemiesInRange.length > 0 && costCard) {
       enemiesInRange.sort((a, b) => a.hp - b.hp || (a.hand?.length || 0) - (b.hand?.length || 0));
@@ -9304,7 +9216,7 @@ export function handleAIReaction(state, aiSeat) {
     const originalTargetSeat = active.canVeOriginalTargetSeat || active.targetSeat;
     const isAlly = areTeammatesInState(state, aiSeat, originalTargetSeat);
     const originalTarget = state.players.find(p => p.seat === originalTargetSeat);
-    const hasDodge = (ai.hand || []).some(c => isDodge(c));
+    const hasDodge = (ai.hand || []).some(c => canUseCardAsDodge(ai, c)) || (ai.anTichCards || []).length > 0;
     const shouldGuard = isAlly && ((originalTarget && originalTarget.hp <= 1) || hasDodge || (originalTarget && ai.hp > originalTarget.hp));
     return handleRespondAction(state, aiSeat, shouldGuard, null);
   }
@@ -9317,10 +9229,11 @@ export function handleAIReaction(state, aiSeat) {
     if (hasKhienMay && !alreadyFailed) {
       return handleRespondAction(state, aiSeat, true, "KHIEN_MAY");
     }
-    const cannon = getEquippedWeapon(caster, "Súng Thần Công");
-    const dodge = ai.hand.find(c => canUseCardAsDodgeAgainstSlash(ai, c, caster, state.activeCard));
+    const dodge = cheapest(ai.hand).find(c => canUseCardAsDodgeAgainstSlash(ai, c, caster, state.activeCard, state));
     if (dodge) {
       return handleRespondAction(state, aiSeat, true, dodge.id);
+    } else if ((ai.anTichCards || []).length > 0) {
+      return handleRespondAction(state, aiSeat, true, "AN_TICH");
     } else if (heroHasSkill(ai, "TRAN_THU") && (ai.equipments || []).length > 0) {
       return handleRespondAction(state, aiSeat, true, ai.equipments[0].id);
     } else {
@@ -9330,21 +9243,21 @@ export function handleAIReaction(state, aiSeat) {
 
   if (state.phase === "AWAIT_THU_PHUC" && state.waitingTargetSeat === aiSeat) {
     const enemies = state.players.filter(p => isLivingPlayer(p) && p.seat !== aiSeat && p.hp >= ai.hp && (p.hand || []).length > 0 && !areTeammatesInState(state, aiSeat, p.seat));
-    const target = enemies[0] || state.players.find(p => isLivingPlayer(p) && p.seat !== aiSeat && p.hp >= ai.hp && (p.hand || []).length > 0);
+    const target = selectBestAiTarget(state, ai, enemies, "disrupt");
     return target
       ? handleRespondAction(state, aiSeat, true, String(target.seat), null, null, target.seat)
       : handleRespondAction(state, aiSeat, false, null);
   }
 
   if (state.phase === "AWAIT_PHO_TA" && state.waitingTargetSeat === aiSeat) {
-    const ally = state.players.find(p => isLivingPlayer(p) && p.seat !== aiSeat && areTeammatesInState(state, aiSeat, p.seat));
+    const ally = allies[0];
     return ally
       ? handleRespondAction(state, aiSeat, true, String(ally.seat), null, null, ally.seat)
       : handleRespondAction(state, aiSeat, false, null);
   }
 
   if (state.phase === "AWAIT_THAN_CHINH_LE_HOAN" && state.waitingTargetSeat === aiSeat) {
-    const card = (ai.hand || [])[0];
+    const card = cheapest(ai.hand)[0];
     if (card) {
       return handleRespondAction(state, aiSeat, true, card.id);
     }
@@ -9355,9 +9268,8 @@ export function handleAIReaction(state, aiSeat) {
     const highestCard = [...(ai.hand || [])].sort((a, b) => (b.rank || 0) - (a.rank || 0))[0];
     const enemies = state.players.filter(p => isLivingPlayer(p) && p.seat !== aiSeat && !areTeammatesInState(state, aiSeat, p.seat) && (p.hand || []).length > 0);
     const opponent = enemies[0];
-    const damagedAlly = state.players.find(p => isLivingPlayer(p) && p.hp < p.maxHp && areTeammatesInState(state, aiSeat, p.seat))
-      || state.players.find(p => isLivingPlayer(p) && p.hp < p.maxHp);
-    if (highestCard && opponent && damagedAlly) {
+    const damagedAlly = [...friends].filter((p) => p.hp < p.maxHp).sort((a, b) => a.hp - b.hp)[0];
+    if (highestCard && opponent && damagedAlly && Number(highestCard.rank) >= (damagedAlly.hp <= 1 ? 7 : 9)) {
       return handleRespondAction(state, aiSeat, true, highestCard.id, null, null, opponent.seat, {
         duelTargetSeat: opponent.seat,
         healTargetSeat: damagedAlly.seat
@@ -9367,17 +9279,15 @@ export function handleAIReaction(state, aiSeat) {
   }
 
   if (state.phase === "AWAIT_TRAO_BAO_EQUIP" && state.waitingTargetSeat === aiSeat) {
-    return handleRespondAction(state, aiSeat, true, null);
+    const incoming = state.pendingTraoBao?.card;
+    const existing = ai.equipments?.find((e) => e.subType === incoming?.subType);
+    return handleRespondAction(state, aiSeat, !existing || aiEquipmentValue(ai, incoming) > aiEquipmentValue(ai, existing), null);
   }
 
   if (state.phase === "AWAIT_MUU_DINH_CHOICE" && state.waitingTargetSeat === aiSeat) {
     const cards = state.pendingMuuDinh?.cards || [];
-    const ally = state.players.find(p => isLivingPlayer(p) && areTeammatesInState(state, aiSeat, p.seat)) || ai;
-    const bestCard = [...cards].sort((a, b) => {
-      if (isPeach(a)) return -1;
-      if (isPeach(b)) return 1;
-      return (b.rank || 0) - (a.rank || 0);
-    })[0] || cards[0];
+    const ally = [...friends].sort((a, b) => a.hand.length - b.hand.length || a.hp - b.hp)[0] || ai;
+    const bestCard = [...cards].sort((a, b) => aiCardKeepValue(ally, b, state) - aiCardKeepValue(ally, a, state))[0];
     return handleRespondAction(state, aiSeat, true, bestCard ? bestCard.id : null, null, null, ally.seat);
   }
 
@@ -9387,22 +9297,22 @@ export function handleAIReaction(state, aiSeat) {
   }
 
   if (state.phase === "AWAIT_NHIEP_CHINH_HEAL" && state.waitingTargetSeat === aiSeat) {
-    const ally = state.players.find(p => isLivingPlayer(p) && p.hp < p.maxHp && areTeammatesInState(state, aiSeat, p.seat))
-      || state.players.find(p => isLivingPlayer(p) && p.hp < p.maxHp);
+    const ally = [...friends].filter((p) => p.hp < p.maxHp).sort((a, b) => a.hp - b.hp)[0];
     return handleRespondAction(state, aiSeat, true, null, null, null, ally ? ally.seat : aiSeat);
   }
 
   if (state.phase === "AWAIT_NAM_QUOC_SON_HA" && state.waitingTargetSeat === aiSeat) {
-    return handleRespondAction(state, aiSeat, true, "all");
+    return handleRespondAction(state, aiSeat, true, friends.map((p) => p.seat).join(","));
   }
 
   if (state.phase === "AWAIT_BORROW_SWORD" && state.waitingTargetSeat === aiSeat) {
     const forcedTargetSeat = Number(state.activeCard?.forcedTargetSeat) || 0;
     const forcedTarget = state.players.find((player) => player.seat === forcedTargetSeat);
     const weapon = ai.equipments?.find((equipment) => equipment.id === state.activeCard?.weaponId);
-    const canSlashForced = forcedTarget && !isDaTrachSlashBlocked(forcedTarget, { subType: CARD_SUBTYPES.SLASH });
-    const slash = ai.hand.find((card) => isSlash(card)
-      && weapon && forcedTargetSeat > 0 && canSlashForced && hasWeaponRange(state, aiSeat, forcedTargetSeat));
+    const canSlashForced = forcedTarget && !isDaTrachSlashBlocked(forcedTarget, { subType: CARD_SUBTYPES.ATTACK_NORMAL });
+    const slash = cheapest(ai.hand).find((card) => isSlash(card)
+      && weapon && forcedTargetSeat > 0 && canSlashForced && !areTeammatesInState(state, aiSeat, forcedTargetSeat)
+      && hasWeaponRange(state, aiSeat, forcedTargetSeat));
     return slash
       ? handleRespondAction(state, aiSeat, true, slash.id)
       : handleRespondAction(state, aiSeat, false, null);
@@ -9411,11 +9321,11 @@ export function handleAIReaction(state, aiSeat) {
   if (state.phase === "AWAIT_DAN_CAU" && state.waitingTargetSeat === aiSeat) {
     const forcedTargetSeat = Number(state.activeCard?.forcedTargetSeat) || 0;
     const forcedTarget = state.players.find((player) => player.seat === forcedTargetSeat);
-    const canSlashForced = forcedTarget && isLivingPlayer(forcedTarget) && !isDaTrachSlashBlocked(forcedTarget, { subType: CARD_SUBTYPES.SLASH });
+    const canSlashForced = forcedTarget && isLivingPlayer(forcedTarget) && !isDaTrachSlashBlocked(forcedTarget, { subType: CARD_SUBTYPES.ATTACK_NORMAL });
     const isTargetAlly = forcedTarget && areTeammatesInState(state, aiSeat, forcedTargetSeat);
     const slash = ai.hand.find((card) => isSlash(card));
 
-    if (slash && canSlashForced && (!isTargetAlly || forcedTarget.hp > 1)) {
+    if (slash && canSlashForced && !isTargetAlly) {
       return handleRespondAction(state, aiSeat, true, slash.id);
     } else {
       return handleRespondAction(state, aiSeat, false, null);
@@ -9431,8 +9341,8 @@ export function handleAIReaction(state, aiSeat) {
       return handleRespondAction(state, aiSeat, true, "KHIEN_MAY");
     }
     let matchingCard = null;
-    if (reqType === "DODGE") matchingCard = ai.hand.find(c => isDodge(c));
-    else if (reqType === "SLASH") matchingCard = ai.hand.find(c => isSlash(c));
+    if (reqType === "DODGE") matchingCard = cheapest(ai.hand).find(c => canUseCardAsDodge(ai, c));
+    else if (reqType === "SLASH") matchingCard = cheapest(ai.hand).find(c => canUseCardAsSlash(ai, c));
 
     if (matchingCard) {
       return handleRespondAction(state, aiSeat, true, matchingCard.id);
@@ -9442,7 +9352,7 @@ export function handleAIReaction(state, aiSeat) {
   }
 
   if (state.phase === "AWAIT_DUEL" && state.waitingTargetSeat === aiSeat) {
-    const slash = ai.hand.find(c => isSlash(c));
+    const slash = cheapest(ai.hand).find(c => canUseCardAsSlash(ai, c));
     if (slash) {
       return handleRespondAction(state, aiSeat, true, slash.id);
     } else {
@@ -9484,8 +9394,14 @@ export function handleAIReaction(state, aiSeat) {
     const flawless = ai.hand.find(c => c.subType === CARD_SUBTYPES.FLAWLESS_DEFENSE || (c.name && c.name.includes("Diệu Kế")));
     if (flawless && chain) {
       const caster = state.players.find(x => x.seat === chain.casterSeat);
-      const isCasterAlly = caster && areTeammatesInState(state, caster.seat, aiSeat);
-      const shouldNullify = (!chain.isCanceled && !isCasterAlly) || (chain.isCanceled && isCasterAlly);
+      const target = state.players.find((p) => p.seat === chain.targetSeat) || caster;
+      const beneficial = [CARD_SUBTYPES.EX_NIHILO, CARD_SUBTYPES.HARVEST, CARD_SUBTYPES.MO_YEN_TIEC,
+        CARD_SUBTYPES.HICH_TUONG_SI, CARD_SUBTYPES.KHO_NHUC_KE].includes(chain.rootCard?.subType);
+      let helpsTeam = target && (beneficial === areTeammatesInState(state, aiSeat, target.seat));
+      if ([CARD_SUBTYPES.SNATCH, CARD_SUBTYPES.DISMANTLE].includes(chain.rootCard?.subType)
+        && target?.judgements?.length && areTeammatesInState(state, aiSeat, target.seat)
+        && areTeammatesInState(state, aiSeat, caster?.seat)) helpsTeam = true;
+      const shouldNullify = target && (chain.isCanceled ? helpsTeam : !helpsTeam);
       if (shouldNullify) {
         return handleRespondAction(state, aiSeat, true, flawless.id);
       }
@@ -9494,8 +9410,10 @@ export function handleAIReaction(state, aiSeat) {
   }
 
   if (state.phase === "AWAIT_SONG_CUNG_FOLLOW_UP" && state.waitingTargetSeat === aiSeat) {
-    const costs = [...ai.hand, ...(ai.equipments || [])].filter((card) => card.id !== state.activeCard?.songCungCardId);
-    if (costs.length >= 2) {
+    const target = state.players.find((p) => p.seat === state.activeCard?.targetSeat);
+    const costs = cheapest([...ai.hand, ...(ai.equipments || [])].filter((card) => card.id !== state.activeCard?.songCungCardId));
+    if (target && !areTeammatesInState(state, aiSeat, target.seat) && costs.length >= 2
+      && (target.hp <= 1 || costs.slice(0, 2).reduce((sum, c) => sum + aiCardKeepValue(ai, c, state), 0) < 75)) {
       return handleRespondAction(state, aiSeat, true, null, null, costs.slice(0, 2).map((card) => card.id));
     }
     return handleRespondAction(state, aiSeat, false, null);
@@ -9503,28 +9421,28 @@ export function handleAIReaction(state, aiSeat) {
 
   if (state.phase === "AWAIT_TARGET_CARD" && state.waitingTargetSeat === aiSeat) {
     const selection = state.targetCardSelection;
-    let chosenOption = selection?.options?.[0];
+    const optionValue = (option) => {
+      if (selection.effectType === "AN_DAN") {
+        const [, from, , to] = option.token.split('|');
+        return (areTeammatesInState(state, aiSeat, Number(from)) ? 100 : -100)
+          + (areTeammatesInState(state, aiSeat, Number(to)) ? -100 : 100);
+      }
+      const owner = state.players.find((p) => p.seat === (option.ownerSeat || option.targetSeat || selection.targetSeat));
+      const friendly = owner && areTeammatesInState(state, aiSeat, owner.seat);
+      const ownCost = owner?.seat === aiSeat && selection.operation === "DESTROY";
+      const card = option.card || (ownCost && option.zone === "HAND" ? ai.hand[Number(option.token.split(':')[1])] : null);
+      const value = option.zone === "EQUIPMENT" ? aiEquipmentValue(owner || ai, card) : card ? aiCardKeepValue(owner || ai, card, state) : 30;
+      if (ownCost) return -value;
+      if (option.zone === "JUDGEMENT") return friendly ? 200 : -100;
+      return friendly ? -200 - value : value;
+    };
+    let chosenOption = [...(selection?.options || [])].sort((a, b) => optionValue(b) - optionValue(a))[0];
     if (selection?.effectType === "DAI_VIET_COLOR") {
       const colors = ["RED", "WHITE", "YELLOW", "BLACK"];
-      colors.sort((left, right) => (ai.hand || []).filter((card) => cardColor(card.suit) === right).length - (ai.hand || []).filter((card) => cardColor(card.suit) === left).length);
+      const colorValue = (color) => (ai.hand || []).filter((card) => cardColor(card.suit) === color)
+        .reduce((sum, card) => sum + (isDodge(card) ? 0.1 : isPeach(card) && ai.hp === ai.maxHp ? 0.2 : 1), 0);
+      colors.sort((left, right) => colorValue(right) - colorValue(left));
       chosenOption = selection.options?.find((option) => option.token === `DAI_VIET:${colors[0]}`) || chosenOption;
-    }
-    if (selection?.effectType === "DOAN_DAO") {
-      chosenOption = selection.options?.find((option) => option.zone === "EQUIPMENT") || chosenOption;
-    }
-    if (selection?.effectType === "UU_THIEP") {
-      const enemyOption = selection.options?.find(opt => {
-        const owner = opt.ownerSeat || opt.targetSeat;
-        return owner && !areTeammatesInState(state, aiSeat, owner);
-      });
-      if (enemyOption) chosenOption = enemyOption;
-    }
-    if (selection?.effectType === "TRIEU_DANG") {
-      const targetOption = selection.options?.find(opt => {
-        const owner = opt.ownerSeat || opt.targetSeat || selection.targetSeat;
-        return owner && !areTeammatesInState(state, aiSeat, owner);
-      }) || selection.options?.[0];
-      if (targetOption) chosenOption = targetOption;
     }
     const token = chosenOption?.token || null;
     return handleRespondAction(state, aiSeat, true, null, token);
@@ -9536,33 +9454,33 @@ export function handleAIReaction(state, aiSeat) {
   }
 
   if (state.phase === "AWAIT_HICH_CASTER_DISCARD" && state.waitingTargetSeat === aiSeat) {
-    const card = ai.hand[0];
+    const card = cheapest(ai.hand)[0];
     return card ? handleRespondAction(state, aiSeat, true, card.id) : handleRespondAction(state, aiSeat, false, null);
   }
 
   if (state.phase === "AWAIT_HICH_TARGET_DISCARD" && state.waitingTargetSeat === aiSeat) {
-    const card = ai.hand[0];
+    const card = cheapest(ai.hand)[0];
     return card ? handleRespondAction(state, aiSeat, true, card.id) : handleRespondAction(state, aiSeat, false, null);
   }
 
   if (state.phase === "AWAIT_THUY_TRIEU_RUT_GIVE" && state.waitingTargetSeat === aiSeat) {
-    const card = ai.hand[0];
+    const card = cheapest(ai.hand)[0];
     return card ? handleRespondAction(state, aiSeat, true, card.id) : { error: "Không còn lá để đưa cho Thủy Triều Rút" };
   }
 
   if (state.phase === "AWAIT_DRUM_CHOICE" && state.waitingTargetSeat === aiSeat) {
-    const card = ai.hand[0];
+    const card = cheapest(ai.hand)[0];
     return card ? handleRespondAction(state, aiSeat, true, card.id) : handleRespondAction(state, aiSeat, false, null);
   }
 
   if (state.phase === "AWAIT_HARVEST" && state.waitingTargetSeat === aiSeat) {
-    const pickedCard = state.harvestPool && state.harvestPool.length > 0 ? state.harvestPool[0] : null;
+    const pickedCard = [...(state.harvestPool || [])].sort((a, b) => aiCardKeepValue(ai, b, state) - aiCardKeepValue(ai, a, state))[0];
     return handleRespondAction(state, aiSeat, true, pickedCard ? pickedCard.id : null);
   }
 
   if (state.phase === "DISCARD" && state.waitingTargetSeat === aiSeat) {
     const excess = ai.hand.length - getHandLimit(ai);
-    const ids = excess > 0 ? ai.hand.slice(0, excess).map((card) => card.id) : [];
+    const ids = excess > 0 ? cheapest(ai.hand).slice(0, excess).map((card) => card.id) : [];
     return handleDiscardCards(state, aiSeat, ids);
   }
 
@@ -9585,7 +9503,8 @@ export function executeFallbackReactionForSeat(state, waitingSeat, waitingPlayer
   } else if (state.phase === "AWAIT_TARGET_CARD" && state.targetCardSelection?.effectType === "DAI_VIET_COLOR") {
     return handleAIReaction(state, waitingSeat);
   } else if (state.phase === "AWAIT_THU_PHAP_DISCARD") {
-    return handleAIReaction(state, waitingSeat);
+    const card = waitingPlayer?.hand?.[0];
+    return card ? handleDiscardCards(state, waitingSeat, [card.id]) : { error: "Không còn lá để bỏ theo Thủ Pháp" };
   } else if (state.phase === "AWAIT_KHUYEN_NONG") {
     return handleAIReaction(state, waitingSeat);
   } else if (state.phase === "AWAIT_TARGET_CARD") {
@@ -9629,7 +9548,8 @@ export function executeFallbackReactionForSeat(state, waitingSeat, waitingPlayer
     return handleUseSkill(state, waitingSeat, "Huynh Trưởng", 0);
   } else if (state.phase === "AWAIT_THU_MUC") {
     return handleRespondAction(state, waitingSeat, false, null);
-  } else if (["AWAIT_DAN_CAU", "AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_CAN_GIAN", "AWAIT_THANG_MOC", "AWAIT_TRUNG_KIEN",
+  } else if (["AWAIT_AN_TICH", "AWAIT_OAI_NHUOC", "AWAIT_CHUYEN_CHE_RESPOND", "AWAIT_BON_PHAN", "AWAIT_NAM_QUOC_SON_HA",
+    "AWAIT_DAN_CAU", "AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_CAN_GIAN", "AWAIT_THANG_MOC", "AWAIT_TRUNG_KIEN",
     "AWAIT_CHINH_THONG_TARGET", "AWAIT_CHINH_THONG_GIVE", "AWAIT_KHOAN_HOA", "AWAIT_NGHIA_TU",
     "AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_UAT_KHI_TARGET",
     "AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_MUU_DINH_CHOICE", "AWAIT_NGHICH_Y"].includes(state.phase)) {
@@ -9639,11 +9559,13 @@ export function executeFallbackReactionForSeat(state, waitingSeat, waitingPlayer
     const discardIds = (waitingPlayer?.hand || []).slice(0, discardCount).map((card) => card.id);
     return handleDiscardCards(state, waitingSeat, discardIds);
   }
-  return { success: true, state };
+  return { error: "Không có phản ứng dự phòng cho giai đoạn đang chờ" };
 }
 
 export function tickGameState(state, connectedSeats = null) {
   if (!state || state.status === "FINISHED") return { changed: false, important: false };
+  checkGameOver(state);
+  if (state.status === "FINISHED") return { changed: true, important: true };
   if (shouldFastForwardAiBattle(state)) return fastForwardAiBattle(state);
   let changed = false;
   let important = false;
@@ -9692,64 +9614,7 @@ export function tickGameState(state, connectedSeats = null) {
           ? handleRespondAction(state, waitingSeat, false, null)
           : handleAIReaction(state, waitingSeat));
       if (!aiRes || aiRes.error) {
-        if (state.phase === "AWAIT_SLASH_DEFENSE") {
-          handleRespondAction(state, waitingSeat, false, null);
-        } else if (state.phase === "AWAIT_BORROW_SWORD") {
-          handleRespondAction(state, waitingSeat, false, null);
-        } else if (state.phase === "AWAIT_NULLIFY") {
-          handleRespondAction(state, waitingSeat, false, null);
-        } else if (state.phase === "AWAIT_TARGET_CARD") {
-          const selection = state.targetCardSelection;
-          const token = selection?.options?.[0]?.token || null;
-          const res = token ? handleRespondAction(state, waitingSeat, true, null, token) : null;
-          if (!res || res.error) {
-            resetTargetCardSelection(state);
-          }
-        } else if (state.phase === "AWAIT_DOAN_DAO_CHOICE") {
-          handleRespondAction(state, waitingSeat, true, null);
-        } else if (state.phase === "AWAIT_HICH_CASTER_DISCARD" || state.phase === "AWAIT_HICH_TARGET_DISCARD"
-          || state.phase === "AWAIT_DRUM_CHOICE") {
-          handleRespondAction(state, waitingSeat, false, null);
-        } else if (state.phase === "AWAIT_THUY_TRIEU_RUT_GIVE") {
-          const card = waitingPlayer?.hand?.[0];
-          if (card) handleRespondAction(state, waitingSeat, true, card.id);
-          else {
-            state.thuyTrieuRutSelection = null;
-            resetWaitingState(state);
-          }
-        } else if (state.phase === "AWAIT_AOE") {
-          handleRespondAction(state, waitingSeat, false, null);
-        } else if (state.phase === "AWAIT_DUEL") {
-          handleRespondAction(state, waitingSeat, false, null);
-        } else if (state.phase === "AWAIT_HARVEST") {
-          handleRespondAction(state, waitingSeat, true, null);
-        } else if (state.phase === "AWAIT_NEAR_DEATH") {
-          handleRespondAction(state, waitingSeat, false, null);
-        } else if (state.phase === "AWAIT_NAM_SON_FOLLOW_UP") {
-          handleRespondAction(state, waitingSeat, false, null);
-        } else if (state.phase === "AWAIT_SONG_CUNG_FOLLOW_UP") {
-          handleRespondAction(state, waitingSeat, false, null);
-		} else if (state.phase === "AWAIT_UAT_KHI") {
-			handleUseSkill(state, waitingSeat, "Uất Khí", 0);
-		} else if (state.phase === "AWAIT_KHOI_BINH") {
-			handleRespondAction(state, waitingSeat, false, null);
-		} else if (state.phase === "AWAIT_HUYNH_TRUONG") {
-			handleUseSkill(state, waitingSeat, "Huynh Trưởng", 0);
-        } else if (state.phase === "AWAIT_THU_MUC") {
-			handleRespondAction(state, waitingSeat, false, null);
-        } else if (state.phase === "AWAIT_THU_PHAP_DISCARD") {
-			const card = waitingPlayer?.hand?.[0];
-			if (card) handleDiscardCards(state, waitingSeat, [card.id]);
-        } else if (["AWAIT_DAN_CAU", "AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_CAN_GIAN", "AWAIT_THANG_MOC", "AWAIT_TRUNG_KIEN",
-			"AWAIT_CHINH_THONG_TARGET", "AWAIT_CHINH_THONG_GIVE", "AWAIT_KHOAN_HOA", "AWAIT_NGHIA_TU",
-			"AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_UAT_KHI_TARGET",
-			"AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_MUU_DINH_CHOICE", "AWAIT_NGHICH_Y", "AWAIT_NAM_QUOC_SON_HA"].includes(state.phase)) {
-			handleRespondAction(state, waitingSeat, false, null);
-        } else if (state.phase === "DISCARD") {
-          const discardCount = Math.max(0, (waitingPlayer?.hand?.length || 0) - getHandLimit(waitingPlayer));
-          const discardIds = (waitingPlayer?.hand || []).slice(0, discardCount).map((card) => card.id);
-          handleDiscardCards(state, waitingSeat, discardIds);
-        }
+        executeFallbackReactionForSeat(state, waitingSeat, waitingPlayer);
       }
       important = true;
       state.timerStartAt = Date.now();
@@ -9762,18 +9627,12 @@ export function tickGameState(state, connectedSeats = null) {
       (Array.isArray(connectedSeats) && !connectedSeats.map(Number).includes(Number(waitingSeat)))
     );
     const isAISlot = waitingPlayer && (waitingPlayer.isAI === true || isDisconnectedOrAway);
-    const canAIReact = !["AWAIT_UAT_KHI", "AWAIT_KHOI_BINH", "AWAIT_HUYNH_TRUONG"].includes(state.phase)
-      && isAISlot
+    const canAIReact = isAISlot
       && (waitingPlayer.hp > 0 || ["AWAIT_NEAR_DEATH", "AWAIT_UAT_KHI_TARGET"].includes(state.phase));
-    if (canAIReact && elapsedMs >= 1200 && elapsed < 40) {
+    if (canAIReact && elapsedMs >= AI_THINK_DELAY_MS && elapsed < 40) {
       const res = handleAIReaction(state, waitingSeat);
-      if (res && !res.error) {
-        important = true;
-        state.timerStartAt = Date.now();
-        return { changed: true, important };
-      }
-      if (isDisconnectedOrAway) {
-        executeFallbackReactionForSeat(state, waitingSeat, waitingPlayer);
+      const reaction = res && !res.error ? res : executeFallbackReactionForSeat(state, waitingSeat, waitingPlayer);
+      if (reaction && !reaction.error) {
         important = true;
         state.timerStartAt = Date.now();
         return { changed: true, important };
@@ -9814,7 +9673,11 @@ export function tickGameState(state, connectedSeats = null) {
       (Array.isArray(connectedSeats) && !connectedSeats.map(Number).includes(Number(state.turnSeat)))
     );
     const isAITurn = turnPlayer && (turnPlayer.isAI || isDisconnectedTurn);
-    if (isAITurn && turnPlayer.hp > 0 && elapsedMs >= 1200 && elapsed < 40) {
+    if ((!turnPlayer || !isLivingPlayer(turnPlayer)) && elapsedMs >= AI_THINK_DELAY_MS) {
+      advanceTurn(state);
+      return { changed: true, important: true };
+    }
+    if (isAITurn && turnPlayer.hp > 0 && elapsedMs >= AI_THINK_DELAY_MS && elapsed < 40) {
       const res = handleAIStep(state, state.turnSeat);
       if (res && res.error) {
         console.log("[AI STEP ERROR]", res.error, state.turnSeat);
@@ -9837,10 +9700,12 @@ export function fastForwardMatchForDeadPlayer(state, requesterSeat) {
   const requester = state?.players?.find((player) => player.seat === Number(requesterSeat));
   if (!requester || isLivingPlayer(requester)) return { error: "Chỉ người đã tử trận mới được tua nhanh" };
   if (state.status === "FINISHED") return { success: true, changed: false };
+  const isAiSlot = (player) => Boolean(player.isAI || player.isAiTakeover || player.isDisconnected);
   const living = state.players.filter((player) => isLivingPlayer(player));
-  if (living.length === 0 || !living.every((player) => player.isAI === true)) {
+  if (living.length === 0 || !living.every(isAiSlot)) {
     return { error: "Chỉ tua nhanh khi những người còn sống đều là AI" };
   }
+  state.fastForwardAiRequested = true;
   const result = fastForwardAiBattle(state);
   return { success: true, changed: result.changed || result.important, fastForwarded: true };
 }
@@ -9963,7 +9828,11 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
   const clientState = {
     version: state.version,
     roomId: state.roomId,
+    modeId: state.modeId,
     status: state.status,
+    winningRole: state.winningRole || "",
+    winningTeamId: state.winningTeamId || "",
+    result: getMatchResult(state, viewerSeat),
     turnSeat: state.turnSeat,
     phase: clientPhase,
     turnTimer: (state.phase === "PLAY") ? remaining : 0,
@@ -10831,7 +10700,7 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
       armorExpired: damageResult?.armorExpired === true,
       description: `💪 ${player.generalName} bỏ [${weapon.name}]${weaponSource === "EQUIPMENT" ? " đang trang bị" : " trên tay"} kích hoạt [Hùng Sức], gây 1 sát thương lên ${target.generalName} rồi rút 1 lá.`
     });
-    if (["AWAIT_UAT_KHI", "AWAIT_KHOI_BINH", "AWAIT_HUYNH_TRUONG", "AWAIT_TRUNG_KIEN", "AWAIT_NGHIA_TU"].includes(state.phase)) {
+    if (state.phase !== "PLAY" && state.phase !== "AWAIT_NEAR_DEATH") {
       state.pendingAfterUatKhi = { type: "HUNG_SUC" };
     } else if (state.phase !== "AWAIT_NEAR_DEATH") {
       resetWaitingState(state);

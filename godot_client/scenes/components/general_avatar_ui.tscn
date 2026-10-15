@@ -299,6 +299,8 @@ theme_override_font_sizes/font_size = 13
 text = "Lý Thường Kiệt"
 horizontal_alignment = 0
 vertical_alignment = 1
+clip_text = true
+text_overrun_behavior = 3
 
 [node name="HealthRail" type="PanelContainer" parent="."]
 z_index = 1

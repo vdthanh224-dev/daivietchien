@@ -1,5 +1,7 @@
 extends Control
 
+const DynastyRoleInfo = preload("res://scripts/dynasty_roles.gd")
+
 # Màn Chọn Tướng 2v2 (Draft Phase) - Chuẩn Unity Battle2v2UI.cs
 # - Tướng xoay tua Thứ 2 hàng tuần (10 tướng Free tuần)
 # - Tướng người chơi đã sở hữu (Appwrite / AuthManager)
@@ -61,6 +63,10 @@ var inspect_skill_desc_lbl: Label
 var lock_in_btn: Button
 var lock_in_btn_lbl: Label
 var role_info_lbl: Label
+var dynasty_role_description: RichTextLabel
+var dynasty_phase_label: RichTextLabel
+var king_hero_portrait: TextureRect
+var king_hero_name_label: Label
 
 func _ready() -> void:
 	var current_room = AppwriteMatchmaking.current_room if AppwriteMatchmaking else {}
@@ -282,7 +288,7 @@ func _setup_draft_slots() -> void:
 	else:
 		# Mặc định 4 ghế chuẩn 2v2 với ghế tương ứng với cửa sổ client
 		var local_seat = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 and NetworkClient.my_seat <= 8 else 1
-		var seat_count := maxi(4, slots.size())
+		var seat_count := 5 if current_mode_id == "dynasty_5" else (8 if current_mode_id == "dynasty_8" else maxi(4, slots.size()))
 		var random_team_seats = range(1, seat_count + 1)
 		random_team_seats.shuffle()
 		var dragon_seats = random_team_seats.slice(0, 2)
@@ -459,16 +465,8 @@ func _build_ui() -> void:
 		var left_col = _build_left_slots_column()
 		left_col.custom_minimum_size = Vector2(250, 0)
 		body_hbox.add_child(left_col)
-	else:
-		var private_col = VBoxContainer.new()
-		private_col.custom_minimum_size = Vector2(250, 0)
-		var private_title = Label.new()
-		private_title.text = "👑 KHU CHỌN TƯỚNG RIÊNG CỦA BẠN"
-		private_title.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
-		private_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		private_col.add_child(private_title)
-		body_hbox.add_child(private_col)
-
+	elif current_mode_id.begins_with("dynasty_"):
+		body_hbox.add_child(_build_dynasty_role_column())
 	# Cột Giữa: Lưới Danh Tướng Khả Dụng (Expand)
 	var center_col = _build_center_grid_column()
 	center_col.size_flags_horizontal = SIZE_EXPAND_FILL
@@ -476,8 +474,101 @@ func _build_ui() -> void:
 
 	# Cột Phải: Soi Tuyệt Kỹ & Khóa Tướng (width: 320px)
 	var right_col = _build_right_inspect_column()
+	right_inspect_panel = right_col
 	right_col.custom_minimum_size = Vector2(320, 0)
 	body_hbox.add_child(right_col)
+	_update_dynasty_draft_ui()
+
+func _build_dynasty_role_column() -> Control:
+	var col = VBoxContainer.new()
+	col.custom_minimum_size.x = 250
+	col.add_theme_constant_override("separation", 12)
+	var title = Label.new()
+	title.text = "VAI TRÒ CỦA BẠN"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 16)
+	title.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+	col.add_child(title)
+	dynasty_role_description = RichTextLabel.new()
+	dynasty_role_description.name = "RoleInstructions"
+	dynasty_role_description.bbcode_enabled = true
+	dynasty_role_description.custom_minimum_size.y = 200
+	dynasty_role_description.size_flags_vertical = SIZE_EXPAND_FILL
+	dynasty_role_description.add_theme_font_size_override("normal_font_size", 14)
+	col.add_child(dynasty_role_description)
+	var king_panel = PanelContainer.new()
+	king_panel.custom_minimum_size.y = 220
+	var style = StyleBoxFlat.new()
+	style.bg_color = COLOR_PANEL_BG
+	style.border_color = DynastyRoleInfo.get_color("KING")
+	style.set_border_width_all(2)
+	style.set_content_margin_all(10)
+	king_panel.add_theme_stylebox_override("panel", style)
+	col.add_child(king_panel)
+	var king_box = VBoxContainer.new()
+	king_box.add_theme_constant_override("separation", 6)
+	king_panel.add_child(king_box)
+	var king_title = Label.new()
+	king_title.text = "TƯỚNG CỦA VUA"
+	king_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	king_title.add_theme_font_size_override("font_size", 15)
+	king_title.add_theme_color_override("font_color", DynastyRoleInfo.get_color("KING"))
+	king_box.add_child(king_title)
+	king_hero_portrait = TextureRect.new()
+	king_hero_portrait.custom_minimum_size.y = 128
+	king_hero_portrait.size_flags_vertical = SIZE_EXPAND_FILL
+	king_hero_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	king_hero_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	king_box.add_child(king_hero_portrait)
+	king_hero_name_label = Label.new()
+	king_hero_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	king_hero_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	king_hero_name_label.add_theme_font_size_override("font_size", 14)
+	king_hero_name_label.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+	king_box.add_child(king_hero_name_label)
+	return col
+
+func _get_king_slot() -> Dictionary:
+	for slot in draft_slots:
+		if str(slot.get("role", "")) == "KING":
+			return slot
+	return {}
+
+func _can_reveal_draft_hero(slot: Dictionary) -> bool:
+	var own_seat: int = NetworkClient.my_seat if NetworkClient else 1
+	return int(slot.get("seatNumber", 0)) == own_seat or (current_mode_id.begins_with("dynasty_") and str(slot.get("role", "")) == "KING" and bool(slot.get("isLocked", false)))
+
+func _update_dynasty_draft_ui() -> void:
+	if not current_mode_id.begins_with("dynasty_"):
+		return
+	if is_instance_valid(dynasty_role_description):
+		dynasty_role_description.text = DynastyRoleInfo.instructions(my_role, draft_slots.size())
+	var king_slot := _get_king_slot()
+	var king_locked := bool(king_slot.get("isLocked", false))
+	var phase_text := "VUA đang chọn tướng"
+	if king_locked:
+		phase_text = "Đang chờ những người khác chọn tướng" if my_role == "KING" else "Đang chờ bạn và những người khác chọn tướng"
+	if is_instance_valid(dynasty_phase_label):
+		dynasty_phase_label.text = "[center]%s[/center]" % DynastyRoleInfo.colorize(phase_text)
+	if is_instance_valid(draft_status_lbl):
+		draft_status_lbl.text = phase_text
+		draft_status_lbl.add_theme_color_override("font_color", DynastyRoleInfo.get_color("KING") if not king_locked else COLOR_GOLD_ACCENT)
+	if is_instance_valid(hero_wait_lbl):
+		hero_wait_lbl.hide()
+	if is_instance_valid(role_info_lbl):
+		role_info_lbl.hide()
+	if is_instance_valid(right_inspect_panel):
+		right_inspect_panel.visible = _is_my_turn() or is_player_locked
+	if is_instance_valid(king_hero_name_label):
+		var hero = king_slot.get("chosenHero", {})
+		if king_locked and hero is Dictionary and not hero.is_empty():
+			king_hero_name_label.text = str(hero.get("name", ""))
+			king_hero_name_label.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+			king_hero_portrait.texture = HeroDatabase.get_avatar_texture(hero.get("avatarPath", "")) if HeroDatabase else null
+		else:
+			king_hero_name_label.text = "VUA chưa chọn tướng"
+			king_hero_name_label.add_theme_color_override("font_color", DynastyRoleInfo.get_color("KING"))
+			king_hero_portrait.texture = null
 
 func _build_header() -> void:
 	var header = PanelContainer.new()
@@ -504,12 +595,18 @@ func _build_header() -> void:
 	# Tiêu đề game
 	var title = Label.new()
 	title.text = "👑 ĐẠI VIỆT CHIẾN • CHỌN TƯỚNG %s" % ("VƯƠNG TRIỀU %d NGƯỜI" % draft_slots.size() if draft_slots.size() > 4 else "2v2 XẾP HẠNG")
+	if current_mode_id.begins_with("dynasty_"):
+		title.text = "👑 ĐẠI VIỆT CHIẾN • %d NGƯỜI" % draft_slots.size()
+	title.custom_minimum_size = Vector2(520, 0)
+	title.clip_text = true
+	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	title.tooltip_text = title.text
 	title.add_theme_font_size_override("font_size", 16)
 	title.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 	hbox.add_child(title)
 
 	var spacer1 = Control.new()
-	spacer1.size_flags_horizontal = SIZE_EXPAND_FILL
+	spacer1.size_flags_horizontal = SIZE_FILL
 	hbox.add_child(spacer1)
 
 	# Trạng thái lượt chọn
@@ -518,10 +615,13 @@ func _build_header() -> void:
 	draft_status_lbl.add_theme_font_size_override("font_size", 14)
 	draft_status_lbl.add_theme_color_override("font_color", COLOR_DRAGON_CYAN)
 	draft_status_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	draft_status_lbl.size_flags_horizontal = SIZE_EXPAND_FILL
+	draft_status_lbl.clip_text = true
+	draft_status_lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	hbox.add_child(draft_status_lbl)
 
 	var spacer2 = Control.new()
-	spacer2.size_flags_horizontal = SIZE_EXPAND_FILL
+	spacer2.size_flags_horizontal = SIZE_FILL
 	hbox.add_child(spacer2)
 
 	# Đồng hồ đếm ngược lượt chọn
@@ -616,6 +716,8 @@ func _build_left_slots_column() -> Control:
 		seat_lbl.add_theme_font_size_override("font_size", 12)
 		seat_lbl.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0, 1.0) if slot_data["isPlayer"] else Color.WHITE)
 		seat_lbl.size_flags_horizontal = SIZE_EXPAND_FILL
+		seat_lbl.clip_text = true
+		seat_lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		r1_hbox.add_child(seat_lbl)
 
 		# Row 2: Avatar + Hero Name + Status
@@ -660,12 +762,16 @@ func _build_left_slots_column() -> Control:
 
 		var hero_name_l = Label.new()
 		hero_name_l.text = "Chưa chọn..."
+		hero_name_l.clip_text = true
+		hero_name_l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		hero_name_l.add_theme_font_size_override("font_size", 13)
 		hero_name_l.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 		info_v.add_child(hero_name_l)
 
 		var status_l = Label.new()
 		status_l.text = "⏳ Chờ lượt..."
+		status_l.clip_text = true
+		status_l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		status_l.add_theme_font_size_override("font_size", 11)
 		status_l.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
 		info_v.add_child(status_l)
@@ -687,10 +793,19 @@ func _build_left_slots_column() -> Control:
 func _build_center_grid_column() -> Control:
 	var col = VBoxContainer.new()
 	col.add_theme_constant_override("separation", 6)
+	if current_mode_id.begins_with("dynasty_"):
+		dynasty_phase_label = RichTextLabel.new()
+		dynasty_phase_label.name = "DraftPhaseNotice"
+		dynasty_phase_label.bbcode_enabled = true
+		dynasty_phase_label.fit_content = true
+		dynasty_phase_label.scroll_active = false
+		dynasty_phase_label.add_theme_font_size_override("normal_font_size", 24)
+		col.add_child(dynasty_phase_label)
 
 	var count_str = str(available_heroes.size())
 	var title = Label.new()
 	title.text = "🎴 DANH TƯỚNG KHẢ DỤNG (%s TƯỚNG SỞ HỮU & FREE TUẦN) • Chạm thẻ để xem tuyệt kỹ:" % count_str
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.add_theme_font_size_override("font_size", 13)
 	title.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0, 0.95))
 	col.add_child(title)
@@ -836,6 +951,9 @@ func _create_hero_grid_card(hero: Dictionary) -> Control:
 
 	var name_lbl = Label.new()
 	name_lbl.text = hero.get("name", "")
+	name_lbl.clip_text = true
+	name_lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	name_lbl.tooltip_text = name_lbl.text
 	name_lbl.add_theme_font_size_override("font_size", 11)
 	name_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 	name_lbl.size_flags_horizontal = SIZE_EXPAND_FILL
@@ -906,6 +1024,8 @@ func _create_hero_grid_card(hero: Dictionary) -> Control:
 	var fac_lbl = Label.new()
 	var fac_code = hero.get("faction", "")
 	fac_lbl.text = "🏛️ %s" % fac_code
+	fac_lbl.clip_text = true
+	fac_lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	fac_lbl.add_theme_font_size_override("font_size", 10)
 	if HeroDatabase:
 		fac_lbl.add_theme_color_override("font_color", HeroDatabase.get_faction_color(fac_code))
@@ -926,6 +1046,9 @@ func _create_hero_grid_card(hero: Dictionary) -> Control:
 
 	var skill_lbl = Label.new()
 	skill_lbl.text = "⚡ %s" % HeroDatabase.get_skill_summary(int(hero.get("id", 0)))
+	skill_lbl.clip_text = true
+	skill_lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	skill_lbl.tooltip_text = skill_lbl.text
 	skill_lbl.add_theme_font_size_override("font_size", 10)
 	skill_lbl.add_theme_color_override("font_color", Color(0.4, 0.92, 1.0, 1.0))
 	skill_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -979,6 +1102,7 @@ func _build_right_inspect_column() -> Control:
 	# 1. Tên tướng lớn
 	inspect_title_lbl = Label.new()
 	inspect_title_lbl.text = "LÝ THƯỜNG KIỆT"
+	inspect_title_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	inspect_title_lbl.add_theme_font_size_override("font_size", 18)
 	inspect_title_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 	inspect_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -987,6 +1111,7 @@ func _build_right_inspect_column() -> Control:
 	# 2. Phụ đề thế lực & tag
 	inspect_sub_lbl = Label.new()
 	inspect_sub_lbl.text = "Thế Lực: Thời Lý • Máu: 4 đóa sen [ĐÃ SỞ HỮU]"
+	inspect_sub_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	inspect_sub_lbl.add_theme_font_size_override("font_size", 12)
 	inspect_sub_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
 	inspect_sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1067,10 +1192,16 @@ func _build_right_inspect_column() -> Control:
 
 	var sp_vbox = VBoxContainer.new()
 	sp_vbox.add_theme_constant_override("separation", 6)
-	sp_margin.add_child(sp_vbox)
+	sp_vbox.size_flags_horizontal = SIZE_EXPAND_FILL
+	var skill_scroll = ScrollContainer.new()
+	skill_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	skill_scroll.size_flags_vertical = SIZE_EXPAND_FILL
+	skill_scroll.add_child(sp_vbox)
+	sp_margin.add_child(skill_scroll)
 
 	inspect_skill_title_lbl = Label.new()
 	inspect_skill_title_lbl.text = "⚡ TUYỆT KỸ: [TIẾN THOÁI]"
+	inspect_skill_title_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	inspect_skill_title_lbl.add_theme_font_size_override("font_size", 13)
 	inspect_skill_title_lbl.add_theme_color_override("font_color", COLOR_GOLD_PRIMARY)
 	sp_vbox.add_child(inspect_skill_title_lbl)
@@ -1163,6 +1294,12 @@ func _inspect_hero(hero: Dictionary) -> void:
 
 func _is_my_turn() -> bool:
 	var my_seat_num = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 and NetworkClient.my_seat <= 8 else 1
+	if current_mode_id.begins_with("dynasty_"):
+		var king_slot := _get_king_slot()
+		var own_idx := _find_draft_slot_index(my_seat_num)
+		if king_slot.is_empty() or own_idx < 0 or bool(draft_slots[own_idx].get("isLocked", false)):
+			return false
+		return my_role == "KING" if not bool(king_slot.get("isLocked", false)) else true
 	# Vương Triều: sau khi Quân Vương khóa, mỗi ghế còn lại được chọn độc lập.
 	if current_mode_id.begins_with("dynasty_") and draft_slots.size() > 4 and bool(draft_slots[0].get("isLocked", false)):
 		var own_idx := _find_draft_slot_index(my_seat_num)
@@ -1427,13 +1564,15 @@ func _highlight_active_picker(idx: int = -1) -> void:
 
 func _lock_hero_for_slot(slot: Dictionary, hero: Dictionary) -> void:
 	var hid = int(hero.get("id", 1))
-	if not hid in selected_hero_ids:
-		selected_hero_ids.append(hid)
 	slot["chosenHero"] = hero
 	slot["isLocked"] = true
 
 	if slot["isPlayer"]:
 		is_player_locked = true
+	if not _can_reveal_draft_hero(slot):
+		return
+	if not hid in selected_hero_ids:
+		selected_hero_ids.append(hid)
 
 	AudioManager.play_card_select()
 
@@ -1641,7 +1780,7 @@ func _on_network_draft_joined(assigned_seat: int) -> void:
 func _on_server_draft_hover_updated(seat: int, hero_id: int, hero_name: String) -> void:
 	if not is_draft_active:
 		return
-	if current_mode_id.begins_with("dynasty_"):
+	if seat != (NetworkClient.my_seat if NetworkClient else 1):
 		return
 	for local_s in draft_slots:
 		if int(local_s.get("seatNumber", local_s.get("seat", 0))) == seat:
@@ -1694,7 +1833,7 @@ func _on_network_draft_closed() -> void:
 	_server_state_received = false
 	draft_status_lbl.text = "⚠️ Mất kết nối máy chủ chọn tướng, đang kết nối lại..."
 
-func _apply_authoritative_draft_slots(server_slots: Array) -> void:
+func _apply_authoritative_draft_slots(server_slots: Array, reveal_for_battle: bool = false) -> void:
 	if server_slots.is_empty():
 		return
 	for s_info in server_slots:
@@ -1712,13 +1851,17 @@ func _apply_authoritative_draft_slots(server_slots: Array) -> void:
 			local_s["isDragon"] = bool(s_info.get("isDragon", local_s.get("isDragon", false)))
 			if int(s_info.get("seatNumber", s_info.get("seat", 0))) == (NetworkClient.my_seat if NetworkClient else 0):
 				my_role = str(s_info.get("role", my_role))
-			local_s["role"] = str(s_info.get("role", local_s.get("role", "")))
-			local_s["roleTag"] = "VƯƠNG" if local_s["role"] == "KING" else "?"
+			local_s["role"] = str(s_info.get("role", ""))
+			local_s["roleTag"] = DynastyRoleInfo.display_name(local_s["role"])
 			local_s["isAI"] = bool(s_info.get("isAI", local_s.get("isAI", false)))
 			var hid = int(s_info.get("heroId", 0))
 			var server_locked := bool(s_info.get("isLocked", false))
 			var is_own_slot: bool = s_num == (NetworkClient.my_seat if NetworkClient else 0)
-			# Other players expose only that they have locked a pick; their hero stays hidden.
+			if is_own_slot:
+				is_player_locked = server_locked
+			# A locked VUA is public. All other players remain hidden until battle data arrives.
+			if not reveal_for_battle and not _can_reveal_draft_hero({"seatNumber":s_num, "role":local_s["role"], "isLocked":server_locked}):
+				hid = 0
 			var is_locked := server_locked
 			if is_locked:
 				var locked_hero: Dictionary = {}
@@ -1781,13 +1924,20 @@ func _apply_authoritative_draft_slots(server_slots: Array) -> void:
 							status_l.text = "Chờ lượt..."
 							status_l.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
 						break
+			if not _can_reveal_draft_hero(local_s):
+				for node in left_slot_nodes:
+					if int(node.get("data", {}).get("seatNumber", 0)) == s_num:
+						node["avatar"].texture = HeroDatabase.get_avatar_texture("") if HeroDatabase else null
+						node["avatar"].modulate = Color(1, 1, 1, 0.4)
+						node["hero_name"].text = "Tướng được giữ kín" if server_locked else "Chưa chọn..."
+						break
 			for node in left_slot_nodes:
 				if int(node.get("data", {}).get("seatNumber", 0)) != s_num:
 					continue
 				var team_lbl = node.get("team")
 				if team_lbl and is_instance_valid(team_lbl):
-					team_lbl.text = "VƯƠNG" if str(local_s.get("role", "")) == "KING" else "?"
-					team_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT if str(local_s.get("role", "")) == "KING" else COLOR_TEXT_MUTED)
+					team_lbl.text = DynastyRoleInfo.display_name(str(local_s.get("role", "")))
+					team_lbl.add_theme_color_override("font_color", DynastyRoleInfo.get_color(str(local_s.get("role", ""))))
 				var av_bg = node.get("bg")
 				if av_bg and is_instance_valid(av_bg):
 					av_bg.texture = preload("res://assets/ui/hero_backgrounds/bg_hero_white.png")
@@ -1798,7 +1948,7 @@ func _apply_authoritative_draft_slots(server_slots: Array) -> void:
 			break
 	selected_hero_ids.clear()
 	for local_s in draft_slots:
-		if local_s.get("isLocked", false):
+		if local_s.get("isLocked", false) and _can_reveal_draft_hero(local_s):
 			var chosen = local_s.get("chosenHero", {})
 			if chosen is Dictionary and chosen.has("id"):
 				selected_hero_ids.append(int(chosen["id"]))
@@ -1819,7 +1969,7 @@ func _apply_authoritative_draft_slots(server_slots: Array) -> void:
 				_pending_pick_hero_id = 0
 				_pending_pick_seat = 0
 				is_player_locked = true
-			elif is_locked or current_picker_index != _find_draft_slot_index(_pending_pick_seat):
+			elif is_locked or not _is_my_turn():
 				_pending_pick_hero_id = 0
 				_pending_pick_seat = 0
 				is_player_locked = is_locked
@@ -1829,14 +1979,7 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 		return
 	_server_state_received = true
 	var revision := int(data.get("revision", 0))
-	var server_slots_preview = data.get("slots", [])
-	var has_locked_state = false
-	if server_slots_preview is Array:
-		for preview_slot in server_slots_preview:
-			if preview_slot is Dictionary and bool(preview_slot.get("isLocked", false)):
-				has_locked_state = true
-				break
-	if revision > 0 and revision < _last_draft_revision and not has_locked_state:
+	if revision > 0 and revision < _last_draft_revision:
 		return
 	if revision > 0:
 		_last_draft_revision = revision
@@ -1887,9 +2030,9 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 
 	# Đồng bộ trạng thái khóa và phe từ Server.
 	var server_slots = data.get("slots", [])
-	var is_my_active_seat := current_mode_id != "2v2" or active_pick_seats.has(server_seat)
 	if server_slots is Array:
 		_apply_authoritative_draft_slots(server_slots)
+		var is_my_active_seat := _is_my_turn()
 		# Đồng bộ danh sách tướng ứng cử viên riêng biệt của người chơi này (disjoint candidateHeroIds)
 		for s_info in server_slots:
 			if not (s_info is Dictionary):
@@ -1931,16 +2074,30 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 
 	_highlight_active_picker(current_picker_index)
 	_update_lock_in_button_state()
+	if current_mode_id.begins_with("dynasty_"):
+		if _is_my_turn():
+			var inspecting_id := int(inspecting_hero.get("id", 0))
+			if inspecting_id <= 0 or not hero_card_nodes.has(inspecting_id) or inspecting_id in selected_hero_ids:
+				var candidate := _get_first_available_candidate()
+				if not candidate.is_empty():
+					_inspect_hero(candidate)
+		if is_player_locked:
+			var own_idx := _find_draft_slot_index(server_seat)
+			var own_hero = draft_slots[own_idx].get("chosenHero", {}) if own_idx >= 0 else {}
+			if own_hero is Dictionary and not own_hero.is_empty() and (hero_card_nodes.size() != 1 or not hero_card_nodes.has(int(own_hero.get("id", 0)))):
+				_rebuild_hero_grid([own_hero])
+		_update_dynasty_draft_ui()
+		return
 
 	# Cập nhật nhãn trạng thái theo lượt
 	var active_slot: Dictionary = draft_slots[current_picker_index] if current_picker_index < draft_slots.size() else {}
 	if current_mode_id.begins_with("dynasty_") and not my_role.is_empty():
-		var role_name: String = str({"KING": "Quân Vương", "LOYALIST": "Trung Thần", "REBEL": "Phản Tặc", "SPY": "Nội Gián"}.get(my_role, my_role))
+		var role_name: String = DynastyRoleInfo.display_name(my_role)
 		var role_goal: String = str({"KING": "bảo vệ bản thân và tiêu diệt mọi kẻ thù", "LOYALIST": "tiêu diệt hết Phản Tặc và Nội Gián", "REBEL": "tiêu diệt Quân Vương", "SPY": "tiêu diệt tất cả ngoại trừ Quân Vương, sau đó tiêu diệt Quân Vương"}.get(my_role, "hoàn thành mục tiêu vai trò"))
 		var role_text: String = "Bạn là %s\n%s\nNgồi vị trí: %d" % [role_name, role_goal, NetworkClient.my_seat if NetworkClient else 1]
 		if role_info_lbl and is_instance_valid(role_info_lbl):
 			role_info_lbl.text = role_text
-			role_info_lbl.add_theme_color_override("font_color", {"KING": COLOR_PHOENIX_RED, "LOYALIST": COLOR_GOLD_ACCENT, "REBEL": Color(0.3, 0.95, 0.45), "SPY": Color(0.3, 0.65, 1.0)}.get(my_role, COLOR_TEXT_MUTED))
+			role_info_lbl.add_theme_color_override("font_color", DynastyRoleInfo.get_color(my_role))
 	if _is_my_turn():
 		if not is_player_locked:
 			var cur_hid = int(inspecting_hero.get("id", 0)) if inspecting_hero is Dictionary else 0
@@ -1975,7 +2132,7 @@ func _on_server_draft_completed(data: Dictionary) -> void:
 	if is_draft_active:
 		var server_slots = data.get("slots", [])
 		if server_slots is Array:
-			_apply_authoritative_draft_slots(server_slots)
+			_apply_authoritative_draft_slots(server_slots, true)
 		current_picker_index = draft_slots.size()
 		_on_draft_completed()
 

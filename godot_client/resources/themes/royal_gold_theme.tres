@@ -1,4 +1,6 @@
-[gd_resource type="Theme" load_steps=6 format=3 uid="uid://b05m7n22yifmf"]
+[gd_resource type="Theme" load_steps=7 format=3 uid="uid://b05m7n22yifmf"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_focus"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_disabled"]
 content_margin_left = 16.0
@@ -95,8 +97,13 @@ Button/colors/font_focus_color = Color(0.109804, 0.086275, 0.047059, 1)
 Button/colors/font_hover_color = Color(0.14902, 0.101961, 0.019608, 1)
 Button/colors/font_pressed_color = Color(0.078431, 0.058824, 0.019608, 1)
 Button/styles/disabled = SubResource("StyleBoxFlat_disabled")
-Button/styles/focus = SubResource("StyleBoxFlat_hover")
+Button/styles/focus = SubResource("StyleBoxEmpty_focus")
 Button/styles/hover = SubResource("StyleBoxFlat_hover")
 Button/styles/normal = SubResource("StyleBoxFlat_normal")
 Button/styles/pressed = SubResource("StyleBoxFlat_pressed")
+FlatButton/styles/disabled = SubResource("StyleBoxEmpty_focus")
+FlatButton/styles/focus = SubResource("StyleBoxEmpty_focus")
+FlatButton/styles/hover = SubResource("StyleBoxEmpty_focus")
+FlatButton/styles/normal = SubResource("StyleBoxEmpty_focus")
+FlatButton/styles/pressed = SubResource("StyleBoxEmpty_focus")
 Panel/styles/panel = SubResource("StyleBoxFlat_panel")

@@ -65,8 +65,8 @@ assert.equal(playRes.success, true);
 assert.equal(state.phase, "AWAIT_SLASH_DEFENSE");
 assert.equal(state.waitingTargetSeat, 2);
 
-// Giả lập thời gian trôi qua 1.3s (>1200ms) với connectedSeats chỉ gồm [1, 3, 4]
-state.timerStartAt = Date.now() - 1300;
+// Giả lập thời gian trôi qua hơn thời gian suy nghĩ 2.5s với connectedSeats chỉ gồm [1, 3, 4]
+state.timerStartAt = Date.now() - 2600;
 const tickRes = tickGameState(state, [1, 3, 4]);
 assert.equal(tickRes.changed, true);
 // Bot AI của P2 phải tự động phản ứng (dùng Đỡ để tránh mất máu)
@@ -80,7 +80,7 @@ state.phase = "PLAY";
 state.turnSeat = 2;
 p2.hand = [{ id: "PEACH_1", name: "Bánh Chưng", suit: "Heart", rank: 5, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH }];
 p2.hp = 2; // Đang bị thương
-state.timerStartAt = Date.now() - 1300;
+state.timerStartAt = Date.now() - 2600;
 
 // Tick chạy với connectedSeats = [1, 3, 4] (Seat 2 vắng mặt)
 const turnTickRes = tickGameState(state, [1, 3, 4]);

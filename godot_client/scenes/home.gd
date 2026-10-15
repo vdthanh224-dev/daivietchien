@@ -37,6 +37,7 @@ var modal_title_label: Label
 var modal_scroll: ScrollContainer
 var modal_content_container: VBoxContainer
 var mail_badge: Control = null
+var checkin_btn_ref: Button = null
 
 # Player State
 var current_silver: int = 5000
@@ -197,6 +198,9 @@ func _build_ui() -> void:
 	_build_top_header()
 
 	# 8. Modal Overlay Layer
+	var chat = preload("res://scenes/components/chat_panel.gd").new()
+	chat.channel = "lobby"
+	add_child(chat)
 	_build_modal_layer()
 
 func _build_top_header() -> void:
@@ -581,13 +585,7 @@ func _build_right_action_deck() -> void:
 
 	battle_cta_btn = Button.new()
 	battle_cta_btn.set_anchors_preset(PRESET_FULL_RECT)
-	battle_cta_btn.flat = true
-	battle_cta_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	var empty_sb = StyleBoxEmpty.new()
-	battle_cta_btn.add_theme_stylebox_override("normal", empty_sb)
-	battle_cta_btn.add_theme_stylebox_override("hover", empty_sb)
-	battle_cta_btn.add_theme_stylebox_override("pressed", empty_sb)
-	battle_cta_btn.add_theme_stylebox_override("focus", empty_sb)
+	_style_transparent_button(battle_cta_btn)
 	battle_cta_btn.pressed.connect(_on_battle_cta_pressed)
 	battle_card.add_child(battle_cta_btn)
 
@@ -845,8 +843,8 @@ func _build_right_action_deck() -> void:
 
 	var modes_list = [
 		{"id": "2v2", "icon": "⚔️", "title": "Đấu Trường 2v2", "sub": "Xếp Hạng"},
-		{"id": "dynasty_5", "icon": "👑", "title": "Vương Triều 5 người", "sub": "(Sắp ra mắt)"},
-		{"id": "dynasty_8", "icon": "👑", "title": "Vương Triều 8 người", "sub": "(Sắp ra mắt)"}
+		{"id": "dynasty_5", "icon": "👑", "title": "Vương Triều 5 người", "sub": "Vương Triều"},
+		{"id": "dynasty_8", "icon": "👑", "title": "Vương Triều 8 người", "sub": "Vương Triều"}
 	]
 
 	for m in modes_list:
@@ -965,10 +963,11 @@ func _build_15day_event_content() -> Control:
 
 	# Nút bấm hình Hộp quà / Rương báu
 	var chest_btn = Button.new()
-	chest_btn.flat = true
-	chest_btn.custom_minimum_size = Vector2(0, 56)
+	_style_transparent_button(chest_btn)
+	chest_btn.custom_minimum_size = Vector2(0, 72)
 
 	var cl_margin = MarginContainer.new()
+	cl_margin.set_anchors_preset(PRESET_FULL_RECT)
 	cl_margin.add_theme_constant_override("margin_left", 14)
 	cl_margin.add_theme_constant_override("margin_right", 14)
 	cl_margin.add_theme_constant_override("margin_top", 8)
@@ -1222,7 +1221,7 @@ func _build_15day_event_content() -> Control:
 	top10_hdr_box.add_child(th_sp)
 
 	var live_tag = Label.new()
-	live_tag.text = "🟢 Live từ Appwrite Singapore"
+	live_tag.text = "🟢"
 	live_tag.add_theme_font_size_override("font_size", 11)
 	live_tag.add_theme_color_override("font_color", Color(0.35, 0.85, 0.45, 1.0))
 	top10_hdr_box.add_child(live_tag)
@@ -1332,9 +1331,11 @@ func _build_15day_event_content() -> Control:
 	checkin_btn.custom_minimum_size = Vector2(170, 44)
 	_style_secondary_mode_button(checkin_btn)
 	checkin_btn.pressed.connect(func():
+		AudioManager.play_card_select()
 		_show_modal("QUÀ ĐIỂM DANH 7 NGÀY", _build_7day_rewards_content())
 	)
 	act_row.add_child(checkin_btn)
+	checkin_btn_ref = checkin_btn
 
 	var lb_full_btn = Button.new()
 	lb_full_btn.text = "👑 Bảng Phong Thần"
@@ -1625,6 +1626,25 @@ func _style_glass_action_button(btn: Button, radius: int, border_col: Color) -> 
 	btn.add_theme_stylebox_override("focus", hover)
 	btn.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
 	btn.add_theme_font_size_override("font_size", 12)
+
+## Hàm dùng chung cho các nút dạng overlay / card / thu nhỏ mở rộng
+## Đảm bảo khi click hoặc ở trạng thái đang chọn (focus/pressed) KHÔNG BAO GIỜ bị phủ trắng
+func _style_transparent_button(btn: Button, keep_pointer_cursor: bool = true) -> Button:
+	if not is_instance_valid(btn):
+		return btn
+	if UIScaleManager and UIScaleManager.has_method("style_transparent_button"):
+		return UIScaleManager.style_transparent_button(btn, keep_pointer_cursor)
+	btn.flat = true
+	btn.focus_mode = Control.FOCUS_NONE
+	if keep_pointer_cursor:
+		btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var empty_sb = StyleBoxEmpty.new()
+	btn.add_theme_stylebox_override("normal", empty_sb)
+	btn.add_theme_stylebox_override("hover", empty_sb)
+	btn.add_theme_stylebox_override("pressed", empty_sb)
+	btn.add_theme_stylebox_override("focus", empty_sb)
+	btn.add_theme_stylebox_override("disabled", empty_sb)
+	return btn
 
 func _style_bronze_drum_cta(btn: Button) -> void:
 	var normal = StyleBoxFlat.new()
@@ -2204,6 +2224,7 @@ func _load_user_data() -> void:
 		_update_quest_nav_indicator()
 		_refresh_inventory_content()
 		_update_mail_badge()
+		_update_checkin_button_status()
 
 # --- Ambient Particle Embers ---
 func _start_ambient_effects() -> void:
@@ -3293,8 +3314,7 @@ void fragment() {
 		# Clickable Button overlay
 		var click_btn = Button.new()
 		click_btn.set_anchors_preset(PRESET_FULL_RECT)
-		click_btn.flat = true
-		click_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		_style_transparent_button(click_btn)
 		var captured_hero = h
 		var captured_owned = is_owned
 		click_btn.pressed.connect(func():
@@ -3935,8 +3955,7 @@ void fragment() {
 		# Click card thumbnail or preview to preview portrait on the left
 		var preview_click = Button.new()
 		preview_click.set_anchors_preset(PRESET_FULL_RECT)
-		preview_click.flat = true
-		preview_click.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		_style_transparent_button(preview_click)
 		preview_click.pressed.connect(func():
 			preview_action.call()
 		)
@@ -4069,6 +4088,18 @@ func _build_heroes_content() -> Control:
 	return dummy
 
 # --- QUÀ 7 NGÀY ĐIỂM DANH ---
+func _update_checkin_button_status() -> void:
+	if not is_instance_valid(checkin_btn_ref):
+		return
+	if AuthManager:
+		var claimed_cnt = AuthManager.checkin_7day_claimed.size()
+		if claimed_cnt >= 7:
+			checkin_btn_ref.text = "👑 Điểm Danh (7/7 Xong)"
+		elif AuthManager.can_claim_checkin_today():
+			checkin_btn_ref.text = "⭐ Điểm Danh (Có Quà!)"
+		else:
+			checkin_btn_ref.text = "⭐ Điểm Danh (%d/7)" % claimed_cnt
+
 func _build_7day_rewards_content() -> Control:
 	var container = VBoxContainer.new()
 	container.add_theme_constant_override("separation", 14)
@@ -4234,10 +4265,12 @@ func _build_7day_rewards_content() -> Control:
 			claim_btn.text = "🎁 NHẬN NGAY"
 			_style_bronze_drum_cta(claim_btn)
 			claim_btn.pressed.connect(func():
+				claim_btn.disabled = true
 				if AuthManager:
 					AuthManager.claim_7day_reward(d_num)
 				AudioManager.play_victory()
 				_refresh_user_profile_ui()
+				_update_checkin_button_status()
 				_show_modal("QUÀ ĐIỂM DANH 7 NGÀY", _build_7day_rewards_content())
 			)
 		else:
@@ -4523,7 +4556,13 @@ func _show_fullscreen_than_dien() -> void:
 	stage_hbox.size_flags_horizontal = SIZE_EXPAND_FILL
 	stage_hbox.size_flags_vertical = SIZE_EXPAND_FILL
 	stage_hbox.add_theme_constant_override("separation", 20)
-	stage_margin.add_child(stage_hbox)
+	# Kỹ năng dài được cuộn trong sân khấu, giữ thanh hiệu triệu trong màn hình.
+	var stage_scroll = ScrollContainer.new()
+	stage_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	stage_scroll.size_flags_horizontal = SIZE_EXPAND_FILL
+	stage_scroll.size_flags_vertical = SIZE_EXPAND_FILL
+	stage_margin.add_child(stage_scroll)
+	stage_scroll.add_child(stage_hbox)
 
 	# --- WING 1: FEATURED HERO SPOTLIGHT ALTAR (LEFT, ~460px) ---
 	var featured_ids = [3, 9, 22, 1, 4, 5, 10, 18, 29, 30, 31, 35, 36, 37, 38, 40]
@@ -4821,6 +4860,8 @@ func _show_fullscreen_than_dien() -> void:
 
 	var prog_title = Label.new()
 	prog_title.text = "📜 BÁCH TƯỚNG BẢNG (TIẾN ĐỘ THU THẬP TƯỚNG 1 → 40)"
+	prog_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	prog_title.size_flags_horizontal = SIZE_EXPAND_FILL
 	prog_title.add_theme_font_size_override("font_size", 13)
 	prog_title.add_theme_color_override("font_color", Color(1.0, 0.88, 0.42, 1.0))
 	prog_header.add_child(prog_title)
@@ -4864,6 +4905,7 @@ func _show_fullscreen_than_dien() -> void:
 	# Section 2: Pool Showcase Roster (4 Mini Hero Cards)
 	var pool_hdr = Label.new()
 	pool_hdr.text = "⭐ MỘT SỐ HÀO KIỆT NỔI BẬT ĐANG CÓ MẶT TRONG BỂ HIỆU TRIỆU:"
+	pool_hdr.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	pool_hdr.add_theme_font_size_override("font_size", 12)
 	pool_hdr.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
 	tp_vbox.add_child(pool_hdr)
@@ -4955,8 +4997,7 @@ func _show_fullscreen_than_dien() -> void:
 		# Clickable button overlay to switch spotlight
 		var m_btn = Button.new()
 		m_btn.set_anchors_preset(PRESET_FULL_RECT)
-		m_btn.flat = true
-		m_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		_style_transparent_button(m_btn)
 		var captured_id = hid
 		m_btn.pressed.connect(func():
 			AudioManager.play_card_select()
@@ -4993,24 +5034,28 @@ func _show_fullscreen_than_dien() -> void:
 
 	var r_title = Label.new()
 	r_title.text = "⚖️ QUY TẮC HIỆU TRIỆU & BẢO HIỂM TRÙNG LẶP:"
+	r_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	r_title.add_theme_font_size_override("font_size", 12)
 	r_title.add_theme_color_override("font_color", Color(1.0, 0.88, 0.42, 1.0))
 	rpv.add_child(r_title)
 
 	var r1 = Label.new()
 	r1.text = "• Bể Hiệu Triệu gồm toàn bộ 40 Hào Kiệt Đại Việt lịch sử đầu tiên (ID từ 1 đến 40)."
+	r1.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	r1.add_theme_font_size_override("font_size", 11)
 	r1.add_theme_color_override("font_color", Color(0.85, 0.88, 0.92, 0.95))
 	rpv.add_child(r1)
 
 	var r2 = Label.new()
 	r2.text = "• Khi quay trúng Danh Tướng đã sở hữu → Tự động quy đổi thành +1,000 BẠC 🥈 nạp ngay vào ngân khố!"
+	r2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	r2.add_theme_font_size_override("font_size", 11)
 	r2.add_theme_color_override("font_color", Color(1.0, 0.90, 0.45, 1.0))
 	rpv.add_child(r2)
 
 	var r3 = Label.new()
 	r3.text = "• Nhận thêm Vé Triệu Hồi và Bạc miễn phí mỗi ngày tại Quà 7 Ngày Điểm Danh!"
+	r3.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	r3.add_theme_font_size_override("font_size", 11)
 	r3.add_theme_color_override("font_color", Color(0.4, 0.92, 0.6, 0.95))
 	rpv.add_child(r3)
@@ -5461,7 +5506,7 @@ func _build_insufficient_tickets_content(needed: int) -> Control:
 	container.add_child(btn_hbox)
 
 	var btn_shop = Button.new()
-	btn_shop.text = "🪙 MUA VÉ TẠI TRÂN BẢO CÁC (39K BẠC)"
+	btn_shop.text = "🪙 MUA VÉ TẠI TRÂN BẢO CÁC (25K BẠC)"
 	btn_shop.custom_minimum_size = Vector2(280, 42)
 	_style_bronze_drum_cta(btn_shop)
 	btn_shop.pressed.connect(func():
@@ -5588,8 +5633,7 @@ func _show_28_heroes_modal() -> void:
 		# Click card to show detail popup
 		var click_btn = Button.new()
 		click_btn.set_anchors_preset(PRESET_FULL_RECT)
-		click_btn.flat = true
-		click_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		_style_transparent_button(click_btn)
 		var captured_hero = h
 		var captured_owned = is_owned
 		click_btn.pressed.connect(func():
@@ -5822,7 +5866,7 @@ func _fetch_and_render_leaderboard(table_rows_container: VBoxContainer, bottom_p
 				_leaderboard_cached_players = players
 			if is_instance_valid(server_status_lbl):
 				var count_real = _leaderboard_cached_players.size()
-				server_status_lbl.text = "🟢• %s" % [count_real, Time.get_time_string_from_system()]
+				server_status_lbl.text = "🟢 %d tướng • %s" % [count_real, Time.get_time_string_from_system()]
 				server_status_lbl.add_theme_color_override("font_color", Color(0.35, 0.85, 0.45))
 			_render_leaderboard_rows(table_rows_container, bottom_pin_container)
 		)
@@ -6459,7 +6503,10 @@ func _update_quest_nav_indicator() -> void:
 	var has_unclaimed: bool = false
 	if DailyQuestSystem and DailyQuestSystem.has_method("has_unclaimed_rewards"):
 		has_unclaimed = DailyQuestSystem.has_unclaimed_rewards()
-	quest_nav_btn.text = "📜  NHIỆM VỤ 🔴" if has_unclaimed else "📜  NHIỆM VỤ"
+	# Thẻ đã có icon và tiêu đề riêng; chỉ cập nhật chấm báo để tránh chồng chữ.
+	quest_nav_btn.text = ""
+	if is_instance_valid(_quest_badge_dot):
+		_quest_badge_dot.visible = has_unclaimed
 
 func _refresh_quests_content() -> void:
 	if is_instance_valid(modal_title_label) and modal_title_label.text == "QUÂN LỆNH TRIỀU ĐÌNH":
@@ -7540,35 +7587,35 @@ func _build_shop_content() -> Control:
 			"badge_bg": Color(0.12, 0.18, 0.28, 0.9),
 			"sub": "Chiêu mộ 1 Danh Tướng tại Thần Điện",
 			"strike": "",
-			"cost_silver": 39000,
+			"cost_silver": 25000,
 			"tickets": 1,
-			"cost_desc": "39.000 Bạc"
+			"cost_desc": "25.000 Bạc"
 		},
 		{
 			"id": "hero_pack_5",
 			"name": "5 Vé Triệu Hồi",
 			"icon": "🎟️",
-			"badge": "🔥 TIẾT KIỆM 10K",
+			"badge": "🔥 GIẢM 15K",
 			"badge_color": Color(1.0, 0.60, 0.20, 1.0),
 			"badge_bg": Color(0.28, 0.10, 0.05, 0.95),
 			"sub": "Đủ 1 lượt Quay 5 Tướng liên hoàn",
-			"strike": "Gốc: 195.000",
-			"cost_silver": 185000,
+			"strike": "Gốc: 125.000",
+			"cost_silver": 110000,
 			"tickets": 5,
-			"cost_desc": "185.000 Bạc"
+			"cost_desc": "110.000 Bạc"
 		},
 		{
 			"id": "hero_pack_10",
 			"name": "10 Vé Triệu Hồi",
 			"icon": "⛩️",
-			"badge": "👑 TIẾT KIỆM 30K",
+			"badge": "👑 GIẢM 35K",
 			"badge_color": Color(1.0, 0.85, 0.25, 1.0),
 			"badge_bg": Color(0.30, 0.20, 0.05, 0.95),
 			"sub": "Đại gói chiêu binh khai sáng triều đại",
-			"strike": "Gốc: 390.000",
-			"cost_silver": 360000,
+			"strike": "Gốc: 250.000",
+			"cost_silver": 215000,
 			"tickets": 10,
-			"cost_desc": "360.000 Bạc"
+			"cost_desc": "215.000 Bạc"
 		}
 	]
 
@@ -8471,49 +8518,6 @@ func _build_settings_content() -> Control:
 	div.custom_minimum_size = Vector2(0, 1)
 	div.color = COLOR_GOLD_PRIMARY
 	container.add_child(div)
-
-	# UI Scale Section
-	var scale_v = VBoxContainer.new()
-	scale_v.add_theme_constant_override("separation", 8)
-	var scale_lbl = Label.new()
-	scale_lbl.text = "📱 TỈ LỆ CHỮ & GIAO DIỆN (UI SCALE):"
-	scale_lbl.add_theme_font_size_override("font_size", 13)
-	scale_lbl.add_theme_color_override("font_color", COLOR_TEXT_GOLD)
-	scale_v.add_child(scale_lbl)
-
-	var scale_hbox = HBoxContainer.new()
-	scale_hbox.add_theme_constant_override("separation", 8)
-
-	var scale_options = [
-		{"label": "Chuẩn PC (100%)", "scale": 1.0},
-		{"label": "Mobile Vừa (125%)", "scale": 1.25},
-		{"label": "Mặc Định Mobile (135%)", "scale": 1.35},
-	]
-
-	var current_s = UIScaleManager.current_scale if is_instance_valid(UIScaleManager) else 1.0
-	for opt in scale_options:
-		var btn = Button.new()
-		btn.text = opt["label"]
-		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.custom_minimum_size = Vector2(0, 38)
-		btn.add_theme_font_size_override("font_size", 11)
-		var is_active = is_equal_approx(current_s, opt["scale"])
-		_style_leaderboard_tab_button(btn, is_active)
-		var target_scale = opt["scale"]
-		btn.pressed.connect(func():
-			if is_instance_valid(UIScaleManager):
-				UIScaleManager.set_scale_factor(target_scale)
-				_show_modal("THIẾT LẬP CHIẾN TRƯỜNG", _build_settings_content())
-		)
-		scale_hbox.add_child(btn)
-
-	scale_v.add_child(scale_hbox)
-	container.add_child(scale_v)
-
-	var div_scale = ColorRect.new()
-	div_scale.custom_minimum_size = Vector2(0, 1)
-	div_scale.color = COLOR_GOLD_PRIMARY
-	container.add_child(div_scale)
 
 	# --- Giftcode Section ---
 	var gift_v = VBoxContainer.new()

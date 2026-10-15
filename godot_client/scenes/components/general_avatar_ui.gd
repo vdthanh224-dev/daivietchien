@@ -1,5 +1,7 @@
 extends Control
 
+const DynastyRoleInfo = preload("res://scripts/dynasty_roles.gd")
+
 signal clicked()
 signal skill_clicked()
 signal skill_button_clicked(skill_key: String)
@@ -68,7 +70,8 @@ var turn_timer_badge: PanelContainer = null
 var turn_timer_label: Label = null
 var is_chained: bool = false
 var chain_overlay: Control = null
-var delayed_tricks_container: HBoxContainer = null
+var delayed_tricks_container: Container = null
+var compact_table_layout: bool = false
 var active_delayed_tricks: Dictionary = {}
 var last_damage_effect_time: float = 0.0
 var defeated_overlay: ColorRect = null
@@ -601,11 +604,25 @@ func set_ai_takeover(active: bool) -> void:
 		if ai_takeover_badge:
 			ai_takeover_badge.visible = false
 
+func set_compact_table_layout(enabled: bool) -> void:
+	compact_table_layout = enabled
+	if not enabled:
+		return
+	for label in [weapon_label, armor_label, treasure_label]:
+		if is_instance_valid(label):
+			label.clip_text = true
+			label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	var equipment_box = weapon_slot.get_parent() if is_instance_valid(weapon_slot) else null
+	if is_instance_valid(equipment_box):
+		equipment_box.offset_right = -6.0
+
 func _update_delayed_tricks_position() -> void:
 	if delayed_tricks_container:
 		delayed_tricks_container.reset_size()
 		var cont_w = max(84.0, delayed_tricks_container.size.x)
 		var target_y = -56.0 if (turn_timer_badge and turn_timer_badge.visible) else -28.0
+		if compact_table_layout:
+			target_y = 40.0
 		delayed_tricks_container.position = Vector2((size.x - cont_w) * 0.5, target_y)
 
 func _normalize_delayed_trick_type(raw_type: String) -> String:
@@ -624,9 +641,17 @@ func set_delayed_trick(trick_type: String, active: bool) -> void:
 	var key = _normalize_delayed_trick_type(trick_type)
 
 	if not delayed_tricks_container:
-		delayed_tricks_container = HBoxContainer.new()
+		if compact_table_layout:
+			var grid := GridContainer.new()
+			grid.columns = 2
+			grid.add_theme_constant_override("h_separation", 4)
+			grid.add_theme_constant_override("v_separation", 2)
+			delayed_tricks_container = grid
+		else:
+			var row := HBoxContainer.new()
+			row.alignment = BoxContainer.ALIGNMENT_CENTER
+			delayed_tricks_container = row
 		delayed_tricks_container.name = "DelayedTricksContainer"
-		delayed_tricks_container.alignment = BoxContainer.ALIGNMENT_CENTER
 		delayed_tricks_container.add_theme_constant_override("separation", 4)
 		delayed_tricks_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		delayed_tricks_container.z_index = 25
@@ -683,17 +708,26 @@ func set_delayed_trick(trick_type: String, active: bool) -> void:
 				style.border_color = Color(0.7, 0.7, 0.7, 1.0)
 				lbl.text = trick_type
 
+			if compact_table_layout:
+				badge.custom_minimum_size.x = 84.0
+				badge.tooltip_text = lbl.text
+				lbl.text = {"dai_hong_thuy":"🌊 Hồng Thủy", "cat_luong":"🌾 Cắt Lương", "tram_ao":"🕸 Trầm Ảo", "bai_coc":"🪵 Bãi Cọc"}.get(key, lbl.text)
 			badge.add_theme_stylebox_override("panel", style)
 			badge.add_child(lbl)
 			delayed_tricks_container.add_child(badge)
 			active_delayed_tricks[key] = badge
 
-			# Lá trì hoãn bay từ dưới lên đúng vị trí vùng phán xét.
+			# GridContainer owns each row's position; animate opacity there so
+			# the second row cannot be pulled over the first by the entrance tween.
 			badge.pivot_offset = Vector2(42, 11)
-			badge.position.y += 28.0
 			var tw = create_tween()
 			tw.set_parallel(true)
-			tw.tween_property(badge, "position:y", 0.0, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			if compact_table_layout:
+				badge.modulate.a = 0.0
+				tw.tween_property(badge, "modulate:a", 1.0, 0.28)
+			else:
+				badge.position.y += 28.0
+				tw.tween_property(badge, "position:y", 0.0, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 			tw.tween_property(badge, "scale", Vector2(1.12, 1.12), 0.12).set_trans(Tween.TRANS_BACK)
 			tw.chain().tween_property(badge, "scale", Vector2.ONE, 0.12)
 	else:
@@ -801,7 +835,7 @@ func set_skill_buttons(button_specs: Array) -> void:
 		button.disabled = bool(spec.get("disabled", false))
 		button.mouse_filter = Control.MOUSE_FILTER_STOP
 		button.custom_minimum_size = Vector2(96, 28)
-		button.add_theme_font_size_override("font_size", 8)
+		UIScaleManager.scale_node_font(button, 8)
 		_set_skill_button_style(button, bool(spec.get("selected", false)))
 		visible_count += 1
 
@@ -862,7 +896,7 @@ func _get_or_create_skill_button(button_index: int) -> Button:
 	button.custom_minimum_size = Vector2(96, 28)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.focus_mode = Control.FOCUS_NONE
-	button.add_theme_font_size_override("font_size", 8)
+	UIScaleManager.scale_node_font(button, 8)
 	button.add_theme_color_override("font_color", Color(1.0, 0.95, 0.7, 1.0))
 	button.add_theme_stylebox_override("normal", skill_btn.get_theme_stylebox("normal"))
 	button.add_theme_stylebox_override("hover", skill_btn.get_theme_stylebox("hover"))
@@ -986,6 +1020,10 @@ func set_equipment(slot_type: String, item_name: String, suit_rank: String = "")
 			var iname = item_name.strip_edges()
 			val = ("%s %s" % [sr, iname]) if sr != "" else iname
 		equipped_items[key] = val
+		if compact_table_layout:
+			for label in [weapon_label, armor_label, treasure_label]:
+				if is_instance_valid(label):
+					label.tooltip_text = label.text
 		if key == "defensive_mount":
 			equipped_items["def_horse"] = val
 		elif key == "offensive_mount":
@@ -1488,7 +1526,9 @@ func setup_general(p_id: String, p_name: String, p_faction: String = "Trần", p
 		if p_role != "":
 			role_badge.visible = true
 			role_badge.text = " %s " % p_role
-			if p_role == "RỒNG" or p_role.contains("RỒNG"):
+			if DynastyRoleInfo.NAMES.values().has(p_role):
+				role_badge.add_theme_color_override("font_color", DynastyRoleInfo.get_color(p_role))
+			elif p_role == "RỒNG" or p_role.contains("RỒNG"):
 				role_badge.add_theme_color_override("font_color", Color(0.2, 0.85, 1.0, 1.0))
 			elif p_role == "PHƯỢNG" or p_role.contains("PHƯỢNG"):
 				role_badge.add_theme_color_override("font_color", Color(1.0, 0.4, 0.25, 1.0))

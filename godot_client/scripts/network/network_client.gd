@@ -15,6 +15,15 @@ signal ping_updated(ping_ms: int)
 signal social_list_updated(friends: Array, incoming: Array)
 signal social_search_completed(results: Array)
 signal social_error(message: String)
+signal chat_message_received(message: Dictionary)
+signal chat_history_received(channel: String, target_room: String)
+signal chat_error(channel: String, message: String)
+
+const CHAT_HISTORY_LIMIT: int = 50
+var chat_messages: Dictionary = {}
+var _pending_chat_channels: Array[String] = []
+var _chat_unavailable: bool = false
+const CHAT_UNAVAILABLE_MESSAGE := "Máy chủ chưa cập nhật chat. Tin nhắn chưa được gửi."
 
 const CANDIDATE_SERVERS: Array[Dictionary] = [
 	# Draft and battle state must use one shared online authority. There is no
@@ -61,7 +70,7 @@ func _detect_instance_index() -> int:
 	for arg in all_args:
 		if arg.begins_with("--seat=") or arg.begins_with("--tester="):
 			var value = arg.substr(arg.find("=") + 1).to_int()
-			if value >= 1 and value <= 4:
+			if value >= 1 and value <= 8:
 				seat_is_explicit = true
 				return value
 
@@ -69,8 +78,8 @@ func _detect_instance_index() -> int:
 		seat_is_explicit = false
 		return 1
 
-	# Tự động nhận diện cửa sổ 1, 2, 3, 4 khi chạy nhiều instance (Godot Run Multiple Instances)
-	for s in range(1, 5):
+	# Tự động nhận diện tối đa 8 cửa sổ khi chạy nhiều instance.
+	for s in range(1, 9):
 		var srv = TCPServer.new()
 		var err = srv.listen(6010 + s, "127.0.0.1")
 		if err == OK:
@@ -180,6 +189,8 @@ func _process(delta: float) -> void:
 	if state == WebSocketPeer.STATE_OPEN:
 		if not is_connected_to_server:
 			is_connected_to_server = true
+			_pending_chat_channels.clear()
+			_chat_unavailable = false
 			is_scanning_candidates = false
 			_ping_timer = 0.0
 			candidate_timer = 0.0
@@ -287,6 +298,40 @@ func _handle_server_message(raw_json: String) -> void:
 		social_error.emit(str(data.get("error", "Lỗi hệ thống bạn bè")))
 		return
 
+	if msg_type == "CHAT_MESSAGE" or msg_type == "CHAT_HISTORY":
+		var channel: String = str(data.get("channel", ""))
+		var target_room: String = str(data.get("roomId", ""))
+		if channel not in ["lobby", "battle"] or (channel == "battle" and target_room != room_id):
+			return
+		_pending_chat_channels.erase(channel)
+		_chat_unavailable = false
+		var key := _chat_key(channel, target_room)
+		if msg_type == "CHAT_HISTORY":
+			var incoming = data.get("messages", [])
+			if not incoming is Array:
+				return
+			chat_messages[key] = []
+			for message in incoming.slice(-CHAT_HISTORY_LIMIT):
+				if message is Dictionary:
+					_cache_chat_message(key, message)
+			chat_history_received.emit(channel, target_room)
+		elif _cache_chat_message(key, data):
+			chat_message_received.emit(data)
+		return
+	if msg_type == "CHAT_ERROR":
+		_pending_chat_channels.erase(str(data.get("channel", "")))
+		chat_error.emit(str(data.get("channel", "")), str(data.get("error", "Không thể gửi tin nhắn")))
+		return
+	# Older Render versions reject CHAT_SUBSCRIBE without echoing its action.
+	# Route that response to chat so it cannot interrupt a battle or lock typing.
+	if msg_type == "ERROR" and str(data.get("error", "")) == "Hành động không hợp lệ" and not _pending_chat_channels.is_empty():
+		_chat_unavailable = true
+		var pending_channels := _pending_chat_channels.duplicate()
+		_pending_chat_channels.clear()
+		for channel in pending_channels:
+			chat_error.emit(channel, CHAT_UNAVAILABLE_MESSAGE)
+		return
+
 	if msg_type == "ERROR" and _ping_awaiting_pong:
 		var err_str = str(data.get("error", ""))
 		if err_str == "Thiếu roomId" or err_str == "Kết nối chưa tham gia phòng":
@@ -352,12 +397,61 @@ func _handle_server_message(raw_json: String) -> void:
 		log_received.emit(data["description"])
 
 func send_json(dict: Dictionary) -> void:
+	if _chat_unavailable and dict.get("action", "") == "CHAT_UNSUBSCRIBE":
+		return
 	if socket.get_ready_state() == WebSocketPeer.STATE_OPEN:
 		var payload := dict.duplicate(true)
 		var json_str = JSON.stringify(payload)
 		socket.send_text(json_str)
 	else:
 		print("[NetworkClient] Cảnh báo: Socket chưa sẵn sàng để gửi!")
+
+func _chat_key(channel: String, target_room: String = "") -> String:
+	return "lobby" if channel == "lobby" else "battle:" + target_room
+
+func _cache_chat_message(key: String, message: Dictionary) -> bool:
+	if not chat_messages.has(key):
+		chat_messages[key] = []
+	var messages: Array = chat_messages[key]
+	var message_id: String = str(message.get("id", ""))
+	for cached in messages:
+		if not message_id.is_empty() and str(cached.get("id", "")) == message_id:
+			return false
+	messages.append(message.duplicate(true))
+	if messages.size() > CHAT_HISTORY_LIMIT:
+		messages.pop_front()
+	return true
+
+func get_chat_messages(channel: String) -> Array:
+	return chat_messages.get(_chat_key(channel, room_id), []).duplicate(true)
+
+func request_chat_history(channel: String) -> void:
+	if _chat_unavailable:
+		chat_error.emit(channel, CHAT_UNAVAILABLE_MESSAGE)
+		return
+	if not _pending_chat_channels.has(channel):
+		_pending_chat_channels.append(channel)
+	var payload: Dictionary = {"action": "CHAT_SUBSCRIBE", "channel": channel}
+	if channel == "battle":
+		payload["roomId"] = room_id
+	send_json(payload)
+
+func send_chat_message(channel: String, text: String) -> bool:
+	if not is_connected_to_server or socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
+		chat_error.emit(channel, "Mất kết nối máy chủ. Đang kết nối lại...")
+		return false
+	if _chat_unavailable:
+		chat_error.emit(channel, CHAT_UNAVAILABLE_MESSAGE)
+		return false
+	text = text.strip_edges()
+	if text.is_empty() or text.length() > 280:
+		chat_error.emit(channel, "Nhập tin nhắn từ 1 đến 280 ký tự")
+		return false
+	var payload: Dictionary = {"action": "CHAT_SEND", "channel": channel, "text": text}
+	if channel == "battle":
+		payload["roomId"] = room_id
+	send_json(payload)
+	return true
 
 func register_social_profile() -> void:
 	if not AuthManager or AuthManager.current_user_id.is_empty():

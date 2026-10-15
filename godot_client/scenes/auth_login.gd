@@ -150,6 +150,9 @@ func _ready() -> void:
 	# 9. Đảm bảo toàn bộ cỡ chữ trong giao diện AuthLogin được scale chuẩn Mobile (135%)
 	if is_instance_valid(UIScaleManager):
 		UIScaleManager.apply_to_scene(self)
+	center_auth_card.minimum_size_changed.connect(_queue_auth_card_layout)
+	get_viewport().size_changed.connect(_queue_auth_card_layout)
+	_queue_auth_card_layout()
 
 	# 10. Phát nhạc nền
 	if AudioManager:
@@ -273,6 +276,7 @@ func set_register_mode(register: bool) -> void:
 	if is_register_mode == register and tab_highlight.size.x > 10:
 		return
 	is_register_mode = register
+	crest_icon.get_parent().visible = not register
 	_update_tab_highlight_position(register, true)
 
 	if is_register_mode:
@@ -297,7 +301,7 @@ func set_register_mode(register: bool) -> void:
 
 	if is_keyboard_mode:
 		var target_top: float = -304.0
-		var estimated_h: float = 330.0 if is_register_mode else 275.0
+		var estimated_h: float = center_auth_card.get_combined_minimum_size().y
 		if card_tween and card_tween.is_valid():
 			card_tween.kill()
 		card_tween = create_tween()
@@ -305,6 +309,24 @@ func set_register_mode(register: bool) -> void:
 
 	if AudioManager:
 		AudioManager.play_sfx("sfx_card_select", -5.0)
+	_queue_auth_card_layout()
+
+func _queue_auth_card_layout() -> void:
+	call_deferred("_update_auth_card_layout")
+
+func _update_auth_card_layout() -> void:
+	if is_keyboard_mode or not is_instance_valid(center_auth_card):
+		return
+	# Chừa riêng vùng tiêu đề và chân trang sau khi cỡ chữ 135% đã được tính.
+	var viewport_height: float = get_viewport_rect().size.y
+	var top_limit: float = title_brand_center.get_rect().end.y + 12.0
+	var bottom_limit: float = viewport_height - 50.0
+	var card_height: float = center_auth_card.get_combined_minimum_size().y
+	var card_top: float = maxf(top_limit, (top_limit + bottom_limit - card_height) * 0.5)
+	center_auth_card.offset_top = card_top - viewport_height * 0.5
+	center_auth_card.offset_bottom = center_auth_card.offset_top + card_height
+	default_card_offset_top = center_auth_card.offset_top
+	default_card_offset_bottom = center_auth_card.offset_bottom
 
 func _init_tab_highlight() -> void:
 	await get_tree().process_frame
@@ -566,7 +588,7 @@ func _apply_keyboard_focus_shift(enable: bool) -> void:
 		# 3. Trượt khung nhập lên sát phía trên (ngay dưới thanh TopBar tại Y=56px)
 		# Viewport cao 720, tâm Y=360 => offset_top = 56 - 360 = -304px
 		var target_top: float = -304.0
-		var estimated_h: float = 330.0 if is_register_mode else 275.0
+		var estimated_h: float = center_auth_card.get_combined_minimum_size().y
 		var target_bottom: float = target_top + estimated_h
 
 		card_tween.tween_property(center_auth_card, "offset_top", target_top, 0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
@@ -581,12 +603,7 @@ func _apply_keyboard_focus_shift(enable: bool) -> void:
 		if is_instance_valid(title_brand_center):
 			card_tween.tween_property(title_brand_center, "modulate:a", 1.0, 0.22).set_trans(Tween.TRANS_CUBIC)
 
-		var target_bottom: float = default_card_offset_bottom
-		if is_register_mode:
-			target_bottom = default_card_offset_bottom + 50.0
-
-		card_tween.tween_property(center_auth_card, "offset_top", default_card_offset_top, 0.25).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-		card_tween.tween_property(center_auth_card, "offset_bottom", target_bottom, 0.25).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		_queue_auth_card_layout()
 
 func _process(_delta: float) -> void:
 	var kb_h = _get_virtual_keyboard_height()
@@ -967,7 +984,7 @@ func _apply_royal_home_styling() -> void:
 		if existing_frame.name != "EmblemFrame":
 			var frame = PanelContainer.new()
 			frame.name = "EmblemFrame"
-			frame.custom_minimum_size = Vector2(88, 88)
+			frame.custom_minimum_size = Vector2(56, 56)
 			frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 			var fs = StyleBoxFlat.new()
 			fs.bg_color = Color(0.14, 0.10, 0.18, 0.95)
@@ -987,7 +1004,7 @@ func _apply_royal_home_styling() -> void:
 			var old_idx = crest_icon.get_index()
 			drum_hdr.remove_child(crest_icon)
 			frame.add_child(crest_icon)
-			crest_icon.custom_minimum_size = Vector2(80, 80)
+			crest_icon.custom_minimum_size = Vector2(48, 48)
 			drum_hdr.add_child(frame)
 			drum_hdr.move_child(frame, old_idx)
 

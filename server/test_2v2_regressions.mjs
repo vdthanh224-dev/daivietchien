@@ -680,10 +680,10 @@ for (const [id, name, subType, reqType] of [
   state.players[1].isAI = true;
   put(state, 1, card("BORROW_AI", "Mượn Gươm Diệt Địch", CARD_SUBTYPES.MUON_GUOM_DIET_DICH, CARD_CATEGORIES.INSTANT_SCROLL));
   put(state, 2, card("BORROW_AI_SLASH", "Trảm Thường", CARD_SUBTYPES.ATTACK_NORMAL));
-  assert.equal(handlePlayCard(state, 1, "BORROW_AI", 2, { targetSeat2: 4 }).success, true);
+  assert.equal(handlePlayCard(state, 1, "BORROW_AI", 2, { targetSeat2: 3 }).success, true);
   assert.equal(handleAIReaction(state, 2).success, true);
   assert.equal(state.phase, "AWAIT_SLASH_DEFENSE");
-  assert.equal(state.waitingTargetSeat, 4);
+  assert.equal(state.waitingTargetSeat, 3);
 }
 
 {

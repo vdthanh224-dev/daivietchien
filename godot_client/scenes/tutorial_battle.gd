@@ -5,7 +5,7 @@ extends Control
 @onready var hand_container = $TableTop/HandCards
 @onready var deck_label: Label = $TableTop/DeckHUD/DeckPlaque/DeckLabel
 @onready var log_text: RichTextLabel = $TableTop/LogPanel/Margin/VBox/Scroll/LogText
-@onready var desc_text: Label = $TableTop/CardDescBar/Margin/DescText
+@onready var desc_text: Label = $TableTop/CardDescBar/Margin/Scroll/DescText
 @onready var card_play_btn: Button = $TableTop/CardPlayBtn
 @onready var end_turn_btn: Button = $TableTop/EndTurnBtn
 
@@ -417,6 +417,7 @@ func _on_card_hovered(c_ui: Control) -> void:
 	if c_ui and c_ui.card_data:
 		var d = c_ui.card_data
 		desc_text.text = "💡 [%s %s %s] %s" % [d.card_name, d.get_suit_symbol() + str(d.rank), d.get_category_name(), d.description]
+		desc_text.get_parent().scroll_vertical = 0
 
 func _on_card_selected_state_changed(card_ui: Control, is_sel: bool) -> void:
 	AudioManager.play_card_select()

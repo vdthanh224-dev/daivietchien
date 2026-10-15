@@ -2,6 +2,7 @@ extends Control
 
 const CardUIScene = preload("res://scenes/components/card_ui.tscn")
 const GeneralAvatarScene = preload("res://scenes/components/general_avatar_ui.tscn")
+const DynastyRoleInfo = preload("res://scripts/dynasty_roles.gd")
 const AI_CARD_PLAY_DELAY: float = 1.5
 const AI_TURN_WATCHDOG_TIMEOUT: float = 60.0
 const IRON_CHAIN_DESCRIPTION := "Chạm avatar để chọn tối đa 2 mục tiêu để đưa họ vào hoặc thoát trạng thái xích (cùng nhận sát thương nguyên tố), có thể đổi thành lá mới."
@@ -104,7 +105,7 @@ const IMPLEMENTED_HERO_SKILL_NAMES := [
 @onready var log_text: RichTextLabel = $TableTop/LogPanel/Margin/VBox/Scroll/LogText
 @onready var log_panel: Control = $TableTop/LogPanel
 @onready var deck_hud: Control = $TableTop/DeckHUD
-@onready var desc_text: Label = $TableTop/CardDescBar/Margin/DescText
+@onready var desc_text: Label = $TableTop/CardDescBar/Margin/Scroll/DescText
 @onready var card_play_btn: Button = $TableTop/CardPlayBtn
 @onready var end_turn_btn: Button = $TableTop/EndTurnBtn
 @onready var hich_recast_btn: Button = $TableTop/HichRecastBtn
@@ -147,7 +148,7 @@ var rescue_card_selector_scroll: ScrollContainer = null
 
 # Iron Chain Modal (Xích Tâm Tỏa đa mục tiêu)
 @onready var iron_chain_modal: Control = $IronChainModal
-@onready var iron_chain_grid: HBoxContainer = $IronChainModal/Dim/Box/Margin/VBox/GeneralsGrid
+@onready var iron_chain_grid: HBoxContainer = $IronChainModal/Dim/Box/Margin/VBox/GeneralsScroll/GeneralsGrid
 @onready var iron_chain_status_lbl: Label = $IronChainModal/Dim/Box/Margin/VBox/StatusLbl
 @onready var iron_chain_confirm_btn: Button = $IronChainModal/Dim/Box/Margin/VBox/HBox/ConfirmBtn
 @onready var iron_chain_cancel_btn: Button = $IronChainModal/Dim/Box/Margin/VBox/HBox/CancelBtn
@@ -181,6 +182,17 @@ func _build_battle_seat_avatar_map(seat_count: int) -> Dictionary:
 	var seats_root: Control = $TableTop/Seats
 	var center := Vector2(640.0, 355.0)
 	var radius := Vector2(470.0, 220.0)
+	# Eight players need separate slots around the table instead of sharing
+	# the smaller ellipse. Reserve the lower middle area for the local hand.
+	var eight_player_positions: Array[Vector2] = [
+		Vector2(seats_root.size.x - 198.0, 105.0),
+		Vector2(seats_root.size.x - 418.0, 95.0),
+		Vector2(lerpf(238.0, seats_root.size.x - 418.0, 2.0 / 3.0), 95.0),
+		Vector2(lerpf(238.0, seats_root.size.x - 418.0, 1.0 / 3.0), 95.0),
+		Vector2(238.0, 95.0),
+		Vector2(22.0, 105.0),
+		Vector2(22.0, seats_root.size.y - 295.0),
+	]
 	# Place seats from the local player toward the right, then continue around
 	# the table counter-clockwise; after the last seat, wrap back to seat 1.
 	var other_seat_order: Array[int] = []
@@ -197,11 +209,12 @@ func _build_battle_seat_avatar_map(seat_count: int) -> Dictionary:
 			holder = Control.new()
 			holder.name = "DynastySeat%d" % (offset + 1)
 			holder.set_meta("dynamic_battle_seat", true)
-			holder.custom_minimum_size = Vector2(170, 230)
+			holder.custom_minimum_size = Vector2(157, 214) if seat_count == 8 else Vector2(170, 230)
 			seats_root.add_child(holder)
 			avatar = GeneralAvatarScene.instantiate()
 			holder.add_child(avatar)
 		avatar.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		avatar.set_compact_table_layout(seat_count == 8)
 		# The local player keeps the existing lower-right 2v2 position. Other seats
 		# use the open upper and side arc so the lower area remains exclusively ours.
 		if offset == 0:
@@ -215,8 +228,18 @@ func _build_battle_seat_avatar_map(seat_count: int) -> Dictionary:
 		# continue counter-clockwise toward the left side.
 		var angle := -0.35 - 2.50 * float(other_index) / float(maxi(1, other_count - 1))
 		holder.set_anchors_preset(Control.PRESET_TOP_LEFT)
-		holder.position = center + Vector2(cos(angle) * radius.x, sin(angle) * radius.y) - Vector2(85, 115)
-		holder.size = Vector2(170, 230)
+		if seat_count == 8:
+			var horizontal_anchors := [1.0, 1.0, 2.0 / 3.0, 1.0 / 3.0, 0.0, 0.0, 0.0]
+			holder.anchor_left = horizontal_anchors[other_index]
+			holder.anchor_right = horizontal_anchors[other_index]
+			if other_index == 6:
+				holder.anchor_top = 1.0
+				holder.anchor_bottom = 1.0
+			holder.position = eight_player_positions[other_index]
+			holder.size = Vector2(157, 214)
+		else:
+			holder.position = center + Vector2(cos(angle) * radius.x, sin(angle) * radius.y) - Vector2(85, 115)
+			holder.size = Vector2(170, 230)
 		var seat_number := other_seat_order[other_index]
 		map[seat_number] = avatar
 		battle_seat_nodes[seat_number] = avatar
@@ -266,7 +289,11 @@ var borrow_sword_owner_seat: int = -1
 var borrow_sword_target_seat: int = -1
 var is_game_over: bool = false
 var exit_battle_btn: Button = null
+var ai_fast_forward_active: bool = false
+var fast_forward_started_at_msec: int = 0
 var match_result_recorded: bool = false
+var pending_match_result: Dictionary = {}
+var battle_mode_id: String = "2v2"
 var match_entry_stake_recorded: bool = false
 var match_entry_star_amount: int = 0
 var doi_do_used_this_turn: bool = false
@@ -514,6 +541,10 @@ func _ready() -> void:
 	randomize()
 	AudioManager.play_bgm("bgm_battle")
 	_setup_history_ui()
+	var chat = preload("res://scenes/components/chat_panel.gd").new()
+	chat.channel = "battle"
+	chat.z_index = 40
+	add_child(chat)
 	for overlay in [dodge_modal, rescue_modal, general_info_modal, victory_defeat_modal, iron_chain_modal, card_pick_modal]:
 		overlay.z_as_relative = false
 		overlay.z_index = 320
@@ -592,6 +623,7 @@ func _ready() -> void:
 	_start_ambient_effects()
 	_init_deck()
 	_init_generals_from_draft()
+	chat.set_battle_seat_count(battle_seat_count)
 
 	# Handle headless screenshot test
 	var cmd_args = OS.get_cmdline_user_args()
@@ -1599,7 +1631,7 @@ func _process(delta: float) -> void:
 	_process_ai_turn_watchdog(delta)
 
 	# Handle Reaction Timer (Đếm 40s trên đầu người bị trảm hoặc người đang phản hồi)
-	if current_waiting_seat > 0 and current_waiting_seat <= 4:
+	if generals_data.has(current_waiting_seat):
 		current_waiting_timer -= delta
 		var sec_wait = max(0, int(ceil(current_waiting_timer)))
 		if generals_data.has(current_waiting_seat) and generals_data[current_waiting_seat].has("avatar_node") and is_instance_valid(generals_data[current_waiting_seat]["avatar_node"]):
@@ -1766,6 +1798,7 @@ func _init_generals_from_draft() -> void:
 
 	my_seat = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 and NetworkClient.my_seat <= 8 else 1
 	var mode_id := str(AppwriteMatchmaking.current_room.get("modeId", "2v2")) if AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary else (NetworkClient.active_mode_id if NetworkClient else "2v2")
+	battle_mode_id = mode_id
 	if mode_id == "dynasty_5" and draft.size() < 5:
 		battle_seat_count = 5
 	elif mode_id == "dynasty_8" and draft.size() < 8:
@@ -1870,7 +1903,7 @@ func _init_generals_from_draft() -> void:
 
 		var is_dynasty := mode_id.begins_with("dynasty_")
 		var role_code := str(slot_data.get("role", ""))
-		var role_str = ("VƯƠNG" if role_code == "KING" else "?") if is_dynasty else ("RỒNG" if is_drag else "PHƯỢNG")
+		var role_str = (DynastyRoleInfo.display_name(role_code) if is_p or role_code == "KING" else "?") if is_dynasty else ("RỒNG" if is_drag else "PHƯỢNG")
 
 		var slot_user_name := str(slot_data.get("userName", "")).strip_edges()
 		if is_p:
@@ -2529,6 +2562,7 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 		if skills is Array and not skills.is_empty() and (skills[0] is Dictionary):
 			skill_desc = skills[0].get("desc", "")
 		desc_text.text = "📜 Kỹ năng của %s: %s" % [g.get("name", ""), skill_desc]
+		desc_text.get_parent().scroll_vertical = 0
 
 func _set_treasure_skill_selected(selected: bool) -> void:
 	var avatar = generals_data.get(my_seat, {}).get("avatar_node")
@@ -3191,6 +3225,7 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 	var r_str = _format_rank(rank)
 	var card_color_tag = "%s %s" % [r_str, s_name] if not s_name.is_empty() else r_str
 	desc_text.text = "🎴 [%s] %s: %s" % [card_color_tag, c_name, c_desc]
+	desc_text.get_parent().scroll_vertical = 0
 
 	_update_action_btn()
 
@@ -6147,6 +6182,11 @@ func _enter_discard_phase(excess: int) -> void:
 func _on_network_game_state_updated(state: Dictionary) -> void:
 	if state == null or not (state is Dictionary) or state.is_empty():
 		return
+	if str(state.get("status", "")) == "FINISHED":
+		pending_bai_coc_state.clear()
+		bai_coc_state_sync_until_msec = 0
+		_apply_network_game_state(state)
+		return
 	var now_msec = Time.get_ticks_msec()
 	var state_delta = state.get("delta", {})
 	var has_bai_coc_judgement = state_delta is Dictionary and (
@@ -6196,13 +6236,16 @@ func _apply_network_game_state(state: Dictionary) -> void:
 	if state == null or not (state is Dictionary) or state.is_empty():
 		return
 	is_network_mode = true
-	latest_server_state = state
 	var previous_server_phase = current_server_phase
 	var server_version = int(state.get("version", -1))
 	if server_version >= 0 and server_version < last_server_version:
 		return
 	if server_version > last_server_version:
 		last_server_version = server_version
+	latest_server_state = state
+	if str(state.get("status", "")) == "FINISHED":
+		_show_authoritative_match_result(state)
+		return
 	if reaction_submission_pending and reaction_submission_version >= 0 and server_version > reaction_submission_version:
 		# A state refresh in the same reaction phase can arrive before the server
 		# handles the submitted card. Keep the modal locked until the phase or
@@ -6273,6 +6316,9 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			continue
 		var g = generals_data[seat]
 		var p_is_takeover = bool(p.get("isDisconnected", false)) or bool(p.get("isAiTakeover", false))
+		g["isAI"] = bool(p.get("isAI", g.get("isAI", false)))
+		g["isAiTakeover"] = p_is_takeover
+		g["isDisconnected"] = bool(p.get("isDisconnected", false))
 		if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
 			if g["avatar_node"].has_method("set_ai_takeover"):
 				g["avatar_node"].set_ai_takeover(p_is_takeover)
@@ -7602,6 +7648,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 	if state.get("status") == "FINISHED" and not is_game_over:
 		is_game_over = true
 		_check_victory_condition()
+	_update_dead_exit_button_visibility()
 
 func _get_rescue_requirement_text(victim_seat: int) -> String:
 	var banh_count = 0
@@ -8192,7 +8239,7 @@ func _get_card_display_name(card: Dictionary) -> String:
 	return friendly if not friendly.is_empty() else card_id
 
 func _on_network_action_received(delta: Dictionary) -> void:
-	if delta == null or not (delta is Dictionary) or delta.is_empty():
+	if is_game_over or delta == null or not (delta is Dictionary) or delta.is_empty():
 		return
 	var caster_seat = int(delta.get("casterSeat", delta.get("seat", 0)))
 	if caster_seat == 0 and delta.has("turnSeat"):
@@ -8712,6 +8759,24 @@ func _relayout_hand_cards() -> void:
 	var viewport_size := get_viewport_rect().size
 	var left_limit := 10.0
 	var right_limit := viewport_size.x - 10.0
+	var chat_window := get_node_or_null("ChatPanel/ChatWindow") as Control
+	if is_instance_valid(chat_window) and chat_window.is_visible_in_tree():
+		left_limit = maxf(left_limit, chat_window.get_global_rect().end.x + 12.0)
+	if battle_seat_count == 8:
+		var hand_rect: Rect2 = hand_container.get_global_rect()
+		for seat in battle_seat_nodes:
+			if int(seat) == my_seat:
+				continue
+			var other_avatar: Control = battle_seat_nodes[seat]
+			var other_rect := other_avatar.get_global_rect()
+			if other_rect.end.y <= hand_rect.position.y or other_rect.position.y >= hand_rect.end.y:
+				continue
+			if other_rect.get_center().x < viewport_size.x * 0.5:
+				var occupied_right := other_rect.end.x
+				for extra in [other_avatar.get_node_or_null("InfoBtn"), other_avatar.get_node_or_null("BottomInfoContainer")]:
+					if is_instance_valid(extra) and extra.is_visible_in_tree():
+						occupied_right = maxf(occupied_right, extra.get_global_rect().end.x)
+				left_limit = maxf(left_limit, occupied_right + 12.0)
 	var avatar = generals_data.get(my_seat, {}).get("avatar_node")
 	if is_instance_valid(avatar):
 		# The hand must stop before the avatar even when no skill button is visible.
@@ -8731,6 +8796,12 @@ func _relayout_hand_cards() -> void:
 	var available_width: float = maxf(card_width, right_local - left_local)
 	hand_container.position.x = left_local
 	hand_container.size.x = available_width
+	var card_desc_bar := get_node_or_null("TableTop/CardDescBar") as Control
+	if is_instance_valid(card_desc_bar):
+		var description_left: float = maxf(240.0, left_local) if is_instance_valid(chat_window) and chat_window.is_visible_in_tree() else 240.0
+		card_desc_bar.custom_minimum_size.x = maxf(118.0, 1050.0 - description_left)
+		card_desc_bar.offset_left = description_left
+		card_desc_bar.offset_right = 1050.0
 	if count == 0:
 		return
 
@@ -10088,7 +10159,7 @@ func _apply_damage_to_general(target_seat: int, amount: int, attacker_seat: int 
 		if tgt.has("avatar_node") and is_instance_valid(tgt["avatar_node"]):
 			tgt["avatar_node"].set_chained(false)
 		# Lan theo vòng chơi, bắt đầu từ người kế tiếp người nhận sát thương.
-		for step in range(1, 4):
+		for step in range(1, battle_seat_count):
 			var other_seat = ((target_seat - 1 + step) % battle_seat_count) + 1
 			if not generals_data.has(other_seat):
 				continue
@@ -10325,38 +10396,140 @@ func _handle_general_death(seat_num: int) -> void:
 			AudioManager.play_voice("Uất Khí")
 			AudioManager.play_skill()
 
-	if seat_num == my_seat and not uat_khi_pending:
-		_show_dead_player_exit()
+	if not uat_khi_pending:
+		_update_dead_exit_button_visibility()
 
 func _show_dead_player_exit() -> void:
-	if exit_battle_btn and is_instance_valid(exit_battle_btn):
-		return
 	_clear_normal_hand_selection()
 	for child in hand_container.get_children():
 		child.queue_free()
 	card_play_btn.visible = false
 	end_turn_btn.visible = false
 	hich_recast_btn.visible = false
-	desc_text.text = "☠️ Bạn đã Tử trận. Trận đấu vẫn tiếp tục cho đến khi có kết quả."
+	_update_dead_exit_button_visibility()
+
+func _is_seat_ai(seat_num: int) -> bool:
+	if not generals_data.has(seat_num):
+		return false
+	if not is_network_mode:
+		return seat_num != my_seat
+	var g = generals_data[seat_num]
+	if bool(g.get("isAI", false)):
+		return true
+	if bool(g.get("isAiTakeover", false)):
+		return true
+	if bool(g.get("isDisconnected", false)):
+		return true
+	return false
+
+func _should_show_dead_exit_button() -> bool:
+	if is_game_over:
+		return false
+	if not generals_data.has(my_seat):
+		return false
+	var my_gen = generals_data[my_seat]
+	var my_alive = bool(my_gen.get("is_alive", true)) and int(my_gen.get("hp", 1)) > 0
+	if my_alive:
+		return false
+	if uat_khi_pending:
+		return false
+
+	var living_other_count := 0
+	var ai_living_count := 0
+	for s_num in range(1, battle_seat_count + 1):
+		if s_num == my_seat:
+			continue
+		if not generals_data.has(s_num):
+			continue
+		var g = generals_data[s_num]
+		var is_alive = bool(g.get("is_alive", true)) and int(g.get("hp", 1)) > 0
+		if is_alive:
+			living_other_count += 1
+			if _is_seat_ai(s_num):
+				ai_living_count += 1
+
+	return living_other_count > 0 and living_other_count == ai_living_count
+
+func _ensure_dead_exit_button_created() -> void:
+	if exit_battle_btn and is_instance_valid(exit_battle_btn):
+		return
 	exit_battle_btn = Button.new()
-	exit_battle_btn.text = "🚪 THOÁT TRẬN"
-	exit_battle_btn.custom_minimum_size = Vector2(230, 54)
-	exit_battle_btn.position = Vector2(285, 52)
+	exit_battle_btn.name = "ExitBattleBtn"
+	exit_battle_btn.text = "🚪 THOÁT TRẬN (TUA NHANH)"
+	exit_battle_btn.custom_minimum_size = Vector2(280, 52)
+	exit_battle_btn.position = Vector2(500, 560)
 	exit_battle_btn.focus_mode = Control.FOCUS_NONE
 	exit_battle_btn.add_theme_font_size_override("font_size", 16)
 	exit_battle_btn.pressed.connect(_on_exit_battle_clicked)
-	hand_container.add_child(exit_battle_btn)
+	if table_top and is_instance_valid(table_top):
+		table_top.add_child(exit_battle_btn)
+	else:
+		add_child(exit_battle_btn)
+
+func _update_dead_exit_button_visibility() -> void:
+	if is_game_over:
+		if exit_battle_btn and is_instance_valid(exit_battle_btn):
+			exit_battle_btn.visible = false
+		return
+
+	if not generals_data.has(my_seat):
+		return
+	var my_gen = generals_data[my_seat]
+	var my_alive = bool(my_gen.get("is_alive", true)) and int(my_gen.get("hp", 1)) > 0
+
+	if my_alive:
+		if exit_battle_btn and is_instance_valid(exit_battle_btn):
+			exit_battle_btn.visible = false
+		return
+
+	card_play_btn.visible = false
+	end_turn_btn.visible = false
+	hich_recast_btn.visible = false
+
+	var should_show = _should_show_dead_exit_button()
+	if should_show:
+		_ensure_dead_exit_button_created()
+		exit_battle_btn.visible = true
+		if not ai_fast_forward_active:
+			desc_text.text = "☠️ Bạn đã tử trận. Các tướng còn lại đều là AI. Bấm 'Thoát trận' để tua nhanh kết quả."
+	else:
+		if exit_battle_btn and is_instance_valid(exit_battle_btn):
+			exit_battle_btn.visible = false
+		if not is_game_over and not ai_fast_forward_active:
+			desc_text.text = "☠️ Bạn đã tử trận. Đang quan sát người chơi khác chiến đấu..."
 
 func _on_exit_battle_clicked() -> void:
-	# Giữ kết nối để nhận trạng thái FINISHED và hiển thị kết quả tua nhanh.
 	if exit_battle_btn and is_instance_valid(exit_battle_btn):
 		exit_battle_btn.disabled = true
 		exit_battle_btn.text = "⏩ ĐANG TUA NHANH..."
-	desc_text.text = "⏩ Bạn đã thoát lượt điều khiển. Đang chờ các AI kết thúc trận đấu..."
-	if NetworkClient and NetworkClient.is_connected_to_server:
+	ai_fast_forward_active = true
+	fast_forward_started_at_msec = Time.get_ticks_msec()
+	desc_text.text = "⏩ Đang tăng tốc độ đánh của AI tối đa..."
+
+	if NetworkClient and NetworkClient.is_connected_to_server and is_network_mode:
 		NetworkClient.send_fast_forward_match()
+	else:
+		_run_local_fast_forward_loop()
+
+func _run_local_fast_forward_loop() -> void:
+	if not is_inside_tree():
+		_check_victory_condition()
+		return
+	var safety_counter := 0
+	while not is_game_over and safety_counter < 100:
+		safety_counter += 1
+		await get_tree().process_frame
+		_check_victory_condition()
+		if is_game_over:
+			break
+	if not is_game_over:
+		_check_victory_condition()
 
 func _check_victory_condition() -> void:
+	if is_network_mode:
+		if str(latest_server_state.get("status", "")) == "FINISHED":
+			_show_authoritative_match_result(latest_server_state)
+		return
 	var dragon_alive = 0
 	var phoenix_alive = 0
 
@@ -10412,489 +10585,140 @@ func _apply_match_entry_stake() -> void:
 		AuthManager.save_profile_to_appwrite()
 
 
-func _show_victory_defeat_modal(is_win: bool) -> void:
-	if not victory_defeat_modal:
-		return
-	if NetworkClient:
-		NetworkClient.clear_active_match()
+func _show_authoritative_match_result(state: Dictionary) -> void:
 	if match_result_recorded:
-		victory_defeat_modal.visible = true
+		return
+	battle_mode_id = str(state.get("modeId", battle_mode_id))
+	for player in state.get("players", []):
+		var seat := int(player.get("seat", 0))
+		if not generals_data.has(seat):
+			continue
+		var general: Dictionary = generals_data[seat]
+		general.hp = int(player.get("hp", general.hp))
+		general.max_hp = int(player.get("maxHp", general.max_hp))
+		general.is_alive = bool(player.get("isAlive", general.is_alive))
+		var own_role := str(player.get("role", ""))
+		if not own_role.is_empty():
+			general.role = own_role
+		if is_instance_valid(general.get("avatar_node")):
+			general.avatar_node.update_hp(general.hp, general.max_hp, true)
+			general.avatar_node.set_defeated(not general.is_alive)
+	var result = state.get("result", {})
+	if result is Dictionary and not result.is_empty():
+		pending_match_result = result.duplicate(true)
+	else:
+		# Accept a final snapshot from the older server until Render is updated.
+		var outcome := str(state.get("winningRole", ""))
+		var team_label := ""
+		for action in state.get("actionHistory", []):
+			if action is Dictionary and str(action.get("type", "")) == "GAME_OVER":
+				outcome = str(action.get("winningRole", outcome))
+				team_label = str(action.get("winningTeam", ""))
+		var own_role := str(generals_data.get(my_seat, {}).get("role", ""))
+		var won := false
+		if battle_mode_id.begins_with("dynasty_"):
+			won = (outcome == "KING" and own_role in ["KING", "LOYALIST"]) or (outcome == "REBELS" and own_role == "REBEL") or (outcome == "SPY" and own_role == "SPY")
+		else:
+			won = (my_team_is_dragon and "Rồng" in team_label) or (not my_team_is_dragon and "Phượng" in team_label)
+		pending_match_result = {
+			"matchId": str(state.get("roomId", NetworkClient.room_id)), "isWinner": won,
+			"winningRole": outcome, "winnerLabel": {"KING":"VUA và Trung Thần", "REBELS":"Phản Tặc", "SPY":"Nội Gián"}.get(outcome, team_label)
+		}
+	is_game_over = true
+	is_player_turn = false
+	card_play_btn.hide()
+	end_turn_btn.hide()
+	hich_recast_btn.hide()
+	for popup in [dodge_modal, rescue_modal, general_info_modal, iron_chain_modal, card_pick_modal, harvest_modal, drum_reveal_modal, doi_do_modal, muu_dinh_modal]:
+		if is_instance_valid(popup):
+			popup.hide()
+	for entry in showcase_entries:
+		if is_instance_valid(entry.get("node")):
+			entry.node.queue_free()
+	showcase_entries.clear()
+	if is_instance_valid(showcase_center):
+		showcase_center.hide()
+	_show_victory_defeat_modal(bool(pending_match_result.get("isWinner", false)))
+
+func _result_label(parent: Node, text: String, font_size: int, color: Color) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_color_override("font_color", color)
+	UIScaleManager.scale_node_font(label, font_size)
+	parent.add_child(label)
+	return label
+
+func _show_victory_defeat_modal(is_win: bool) -> void:
+	if not is_instance_valid(victory_defeat_modal) or match_result_recorded:
 		return
 	match_result_recorded = true
-
-	victory_defeat_modal.visible = true
-
-	# 1. Lấy dữ liệu Rank, Số Sao, Điểm Tích Lũy hiện tại của người chơi
-	var cur_rank_idx = 0
-	var cur_stars = 0
-	var cur_acc = 0
-	if AuthManager:
-		cur_rank_idx = AuthManager.current_2v2_rank_index
-		cur_stars = AuthManager.current_2v2_stars
-		cur_acc = AuthManager.current_2v2_accumulation_points
-
-	# 2. Xử lý tăng giảm sao và điểm tích lũy theo RankSystem. Sao cược đã
-	# được trừ lúc vào trận nên không trừ lần hai khi thua; thắng hoàn cược và
-	# nhận thêm 1 sao thắng.
-	var result_star_delta := RankSystem.WIN_STARS if is_win else RankSystem.LOSE_STARS
-	var result_acc_delta := RankSystem.WIN_ACCUMULATION_POINTS if is_win else RankSystem.LOSE_ACCUMULATION_POINTS
-	if match_entry_stake_recorded:
-		result_star_delta = (RankSystem.WIN_STARS + match_entry_star_amount) if is_win else 0
-	var res = RankSystem.process_match_result_adjusted(
-		is_win, cur_rank_idx, cur_stars, cur_acc, result_star_delta, result_acc_delta
-	)
-
-	# 3. Cập nhật và lưu ngay lập tức vào AuthManager
-	if DailyQuestSystem:
-		DailyQuestSystem.record_progress("battle", 1)
-		if is_win:
-			DailyQuestSystem.record_progress("win", 1)
-
-	var exp_result: Dictionary = {}
-	if AuthManager:
-		AuthManager.current_2v2_rank_index = res["rank_index"]
-		AuthManager.current_2v2_stars = res["stars"]
-		AuthManager.current_2v2_accumulation_points = res["accumulation_points"]
-		if is_win:
-			AuthManager.current_wins += 1
-		else:
-			AuthManager.current_losses += 1
-		var exp_gain: int = 20 if is_win else 12
-		if AuthManager.has_method("add_exp"):
-			exp_result = AuthManager.add_exp(exp_gain)
-		else:
-			AuthManager.current_exp += exp_gain
-		AuthManager.current_silver += 300 if is_win else 100
-		AuthManager.save_profile_to_appwrite()
-		AuthManager.current_2v2_entry_stake_room_id = ""
-		AuthManager.current_2v2_entry_stake_amount = 0
-
-	# 4. Tái cấu trúc Box hiển thị Thông báo cuối trận
-	var box = victory_defeat_modal.get_node_or_null("Dim/Box") as PanelContainer
-	if not box:
-		return
-
-	box.custom_minimum_size = Vector2(580, 480)
-	var box_style = StyleBoxFlat.new()
-	box_style.bg_color = Color(0.06, 0.08, 0.14, 0.98)
-	box_style.border_width_left = 2
-	box_style.border_width_top = 2
-	box_style.border_width_right = 2
-	box_style.border_width_bottom = 2
-	box_style.border_color = Color(0.95, 0.78, 0.25, 1.0) if is_win else Color(0.75, 0.25, 0.25, 1.0)
-	box_style.corner_radius_top_left = 16
-	box_style.corner_radius_top_right = 16
-	box_style.corner_radius_bottom_right = 16
-	box_style.corner_radius_bottom_left = 16
-	box_style.shadow_color = Color(0, 0, 0, 0.7)
-	box_style.shadow_size = 12
-	box_style.shadow_offset = Vector2(0, 4)
-	box.add_theme_stylebox_override("panel", box_style)
-
-	var vbox = victory_defeat_modal.get_node_or_null("Dim/Box/Margin/VBox") as VBoxContainer
-	if not vbox:
-		return
-
-	# Xóa các con cũ để xây dựng giao diện động mới hoàn toàn
-	for ch in vbox.get_children():
-		ch.queue_free()
-
-	vbox.add_theme_constant_override("separation", 10)
-
-	# --- A. TIÊU ĐỀ KẾT QUẢ TRẬN ĐẤU ---
-	var header_vbox = VBoxContainer.new()
-	header_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	header_vbox.add_theme_constant_override("separation", 2)
-	vbox.add_child(header_vbox)
-
-	var title_lbl = Label.new()
-	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_lbl.text = "🎉 CHIẾN THẮNG HUY HOÀNG!" if is_win else "💀 CHIẾN BẠI SA TRƯỜNG!"
-	title_lbl.add_theme_font_size_override("font_size", 22)
-	title_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.25, 1.0) if is_win else Color(0.95, 0.35, 0.35, 1.0))
-	title_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
-	title_lbl.add_theme_constant_override("shadow_offset_y", 2)
-	header_vbox.add_child(title_lbl)
-
-	var sub_lbl = Label.new()
-	sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub_lbl.text = "Đại phá phòng tuyến đối phương • Khắc ghi chiến công!" if is_win else "Toàn quân lui binh • Tu dưỡng thao lược chờ ngày phục thù!"
-	sub_lbl.add_theme_font_size_override("font_size", 12)
-	sub_lbl.add_theme_color_override("font_color", Color(0.75, 0.80, 0.90, 0.9))
-	header_vbox.add_child(sub_lbl)
-
-	# --- B. KHUNG THÔNG TIN RANK & SAO & ĐIỂM TÍCH LŨY ---
-	var card_panel = PanelContainer.new()
-	var cp_style = StyleBoxFlat.new()
-	cp_style.bg_color = Color(0.04, 0.06, 0.10, 0.9)
-	cp_style.border_width_left = 1
-	cp_style.border_width_top = 1
-	cp_style.border_width_right = 1
-	cp_style.border_width_bottom = 1
-	cp_style.border_color = Color(0.4, 0.5, 0.7, 0.5)
-	cp_style.corner_radius_top_left = 12
-	cp_style.corner_radius_top_right = 12
-	cp_style.corner_radius_bottom_right = 12
-	cp_style.corner_radius_bottom_left = 12
-	card_panel.add_theme_stylebox_override("panel", cp_style)
-	vbox.add_child(card_panel)
-
-	var card_margin = MarginContainer.new()
-	card_margin.add_theme_constant_override("margin_left", 16)
-	card_margin.add_theme_constant_override("margin_right", 16)
-	card_margin.add_theme_constant_override("margin_top", 12)
-	card_margin.add_theme_constant_override("margin_bottom", 12)
-	card_panel.add_child(card_margin)
-
-	var card_hbox = HBoxContainer.new()
-	card_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	card_hbox.add_theme_constant_override("separation", 24)
-	card_margin.add_child(card_hbox)
-
-	# 1. Cột trái: Huy hiệu Rank
-	var badge_col = VBoxContainer.new()
-	badge_col.alignment = BoxContainer.ALIGNMENT_CENTER
-	badge_col.custom_minimum_size = Vector2(130, 0)
-	badge_col.add_theme_constant_override("separation", 4)
-	card_hbox.add_child(badge_col)
-
-	var badge_rect = TextureRect.new()
-	badge_rect.custom_minimum_size = Vector2(96, 96)
-	badge_rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	badge_rect.pivot_offset = Vector2(48, 48)
-	badge_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	badge_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	var initial_icon_path = RankSystem.get_rank_icon_path(res["old_rank_idx"])
-	if ResourceLoader.exists(initial_icon_path):
-		badge_rect.texture = load(initial_icon_path)
-	badge_col.add_child(badge_rect)
-
-	var rank_name_lbl = Label.new()
-	rank_name_lbl.text = RankSystem.get_rank_name(res["old_rank_idx"]).to_upper()
-	rank_name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rank_name_lbl.add_theme_font_size_override("font_size", 15)
-	var rank_color = RankSystem.get_rank_info(res["old_rank_idx"]).get("color", Color(1.0, 0.85, 0.4))
-	rank_name_lbl.add_theme_color_override("font_color", rank_color)
-	badge_col.add_child(rank_name_lbl)
-
-	# Đường phân cách dọc
-	var card_sep = VSeparator.new()
-	var cs_style = StyleBoxLine.new()
-	cs_style.color = Color(0.3, 0.4, 0.55, 0.3)
-	cs_style.vertical = true
-	card_sep.add_theme_stylebox_override("separator", cs_style)
-	card_hbox.add_child(card_sep)
-
-	# 2. Cột phải: Dải Sao & Thanh Điểm Tích Lũy
-	var info_col = VBoxContainer.new()
-	info_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info_col.alignment = BoxContainer.ALIGNMENT_CENTER
-	info_col.add_theme_constant_override("separation", 10)
-	card_hbox.add_child(info_col)
-
-	# --- Dải Sao ---
-	var star_section = VBoxContainer.new()
-	star_section.add_theme_constant_override("separation", 2)
-	info_col.add_child(star_section)
-
-	var star_header = HBoxContainer.new()
-	var star_title = Label.new()
-	star_title.text = "Số sao xếp hạng:"
-	star_title.add_theme_font_size_override("font_size", 13)
-	star_title.add_theme_color_override("font_color", Color(0.85, 0.88, 0.95))
-	star_header.add_child(star_title)
-
-	var star_tag = Label.new()
-	# Chỉ hiển thị sao thắng thực tế; sao hoàn lại từ khoản cược được xử lý ẩn.
-	star_tag.text = " +1 ⭐" if is_win else (" Không trừ ⭐" if match_entry_stake_recorded else " -1 ⭐")
-	star_tag.add_theme_font_size_override("font_size", 13)
-	star_tag.add_theme_color_override("font_color", Color(0.35, 0.95, 0.45) if is_win else Color(1.0, 0.35, 0.35))
-	star_header.add_child(star_tag)
-	star_section.add_child(star_header)
-
-	var stars_hbox = HBoxContainer.new()
-	stars_hbox.add_theme_constant_override("separation", 6)
-	star_section.add_child(stars_hbox)
-
-	var star_nodes: Array = []
-	for s in range(5):
-		var star_lbl = Label.new()
-		star_lbl.text = "⭐"
-		star_lbl.add_theme_font_size_override("font_size", 24)
-		star_lbl.pivot_offset = Vector2(12, 14)
-		if s < res["old_stars"]:
-			star_lbl.modulate = Color(1.3, 1.2, 0.5, 1.0)
-			star_lbl.add_theme_color_override("font_color", Color(1.0, 0.95, 0.3, 1.0))
-			star_lbl.add_theme_color_override("font_shadow_color", Color(1.0, 0.6, 0.0, 0.9))
-			star_lbl.add_theme_constant_override("shadow_offset_x", 0)
-			star_lbl.add_theme_constant_override("shadow_offset_y", 1)
-		else:
-			star_lbl.modulate = Color(0.18, 0.20, 0.28, 0.28)
-			star_lbl.add_theme_color_override("font_color", Color(0.2, 0.22, 0.3, 0.5))
-		stars_hbox.add_child(star_lbl)
-		star_nodes.append(star_lbl)
-
-	var star_count_lbl = Label.new()
-	star_count_lbl.text = " %d/5 Sao" % res["old_stars"]
-	star_count_lbl.add_theme_font_size_override("font_size", 12)
-	star_count_lbl.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85))
-	stars_hbox.add_child(star_count_lbl)
-
-	# --- Thanh Điểm Tích Lũy ---
-	var acc_section = VBoxContainer.new()
-	acc_section.add_theme_constant_override("separation", 4)
-	info_col.add_child(acc_section)
-
-	var acc_header = HBoxContainer.new()
-	var acc_title = Label.new()
-	acc_title.text = "Điểm tích lũy dũng cảm:"
-	acc_title.add_theme_font_size_override("font_size", 13)
-	acc_title.add_theme_color_override("font_color", Color(0.85, 0.88, 0.95))
-	acc_header.add_child(acc_title)
-
-	var acc_delta_lbl = Label.new()
-	acc_delta_lbl.text = " +%dđ" % result_acc_delta
-	acc_delta_lbl.add_theme_font_size_override("font_size", 13)
-	acc_delta_lbl.add_theme_color_override("font_color", Color(0.3, 0.85, 1.0) if is_win else Color(0.95, 0.75, 0.2))
-	acc_header.add_child(acc_delta_lbl)
-	acc_section.add_child(acc_header)
-
-	var acc_bar = ProgressBar.new()
-	acc_bar.custom_minimum_size = Vector2(0, 14)
-	acc_bar.max_value = 100
-	acc_bar.value = res["old_acc_points"]
-	acc_bar.show_percentage = false
-	var bar_bg = StyleBoxFlat.new()
-	bar_bg.bg_color = Color(0.1, 0.13, 0.2, 0.9)
-	bar_bg.corner_radius_top_left = 6
-	bar_bg.corner_radius_top_right = 6
-	bar_bg.corner_radius_bottom_right = 6
-	bar_bg.corner_radius_bottom_left = 6
-	var bar_fg = StyleBoxFlat.new()
-	bar_fg.bg_color = Color(0.2, 0.75, 0.95, 1.0)
-	bar_fg.corner_radius_top_left = 6
-	bar_fg.corner_radius_top_right = 6
-	bar_fg.corner_radius_bottom_right = 6
-	bar_fg.corner_radius_bottom_left = 6
-	acc_bar.add_theme_stylebox_override("background", bar_bg)
-	acc_bar.add_theme_stylebox_override("fill", bar_fg)
-	acc_section.add_child(acc_bar)
-
-	var acc_text_lbl = Label.new()
-	acc_text_lbl.text = "%d/100 Điểm (Đủ 100đ đổi +1⭐)" % res["old_acc_points"]
-	acc_text_lbl.add_theme_font_size_override("font_size", 11)
-	acc_text_lbl.add_theme_color_override("font_color", Color(0.65, 0.75, 0.85))
-	acc_section.add_child(acc_text_lbl)
-
-	# --- C. BANNER THĂNG HẠNG (PROMOTION) ---
-	var promo_panel = PanelContainer.new()
-	promo_panel.visible = false
-	promo_panel.pivot_offset = Vector2(250, 18)
-	var pp_style = StyleBoxFlat.new()
-	pp_style.bg_color = Color(0.35, 0.22, 0.05, 0.95)
-	pp_style.border_width_left = 2
-	pp_style.border_width_top = 2
-	pp_style.border_width_right = 2
-	pp_style.border_width_bottom = 2
-	pp_style.border_color = Color(1.0, 0.9, 0.35, 1.0)
-	pp_style.corner_radius_top_left = 10
-	pp_style.corner_radius_top_right = 10
-	pp_style.corner_radius_bottom_right = 10
-	pp_style.corner_radius_bottom_left = 10
-	promo_panel.add_theme_stylebox_override("panel", pp_style)
-	vbox.add_child(promo_panel)
-
-	var promo_margin = MarginContainer.new()
-	promo_margin.add_theme_constant_override("margin_top", 6)
-	promo_margin.add_theme_constant_override("margin_bottom", 6)
-	promo_panel.add_child(promo_margin)
-
-	var promo_lbl = Label.new()
-	promo_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	promo_lbl.text = "🌟 CHÚC MỪNG THĂNG HẠNG: %s! 🌟" % RankSystem.get_rank_name(res["rank_index"]).to_upper()
-	promo_lbl.add_theme_font_size_override("font_size", 14)
-	promo_lbl.add_theme_color_override("font_color", Color(1.0, 0.95, 0.4, 1.0))
-	promo_margin.add_child(promo_lbl)
-
-	# --- D. PHẦN THƯỞNG & NÚT VỀ SẢNH ---
-	var rewards_hbox = HBoxContainer.new()
-	rewards_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	rewards_hbox.add_theme_constant_override("separation", 24)
-	vbox.add_child(rewards_hbox)
-
-	var exp_lbl = Label.new()
-	exp_lbl.text = "🎁 +%d EXP" % (20 if is_win else 12)
-	exp_lbl.add_theme_font_size_override("font_size", 13)
-	exp_lbl.add_theme_color_override("font_color", Color(0.4, 0.9, 1.0))
-	rewards_hbox.add_child(exp_lbl)
-	if not exp_result.is_empty() and bool(exp_result.get("leveled_up", false)):
-		var level_lbl = Label.new()
-		level_lbl.text = "🎉 LÊN CẤP %d" % int(exp_result.get("new_level", 1))
-		level_lbl.add_theme_font_size_override("font_size", 13)
-		level_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.25))
-		rewards_hbox.add_child(level_lbl)
-
-	var silver_lbl = Label.new()
-	silver_lbl.text = "🪙 +%d Bạc" % (300 if is_win else 100)
-	silver_lbl.add_theme_font_size_override("font_size", 13)
-	silver_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
-	rewards_hbox.add_child(silver_lbl)
-
-	var return_btn = Button.new()
-	return_btn.custom_minimum_size = Vector2(240, 42)
-	return_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	return_btn.text = "🏠 VỀ SẢNH CHÍNH"
-	var r_style = StyleBoxFlat.new()
-	r_style.bg_color = Color(0.85, 0.68, 0.22, 1.0)
-	r_style.corner_radius_top_left = 8
-	r_style.corner_radius_top_right = 8
-	r_style.corner_radius_bottom_right = 8
-	r_style.corner_radius_bottom_left = 8
-	r_style.shadow_color = Color(0, 0, 0, 0.4)
-	r_style.shadow_size = 4
-	return_btn.add_theme_stylebox_override("normal", r_style)
-	return_btn.add_theme_color_override("font_color", Color(0.08, 0.05, 0.01))
-	return_btn.add_theme_font_size_override("font_size", 14)
-	return_btn.pressed.connect(_on_return_home_clicked)
-	vbox.add_child(return_btn)
-
-	# --- E. HOẠT HỌA TUẦN TỰ (SEQUENTIAL TWEEN ANIMATIONS) ---
-	# 1. Xuất hiện Modal nảy nhẹ
-	box.pivot_offset = Vector2(290, 240)
-	box.scale = Vector2(0.85, 0.85)
-	box.modulate.a = 0.0
-	var tw = create_tween().set_parallel(true)
-	tw.tween_property(box, "scale", Vector2(1.0, 1.0), 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(box, "modulate:a", 1.0, 0.2)
+	is_game_over = true
+	if pending_match_result.is_empty():
+		pending_match_result = {"matchId":"local:%d" % get_instance_id(), "isWinner":is_win, "winnerLabel":""}
+	if NetworkClient:
+		NetworkClient.clear_active_match()
+	if is_instance_valid(exit_battle_btn):
+		exit_battle_btn.hide()
+	victory_defeat_modal.z_index = 1000
+	victory_defeat_modal.show()
+	var box := victory_defeat_modal.get_node("Dim/Box") as PanelContainer
+	box.custom_minimum_size = Vector2(620, 360)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#101624")
+	style.border_color = Color("#edcb64") if is_win else Color("#e57676")
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(16)
+	box.add_theme_stylebox_override("panel", style)
+	var content := victory_defeat_modal.get_node("Dim/Box/Margin/VBox") as VBoxContainer
+	for child in content.get_children():
+		content.remove_child(child)
+		child.queue_free()
+	content.add_theme_constant_override("separation", 14)
+	_result_label(content, "CHIẾN THẮNG!" if is_win else "THẤT BẠI", 24, style.border_color)
+	var winner_label := str(pending_match_result.get("winnerLabel", ""))
+	if not winner_label.is_empty():
+		var faction_label := RichTextLabel.new()
+		faction_label.bbcode_enabled = true
+		faction_label.fit_content = true
+		faction_label.scroll_active = false
+		faction_label.text = "[center]%s chiến thắng[/center]" % DynastyRoleInfo.colorize(winner_label)
+		UIScaleManager.scale_node_font(faction_label, 16, "normal_font_size")
+		content.add_child(faction_label)
+	if battle_mode_id.begins_with("dynasty_"):
+		var role := str(generals_data.get(my_seat, {}).get("role", ""))
+		_result_label(content, "Vai trò của bạn: %s" % DynastyRoleInfo.display_name(role), 14, DynastyRoleInfo.get_color(role))
+	else:
+		var star_delta := RankSystem.WIN_STARS if is_win else RankSystem.LOSE_STARS
+		if match_entry_stake_recorded:
+			star_delta = RankSystem.WIN_STARS + match_entry_star_amount if is_win else 0
+		var rank_result = RankSystem.process_match_result_adjusted(is_win, AuthManager.current_2v2_rank_index,
+			AuthManager.current_2v2_stars, AuthManager.current_2v2_accumulation_points, star_delta,
+			RankSystem.WIN_ACCUMULATION_POINTS if is_win else RankSystem.LOSE_ACCUMULATION_POINTS)
+		_result_label(content, "%s • %d sao • %d/100 điểm" % [RankSystem.get_rank_name(rank_result.rank_index), rank_result.stars, rank_result.accumulation_points], 14, Color("#b9d9ff"))
+	_result_label(content, "+%d Bạc" % (150 if is_win else 75), 24, Color("#ffdc75"))
+	_result_label(content, "+%d EXP" % (20 if is_win else 12), 14, Color("#99dcff"))
+	var claim_button := Button.new()
+	claim_button.name = "ClaimRewardBtn"
+	claim_button.text = "NHẬN THƯỞNG VÀ VỀ TRANG CHỦ"
+	claim_button.custom_minimum_size.y = 54
+	UIScaleManager.scale_node_font(claim_button, 15)
+	claim_button.pressed.connect(_on_return_home_clicked)
+	content.add_child(claim_button)
 	if is_win:
 		AudioManager.play_victory()
 	else:
 		AudioManager.play_defeat()
-	await tw.finished
 
-	await get_tree().create_timer(0.3).timeout
+func _claim_match_reward() -> bool:
+	if pending_match_result.is_empty() or not AuthManager:
+		return false
+	return AuthManager.claim_match_reward(pending_match_result, battle_mode_id, match_entry_stake_recorded, match_entry_star_amount)
 
-	# 2. Hoạt họa Tăng / Giảm Sao
-	if is_win:
-		var target_star_idx = res["old_stars"]
-		if target_star_idx < star_nodes.size():
-			var s_node = star_nodes[target_star_idx] as Label
-			var s_tw = create_tween()
-			s_tw.tween_property(s_node, "scale", Vector2(1.8, 1.8), 0.18).set_trans(Tween.TRANS_BACK)
-			s_tw.parallel().tween_property(s_node, "modulate", Color(1.3, 1.2, 0.5, 1.0), 0.18)
-			s_tw.parallel().tween_property(s_node, "theme_override_colors/font_color", Color(1.0, 0.95, 0.3, 1.0), 0.18)
-			s_node.add_theme_color_override("font_shadow_color", Color(1.0, 0.6, 0.0, 0.9))
-			s_node.add_theme_constant_override("shadow_offset_x", 0)
-			s_node.add_theme_constant_override("shadow_offset_y", 1)
-			s_tw.tween_property(s_node, "scale", Vector2(1.0, 1.0), 0.15)
-			AudioManager.play_card_draw()
-			await s_tw.finished
-	else:
-		if result_star_delta < 0 and res["old_stars"] > 0:
-			var target_star_idx = res["old_stars"] - 1
-			if target_star_idx < star_nodes.size():
-				var s_node = star_nodes[target_star_idx] as Label
-				var s_tw = create_tween()
-				s_tw.tween_property(s_node, "modulate", Color(1.0, 0.25, 0.25, 0.9), 0.15)
-				s_tw.tween_property(s_node, "modulate", Color(0.18, 0.20, 0.28, 0.28), 0.25)
-				s_tw.parallel().tween_property(s_node, "theme_override_colors/font_color", Color(0.2, 0.22, 0.3, 0.5), 0.25)
-				s_node.remove_theme_color_override("font_shadow_color")
-				AudioManager.play_damage()
-				await s_tw.finished
-
-	# Cập nhật nhãn số sao sau khi sao đổi
-	var intermediate_stars = res["stars"]
-	if res["promoted"]:
-		intermediate_stars = 5 # Đầy 5 sao trước khi biến hình thăng hạng
-	star_count_lbl.text = " %d/5 Sao" % intermediate_stars
-
-	await get_tree().create_timer(0.3).timeout
-
-	# 3. Hoạt họa Thanh Điểm Tích Lũy
-	var bar_tw = create_tween()
-	if res["star_bonus_from_points"]:
-		# Chạy lên 100/100 -> bùng nổ thưởng 1 sao -> chạy về điểm dư
-		bar_tw.tween_property(acc_bar, "value", 100.0, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		await bar_tw.finished
-		
-		acc_text_lbl.text = "⚡ ĐẦY 100 ĐIỂM TÍCH LŨY → THƯỞNG +1 SAO! ⚡"
-		acc_text_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.2))
-		AudioManager.play_skill()
-
-		# Thêm 1 sao nữa vào dải sao
-		var bonus_star_idx = intermediate_stars
-		if bonus_star_idx < star_nodes.size():
-			var b_node = star_nodes[bonus_star_idx] as Label
-			var b_tw = create_tween()
-			b_tw.tween_property(b_node, "scale", Vector2(1.8, 1.8), 0.2)
-			b_tw.parallel().tween_property(b_node, "modulate", Color(1.3, 1.2, 0.5, 1.0), 0.2)
-			b_tw.parallel().tween_property(b_node, "theme_override_colors/font_color", Color(1.0, 0.95, 0.3, 1.0), 0.2)
-			b_node.add_theme_color_override("font_shadow_color", Color(1.0, 0.6, 0.0, 0.9))
-			b_node.add_theme_constant_override("shadow_offset_x", 0)
-			b_node.add_theme_constant_override("shadow_offset_y", 1)
-			b_tw.tween_property(b_node, "scale", Vector2(1.0, 1.0), 0.15)
-			await b_tw.finished
-		
-		await get_tree().create_timer(0.3).timeout
-		var bar_reset_tw = create_tween()
-		bar_reset_tw.tween_property(acc_bar, "value", float(res["accumulation_points"]), 0.4)
-		await bar_reset_tw.finished
-		acc_text_lbl.text = "%d/100 Điểm (Đủ 100đ đổi +1⭐)" % res["accumulation_points"]
-		acc_text_lbl.add_theme_color_override("font_color", Color(0.65, 0.75, 0.85))
-	else:
-		bar_tw.tween_property(acc_bar, "value", float(res["accumulation_points"]), 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		await bar_tw.finished
-		acc_text_lbl.text = "%d/100 Điểm (Đủ 100đ đổi +1⭐)" % res["accumulation_points"]
-
-	# 4. Hoạt Họa Lên Rank (Promotion)
-	if res["promoted"]:
-		await get_tree().create_timer(0.4).timeout
-		
-		# Hiệu ứng huy hiệu phát sáng và rung lắc nhẹ
-		var r_tw = create_tween()
-		r_tw.tween_property(badge_rect, "scale", Vector2(1.4, 1.4), 0.25).set_trans(Tween.TRANS_BACK)
-		r_tw.parallel().tween_property(badge_rect, "modulate", Color(2.5, 2.3, 1.5), 0.25)
-		await r_tw.finished
-		
-		# Đổi sang icon rank mới
-		var new_icon_path = RankSystem.get_rank_icon_path(res["rank_index"])
-		if ResourceLoader.exists(new_icon_path):
-			badge_rect.texture = load(new_icon_path)
-		
-		rank_name_lbl.text = RankSystem.get_rank_name(res["rank_index"]).to_upper()
-		var new_color = RankSystem.get_rank_info(res["rank_index"]).get("color", Color(1.0, 0.9, 0.3))
-		rank_name_lbl.add_theme_color_override("font_color", new_color)
-		
-		var r_down = create_tween()
-		r_down.tween_property(badge_rect, "scale", Vector2(1.0, 1.0), 0.35).set_trans(Tween.TRANS_BOUNCE)
-		r_down.parallel().tween_property(badge_rect, "modulate", Color(1.0, 1.0, 1.0), 0.35)
-		
-		# Hiện Banner thăng hạng
-		promo_panel.visible = true
-		promo_panel.scale = Vector2(0.6, 0.6)
-		promo_panel.modulate.a = 0.0
-		var p_tw = create_tween().set_parallel(true)
-		p_tw.tween_property(promo_panel, "scale", Vector2(1.0, 1.0), 0.3).set_trans(Tween.TRANS_BACK)
-		p_tw.tween_property(promo_panel, "modulate:a", 1.0, 0.2)
-		
-		AudioManager.play_victory()
-
-		# Reset dải sao về số sao mới của rank mới (mặc định 0 sao)
-		for s in range(5):
-			var s_node = star_nodes[s] as Label
-			if s < res["stars"]:
-				s_node.modulate = Color(1.3, 1.2, 0.5, 1.0)
-				s_node.add_theme_color_override("font_color", Color(1.0, 0.95, 0.3, 1.0))
-				s_node.add_theme_color_override("font_shadow_color", Color(1.0, 0.6, 0.0, 0.9))
-				s_node.add_theme_constant_override("shadow_offset_x", 0)
-				s_node.add_theme_constant_override("shadow_offset_y", 1)
-			else:
-				s_node.modulate = Color(0.18, 0.20, 0.28, 0.28)
-				s_node.add_theme_color_override("font_color", Color(0.2, 0.22, 0.3, 0.5))
-				s_node.remove_theme_color_override("font_shadow_color")
-		star_count_lbl.text = " %d/5 Sao" % res["stars"]
 
 func _on_return_home_clicked() -> void:
+	_claim_match_reward()
 	if NetworkClient:
 		NetworkClient.clear_active_match()
 		NetworkClient.room_id = ""
@@ -10916,6 +10740,7 @@ func _start_turn(seat_num: int) -> void:
 		return
 	if is_network_mode:
 		return
+	_update_dead_exit_button_visibility()
 	turn_generation += 1
 	_reset_ai_turn_watchdog()
 
@@ -10945,7 +10770,7 @@ func _start_turn(seat_num: int) -> void:
 		wine_used_this_turn = false
 	is_discard_phase = false
 	cards_to_discard_count = 0
-	var turn_role := "VƯƠNG" if str(g.get("role", "")) == "KING" else "?"
+	var turn_role := DynastyRoleInfo.display_name(str(g.get("role", ""))) if int(g.get("seat", 0)) == my_seat or str(g.get("role", "")) == "KING" else "?"
 	_add_log("📜 [LƯỢT %d] Tướng %s (%s) bước vào lượt chiến đấu." % [seat_num, g["name"], turn_role])
 
 	# Kích hoạt 3 dấu chấm viền chạy quanh và đồng hồ đếm ngược trên đầu avatar tướng
@@ -11395,7 +11220,10 @@ func _execute_ai_turn(ai_seat: int) -> void:
 	if is_network_mode:
 		return
 	var ai_turn_token := turn_generation
-	await get_tree().create_timer(AI_CARD_PLAY_DELAY).timeout
+	if not ai_fast_forward_active:
+		await get_tree().create_timer(AI_CARD_PLAY_DELAY).timeout
+	else:
+		await get_tree().process_frame
 	if is_game_over or ai_turn_token != turn_generation or ai_turn_watchdog_recovering:
 		return
 
@@ -11866,10 +11694,18 @@ func _execute_ai_turn(ai_seat: int) -> void:
 		return
 	_reset_ai_turn_watchdog()
 	_broadcast_player_battle_action("END_TURN", "", 0, ai_seat)
-	await get_tree().create_timer(AI_CARD_PLAY_DELAY).timeout
+	if not ai_fast_forward_active:
+		await get_tree().create_timer(AI_CARD_PLAY_DELAY).timeout
+	else:
+		await get_tree().process_frame
 	_next_turn()
 
 func _wait_for_ai_card_play() -> void:
+	if not is_inside_tree():
+		return
+	if ai_fast_forward_active:
+		await get_tree().process_frame
+		return
 	await get_tree().create_timer(AI_CARD_PLAY_DELAY).timeout
 
 func _reset_ai_turn_watchdog() -> void:
@@ -12526,6 +12362,8 @@ func _save_viewport_screenshot(path: String) -> void:
 		print("[Screenshot] Đã lưu %s!" % global_path)
 
 func _animate_showcase_card(c_name: String, banner_text: String, card_info: Dictionary = {}, duration_override: float = -1.0) -> void:
+	if ai_fast_forward_active:
+		return
 	_ensure_showcase_layer()
 	var info = _get_showcase_card_info(c_name, card_info)
 	var entry = VBoxContainer.new()
@@ -13362,7 +13200,7 @@ func _execute_aoe_attack(caster_seat: int, aoe_name: String, required_card_name:
 	var incoming_damage = max(1, damage_amount)
 
 	var victims_order: Array = []
-	for i in range(1, 4):
+	for i in range(1, battle_seat_count):
 		var s = ((caster_seat - 1 + i) % battle_seat_count) + 1
 		if generals_data.has(s) and generals_data[s]["is_alive"]:
 			victims_order.append(s)

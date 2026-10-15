@@ -17,9 +17,12 @@ import {
   hydrateGameState,
   ensureMutationVersion,
   recordAction,
+  fastForwardMatchForDeadPlayer,
+  AI_THINK_DELAY_MS,
 } from "./functions/game-engine/src/gameEngine.js";
 import { HERO_MAX_HP, HEROES } from "./functions/game-engine/src/heroes.js";
 import { getModeRules } from "./functions/game-engine/src/modeRegistry.js";
+import { createLobbyChatStore, LOBBY_CHAT_HISTORY_LIMIT } from "./lobby_chat_store.js";
 
 const rooms = new Map();
 // Social data is kept in the Render process so online players can search and
@@ -29,7 +32,6 @@ const socialFriends = new Map();
 const socialRequests = new Map();
 let nextSocialRequestId = 1;
 const lobbyChatSockets = new Set();
-const lobbyChatMessages = [];
 const CHAT_HISTORY_LIMIT = 50;
 const CHAT_MAX_LENGTH = 280;
 let nextChatMessageId = 1;
@@ -47,6 +49,12 @@ const APPWRITE_MATCHMAKING_DATABASE = "game";
 const APPWRITE_MATCHMAKING_COLLECTION = "matchmaking_queue";
 const APPWRITE_MATCHMAKING_MAX_AGE_MS = 180000;
 const APPWRITE_MATCHMAKING_POLL_MS = 2000;
+const lobbyChatStore = createLobbyChatStore({
+  request: appwriteMatchmakingRequest,
+  documentsPath: `/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents`,
+  onCleanupError: (error) => console.error("[Lobby Chat] History cleanup failed:", error.message),
+});
+let lobbyChatQueue = Promise.resolve();
 let matchmakingSweepRunning = false;
 // A client can finish the Appwrite lobby flow with the id of a room that was
 // merged while it was polling. Keep the redirect in Render too, so its first
@@ -565,7 +573,7 @@ function sendChatError(socket, channel, error) {
   socket.send(JSON.stringify({ type: "CHAT_ERROR", channel, error }));
 }
 
-function handleChat(socket, payload, currentRoomId, currentSeat) {
+async function handleChat(socket, payload, currentRoomId, currentSeat) {
   const { action, channel } = payload;
   if (channel !== "lobby" && channel !== "battle") {
     return sendChatError(socket, channel, "Kênh trò chuyện không hợp lệ");
@@ -584,7 +592,6 @@ function handleChat(socket, payload, currentRoomId, currentSeat) {
       return sendChatError(socket, channel, "Vui lòng đăng nhập để trò chuyện");
     }
     sender = { userId: profile.userId, userName: profile.userName };
-    history = lobbyChatMessages;
   } else {
     room = rooms.get(currentRoomId);
     if (!room || room.sockets.get(currentSeat) !== socket || resolveMatchmakingRoomId(payload.roomId) !== currentRoomId) {
@@ -598,8 +605,17 @@ function handleChat(socket, payload, currentRoomId, currentSeat) {
   }
 
   if (action === "CHAT_SUBSCRIBE") {
-    if (channel === "lobby") lobbyChatSockets.add(socket);
-    socket.send(JSON.stringify({ type: "CHAT_HISTORY", channel, roomId: room ? currentRoomId : "", messages: history }));
+    if (channel === "lobby") {
+      try { history = await lobbyChatStore.history(); }
+      catch (error) {
+        console.error("[Lobby Chat] History read failed:", error.message);
+        return sendChatError(socket, channel, "Chưa tải được lịch sử trò chuyện. Vui lòng thử lại.");
+      }
+      if (socket.readyState !== WebSocket.OPEN) return;
+      lobbyChatSockets.add(socket);
+    }
+    socket.send(JSON.stringify({ type: "CHAT_HISTORY", channel, roomId: room ? currentRoomId : "", messages: history,
+      historyLimit: channel === "lobby" ? LOBBY_CHAT_HISTORY_LIMIT : CHAT_HISTORY_LIMIT }));
     return;
   }
   if (typeof payload.text !== "string" || Array.from(payload.text).length > CHAT_MAX_LENGTH) {
@@ -611,13 +627,21 @@ function handleChat(socket, payload, currentRoomId, currentSeat) {
   if (socket.lastChatSentAt !== undefined && now - socket.lastChatSentAt < 1000) {
     return sendChatError(socket, channel, "Vui lòng chờ 1 giây trước khi gửi tiếp");
   }
-  socket.lastChatSentAt = now;
   const message = {
     id: `${instanceId}_chat_${nextChatMessageId++}`, channel,
     roomId: room ? currentRoomId : "", ...sender, text, timestamp: now,
   };
-  history.push(message);
-  if (history.length > CHAT_HISTORY_LIMIT) history.shift();
+  if (channel === "lobby") {
+    try { await lobbyChatStore.append(message); }
+    catch (error) {
+      console.error("[Lobby Chat] Message save failed:", error.message);
+      return sendChatError(socket, channel, "Chưa lưu được tin nhắn. Vui lòng gửi lại.");
+    }
+  } else {
+    history.push(message);
+    if (history.length > CHAT_HISTORY_LIMIT) history.shift();
+  }
+  socket.lastChatSentAt = now;
   const packet = JSON.stringify({ type: "CHAT_MESSAGE", ...message });
   const recipients = room ? room.sockets.values() : new Set([...lobbyChatSockets, socket]);
   for (const recipient of recipients) {
@@ -810,6 +834,9 @@ function updateLocalRoom(roomId, state) {
 function applyActionToState(state, seat, payload) {
   if (!hasSeat(state, seat)) return { error: "Ghế không thuộc phòng đấu" };
 
+  if (payload.action === "FAST_FORWARD_MATCH") {
+    return fastForwardMatchForDeadPlayer(state, seat);
+  }
   if (payload.action === "USE_SKILL") {
     return handleUseSkill(state, seat, payload.skillId, payload.targetSeat, payload.cardId, payload);
   }
@@ -918,6 +945,39 @@ function tickSharedRoom(roomId, room) {
   }
 }
 
+function sanitizeDraftMessageForClient(message, seat, modeId) {
+  const completed = message.type === "DRAFT_COMPLETED";
+  const dynasty = String(modeId || "").startsWith("dynasty_");
+  const slots = (message.slots || []).map((slot) => {
+    const { role, heroId, heroName, hoverHeroId, hoverHeroName,
+      candidateHeroIds, availableHeroIds, maxHp, ...publicSlot } = slot;
+    const own = Number(slot.seat) === Number(seat);
+    const publicKing = dynasty && role === "KING" && slot.isLocked;
+    const revealHero = completed || own || publicKing;
+    return {
+      ...publicSlot,
+      role: own || role === "KING" ? role || "" : undefined,
+      heroId: revealHero ? heroId || 0 : 0,
+      heroName: revealHero ? heroName || "" : "",
+      maxHp: revealHero ? maxHp : undefined,
+      hoverHeroId: own ? hoverHeroId || 0 : 0,
+      hoverHeroName: own ? hoverHeroName || "" : "",
+      candidateHeroIds: own ? candidateHeroIds || [] : [],
+    };
+  });
+  const safe = { ...message, slots };
+  if (Array.isArray(message.selectedHeroIds)) {
+    safe.selectedHeroIds = slots.filter((slot) => slot.isLocked && slot.heroId > 0).map((slot) => slot.heroId);
+  }
+  if (Array.isArray(message.battlePlayers)) {
+    safe.battlePlayers = message.battlePlayers.map(({ role, ...player }) => ({
+      ...player,
+      role: Number(player.seat) === Number(seat) || role === "KING" ? role || "" : undefined,
+    }));
+  }
+  return safe;
+}
+
 function broadcastRoom(room, messageObj) {
   for (const [seat, ws] of room.sockets.entries()) {
     if (ws.readyState === WebSocket.OPEN) {
@@ -929,16 +989,11 @@ function broadcastRoom(room, messageObj) {
             state: sanitizedState,
           };
           ws.send(JSON.stringify(personalized));
-        } else if (messageObj.type === "DRAFT_STATE_UPDATE") {
-          const safe = { ...messageObj, activeSeats: messageObj.activeSeats, round: messageObj.round, slots: (messageObj.slots || []).map((slot) => { const { role, heroId, heroName, hoverHeroId, hoverHeroName, candidateHeroIds, availableHeroIds, ...publicSlot } = slot; const own = slot.seat === seat; const locked = Boolean(slot.isLocked && heroId > 0); return { ...publicSlot, role: own || role === "KING" ? (role || "") : undefined, heroId: own || locked ? heroId : 0, heroName: own || locked ? heroName : "", hoverHeroId: own ? (hoverHeroId || 0) : 0, hoverHeroName: own ? (hoverHeroName || "") : "", candidateHeroIds: own ? (candidateHeroIds || []) : [] }; }) };
-          if (String(room.draft?.modeId || "").startsWith("dynasty_")) {
-            const own = safe.slots.find((slot) => slot.seat === seat);
-            safe.selectedHeroIds = own && own.heroId > 0 ? [own.heroId] : [];
-          }
-          ws.send(JSON.stringify(safe));
-        } else if (messageObj.type === "DRAFT_COMPLETED") {
-          const safe = { ...messageObj, slots: (messageObj.slots || []).map((slot) => { const { role, ...publicSlot } = slot; return { ...publicSlot, role: slot.seat === seat || role === "KING" ? (role || "") : undefined }; }) };
-          ws.send(JSON.stringify(safe));
+        } else if (messageObj.type === "DRAFT_STATE_UPDATE" || messageObj.type === "DRAFT_COMPLETED") {
+          ws.send(JSON.stringify(sanitizeDraftMessageForClient(messageObj, seat, room.draft?.modeId)));
+        } else if (messageObj.type === "DRAFT_HOVER_UPDATE") {
+          // Previews stay private in every mode, including cluster relays and AI previews.
+          if (Number(messageObj.seat) === Number(seat)) ws.send(JSON.stringify(messageObj));
         } else {
           ws.send(JSON.stringify(messageObj));
         }
@@ -1009,6 +1064,12 @@ function arrangeDraftSlots(slots, modeId) {
 
 function draftRoles(modeId) { return modeId === "dynasty_5" ? ["KING", "LOYALIST", "REBEL", "REBEL", "SPY"] : (modeId === "dynasty_8" ? ["KING", "LOYALIST", "REBEL", "REBEL", "SPY", "LOYALIST", "REBEL", "REBEL"] : []); }
 function isDynastyDraft(draft) { return String(draft?.modeId || "").startsWith("dynasty_"); }
+
+function activeDynastyDraftSeats(draft) {
+  const king = draft.slots.find((slot) => slot.role === "KING") || draft.slots[0];
+  if (king && !king.isLocked) return [king.seat];
+  return draft.slots.filter((slot) => !slot.isLocked).map((slot) => slot.seat);
+}
 
 function resolveDraftSeat(room, requestedSeat, payload, socket) {
   const slots = room.draft?.slots || [];
@@ -1139,7 +1200,9 @@ function getCandidateIdsForSlot(slot) {
 
 function draftMessage(roomId, draft) {
   const is2v2 = !isDynastyDraft(draft);
-  const activeSeats = draft.activeSeats || [draft.slots.find((slot) => !slot.isLocked)?.seat || draft.slots[0]?.seat || 1];
+  const activeSeats = is2v2
+    ? draft.activeSeats || [draft.slots.find((slot) => !slot.isLocked)?.seat || draft.slots[0]?.seat || 1]
+    : activeDynastyDraftSeats(draft);
   const currentSeat = activeSeats[0] || 1;
   const slots = [...draft.slots]
     .sort((a, b) => a.seat - b.seat)
@@ -1154,6 +1217,7 @@ function draftMessage(roomId, draft) {
   return {
     type: "DRAFT_STATE_UPDATE",
     roomId,
+    modeId: draft.modeId || "2v2",
     revision: draft.revision || 1,
     currentPickerIndex: currentPickerIndex >= 0 ? currentPickerIndex : draft.currentPickerIndex,
     currentSeat,
@@ -1293,6 +1357,7 @@ async function tickDraftRoom(roomId, room) {
       .map((slot, index) => index)
       .filter((index) => activeSeats.includes(draft.slots[index]?.seat) && !draft.slots[index]?.isLocked);
   } else if (dynastyReady) {
+    draft.activeSeats = activeDynastyDraftSeats(draft);
     indexes = draft.slots.map((slot, index) => index).filter((index) => index > 0 && !draft.slots[index].isLocked);
   } else {
     indexes = draft.currentPickerIndex < draft.slots.length && !draft.slots[draft.currentPickerIndex]?.isLocked
@@ -1338,7 +1403,7 @@ async function tickDraftRoom(roomId, room) {
     // slots explicitly marked as AI may use the fast automatic-pick path.
     const isBot = slotIsActuallyAI(room, currentSlot);
 
-    if (isBot && elapsedMs >= 800 && !currentSlot.hoverHeroId) {
+    if (isBot && elapsedMs >= AI_THINK_DELAY_MS && !currentSlot.hoverHeroId) {
       const used = new Set(draft.slots.filter((slot) => slot.isLocked).map((slot) => slot.heroId));
       for (const idx of indexes) {
         if (idx !== index && draft.slots[idx]?.hoverHeroId) {
@@ -1361,7 +1426,7 @@ async function tickDraftRoom(roomId, room) {
       }
     }
 
-    const botThresholdSec = isBot ? 1.5 : 40.0;
+    const botThresholdSec = isBot ? AI_THINK_DELAY_MS / 1000 : 40.0;
     if (elapsedMs >= botThresholdSec * 1000 || elapsed >= 40) {
       const used = new Set(draft.slots.filter((slot) => slot.isLocked).map((slot) => slot.heroId));
       let heroId = currentSlot.hoverHeroId > 0 && !used.has(currentSlot.hoverHeroId) ? currentSlot.hoverHeroId : 0;
@@ -1395,6 +1460,8 @@ async function tickDraftRoom(roomId, room) {
       }
     } else if (!dynastyReady) {
       draft.currentPickerIndex += 1;
+      draft.activeSeats = activeDynastyDraftSeats(draft);
+      draft.round = 2;
       draft.timerStartAt = Date.now();
       draft.timer = 40;
       draft.lastBroadcastTimer = 40;
@@ -1515,6 +1582,11 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
         const requestSeat = normalizeSeat(payload.seat);
 
         if (action.startsWith("CHAT_")) {
+          if (payload.channel === "lobby") {
+            const operation = lobbyChatQueue.then(() => handleChat(socket, payload, currentRoomId, currentSeat));
+            lobbyChatQueue = operation.catch(() => {});
+            return operation;
+          }
           return handleChat(socket, payload, currentRoomId, currentSeat);
         }
 
@@ -1693,7 +1765,8 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           const noActiveSockets = !room || !room.sockets || Array.from(room.sockets.values()).every((s) => s.readyState !== WebSocket.OPEN);
           const requestedSeatCount = draftSeatCount(String(payload.modeId || "2v2"));
           const draftShapeChanged = !!room?.draft && (String(room.draft.modeId || "2v2") !== String(payload.modeId || "2v2") || room.draft.slots.length !== requestedSeatCount);
-          const fresh = !room || draftShapeChanged || room.draft?.isCompleted || (noActiveSockets && Date.now() - room.lastActivity > 15000);
+          const activeBattle = room?.draft?.isCompleted && room.state && room.state.status !== "FINISHED";
+          const fresh = !room || (!activeBattle && (draftShapeChanged || room.draft?.isCompleted || (noActiveSockets && Date.now() - room.lastActivity > 15000)));
           if (fresh) room = createDraftRoom(roomId, payload, boundSeat);
           if (!room?.draft) {
             return socket.send(JSON.stringify({ type: "ERROR", error: "Không thể khởi tạo phòng chọn tướng" }));
@@ -1726,12 +1799,12 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           room.lastActivity = Date.now();
           socket.send(JSON.stringify({ type: "DRAFT_JOINED", roomId, seat: draftSeat, assignedSeat: draftSeat }));
           if (room.draft.isCompleted && room.state) {
-            return socket.send(JSON.stringify({
+            return socket.send(JSON.stringify(sanitizeDraftMessageForClient({
               type: "DRAFT_COMPLETED",
               roomId,
               slots: room.draft.slots,
               battlePlayers: room.state.players,
-            }));
+            }, currentSeat, room.draft.modeId)));
           }
           broadcastRoom(room, draftMessage(roomId, room.draft));
           clusterBroadcast({ type: "DRAFT_SYNC", roomId, draft: room.draft });
@@ -1795,6 +1868,8 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
             }
           } else if (!dynastyReady) {
             room.draft.currentPickerIndex += 1;
+            room.draft.activeSeats = activeDynastyDraftSeats(room.draft);
+            room.draft.round = 2;
             room.draft.timer = 40;
             room.draft.timerStartAt = Date.now();
             room.draft.lastBroadcastTimer = 40;

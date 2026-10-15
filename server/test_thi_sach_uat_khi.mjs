@@ -12,6 +12,17 @@ function makeCard(id, name, subType = CARD_SUBTYPES.ATTACK_NORMAL, suit = "Spade
   return { id, name, subType, suit, rank, category: 0 };
 }
 
+// Persisted games may still contain the legacy damage-trigger prompt.
+// New games trigger Uất Khí on death; exercise legacy recovery explicitly.
+function restoreLegacyPrompt(state) {
+  assert.equal(state.phase, "PLAY", "Nonfatal damage must finish without a new Uất Khí prompt");
+  state.phase = "AWAIT_UAT_KHI";
+  state.waitingTargetSeat = 2;
+  state.waitingReactionType = "UAT_KHI";
+  state.waitingTimer = 40;
+  state.uatKhiQueue = [{ seat: 2 }];
+}
+
 // Test 1: AI Thi Sách tự chọn đồng đội khi đồng đội có ít bài hơn
 {
   const state = initGame("test-uat-khi-teammate", [
@@ -30,6 +41,7 @@ function makeCard(id, name, subType = CARD_SUBTYPES.ATTACK_NORMAL, suit = "Spade
   handlePlayCard(state, 1, "slash-1", 2);
   // Seat 2 không Đỡ -> Mất 1 Máu (từ 4 xuống 3, chưa cận tử)
   handleRespondAction(state, 2, false, null);
+  restoreLegacyPrompt(state);
 
   assert.equal(state.phase, "AWAIT_UAT_KHI", "Pha phải chuyển sang AWAIT_UAT_KHI khi mất máu chưa cận tử");
   assert.equal(state.waitingTargetSeat, 2, "Thi Sách phải là người chờ phản ứng Uất Khí");
@@ -66,6 +78,7 @@ function makeCard(id, name, subType = CARD_SUBTYPES.ATTACK_NORMAL, suit = "Spade
   // Seat 1 Trảm Seat 2 -> mất 1 máu
   handlePlayCard(state, 1, "slash-2", 2);
   handleRespondAction(state, 2, false, null);
+  restoreLegacyPrompt(state);
 
   assert.equal(state.phase, "AWAIT_UAT_KHI");
   assert.equal(state.waitingTargetSeat, 2);
@@ -80,7 +93,7 @@ function makeCard(id, name, subType = CARD_SUBTYPES.ATTACK_NORMAL, suit = "Spade
   assert.equal(uatKhiAction.targetSeat, 2, "Mục tiêu được chọn phải là chính Thi Sách (Seat 2)");
 }
 
-// Test 3: tickGameState tự động phản ứng cho AI Thi Sách sau 1.5s
+// Test 3: tickGameState tự động phản ứng cho AI Thi Sách sau 2.5s
 {
   const state = initGame("test-uat-khi-tick", [
     { seat: 1, heroId: "HERO_1", isAI: false },
@@ -94,13 +107,14 @@ function makeCard(id, name, subType = CARD_SUBTYPES.ATTACK_NORMAL, suit = "Spade
 
   handlePlayCard(state, 1, "slash-3", 2);
   handleRespondAction(state, 2, false, null);
+  restoreLegacyPrompt(state);
 
   assert.equal(state.phase, "AWAIT_UAT_KHI");
 
-  // Giả lập trôi qua 1600ms
-  state.timerStartAt = Date.now() - 1600;
+  // Giả lập trôi qua hơn thời gian suy nghĩ 2.5s
+  state.timerStartAt = Date.now() - 2600;
   const tickRes = tickGameState(state);
-  assert.equal(tickRes.changed, true, "tickGameState phải xử lý hành động AI khi elapsedMs >= 1500");
+  assert.equal(tickRes.changed, true, "tickGameState phải xử lý hành động AI khi elapsedMs >= 2500");
   assert.equal(state.phase, "PLAY", "tickGameState phải giải quyết xong AWAIT_UAT_KHI");
   assert.equal(state.players[1].hand.length, 1, "Thi Sách phải nhận được lá bài");
 }
@@ -124,6 +138,7 @@ function makeCard(id, name, subType = CARD_SUBTYPES.ATTACK_NORMAL, suit = "Spade
   // Seat 1 Trảm Thi Sách
   handlePlayCard(state, 1, "slash-4", 2);
   handleRespondAction(state, 2, false, null);
+  restoreLegacyPrompt(state);
 
   assert.equal(state.phase, "AWAIT_UAT_KHI", "Pha phải là AWAIT_UAT_KHI");
   assert.equal(state.waitingTargetSeat, 2);
