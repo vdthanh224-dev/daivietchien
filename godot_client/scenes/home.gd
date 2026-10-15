@@ -8902,7 +8902,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	var own_room_id = "room_" + str(randi()).md5_text().substr(0, 8)
 	var own_team_seats = range(1, target_player_count + 1)
 	own_team_seats.shuffle()
-	var own_dragon_seats = own_team_seats.slice(0, 2)
+	var own_dragon_seats = own_team_seats.slice(0, maxi(1, target_player_count / 2))
 	var own_room = {
 		"roomId": own_room_id,
 		"modeId": mode_id,
@@ -9022,7 +9022,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		var new_room_id = "room_" + str(randi()).md5_text().substr(0, 8)
 		var random_team_seats = range(1, target_player_count + 1)
 		random_team_seats.shuffle()
-		var dragon_seats = random_team_seats.slice(0, 2)
+		var dragon_seats = random_team_seats.slice(0, maxi(1, target_player_count / 2))
 		var new_room = {
 			"roomId": new_room_id,
 			"modeId": mode_id,
@@ -9294,13 +9294,21 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 
 		var bot_seed_base = AppwriteMatchmaking.get_deterministic_hash_code(mm_active_room_id)
 		var existing_players: Array = []
+		var seen_uids: Dictionary = {}
 		for s in mm_current_room.get("slots", []):
 			if not (s is Dictionary):
 				continue
-			if not s.get("isEmpty", false) and str(s.get("userId", "")) != "" and str(s.get("userId", "")) != "empty":
-				existing_players.append(s.duplicate(true))
+			var uid_str = str(s.get("userId", "")).strip_edges()
+			if not s.get("isEmpty", false) and uid_str != "" and uid_str != "empty":
+				if not seen_uids.has(uid_str):
+					seen_uids[uid_str] = true
+					existing_players.append(s.duplicate(true))
 
-		# Bổ sung bot nếu chưa đủ 4 người
+		# Giới hạn số người chơi không vượt quá số lượng tối đa của chế độ
+		if existing_players.size() > target_player_count:
+			existing_players = existing_players.slice(0, target_player_count)
+
+		# Bổ sung bot nếu chưa đủ người
 		while existing_players.size() < target_player_count:
 			var i = existing_players.size()
 			var bot_name = AppwriteMatchmaking.get_realistic_gamer_name(bot_seed_base + i * 17, used_names)
@@ -9313,19 +9321,31 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 				"isEmpty": false
 			})
 
-		# 1. Random ngẫu nhiên 4 người vào 4 vị trí ghế 1->4
+		# 1. Random ngẫu nhiên người chơi vào các vị trí ghế
 		existing_players.shuffle()
 
-		# 2. Random ngẫu nhiên 2 Rồng và 2 Phượng
-		var team_roles: Array[bool] = [true, true, false, false]
-		team_roles.shuffle()
+		# 2. Khởi tạo danh sách phe (Rồng / Phượng) tương ứng với số ghế
+		var team_roles: Array[bool] = []
+		if target_player_count == 4:
+			team_roles = [true, true, false, false]
+			team_roles.shuffle()
+		elif target_player_count == 5:
+			team_roles = [true, true, false, false, false]
+			team_roles.shuffle()
+		elif target_player_count == 8:
+			team_roles = [true, true, true, true, false, false, false, false]
+			team_roles.shuffle()
+		else:
+			for i in range(target_player_count):
+				team_roles.append(i % 2 == 0)
+			team_roles.shuffle()
 
-		# 3. Cố định 4 vị trí và phe vào slots trước khi bắt đầu chọn tướng
+		# 3. Cố định vị trí và phe vào slots trước khi bắt đầu chọn tướng
 		var final_slots: Array = []
 		for idx in range(existing_players.size()):
 			var p = existing_players[idx]
 			var s_num = idx + 1
-			var is_drag = team_roles[idx]
+			var is_drag: bool = team_roles[idx] if (idx >= 0 and idx < team_roles.size()) else (idx % 2 == 0)
 			final_slots.append({
 				"seatNumber": s_num,
 				"userId": str(p.get("userId", "")),
