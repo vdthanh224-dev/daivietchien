@@ -2437,7 +2437,7 @@ func _show_modal(title_text: String, content_node: Node) -> void:
 			if is_instance_valid(modal_scroll):
 				modal_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		elif title_text.begins_with("HỒ SƠ") or title_text.begins_with("CHỌN NỀN"):
-			modal_panel.custom_minimum_size = Vector2(900, 705)
+			modal_panel.custom_minimum_size = Vector2(1060, 600)
 			if is_instance_valid(modal_scroll):
 				modal_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 		elif title_text == "TRÂN BẢO CÁC":
@@ -9259,58 +9259,52 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 	var p_uid = str(player_data.get("user_id", ""))
 	var is_self = player_data.is_empty() or (not my_uid.is_empty() and p_uid == my_uid)
 
-	# Khung bao bọc lớn gấp rưỡi (custom_minimum_size ~850px)
+	# Khung bao bọc lớn chia làm 2 cột: BÊN TRÁI là thông tin hồ sơ, BÊN PHẢI là hình nền tướng đẹp rộng rãi
 	var root_wrapper = PanelContainer.new()
-	root_wrapper.custom_minimum_size = Vector2(850, 620)
+	root_wrapper.custom_minimum_size = Vector2(1020, 520)
 	root_wrapper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root_wrapper.size_flags_vertical = Control.SIZE_EXPAND_FILL
 
 	var wrap_style = StyleBoxFlat.new()
-	wrap_style.bg_color = Color(0.04, 0.05, 0.09, 0.95)
+	wrap_style.bg_color = Color(0.03, 0.04, 0.07, 0.96)
+	wrap_style.border_width_left = 2
+	wrap_style.border_width_top = 2
+	wrap_style.border_width_right = 2
+	wrap_style.border_width_bottom = 2
+	wrap_style.border_color = Color(0.85, 0.70, 0.25, 0.6)
 	wrap_style.corner_radius_top_left = 12
 	wrap_style.corner_radius_top_right = 12
 	wrap_style.corner_radius_bottom_right = 12
 	wrap_style.corner_radius_bottom_left = 12
 	root_wrapper.add_theme_stylebox_override("panel", wrap_style)
 
-	# --- 1. LỚP NỀN TƯỚNG (NẾU ĐÃ CHỌN LÀM NỀN) ---
-	var bg_hero_id: int = (AuthManager.current_profile_bg if AuthManager else 0) if is_self else int(player_data.get("profile_bg", player_data.get("profileBg", 0)))
-	if bg_hero_id > 0 and HeroDatabase:
-		var eq_skin_id = HeroDatabase.get_equipped_skin_id(bg_hero_id) if is_self else "default"
-		var bg_tex = HeroDatabase.get_skin_texture(bg_hero_id, eq_skin_id)
-		if not bg_tex:
-			var hd = HeroDatabase.get_hero(bg_hero_id)
-			var av = str(hd.get("avatar", ""))
-			if ResourceLoader.exists(av): bg_tex = load(av)
-		if bg_tex:
-			var bg_rect = TextureRect.new()
-			bg_rect.texture = bg_tex
-			bg_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			bg_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-			bg_rect.set_anchors_preset(PRESET_FULL_RECT)
-			bg_rect.modulate = Color(1.0, 1.0, 1.0, 0.32)
-			root_wrapper.add_child(bg_rect)
-
-			var dark_overlay = ColorRect.new()
-			dark_overlay.set_anchors_preset(PRESET_FULL_RECT)
-			dark_overlay.color = Color(0.03, 0.04, 0.08, 0.65)
-			root_wrapper.add_child(dark_overlay)
-
 	var margin_wrap = MarginContainer.new()
-	margin_wrap.add_theme_constant_override("margin_left", 14)
-	margin_wrap.add_theme_constant_override("margin_right", 14)
+	margin_wrap.add_theme_constant_override("margin_left", 12)
+	margin_wrap.add_theme_constant_override("margin_right", 12)
 	margin_wrap.add_theme_constant_override("margin_top", 12)
 	margin_wrap.add_theme_constant_override("margin_bottom", 12)
 	root_wrapper.add_child(margin_wrap)
 
-	var container = VBoxContainer.new()
-	container.add_theme_constant_override("separation", 10)
-	margin_wrap.add_child(container)
+	var main_hbox = HBoxContainer.new()
+	main_hbox.add_theme_constant_override("separation", 14)
+	main_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	main_hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	margin_wrap.add_child(main_hbox)
 
-	# --- 2. BANNER TÊN CHIẾN TƯỚNG & DANH HIỆU & NÚT ĐỔI NỀN ---
+	# =========================================================================
+	# === CỘT TRÁI: CÁC THÔNG TIN HỒ SƠ (TÊN, RANK, CẤP, QUÂN HÀM, TỈ LỆ) ===
+	# =========================================================================
+	var left_col = VBoxContainer.new()
+	left_col.custom_minimum_size = Vector2(530, 0)
+	left_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_col.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	left_col.add_theme_constant_override("separation", 8)
+	main_hbox.add_child(left_col)
+
+	# --- 1. BANNER TÊN CHIẾN TƯỚNG & DANH HIỆU & NÚT DANH HIỆU ---
 	var name_panel = PanelContainer.new()
 	var np_style = StyleBoxFlat.new()
-	np_style.bg_color = Color(0.05, 0.07, 0.12, 0.90)
+	np_style.bg_color = Color(0.06, 0.08, 0.14, 0.95)
 	np_style.border_width_left = 1
 	np_style.border_width_top = 1
 	np_style.border_width_right = 1
@@ -9323,22 +9317,22 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 	name_panel.add_theme_stylebox_override("panel", np_style)
 
 	var np_margin = MarginContainer.new()
-	np_margin.add_theme_constant_override("margin_top", 8)
-	np_margin.add_theme_constant_override("margin_bottom", 8)
-	np_margin.add_theme_constant_override("margin_left", 16)
-	np_margin.add_theme_constant_override("margin_right", 16)
+	np_margin.add_theme_constant_override("margin_top", 6)
+	np_margin.add_theme_constant_override("margin_bottom", 6)
+	np_margin.add_theme_constant_override("margin_left", 12)
+	np_margin.add_theme_constant_override("margin_right", 12)
 	name_panel.add_child(np_margin)
 
 	var name_hbox = HBoxContainer.new()
 	name_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	name_hbox.add_theme_constant_override("separation", 10)
+	name_hbox.add_theme_constant_override("separation", 8)
 	np_margin.add_child(name_hbox)
 
 	var user_name_str = (AuthManager.current_user_name if AuthManager and AuthManager.current_user_name != "" else "ĐẠI TƯỚNG QUÂN") if is_self else str(player_data.get("name", "Đại Tướng Quân"))
 
 	var name_lbl = Label.new()
 	name_lbl.text = "👑 " + user_name_str.to_upper()
-	name_lbl.add_theme_font_size_override("font_size", 18)
+	name_lbl.add_theme_font_size_override("font_size", 16)
 	name_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.35, 1.0))
 	name_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	name_lbl.add_theme_constant_override("shadow_offset_y", 1)
@@ -9354,8 +9348,8 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 		name_hbox.add_child(tb)
 	else:
 		var title_tag = Label.new()
-		title_tag.text = "• CHIẾN TƯỚNG ĐẠI VIỆT"
-		title_tag.add_theme_font_size_override("font_size", 12)
+		title_tag.text = "• TƯỚNG QUÂN"
+		title_tag.add_theme_font_size_override("font_size", 11)
 		title_tag.add_theme_color_override("font_color", Color(0.70, 0.78, 0.88, 0.85))
 		name_hbox.add_child(title_tag)
 
@@ -9363,31 +9357,34 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 	sp_banner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_hbox.add_child(sp_banner)
 
-	# Nếu là hồ sơ bản thân -> Hiển thị 2 nút: "🏷️ DANH HIỆU" và "🖼️ ĐỔI NỀN"
+	# Nếu là hồ sơ bản thân -> Nút trang bị danh hiệu
 	if is_self:
 		var btn_title = Button.new()
 		btn_title.text = "🏷️ DANH HIỆU"
-		btn_title.custom_minimum_size = Vector2(124, 34)
-		_style_white_gold_button(btn_title, 8, 2, Vector2(0, 1))
+		btn_title.custom_minimum_size = Vector2(110, 30)
+		_style_white_gold_button(btn_title, 7, 2, Vector2(0, 1))
 		btn_title.pressed.connect(func():
 			AudioManager.play_card_select()
 			_show_title_selection_modal()
 		)
 		name_hbox.add_child(btn_title)
 
-		var btn_bg = Button.new()
-		btn_bg.text = "🖼️ ĐỔI NỀN"
-		btn_bg.custom_minimum_size = Vector2(110, 34)
-		_style_white_gold_button(btn_bg, 8, 2, Vector2(0, 1))
-		btn_bg.pressed.connect(func():
-			AudioManager.play_card_select()
-			_show_profile_bg_selection_modal()
-		)
-		name_hbox.add_child(btn_bg)
+	left_col.add_child(name_panel)
 
-	container.add_child(name_panel)
+	# --- 2. SCROLL CHỨA CÁC THẺ THÔNG TIN CHI TIẾT ---
+	var scroll_cards = ScrollContainer.new()
+	scroll_cards.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll_cards.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll_cards.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll_cards.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	left_col.add_child(scroll_cards)
 
-	# --- 3. MỤC CẤP ĐỘ ---
+	var cards_vbox = VBoxContainer.new()
+	cards_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cards_vbox.add_theme_constant_override("separation", 6)
+	scroll_cards.add_child(cards_vbox)
+
+	# Thẻ 1: CẤP ĐỘ CHIẾN TƯỚNG
 	var lvl = (AuthManager.current_level if AuthManager else 1) if is_self else int(player_data.get("level", 1))
 	var exp_c = (AuthManager.current_exp if AuthManager else 0) if is_self else int(player_data.get("exp", 0))
 	var exp_req = (AuthManager.get_exp_to_next_level() if AuthManager else 20) if is_self else 100
@@ -9395,7 +9392,7 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 
 	var exp_vbox = VBoxContainer.new()
 	exp_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	exp_vbox.add_theme_constant_override("separation", 3)
+	exp_vbox.add_theme_constant_override("separation", 2)
 
 	var exp_lbl = Label.new()
 	exp_lbl.text = "Tiến độ: %d / %d EXP (%d%%)" % [exp_c, exp_req, exp_pct]
@@ -9404,32 +9401,32 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 	exp_vbox.add_child(exp_lbl)
 
 	var exp_pbar = ProgressBar.new()
-	exp_pbar.custom_minimum_size = Vector2(0, 10)
+	exp_pbar.custom_minimum_size = Vector2(0, 8)
 	exp_pbar.max_value = exp_req
 	exp_pbar.value = exp_c
 	exp_pbar.show_percentage = false
 	var p_bg = StyleBoxFlat.new()
 	p_bg.bg_color = Color(0.08, 0.11, 0.18, 0.9)
-	p_bg.corner_radius_top_left = 5
-	p_bg.corner_radius_top_right = 5
-	p_bg.corner_radius_bottom_right = 5
-	p_bg.corner_radius_bottom_left = 5
+	p_bg.corner_radius_top_left = 4
+	p_bg.corner_radius_top_right = 4
+	p_bg.corner_radius_bottom_right = 4
+	p_bg.corner_radius_bottom_left = 4
 	var p_fg = StyleBoxFlat.new()
 	p_fg.bg_color = Color(0.25, 0.75, 0.95, 1.0)
-	p_fg.corner_radius_top_left = 5
-	p_fg.corner_radius_top_right = 5
-	p_fg.corner_radius_bottom_right = 5
-	p_fg.corner_radius_bottom_left = 5
+	p_fg.corner_radius_top_left = 4
+	p_fg.corner_radius_top_right = 4
+	p_fg.corner_radius_bottom_right = 4
+	p_fg.corner_radius_bottom_left = 4
 	exp_pbar.add_theme_stylebox_override("background", p_bg)
 	exp_pbar.add_theme_stylebox_override("fill", p_fg)
 	exp_vbox.add_child(exp_pbar)
 
 	var lvl_icon = Label.new()
 	lvl_icon.text = "⭐"
-	lvl_icon.add_theme_font_size_override("font_size", 22)
+	lvl_icon.add_theme_font_size_override("font_size", 20)
 	lvl_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	container.add_child(_create_profile_card_row(
+	cards_vbox.add_child(_create_profile_card_row(
 		lvl_icon,
 		"CẤP ĐỘ CHIẾN TƯỚNG",
 		"CẤP %d" % lvl,
@@ -9437,7 +9434,7 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 		exp_vbox
 	))
 
-	# --- 4. MỤC QUÂN HÀM ---
+	# Thẻ 2: QUÂN HÀM TRIỀU ĐÌNH
 	var mil_info = {}
 	if is_self:
 		mil_info = AuthManager.get_military_rank_info() if AuthManager else {"badge": "🔰", "name": "Tân Binh", "tier": 1, "points": 5, "next_min": 100}
@@ -9450,7 +9447,7 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 
 	var mil_vbox = VBoxContainer.new()
 	mil_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	mil_vbox.add_theme_constant_override("separation", 3)
+	mil_vbox.add_theme_constant_override("separation", 2)
 
 	var mil_lbl = Label.new()
 	mil_lbl.text = "Chiến công: %d / %d điểm (%d%%)" % [mil_pts, mil_next, mil_pct]
@@ -9459,26 +9456,26 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 	mil_vbox.add_child(mil_lbl)
 
 	var mil_pbar = ProgressBar.new()
-	mil_pbar.custom_minimum_size = Vector2(0, 10)
+	mil_pbar.custom_minimum_size = Vector2(0, 8)
 	mil_pbar.max_value = mil_next
 	mil_pbar.value = mil_pts
 	mil_pbar.show_percentage = false
 	var m_fg = StyleBoxFlat.new()
 	m_fg.bg_color = Color(0.90, 0.70, 0.22, 1.0)
-	m_fg.corner_radius_top_left = 5
-	m_fg.corner_radius_top_right = 5
-	m_fg.corner_radius_bottom_right = 5
-	m_fg.corner_radius_bottom_left = 5
+	m_fg.corner_radius_top_left = 4
+	m_fg.corner_radius_top_right = 4
+	m_fg.corner_radius_bottom_right = 4
+	m_fg.corner_radius_bottom_left = 4
 	mil_pbar.add_theme_stylebox_override("background", p_bg)
 	mil_pbar.add_theme_stylebox_override("fill", m_fg)
 	mil_vbox.add_child(mil_pbar)
 
 	var mil_icon = Label.new()
 	mil_icon.text = mil_info.get("badge", "🔰")
-	mil_icon.add_theme_font_size_override("font_size", 22)
+	mil_icon.add_theme_font_size_override("font_size", 20)
 	mil_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	container.add_child(_create_profile_card_row(
+	cards_vbox.add_child(_create_profile_card_row(
 		mil_icon,
 		"QUÂN HÀM TRIỀU ĐÌNH",
 		"%s (BẬC %d/12)" % [mil_info.get("name", "Tân Binh").to_upper(), mil_info.get("tier", 1)],
@@ -9486,7 +9483,7 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 		mil_vbox
 	))
 
-	# --- 5. MỤC TỈ LỆ THẮNG ---
+	# Thẻ 3: TỈ LỆ THẮNG TRẬN
 	var wins = (AuthManager.current_wins if AuthManager else 0) if is_self else int(player_data.get("wins", 0))
 	var losses = (AuthManager.current_losses if AuthManager else 0) if is_self else int(player_data.get("losses", 0))
 	var total_matches = wins + losses
@@ -9494,7 +9491,7 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 
 	var win_vbox = VBoxContainer.new()
 	win_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	win_vbox.add_theme_constant_override("separation", 3)
+	win_vbox.add_theme_constant_override("separation", 2)
 
 	var win_lbl = Label.new()
 	if total_matches > 0:
@@ -9506,32 +9503,32 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 	win_vbox.add_child(win_lbl)
 
 	var win_pbar = ProgressBar.new()
-	win_pbar.custom_minimum_size = Vector2(0, 10)
+	win_pbar.custom_minimum_size = Vector2(0, 8)
 	win_pbar.max_value = 100.0
 	win_pbar.value = rate_val if total_matches > 0 else 0.0
 	win_pbar.show_percentage = false
 	var w_bg = StyleBoxFlat.new()
 	w_bg.bg_color = Color(0.65, 0.20, 0.20, 0.85) if total_matches > 0 else Color(0.08, 0.11, 0.18, 0.9)
-	w_bg.corner_radius_top_left = 5
-	w_bg.corner_radius_top_right = 5
-	w_bg.corner_radius_bottom_right = 5
-	w_bg.corner_radius_bottom_left = 5
+	w_bg.corner_radius_top_left = 4
+	w_bg.corner_radius_top_right = 4
+	w_bg.corner_radius_bottom_right = 4
+	w_bg.corner_radius_bottom_left = 4
 	var w_fg = StyleBoxFlat.new()
 	w_fg.bg_color = Color(0.20, 0.85, 0.40, 1.0)
-	w_fg.corner_radius_top_left = 5
-	w_fg.corner_radius_top_right = 5
-	w_fg.corner_radius_bottom_right = 5
-	w_fg.corner_radius_bottom_left = 5
+	w_fg.corner_radius_top_left = 4
+	w_fg.corner_radius_top_right = 4
+	w_fg.corner_radius_bottom_right = 4
+	w_fg.corner_radius_bottom_left = 4
 	win_pbar.add_theme_stylebox_override("background", w_bg)
 	win_pbar.add_theme_stylebox_override("fill", w_fg)
 	win_vbox.add_child(win_pbar)
 
 	var win_icon = Label.new()
 	win_icon.text = "⚔️"
-	win_icon.add_theme_font_size_override("font_size", 22)
+	win_icon.add_theme_font_size_override("font_size", 20)
 	win_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	container.add_child(_create_profile_card_row(
+	cards_vbox.add_child(_create_profile_card_row(
 		win_icon,
 		"TỈ LỆ THẮNG TRẬN",
 		"%.1f%%" % rate_val if total_matches > 0 else "0.0%",
@@ -9539,7 +9536,7 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 		win_vbox
 	))
 
-	# --- 6. MỤC HẠNG 2v2 ---
+	# Thẻ 4: ĐẤU TRƯỜNG 2v2 XẾP HẠNG
 	var rank_idx = (AuthManager.current_2v2_rank_index if AuthManager else 0) if is_self else int(player_data.get("rank_index", player_data.get("rank2v2Index", 0)))
 	var rank_stars = (AuthManager.current_2v2_stars if AuthManager else 0) if is_self else int(player_data.get("rank_stars", player_data.get("rank2v2Stars", 0)))
 	var rank_acc = (AuthManager.current_2v2_accumulation_points if AuthManager else 0) if is_self else int(player_data.get("rank_acc", player_data.get("rank2v2AccPoints", 0)))
@@ -9547,7 +9544,7 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 	var r_color = rank_info.get("color", Color(1.0, 0.85, 0.4))
 
 	var badge_tex = TextureRect.new()
-	badge_tex.custom_minimum_size = Vector2(38, 38)
+	badge_tex.custom_minimum_size = Vector2(34, 34)
 	badge_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	badge_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	var r_path = RankSystem.get_rank_icon_path(rank_idx) if RankSystem else ""
@@ -9559,11 +9556,11 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 	rank_vbox.add_theme_constant_override("separation", 2)
 
 	var stars_hbox = HBoxContainer.new()
-	stars_hbox.add_theme_constant_override("separation", 3)
+	stars_hbox.add_theme_constant_override("separation", 2)
 	for s in range(5):
 		var s_lbl = Label.new()
 		s_lbl.text = "⭐"
-		s_lbl.add_theme_font_size_override("font_size", 16)
+		s_lbl.add_theme_font_size_override("font_size", 14)
 		if s < rank_stars:
 			s_lbl.modulate = Color(1.3, 1.2, 0.5, 1.0)
 			s_lbl.add_theme_color_override("font_color", Color(1.0, 0.95, 0.3, 1.0))
@@ -9582,11 +9579,11 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 
 	var acc_lbl = Label.new()
 	acc_lbl.text = "Tích lũy dũng cảm: %d/100đ" % rank_acc
-	acc_lbl.add_theme_font_size_override("font_size", 11)
+	acc_lbl.add_theme_font_size_override("font_size", 10)
 	acc_lbl.add_theme_color_override("font_color", Color(0.3, 0.85, 1.0))
 	rank_vbox.add_child(acc_lbl)
 
-	container.add_child(_create_profile_card_row(
+	cards_vbox.add_child(_create_profile_card_row(
 		badge_tex,
 		"ĐẤU TRƯỜNG 2v2 XẾP HẠNG",
 		RankSystem.get_rank_name(rank_idx).to_upper() if RankSystem else "DÂN BINH",
@@ -9594,11 +9591,11 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 		rank_vbox
 	))
 
-	# --- 7. MỤC BỘ SƯU TẬP DANH TƯỚNG ---
+	# Thẻ 5: BỘ SƯU TẬP DANH TƯỚNG
 	var generals_cnt = (AuthManager.current_generals.size() if AuthManager else 1) if is_self else int(player_data.get("generals_count", 1))
 	var gen_vbox = VBoxContainer.new()
 	gen_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	gen_vbox.add_theme_constant_override("separation", 3)
+	gen_vbox.add_theme_constant_override("separation", 2)
 
 	var gen_p_lbl = Label.new()
 	gen_p_lbl.text = "Đã chiêu mộ: %d / 40 Danh Tướng (%d%%)" % [generals_cnt, int(float(generals_cnt) / 40.0 * 100.0)]
@@ -9607,32 +9604,204 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 	gen_vbox.add_child(gen_p_lbl)
 
 	var gen_pbar = ProgressBar.new()
-	gen_pbar.custom_minimum_size = Vector2(0, 10)
+	gen_pbar.custom_minimum_size = Vector2(0, 8)
 	gen_pbar.max_value = 40
 	gen_pbar.value = generals_cnt
 	gen_pbar.show_percentage = false
 	var g_fg = StyleBoxFlat.new()
 	g_fg.bg_color = Color(0.85, 0.55, 0.20, 1.0)
-	g_fg.corner_radius_top_left = 5
-	g_fg.corner_radius_top_right = 5
-	g_fg.corner_radius_bottom_right = 5
-	g_fg.corner_radius_bottom_left = 5
+	g_fg.corner_radius_top_left = 4
+	g_fg.corner_radius_top_right = 4
+	g_fg.corner_radius_bottom_right = 4
+	g_fg.corner_radius_bottom_left = 4
 	gen_pbar.add_theme_stylebox_override("background", p_bg)
 	gen_pbar.add_theme_stylebox_override("fill", g_fg)
 	gen_vbox.add_child(gen_pbar)
 
 	var gen_icon = Label.new()
 	gen_icon.text = "👥"
-	gen_icon.add_theme_font_size_override("font_size", 22)
+	gen_icon.add_theme_font_size_override("font_size", 20)
 	gen_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	container.add_child(_create_profile_card_row(
+	cards_vbox.add_child(_create_profile_card_row(
 		gen_icon,
 		"BỘ SƯU TẬP DANH TƯỚNG",
 		"%d / 40 TƯỚNG" % generals_cnt,
 		Color(1.0, 0.85, 0.35),
 		gen_vbox
 	))
+
+	# =========================================================================
+	# === CỘT PHẢI: HÌNH NỀN TƯỚNG ĐẸP RỘNG RÃI KHÔNG BỊ CHE ĐI ================
+	# =========================================================================
+	var right_panel = PanelContainer.new()
+	right_panel.custom_minimum_size = Vector2(440, 0)
+	right_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+	var rp_style = StyleBoxFlat.new()
+	rp_style.bg_color = Color(0.04, 0.05, 0.09, 0.98)
+	rp_style.border_width_left = 2
+	rp_style.border_width_top = 2
+	rp_style.border_width_right = 2
+	rp_style.border_width_bottom = 2
+	rp_style.border_color = Color(0.90, 0.74, 0.28, 0.85)
+	rp_style.corner_radius_top_left = 10
+	rp_style.corner_radius_top_right = 10
+	rp_style.corner_radius_bottom_right = 10
+	rp_style.corner_radius_bottom_left = 10
+	rp_style.shadow_color = Color(0.85, 0.65, 0.15, 0.22)
+	right_panel.clip_contents = true
+	right_panel.add_theme_stylebox_override("panel", rp_style)
+	main_hbox.add_child(right_panel)
+
+	# Lấy thông tin Tướng được chọn làm nền (Nếu chưa chọn -> Mặc định Lý Thường Kiệt #47)
+	var bg_hero_id: int = (AuthManager.current_profile_bg if AuthManager else 0) if is_self else int(player_data.get("profile_bg", player_data.get("profileBg", 0)))
+	var display_hero_id: int = bg_hero_id if bg_hero_id > 0 else 47
+	var eq_skin_id: String = (HeroDatabase.get_equipped_skin_id(display_hero_id) if HeroDatabase else "default") if is_self else "default"
+
+	var hd: Dictionary = HeroDatabase.get_hero(display_hero_id) if HeroDatabase else {}
+	var hero_name: String = str(hd.get("name", "Lý Thường Kiệt"))
+	var hero_title: String = str(hd.get("title", "Nam Quốc Sơn Hà"))
+	var hero_faction: String = str(hd.get("faction", "Đại Việt"))
+
+	# Lấy texture hình nền / tranh tướng
+	var hero_tex: Texture2D = null
+	if HeroDatabase:
+		hero_tex = HeroDatabase.get_skin_texture(display_hero_id, eq_skin_id)
+		if not hero_tex:
+			var av = str(hd.get("avatarPath", ""))
+			hero_tex = HeroDatabase.get_avatar_texture(av, display_hero_id)
+	if not hero_tex:
+		var fallback_path = "res://assets/heroes_transparent/ly_thuong_kiet.png"
+		if ResourceLoader.exists(fallback_path):
+			hero_tex = load(fallback_path)
+
+	# Container bên trong cột phải (xếp chồng lớp: Nền nghệ thuật -> Tranh tướng -> Plaque tên)
+	var right_stack = Control.new()
+	right_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	right_panel.add_child(right_stack)
+
+	# 1. Nền hoa văn phía sau tranh tướng
+	var faction_bg_tex: Texture2D = null
+	var faction_path = "res://assets/ui/hero_backgrounds/bg_hero_yellow.png"
+	if hero_faction == "Đại Việt" or hero_faction == "Trần":
+		faction_path = "res://assets/ui/hero_backgrounds/bg_hero_yellow.png"
+	elif hero_faction == "Hậu Lê":
+		faction_path = "res://assets/ui/hero_backgrounds/bg_hero_red.png"
+	elif hero_faction == "Nguyễn":
+		faction_path = "res://assets/ui/hero_backgrounds/bg_hero_green.png"
+	elif hero_faction == "Tây Sơn":
+		faction_path = "res://assets/ui/hero_backgrounds/bg_hero_blue.png"
+	if ResourceLoader.exists(faction_path):
+		faction_bg_tex = load(faction_path)
+
+	if faction_bg_tex:
+		var f_rect = TextureRect.new()
+		f_rect.texture = faction_bg_tex
+		f_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		f_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		f_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		f_rect.modulate = Color(1.0, 1.0, 1.0, 0.40)
+		right_stack.add_child(f_rect)
+
+	# 2. Tranh tướng toàn thân / splash art sắc nét, rộng rãi, sáng rõ 100%
+	if hero_tex:
+		var hero_img = TextureRect.new()
+		hero_img.texture = hero_tex
+		hero_img.set_anchors_preset(Control.PRESET_FULL_RECT)
+		hero_img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		hero_img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		hero_img.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hero_img.modulate = Color.WHITE
+		right_stack.add_child(hero_img)
+
+	# 3. Huy hiệu góc trên: "DANH TƯỚNG ĐẠI DIỆN"
+	var top_badge = PanelContainer.new()
+	top_badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	top_badge.anchor_left = 1.0
+	top_badge.anchor_right = 1.0
+	top_badge.offset_left = -160
+	top_badge.offset_right = -10
+	top_badge.offset_top = 10
+	top_badge.offset_bottom = 34
+	var tb_st = StyleBoxFlat.new()
+	tb_st.bg_color = Color(0.04, 0.06, 0.12, 0.85)
+	tb_st.border_width_left = 1
+	tb_st.border_width_top = 1
+	tb_st.border_width_right = 1
+	tb_st.border_width_bottom = 1
+	tb_st.border_color = Color(0.90, 0.75, 0.30, 0.75)
+	tb_st.corner_radius_top_left = 6
+	tb_st.corner_radius_top_right = 6
+	tb_st.corner_radius_bottom_right = 6
+	tb_st.corner_radius_bottom_left = 6
+	top_badge.add_theme_stylebox_override("panel", tb_st)
+
+	var tb_lbl = Label.new()
+	tb_lbl.text = "🖼️ HÌNH NỀN HỒ SƠ"
+	tb_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tb_lbl.add_theme_font_size_override("font_size", 10)
+	tb_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.45))
+	top_badge.add_child(tb_lbl)
+	right_stack.add_child(top_badge)
+
+	# 4. Thanh thông tin ở chân tranh tướng (Bottom Plaque): Tên tướng & Nút đổi nền
+	var btm_plaque = PanelContainer.new()
+	btm_plaque.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	btm_plaque.offset_top = -68
+	var bp_st = StyleBoxFlat.new()
+	bp_st.bg_color = Color(0.03, 0.04, 0.08, 0.88)
+	bp_st.border_width_top = 1
+	bp_st.border_color = Color(0.85, 0.70, 0.25, 0.6)
+	bp_st.corner_radius_bottom_left = 10
+	bp_st.corner_radius_bottom_right = 10
+	btm_plaque.add_theme_stylebox_override("panel", bp_st)
+
+	var bp_margin = MarginContainer.new()
+	bp_margin.add_theme_constant_override("margin_left", 14)
+	bp_margin.add_theme_constant_override("margin_right", 14)
+	bp_margin.add_theme_constant_override("margin_top", 8)
+	bp_margin.add_theme_constant_override("margin_bottom", 8)
+	btm_plaque.add_child(bp_margin)
+
+	var bp_hbox = HBoxContainer.new()
+	bp_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	bp_hbox.add_theme_constant_override("separation", 10)
+	bp_margin.add_child(bp_hbox)
+
+	var t_vbox = VBoxContainer.new()
+	t_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	t_vbox.add_theme_constant_override("separation", 2)
+
+	var h_name_lbl = Label.new()
+	h_name_lbl.text = "⚔️ " + hero_name.to_upper()
+	h_name_lbl.add_theme_font_size_override("font_size", 15)
+	h_name_lbl.add_theme_color_override("font_color", Color(1.0, 0.90, 0.40))
+	h_name_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	h_name_lbl.add_theme_constant_override("shadow_offset_y", 1)
+	t_vbox.add_child(h_name_lbl)
+
+	var h_sub_lbl = Label.new()
+	h_sub_lbl.text = "%s • %s" % [hero_faction, hero_title]
+	h_sub_lbl.add_theme_font_size_override("font_size", 11)
+	h_sub_lbl.add_theme_color_override("font_color", Color(0.78, 0.82, 0.92, 0.85))
+	t_vbox.add_child(h_sub_lbl)
+	bp_hbox.add_child(t_vbox)
+
+	if is_self:
+		var btn_change_bg = Button.new()
+		btn_change_bg.text = "🖼️ ĐỔI NỀN"
+		btn_change_bg.custom_minimum_size = Vector2(100, 32)
+		_style_white_gold_button(btn_change_bg, 7, 2, Vector2(0, 1))
+		btn_change_bg.pressed.connect(func():
+			AudioManager.play_card_select()
+			_show_profile_bg_selection_modal()
+		)
+		bp_hbox.add_child(btn_change_bg)
+
+	right_stack.add_child(btm_plaque)
 
 	return root_wrapper
 
@@ -9960,7 +10129,7 @@ func _build_profile_bg_selection_content() -> Control:
 
 func _create_profile_card_row(icon_node: Control, title_text: String, main_val_text: String, main_val_color: Color, sub_widget: Control) -> PanelContainer:
 	var card = PanelContainer.new()
-	card.custom_minimum_size = Vector2(0, 68)
+	card.custom_minimum_size = Vector2(0, 62)
 	var cs = StyleBoxFlat.new()
 	cs.bg_color = Color(0.06, 0.08, 0.14, 0.95)
 	cs.border_width_left = 1
@@ -9968,30 +10137,30 @@ func _create_profile_card_row(icon_node: Control, title_text: String, main_val_t
 	cs.border_width_right = 1
 	cs.border_width_bottom = 1
 	cs.border_color = Color(0.85, 0.70, 0.25, 0.35)
-	cs.corner_radius_top_left = 10
-	cs.corner_radius_top_right = 10
-	cs.corner_radius_bottom_right = 10
-	cs.corner_radius_bottom_left = 10
+	cs.corner_radius_top_left = 8
+	cs.corner_radius_top_right = 8
+	cs.corner_radius_bottom_right = 8
+	cs.corner_radius_bottom_left = 8
 	cs.shadow_color = Color(0, 0, 0, 0.5)
-	cs.shadow_size = 4
-	cs.shadow_offset = Vector2(0, 2)
+	cs.shadow_size = 3
+	cs.shadow_offset = Vector2(0, 1)
 	card.add_theme_stylebox_override("panel", cs)
 
 	var margin = MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 14)
-	margin.add_theme_constant_override("margin_right", 14)
-	margin.add_theme_constant_override("margin_top", 8)
-	margin.add_theme_constant_override("margin_bottom", 8)
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_top", 6)
+	margin.add_theme_constant_override("margin_bottom", 6)
 	card.add_child(margin)
 
 	var hbox = HBoxContainer.new()
 	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	hbox.add_theme_constant_override("separation", 14)
+	hbox.add_theme_constant_override("separation", 10)
 	margin.add_child(hbox)
 
 	# 1. Khung Icon bên trái
 	var icon_box = PanelContainer.new()
-	icon_box.custom_minimum_size = Vector2(44, 44)
+	icon_box.custom_minimum_size = Vector2(38, 38)
 	var ib_style = StyleBoxFlat.new()
 	ib_style.bg_color = Color(0.12, 0.15, 0.22, 0.9)
 	ib_style.border_width_left = 1
@@ -9999,10 +10168,10 @@ func _create_profile_card_row(icon_node: Control, title_text: String, main_val_t
 	ib_style.border_width_right = 1
 	ib_style.border_width_bottom = 1
 	ib_style.border_color = Color(0.9, 0.75, 0.3, 0.5)
-	ib_style.corner_radius_top_left = 8
-	ib_style.corner_radius_top_right = 8
-	ib_style.corner_radius_bottom_right = 8
-	ib_style.corner_radius_bottom_left = 8
+	ib_style.corner_radius_top_left = 6
+	ib_style.corner_radius_top_right = 6
+	ib_style.corner_radius_bottom_right = 6
+	ib_style.corner_radius_bottom_left = 6
 	icon_box.add_theme_stylebox_override("panel", ib_style)
 
 	icon_node.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -10014,17 +10183,17 @@ func _create_profile_card_row(icon_node: Control, title_text: String, main_val_t
 	var mid_vbox = VBoxContainer.new()
 	mid_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	mid_vbox.add_theme_constant_override("separation", 2)
-	mid_vbox.custom_minimum_size = Vector2(175, 0)
+	mid_vbox.custom_minimum_size = Vector2(148, 0)
 
 	var t_lbl = Label.new()
 	t_lbl.text = title_text
-	t_lbl.add_theme_font_size_override("font_size", 11)
+	t_lbl.add_theme_font_size_override("font_size", 10)
 	t_lbl.add_theme_color_override("font_color", Color(0.70, 0.75, 0.85, 0.9))
 	mid_vbox.add_child(t_lbl)
 
 	var v_lbl = Label.new()
 	v_lbl.text = main_val_text
-	v_lbl.add_theme_font_size_override("font_size", 15)
+	v_lbl.add_theme_font_size_override("font_size", 14)
 	v_lbl.add_theme_color_override("font_color", main_val_color)
 	v_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	v_lbl.add_theme_constant_override("shadow_offset_y", 1)

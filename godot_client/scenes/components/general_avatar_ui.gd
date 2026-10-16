@@ -210,19 +210,19 @@ func _update_role_guess_display() -> void:
 	role_guess_button.text = "?" if is_unknown else ("Trung" if role_guess == "LOYALIST" else ("Phản" if role_guess == "REBEL" else ("Nội" if role_guess == "SPY" else "?")))
 	role_guess_button.add_theme_font_size_override("font_size", 27 if is_unknown else 14)
 	var bg_tex: Texture2D = null
-	var bg_color := Color(0.05, 0.07, 0.12, 0.96)
+	var bg_color := Color(0.05, 0.07, 0.12, 0.28)
 	if role_guess == "?" and is_instance_valid(background_rect):
 		bg_tex = background_rect.texture
-		bg_color = Color(0.05, 0.07, 0.12, 0.15)
+		bg_color = Color(0.05, 0.07, 0.12, 0.22)
 	if role_guess == "LOYALIST":
 		bg_tex = BG_GUESS_TRUNG_TEX
-		bg_color = Color(0.8, 0.62, 0.08, 0.95)
+		bg_color = Color(0.8, 0.62, 0.08, 0.22)
 	elif role_guess == "REBEL":
 		bg_tex = BG_GUESS_PHAN_TEX
-		bg_color = Color(0.08, 0.5, 0.18, 0.95)
+		bg_color = Color(0.08, 0.5, 0.18, 0.22)
 	elif role_guess == "SPY":
 		bg_tex = BG_GUESS_NOI_TEX
-		bg_color = Color(0.08, 0.25, 0.7, 0.95)
+		bg_color = Color(0.08, 0.25, 0.7, 0.22)
 	role_guess_background.texture = bg_tex
 	role_guess_background.visible = role_guess_enabled and not role_revealed and bg_tex != null
 	var normal := _role_guess_style(bg_color)

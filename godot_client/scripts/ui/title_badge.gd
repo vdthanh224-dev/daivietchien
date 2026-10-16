@@ -51,6 +51,15 @@ func _init(p_title_id: String = "admin") -> void:
 		_rtl.text = "[center][b]%s[/b][/center]" % title_id.to_upper()
 	add_child(_rtl)
 
+func set_title(p_title_id: String) -> void:
+	title_id = p_title_id.strip_edges().to_lower()
+	if not is_instance_valid(_rtl):
+		return
+	if title_id == "admin":
+		_rtl.text = "[center][rainbow freq=0.6 sat=1.0 val=1.0][b]ADMIN[/b][/rainbow][/center]"
+	else:
+		_rtl.text = "[center][b]%s[/b][/center]" % title_id.to_upper()
+
 func _process(_delta: float) -> void:
 	if not is_neon_animated or not is_instance_valid(_stylebox):
 		return
