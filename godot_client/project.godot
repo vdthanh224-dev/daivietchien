@@ -31,6 +31,7 @@ DailyQuestSystem="*res://scripts/daily_quest_system.gd"
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
+window/handheld/orientation=4
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 

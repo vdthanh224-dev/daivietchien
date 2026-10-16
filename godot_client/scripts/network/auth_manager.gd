@@ -49,6 +49,8 @@ var claimed_match_rewards: Dictionary = {}
 var deleted_mails: Array = []
 var admin_gift_code: String = "DAIVIETCHIEN"
 var admin_gift_reward: String = "5 vé quay tướng"
+var current_title: String = ""
+var current_profile_bg: int = 0
 
 # 12 Tiers of Military Ranks
 const MILITARY_TIERS = [
@@ -230,6 +232,52 @@ func consume_skin_tickets(amount: int) -> bool:
 	save_profile_to_appwrite()
 	profile_updated.emit()
 	return true
+
+# --- Danh hiệu & Nền hồ sơ tướng ---
+func get_available_titles() -> Array:
+	var list: Array = []
+	var admin_unlocked: bool = is_admin()
+	list.append({
+		"id": "admin",
+		"name": "ADMIN",
+		"desc": "Danh hiệu tối cao độc quyền dành riêng cho Quản Trị Viên Đại Việt Chiến.",
+		"badge_type": "rainbow_neon",
+		"unlocked": admin_unlocked,
+		"req_text": "Chỉ dành cho nick có nhãn (label) 'admin' trong hệ thống Appwrite"
+	})
+	return list
+
+func equip_title(title_id: String) -> void:
+	var clean = title_id.strip_edges().to_lower()
+	if clean == "admin" and not is_admin():
+		print("[AuthManager] Không thể trang bị danh hiệu ADMIN do tài khoản không có quyền admin!")
+		return
+	current_title = clean
+	save_session()
+	save_profile_to_appwrite()
+	var nc = get_node_or_null("/root/NetworkClient")
+	if nc and nc.has_method("register_social_profile"):
+		nc.register_social_profile()
+	profile_updated.emit()
+
+func unequip_title() -> void:
+	current_title = ""
+	save_session()
+	save_profile_to_appwrite()
+	var nc = get_node_or_null("/root/NetworkClient")
+	if nc and nc.has_method("register_social_profile"):
+		nc.register_social_profile()
+	profile_updated.emit()
+
+func set_profile_bg(hero_id: int) -> void:
+	current_profile_bg = hero_id
+	save_session()
+	save_profile_to_appwrite()
+	var nc = get_node_or_null("/root/NetworkClient")
+	if nc and nc.has_method("register_social_profile"):
+		nc.register_social_profile()
+	profile_updated.emit()
+
 
 # --- 7-Day Login Rewards ---
 const SEVEN_DAY_REWARDS = [
@@ -689,6 +737,13 @@ func fetch_profile_from_appwrite(on_completed: Callable = Callable()) -> void:
 					elif data.has("reward"):
 						admin_gift_reward = str(data["reward"])
 
+					if data.has("title"):
+						current_title = str(data["title"])
+					if data.has("profileBg"):
+						current_profile_bg = int(data["profileBg"])
+					if current_title == "admin" and not is_admin():
+						current_title = ""
+
 					save_session()
 
 					if needs_init_on_appwrite:
@@ -747,7 +802,9 @@ func save_profile_to_appwrite(on_completed: Callable = Callable()) -> void:
 		"hasPlayedBefore": has_played_before or onboarding_completed or tutorial_reward_claimed,
 		"redeemedCodes": JSON.stringify(redeemed_codes),
 		"claimedMails": JSON.stringify(claimed_mails),
-		"deletedMails": JSON.stringify(deleted_mails)
+		"deletedMails": JSON.stringify(deleted_mails),
+		"title": current_title,
+		"profileBg": current_profile_bg
 	}
 	if current_user_email == "vdthanh224@gmail.com" or current_user_name == "Thành Hydro" or is_admin():
 		prefs_payload["code"] = admin_gift_code
@@ -806,6 +863,8 @@ func get_leaderboard_player_data() -> Dictionary:
 		"rank_points": current_2v2_points,
 		"wins": current_wins,
 		"losses": current_losses,
+		"title": current_title,
+		"profile_bg": current_profile_bg,
 		"updated_at": int(Time.get_unix_time_from_system())
 	}
 	if current_user_email == "vdthanh224@gmail.com" or current_user_name == "Thành Hydro" or is_admin():
@@ -1532,7 +1591,9 @@ func save_session() -> void:
 			"claimedMatchRewards": claimed_match_rewards,
 			"deletedMails": deleted_mails,
 			"adminGiftCode": admin_gift_code,
-			"adminGiftReward": admin_gift_reward
+			"adminGiftReward": admin_gift_reward,
+			"title": current_title,
+			"profileBg": current_profile_bg
 		}
 		if current_user_email != "":
 			data["onboarding_" + current_user_email] = 2 if (onboarding_completed or tutorial_reward_claimed) else 0
@@ -1638,6 +1699,10 @@ func load_saved_session() -> void:
 							redeemed_codes.append(str(rc))
 					admin_gift_code = str(data.get("adminGiftCode", admin_gift_code))
 					admin_gift_reward = str(data.get("adminGiftReward", admin_gift_reward))
+					current_title = str(data.get("title", ""))
+					current_profile_bg = int(data.get("profileBg", 0))
+					if current_title == "admin" and not is_admin():
+						current_title = ""
 					var saved_claimed_m = data.get("claimedMails", [])
 					if saved_claimed_m is Array:
 						for cm in saved_claimed_m:

@@ -114,11 +114,14 @@ function decodeMatchmakingRoom(doc) {
   for (let index = slotStart; index < Math.min(parts.length, slotStart + slotCount); index += 1) {
     const values = parts[index].split(",");
     const userId = values[0] || "empty";
+    const dynasty = String(modeId).startsWith("dynasty_");
     slots.push({
       seatNumber: index - slotStart + 1,
       userId,
       userName: values[1] || "",
-      rankPoints: Number(values[2]) || 0,
+      // Vương Triều has no 2v2 rank. Do not carry a rank value through its
+      // matchmaking records, even when an older client still sends one.
+      rankPoints: dynasty ? 0 : (Number(values[2]) || 0),
       isDragon: values[3] === "1",
       isAI: values[4] === "1",
       isEmpty: userId === "" || userId === "empty",
@@ -137,7 +140,7 @@ function decodeMatchmakingRoom(doc) {
     slots,
     documentId: String(doc?.$id || ""),
     timestamp: Number(doc?.timestamp) || 0,
-    hostRankPoints: Number(doc?.rankPoints) || 0,
+    hostRankPoints: String(modeId).startsWith("dynasty_") ? 0 : (Number(doc?.rankPoints) || 0),
   };
 }
 
@@ -145,13 +148,15 @@ function encodeMatchmakingRoom(room) {
   const clean = (value, max = 60) => String(value ?? "").replace(/[|:,]/g, "_").trim().slice(0, max);
   const slots = Array.isArray(room.slots) ? room.slots : [];
   const count = Math.max(4, slots.length);
-  const parts = ["ROOMV2", clean(room.roomId, 18), clean(room.hostUserId), clean(room.status || "WAITING", 10), String(Number(room.version) || 1), clean(room.modeId || "2v2", 16), String(count)];
+  const modeId = clean(room.modeId || "2v2", 16);
+  const isDynasty = modeId.startsWith("dynasty_");
+  const parts = ["ROOMV2", clean(room.roomId, 18), clean(room.hostUserId), clean(room.status || "WAITING", 10), String(Number(room.version) || 1), modeId, String(count)];
   for (let index = 0; index < count; index += 1) {
     const slot = slots[index] || {};
     const empty = slot.isEmpty === true || !slot.userId || slot.userId === "empty";
     parts.push(empty
       ? `empty,,0,${slot.isDragon ? 1 : (index === 0 || index === 2 ? 1 : 0)},0`
-      : `${clean(slot.userId)},${clean(slot.userName, 14)},${Number(slot.rankPoints) || 0},${slot.isDragon ? 1 : 0},${slot.isAI ? 1 : 0}`);
+      : `${clean(slot.userId)},${clean(slot.userName, 14)},${isDynasty ? 0 : (Number(slot.rankPoints) || 0)},${slot.isDragon ? 1 : 0},${slot.isAI ? 1 : 0}`);
   }
   return parts.join("|");
 }
@@ -172,7 +177,7 @@ function matchmakingRoomPayload(room, status = "ROOM_WAITING") {
     data: {
       userId: status,
       userName: encodeMatchmakingRoom(room),
-      rankPoints: Number(room.hostRankPoints) || 0,
+      rankPoints: String(room.modeId || "2v2").startsWith("dynasty_") ? 0 : (Number(room.hostRankPoints) || 0),
       timestamp: now,
     },
     permissions: ["read(\"any\")", "update(\"any\")", "delete(\"any\")"],
@@ -225,7 +230,7 @@ function mergeMatchmakingDraftSlots(targetDraft, sourceDraft) {
       isAI: false,
       isEmpty: false,
       isDragon: sourceSlot.isDragon === true,
-      rankPoints: Number(sourceSlot.rankPoints) || 0,
+      rankPoints: String(targetDraft.modeId || "").startsWith("dynasty_") ? 0 : (Number(sourceSlot.rankPoints) || 0),
     });
   }
   targetDraft.revision = Math.max(Number(targetDraft.revision) || 0, Number(sourceDraft.revision) || 0) + 1;
@@ -591,7 +596,14 @@ async function handleChat(socket, payload, currentRoomId, currentSeat) {
     if (!profile || profile.socket !== socket) {
       return sendChatError(socket, channel, "Vui lòng đăng nhập để trò chuyện");
     }
-    sender = { userId: profile.userId, userName: profile.userName };
+    sender = {
+      userId: profile.userId,
+      userName: profile.userName,
+      title: profile.title || payload.title || "",
+      profileBg: profile.profileBg || payload.profileBg || 0,
+      level: profile.level || 1,
+      rankIndex: profile.rankIndex || 0
+    };
   } else {
     room = rooms.get(currentRoomId);
     if (!room || room.sockets.get(currentSeat) !== socket || resolveMatchmakingRoomId(payload.roomId) !== currentRoomId) {
@@ -600,7 +612,15 @@ async function handleChat(socket, payload, currentRoomId, currentSeat) {
     // Only expose the player's public name and seat; dynasty roles stay private.
     const player = room.draft?.slots?.find((p) => p.seat === currentSeat)
       || room.state?.players?.find((p) => p.seat === currentSeat);
-    sender = { seat: currentSeat, userName: socialUserName(player?.userName || `Người chơi ${currentSeat}`) };
+    sender = {
+      seat: currentSeat,
+      userId: player?.userId || socket.socialUserId || "",
+      userName: socialUserName(player?.userName || `Người chơi ${currentSeat}`),
+      title: player?.title || payload.title || "",
+      profileBg: player?.profileBg || payload.profileBg || 0,
+      level: player?.level || 1,
+      rankIndex: player?.rankIndex || 0
+    };
     history = room.chatMessages ||= [];
   }
 
@@ -654,10 +674,10 @@ function validateClientPayload(payload, rawBytes) {
   if (rawBytes > MAX_WS_MESSAGE_BYTES) return "Gói tin vượt giới hạn cho phép";
   if (typeof payload.action !== "string" || !ALLOWED_WS_ACTIONS.has(payload.action)) return "Hành động không hợp lệ";
   if (payload.roomId !== undefined && (typeof payload.roomId !== "string" || payload.roomId.length > 128)) return "Mã phòng không hợp lệ";
-  for (const key of ["cardId", "targetCardId", "skillId", "heroName", "userId", "userName", "targetUserId", "query", "requestId", "fromUserId", "fromUserName"]) {
+  for (const key of ["cardId", "targetCardId", "skillId", "heroName", "userId", "userName", "targetUserId", "query", "requestId", "fromUserId", "fromUserName", "title"]) {
     if (payload[key] !== undefined && (typeof payload[key] !== "string" || payload[key].length > 256)) return `${key} không hợp lệ`;
   }
-  for (const key of ["seat", "targetSeat", "targetSeat2", "expectedVersion", "level"]) {
+  for (const key of ["seat", "targetSeat", "targetSeat2", "expectedVersion", "level", "profileBg", "rankIndex"]) {
     if (payload[key] !== undefined && (!Number.isInteger(Number(payload[key])) || Number(payload[key]) < 0)) return `${key} không hợp lệ`;
   }
   if (payload.cardIds !== undefined && (!Array.isArray(payload.cardIds) || payload.cardIds.length > 20 || payload.cardIds.some((id) => typeof id !== "string" || id.length > 256))) return "Danh sách lá bài không hợp lệ";
@@ -1601,6 +1621,9 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
               userId: socialId,
               userName: name,
               level: level || previous?.level || 1,
+              title: String(payload.title || previous?.title || ""),
+              profileBg: Number(payload.profileBg || previous?.profileBg || 0),
+              rankIndex: payload.rankIndex !== undefined ? Number(payload.rankIndex) : (previous?.rankIndex || 0),
               socket
             });
             if (previous?.socket && previous.socket !== socket) previous.socket = null;

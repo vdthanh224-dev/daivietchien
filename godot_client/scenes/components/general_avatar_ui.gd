@@ -6,12 +6,16 @@ signal clicked()
 signal skill_clicked()
 signal skill_button_clicked(skill_key: String)
 signal info_clicked()
+signal role_guess_changed(guess: String)
 
 @onready var portrait_rect: TextureRect = $Frame/Portrait
 @onready var background_rect: TextureRect = $Frame.get_node_or_null("Background")
 
 const BG_DRAGON_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_green.png")
 const BG_PHOENIX_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_red.png")
+const BG_GUESS_TRUNG_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_yellow.png")
+const BG_GUESS_PHAN_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_green.png")
+const BG_GUESS_NOI_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_blue.png")
 @onready var name_label: Label = $Frame/TopBanner/Margin/HBox/NameLabel
 @onready var role_badge: Label = $Frame/TopBanner/Margin/HBox/RoleBadge
 @onready var health_rail: PanelContainer = $HealthRail
@@ -92,6 +96,11 @@ var frame_rest_position: Vector2
 var frame_shake_tween: Tween = null
 var ai_takeover_badge: PanelContainer = null
 var is_ai_takeover: bool = false
+var role_guess_button: Button = null
+var role_guess_background: TextureRect = null
+var role_guess_enabled: bool = false
+var role_guess: String = "?"
+var role_revealed: bool = false
 
 const DRAGON_TEAM_COLOR := Color(0.22, 0.82, 0.42, 1.0)
 const PHOENIX_TEAM_COLOR := Color(0.93, 0.24, 0.22, 1.0)
@@ -138,6 +147,127 @@ func _ready() -> void:
 	_build_turn_indicators()
 	_build_distance_label()
 	_build_depth_rim()
+	_build_role_guess_button()
+
+func _build_role_guess_button() -> void:
+	if is_instance_valid(role_guess_button):
+		return
+	role_guess_background = TextureRect.new()
+	role_guess_background.name = "RoleGuessBackground"
+	role_guess_background.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	role_guess_background.position = Vector2(2, 2)
+	role_guess_background.size = Vector2(45, 45)
+	role_guess_background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	role_guess_background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	role_guess_background.clip_contents = true
+	role_guess_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	role_guess_background.visible = false
+	role_guess_background.z_index = 90
+	var circle_shader := Shader.new()
+	circle_shader.code = "shader_type canvas_item; void fragment() { vec2 p = UV - vec2(0.5); if (length(p) > 0.5) { discard; } COLOR = texture(TEXTURE, UV); }"
+	var circle_material := ShaderMaterial.new()
+	circle_material.shader = circle_shader
+	role_guess_background.material = circle_material
+	add_child(role_guess_background)
+
+	role_guess_button = Button.new()
+	role_guess_button.name = "RoleGuessButton"
+	role_guess_button.position = Vector2(2, 2)
+	role_guess_button.size = Vector2(45, 45)
+	role_guess_button.custom_minimum_size = Vector2(45, 45)
+	role_guess_button.focus_mode = Control.FOCUS_NONE
+	role_guess_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	role_guess_button.z_index = 91
+	role_guess_button.visible = false
+	role_guess_button.add_theme_font_size_override("font_size", 25)
+	role_guess_button.add_theme_color_override("font_color", Color(1.0, 0.98, 0.86, 1.0))
+	role_guess_button.add_theme_color_override("font_hover_color", Color.WHITE)
+	role_guess_button.add_theme_color_override("font_pressed_color", Color.WHITE)
+	role_guess_button.pressed.connect(_cycle_role_guess)
+	add_child(role_guess_button)
+	_update_role_guess_display()
+
+func _role_guess_style(color: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = color
+	style.border_width_left = 3
+	style.border_width_top = 3
+	style.border_width_right = 3
+	style.border_width_bottom = 3
+	style.border_color = Color(1.0, 0.9, 0.45, 0.95)
+	style.corner_radius_top_left = 23
+	style.corner_radius_top_right = 23
+	style.corner_radius_bottom_left = 23
+	style.corner_radius_bottom_right = 23
+	style.shadow_color = Color(0.0, 0.0, 0.0, 0.65)
+	style.shadow_size = 5
+	return style
+
+func _update_role_guess_display() -> void:
+	if not is_instance_valid(role_guess_button):
+		return
+	var is_unknown := role_guess == "?" and not role_revealed
+	role_guess_button.text = "?" if is_unknown else ("Trung" if role_guess == "LOYALIST" else ("Phản" if role_guess == "REBEL" else ("Nội" if role_guess == "SPY" else "?")))
+	role_guess_button.add_theme_font_size_override("font_size", 27 if is_unknown else 14)
+	var bg_tex: Texture2D = null
+	var bg_color := Color(0.05, 0.07, 0.12, 0.96)
+	if role_guess == "?" and is_instance_valid(background_rect):
+		bg_tex = background_rect.texture
+		bg_color = Color(0.05, 0.07, 0.12, 0.15)
+	if role_guess == "LOYALIST":
+		bg_tex = BG_GUESS_TRUNG_TEX
+		bg_color = Color(0.8, 0.62, 0.08, 0.95)
+	elif role_guess == "REBEL":
+		bg_tex = BG_GUESS_PHAN_TEX
+		bg_color = Color(0.08, 0.5, 0.18, 0.95)
+	elif role_guess == "SPY":
+		bg_tex = BG_GUESS_NOI_TEX
+		bg_color = Color(0.08, 0.25, 0.7, 0.95)
+	role_guess_background.texture = bg_tex
+	role_guess_background.visible = role_guess_enabled and not role_revealed and bg_tex != null
+	var normal := _role_guess_style(bg_color)
+	var hover := normal.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(minf(bg_color.r + 0.12, 1.0), minf(bg_color.g + 0.12, 1.0), minf(bg_color.b + 0.12, 1.0), 0.98)
+	var pressed := normal.duplicate() as StyleBoxFlat
+	pressed.bg_color = Color(bg_color.r * 0.78, bg_color.g * 0.78, bg_color.b * 0.78, 1.0)
+	role_guess_button.add_theme_stylebox_override("normal", normal)
+	role_guess_button.add_theme_stylebox_override("hover", hover)
+	role_guess_button.add_theme_stylebox_override("pressed", pressed)
+	role_guess_button.visible = role_guess_enabled and not role_revealed
+
+func _cycle_role_guess() -> void:
+	if not role_guess_enabled or role_revealed:
+		return
+	var guesses := ["?", "LOYALIST", "REBEL", "SPY"]
+	var next_index := (guesses.find(role_guess) + 1) % guesses.size()
+	role_guess = guesses[next_index]
+	_update_role_guess_display()
+	role_guess_changed.emit(role_guess)
+
+func set_role_guess_enabled(enabled: bool, current_guess: String = "?") -> void:
+	role_guess_enabled = enabled
+	role_revealed = false
+	role_guess = current_guess if current_guess in ["?", "LOYALIST", "REBEL", "SPY"] else "?"
+	if is_instance_valid(role_badge) and enabled:
+		role_badge.visible = false
+	_update_role_guess_display()
+
+func set_revealed_role(role_code: String) -> void:
+	role_revealed = true
+	role_guess_enabled = false
+	role_guess = "?"
+	if is_instance_valid(role_guess_button):
+		role_guess_button.visible = false
+	if is_instance_valid(role_guess_background):
+		role_guess_background.visible = false
+	if not is_instance_valid(role_badge):
+		return
+	var display := DynastyRoleInfo.display_name(role_code)
+	if role_code.is_empty() or display == "?":
+		return
+	role_badge.visible = true
+	role_badge.text = " %s " % display
+	role_badge.add_theme_color_override("font_color", DynastyRoleInfo.get_color(role_code))
 
 func _build_distance_label() -> void:
 	if is_instance_valid(bottom_info_container):

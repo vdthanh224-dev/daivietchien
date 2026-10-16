@@ -9,6 +9,9 @@ var current_scale: float = DEFAULT_SCALE
 const MIN_FONT_SIZE_MOBILE: int = 12
 
 func _ready() -> void:
+	# Cho phép thiết bị di động xoay ngang tự do cả 2 phía (Landscape & Reverse Landscape)
+	if DisplayServer.has_method("screen_set_orientation"):
+		DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR_LANDSCAPE)
 	_init_scale()
 	get_tree().node_added.connect(_on_node_added)
 	_apply_theme_scale()

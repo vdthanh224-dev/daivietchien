@@ -465,6 +465,22 @@ for (const [id, name, subType, reqType] of [
   assert.equal(state.lastAction.armorEffect, "AO_BAO_HOANG_TOC");
 }
 
+// Remote clients must receive the exact card used to answer AOE effects.
+for (const [id, name, subType, reqType, response] of [
+  ["AOE_RESPONSE_GIAC", "Giặc Tới", CARD_SUBTYPES.BARBARIAN_INVASION, "SLASH", ["RESP_SLASH", "Trảm Thường"]],
+  ["AOE_RESPONSE_MUA", "Mưa Tên Liên Châu", CARD_SUBTYPES.ARROW_RAIN, "DODGE", ["RESP_DODGE", "Đỡ"]],
+]) {
+  const state = freshState();
+  put(state, 1, card(id, name, subType, CARD_CATEGORIES.INSTANT_SCROLL));
+  put(state, 2, card(response[0], response[1], reqType === "SLASH" ? CARD_SUBTYPES.ATTACK_NORMAL : CARD_SUBTYPES.DODGE));
+  assert.equal(handlePlayCard(state, 1, id, 0).success, true);
+  assert.equal(handleRespondAction(state, 2, true, response[0]).success, true);
+  assert.equal(state.lastAction.type, "AOE_DEFENDED");
+  assert.equal(state.lastAction.casterSeat, 2);
+  assert.equal(state.lastAction.card.id, response[0]);
+  assert.equal(sanitizeGameStateForClient(state, 3).delta.card.id, response[0]);
+}
+
 {
   const state = freshState();
   const trap = card("TRAP_ONE_JUDGEMENT", "Bãi Cọc Bạch Đằng", CARD_SUBTYPES.BAI_COC_BACH_DANG, CARD_CATEGORIES.DELAYED_SCROLL);

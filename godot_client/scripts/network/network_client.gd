@@ -447,7 +447,13 @@ func send_chat_message(channel: String, text: String) -> bool:
 	if text.is_empty() or text.length() > 280:
 		chat_error.emit(channel, "Nhập tin nhắn từ 1 đến 280 ký tự")
 		return false
-	var payload: Dictionary = {"action": "CHAT_SEND", "channel": channel, "text": text}
+	var payload: Dictionary = {
+		"action": "CHAT_SEND",
+		"channel": channel,
+		"text": text,
+		"title": AuthManager.current_title if AuthManager else "",
+		"profileBg": AuthManager.current_profile_bg if AuthManager else 0
+	}
 	if channel == "battle":
 		payload["roomId"] = room_id
 	send_json(payload)
@@ -460,7 +466,10 @@ func register_social_profile() -> void:
 		"action": "SOCIAL_REGISTER",
 		"userId": AuthManager.current_user_id,
 		"userName": AuthManager.current_user_name,
-		"level": AuthManager.current_level if AuthManager else 1
+		"level": AuthManager.current_level if AuthManager else 1,
+		"title": AuthManager.current_title if AuthManager else "",
+		"profileBg": AuthManager.current_profile_bg if AuthManager else 0,
+		"rankIndex": AuthManager.current_2v2_rank_index if AuthManager else 0
 	})
 
 func request_friend_list() -> void:
@@ -493,7 +502,9 @@ func send_join_draft(target_room: String, seat: int, user_id: String, user_name:
 		"userName": user_name,
 		"modeId": mode_id,
 		"availableHeroIds": available_hero_ids,
-		"isAdmin": AuthManager != null and AuthManager.is_admin()
+		"isAdmin": AuthManager != null and AuthManager.is_admin(),
+		"title": AuthManager.current_title if AuthManager else "",
+		"profileBg": AuthManager.current_profile_bg if AuthManager else 0
 	}
 	if not slots_data.is_empty():
 		payload["slots"] = slots_data

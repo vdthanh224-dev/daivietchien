@@ -7259,6 +7259,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       || state.activeCard?.reqType === "DODGE";
     const aoeName = state.activeCard?.cardName || "";
     let satisfied = false;
+    let responseCard = null;
 
     if (accepted && (cardId === "KHIEN_MAY" || cardId === "KHIEN_MAY_BEN")) {
       if (!isArrow) return { error: "Khiên Mây Bện chỉ có tác dụng khi cần Đỡ (Né)" };
@@ -7295,6 +7296,11 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       const idx = respondent.hand.findIndex(c => (c.id === cardId || c.name === cardId) && (isArrow ? canUseCardAsDodge(respondent, c) : canUseCardAsSlash(respondent, c)));
       if (idx < 0) return { error: `Lá ${isArrow ? "Đỡ" : "Trảm"} không còn hợp lệ` };
       const c = respondent.hand.splice(idx, 1)[0];
+      // Keep the exact response card in the public action. The card may no
+      // longer be discoverable from the discard pile after the next AOE
+      // victim is advanced, which previously made remote clients render no
+      // card for Giặc Tới/Mưa Tên responses.
+      responseCard = c;
       const isTienThoai = heroHasSkill(respondent, "TIEN_THOAI") && (isArrow ? isSlash(c) : isDodge(c));
       discardCard(state, c);
       satisfied = true;
@@ -7329,9 +7335,11 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     delete state._lastTienThoaiAOE;
     recordAction(state, {
       type: satisfied ? "AOE_DEFENDED" : "AOE_HIT",
+      casterSeat: respondentSeat,
       targetSeat: respondentSeat,
-      cardId: satisfied ? (state.discardTop?.id || "") : "",
+      cardId: satisfied ? (responseCard?.id || state.discardTop?.id || "") : "",
       cardName: satisfied ? (isArrow ? "Đỡ" : "Trảm") : "",
+      card: satisfied ? responseCard : null,
       originalCardName: tienThoaiAoe ? tienThoaiAoe.from : (state.discardTop?.name || ""),
       tienThoaiConvert: tienThoaiAoe ? { from: tienThoaiAoe.from, to: tienThoaiAoe.to } : null,
       skillActivations: tienThoaiAoe ? [{ name: "Tiến Thoái", seat: respondentSeat }] : [],
@@ -9814,12 +9822,22 @@ function sanitizeActionForClient(action, requestingSeat) {
   return sanitized;
 }
 
+function dynastyRoleLabel(role) {
+  return {
+    KING: "VUA",
+    LOYALIST: "Trung Thần",
+    REBEL: "Phản Tặc",
+    SPY: "Nội Gián"
+  }[String(role || "")] || "";
+}
+
 const MAX_CLIENT_STATE_BYTES = 24576;
 const MIN_CLIENT_HISTORY_ENTRIES = 5;
 
 export function sanitizeGameStateForClient(state, requestingSeat = 0) {
   if (!state) return null;
   const viewerSeat = Number(requestingSeat);
+  const isDynastyMode = String(state.modeId || "").startsWith("dynasty_");
   const elapsed = state.timerStartAt ? Math.floor((Date.now() - state.timerStartAt) / 1000) : 0;
   const remaining = Math.max(0, 40 - elapsed);
 
@@ -9957,11 +9975,18 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
       userId: p.userId,
       userName: p.userName || "",
       heroId: p.heroId,
-      generalName: p.generalName,
+      generalName: isDynastyMode && p.isAlive === false && dynastyRoleLabel(p.role)
+        ? `${p.generalName} · ${dynastyRoleLabel(p.role)}`
+        : p.generalName,
       maxHp: p.maxHp,
       hp: p.hp,
       isAlly: p.isAlly === true,
-      role: viewerSeat === p.seat ? (p.role || "") : "",
+      // A role stays private while a player is alive. Once a Dynasty player
+      // dies, reveal it to every viewer so the role badge on that avatar can
+      // identify the fallen player's allegiance.
+      role: viewerSeat === p.seat || (isDynastyMode && p.isAlive === false)
+        ? (p.role || "")
+        : "",
       isAI: p.isAI,
       isDisconnected: p.isDisconnected === true,
       isAiTakeover: p.isAiTakeover === true,

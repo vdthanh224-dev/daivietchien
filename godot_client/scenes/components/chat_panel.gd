@@ -1,6 +1,8 @@
 extends Control
 
 ## Shared lobby / match chat. Match chat starts folded to keep the table clear.
+signal player_profile_requested(player_data: Dictionary)
+
 var channel: String = "lobby"
 var panel: PanelContainer
 var toggle_button: Button
@@ -125,9 +127,10 @@ func _build_ui() -> void:
 	messages_view.name = "Messages"
 	messages_view.size_flags_vertical = SIZE_EXPAND_FILL
 	messages_view.custom_minimum_size = Vector2(0, 64)
-	messages_view.bbcode_enabled = false
+	messages_view.bbcode_enabled = true
 	messages_view.scroll_following = true
 	messages_view.selection_enabled = true
+	messages_view.meta_clicked.connect(_on_meta_clicked)
 	messages_view.add_theme_font_size_override("normal_font_size", 12)
 	messages_view.add_theme_color_override("default_color", Color(0.90, 0.92, 0.96))
 	content.add_child(messages_view)
@@ -224,6 +227,17 @@ func _on_history(received_channel: String, target_room: String) -> void:
 	status_label.text = "Mọi người trong trận đều đọc được" if channel == "battle" else "Trò chuyện cùng người chơi trực tuyến"
 	_render_messages()
 
+func _on_meta_clicked(meta: Variant) -> void:
+	var p_data: Dictionary = {}
+	if meta is String:
+		var parsed = JSON.parse_string(meta)
+		if parsed is Dictionary:
+			p_data = parsed
+	elif meta is Dictionary:
+		p_data = meta
+	if not p_data.is_empty():
+		player_profile_requested.emit(p_data)
+
 func _render_messages() -> void:
 	messages_view.clear()
 	var messages := NetworkClient.get_chat_messages(channel)
@@ -231,13 +245,31 @@ func _render_messages() -> void:
 		messages_view.add_text("Chưa có tin nhắn. Hãy gửi lời chào!")
 		return
 	for message in messages:
-		var sender: String = str(message.get("userName", "Người chơi"))
+		var sender_raw: String = str(message.get("userName", "Người chơi")).strip_edges()
+		if sender_raw.is_empty():
+			sender_raw = "Người chơi"
+		var sender_disp = sender_raw
 		if channel == "battle":
-			sender = "Ghế %d · %s" % [int(message.get("seat", 0)), sender]
-		messages_view.push_color(Color(0.98, 0.83, 0.45))
-		messages_view.add_text(sender + ": ")
-		messages_view.pop()
-		# add_text keeps player-provided BBCode and links as plain text.
+			sender_disp = "Ghế %d · %s" % [int(message.get("seat", 0)), sender_raw]
+		var title_id: String = str(message.get("title", "")).strip_edges().to_lower()
+		var player_meta = {
+			"user_id": str(message.get("userId", "")),
+			"name": sender_raw,
+			"title": title_id,
+			"profile_bg": int(message.get("profileBg", message.get("profile_bg", 0))),
+			"level": int(message.get("level", 1)),
+			"rank_index": int(message.get("rankIndex", 0))
+		}
+		var meta_str = JSON.stringify(player_meta)
+		# Tên người chơi có link để click xem hồ sơ
+		messages_view.append_text("[url=%s][b][color=#fadb72]%s[/color][/b][/url]" % [meta_str, sender_disp])
+		# Danh hiệu bên cạnh tên (ví dụ: ADMIN 7 sắc cầu vồng nhấp nháy neon)
+		if title_id == "admin":
+			messages_view.append_text(" [url=%s][rainbow freq=0.6 sat=1.0 val=1.0][b]ADMIN[/b][/rainbow][/url]" % meta_str)
+		elif not title_id.is_empty():
+			messages_view.append_text(" [url=%s][b][color=#e0b0ff][%s][/color][/b][/url]" % [meta_str, title_id.to_upper()])
+		messages_view.append_text(": ")
+		# add_text bảo vệ tin nhắn của người chơi tránh bị tiêm BBCode
 		messages_view.add_text(str(message.get("text", "")) + "\n")
 
 func _on_message(message: Dictionary) -> void:

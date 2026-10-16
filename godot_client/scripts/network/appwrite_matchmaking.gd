@@ -89,6 +89,7 @@ func encode_room_string(room: Dictionary) -> String:
 	var st = sanitize(room.get("status", "WAITING"), 10)
 	var ver = int(room.get("version", 1))
 	var mode_id = sanitize(room.get("modeId", "2v2"), 16)
+	var is_dynasty := mode_id.begins_with("dynasty_")
 	var slots = room.get("slots", [])
 	var slot_count = maxi(4, slots.size())
 	var parts: Array[String] = ["ROOMV2", r_id, h_uid, st, str(ver), mode_id, str(slot_count)]
@@ -99,7 +100,7 @@ func encode_room_string(room: Dictionary) -> String:
 			var is_empty = bool(s.get("isEmpty", false)) or s.get("userId", "") == "" or s.get("userId", "") == "empty"
 			var uid = "empty" if is_empty else sanitize(s.get("userId", ""), 60)
 			var uname = "" if is_empty else sanitize(s.get("userName", ""), 14)
-			var rp = int(s.get("rankPoints", 0))
+			var rp = 0 if is_dynasty else int(s.get("rankPoints", 0))
 			var is_drag = 1 if bool(s.get("isDragon", (i == 0 or i == 2))) else 0
 			var is_ai = 1 if bool(s.get("isAI", false)) else 0
 			parts.append("%s,%s,%d,%d,%d" % [uid, uname, rp, is_drag, is_ai])
@@ -139,7 +140,7 @@ func decode_room_string(raw_str: String, doc_timestamp: int = 0, host_rp: int = 
 		"modeId": mode_id,
 		"hostTimestamp": doc_timestamp,
 		"updateTimestamp": doc_timestamp,
-		"hostRankPoints": host_rp,
+		"hostRankPoints": 0 if mode_id.begins_with("dynasty_") else host_rp,
 		"slots": []
 	}
 
@@ -147,7 +148,7 @@ func decode_room_string(raw_str: String, doc_timestamp: int = 0, host_rp: int = 
 		var sub = parts[i].split(",")
 		var uid = sub[0] if sub.size() > 0 else "empty"
 		var uname = sub[1] if sub.size() > 1 else ""
-		var rp = int(sub[2]) if sub.size() > 2 and sub[2].is_valid_int() else 0
+		var rp = 0 if mode_id.begins_with("dynasty_") else (int(sub[2]) if sub.size() > 2 and sub[2].is_valid_int() else 0)
 		var seat_idx = i - slot_start_idx + 1
 		var is_drag = (seat_idx == 1 or seat_idx == 3)
 		if sub.size() > 3:
@@ -266,7 +267,7 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 				real_count += 1
 		if (present and not is_requested_room) or not has_empty:
 			continue
-		var diff = abs(int(room.get("hostRankPoints", 0)) - my_rank_points)
+		var diff = 0 if mode_id.begins_with("dynasty_") else abs(int(room.get("hostRankPoints", 0)) - my_rank_points)
 		var room_id = str(room.get("roomId", ""))
 		var best_room_id = str(best_room.get("roomId", "~"))
 		# Đã bỏ giới hạn tìm trận theo rank: Ai cũng có thể ghép phòng với nhau.
@@ -379,7 +380,8 @@ func join_room_slot(room: Dictionary, my_user_id: String, my_user_name: String, 
 		# Dictionary.merge does not overwrite existing keys by default. Empty
 		# slots already contain userId="empty", so use overwrite=true or the
 		# successful PATCH would still serialize an empty slot.
-		latest_room["slots"][target_index].merge({"userId": my_user_id, "userName": my_user_name, "rankPoints": my_rank_points, "isAI": false, "isEmpty": false}, true)
+		var join_rank_points: int = 0 if str(latest_room.get("modeId", "2v2")).begins_with("dynasty_") else my_rank_points
+		latest_room["slots"][target_index].merge({"userId": my_user_id, "userName": my_user_name, "rankPoints": join_rank_points, "isAI": false, "isEmpty": false}, true)
 		latest_room["version"] = int(latest_room.get("version", 1)) + 1
 		var doc_id = get_deterministic_doc_id("r_", room_id)
 		var patch_url = "%s/databases/%s/collections/%s/documents/%s" % [ENDPOINT, DATABASE_ID, COLLECTION_ID, doc_id]

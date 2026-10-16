@@ -537,6 +537,274 @@ func _show_no_server_modal(message: String = "") -> void:
 	)
 	vbox.add_child(btn)
 
+func _show_battle_player_profile(player_data: Dictionary) -> void:
+	if player_data.is_empty():
+		return
+	var old_overlay = get_node_or_null("BattlePlayerProfileOverlay")
+	if is_instance_valid(old_overlay):
+		old_overlay.queue_free()
+
+	if AudioManager:
+		AudioManager.play_card_draw()
+
+	var dim = ColorRect.new()
+	dim.name = "BattlePlayerProfileOverlay"
+	dim.set_anchors_preset(PRESET_FULL_RECT)
+	dim.z_as_relative = false
+	dim.z_index = 450
+	dim.color = Color(0.0, 0.0, 0.0, 0.82)
+	add_child(dim)
+
+	var center = CenterContainer.new()
+	center.set_anchors_preset(PRESET_FULL_RECT)
+	dim.add_child(center)
+
+	var panel = PanelContainer.new()
+	panel.custom_minimum_size = Vector2(850, 560)
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.05, 0.06, 0.10, 0.98)
+	style.border_width_left = 2
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.border_width_bottom = 2
+	style.border_color = Color(0.85, 0.70, 0.25, 0.8)
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	style.shadow_color = Color(0.85, 0.65, 0.15, 0.25)
+	style.shadow_size = 8
+	panel.add_theme_stylebox_override("panel", style)
+	center.add_child(panel)
+
+	# Nền tướng nếu có
+	var bg_hero_id: int = int(player_data.get("profile_bg", player_data.get("profileBg", 0)))
+	if bg_hero_id > 0 and HeroDatabase:
+		var eq_skin_id = "default"
+		var my_uid = AuthManager.current_user_id if AuthManager else ""
+		var p_uid = str(player_data.get("user_id", ""))
+		if not my_uid.is_empty() and p_uid == my_uid:
+			eq_skin_id = HeroDatabase.get_equipped_skin_id(bg_hero_id)
+		var bg_tex = HeroDatabase.get_skin_texture(bg_hero_id, eq_skin_id)
+		if not bg_tex:
+			var hd = HeroDatabase.get_hero(bg_hero_id)
+			var av = str(hd.get("avatar", ""))
+			if ResourceLoader.exists(av):
+				bg_tex = load(av)
+		if bg_tex:
+			var bg_rect = TextureRect.new()
+			bg_rect.texture = bg_tex
+			bg_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			bg_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+			bg_rect.set_anchors_preset(PRESET_FULL_RECT)
+			bg_rect.modulate = Color(1.0, 1.0, 1.0, 0.32)
+			panel.add_child(bg_rect)
+
+			var dark_overlay = ColorRect.new()
+			dark_overlay.set_anchors_preset(PRESET_FULL_RECT)
+			dark_overlay.color = Color(0.03, 0.04, 0.08, 0.65)
+			panel.add_child(dark_overlay)
+
+	var margin = MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_top", 18)
+	margin.add_theme_constant_override("margin_bottom", 18)
+	panel.add_child(margin)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 16)
+	margin.add_child(vbox)
+
+	# Header bar with Title & Close button
+	var top_bar = HBoxContainer.new()
+	var title_lbl = Label.new()
+	title_lbl.text = "📜 HỒ SƠ TƯỚNG QUÂN"
+	title_lbl.add_theme_font_size_override("font_size", 16)
+	title_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.35))
+	top_bar.add_child(title_lbl)
+
+	var spacer = Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top_bar.add_child(spacer)
+
+	var close_x = Button.new()
+	close_x.text = "✕"
+	close_x.custom_minimum_size = Vector2(34, 34)
+	close_x.pressed.connect(func(): if is_instance_valid(dim): dim.queue_free())
+	top_bar.add_child(close_x)
+	vbox.add_child(top_bar)
+
+	# Banner thông tin người chơi: Avatar, Tên, Danh hiệu
+	var banner_panel = PanelContainer.new()
+	var bp_style = StyleBoxFlat.new()
+	bp_style.bg_color = Color(0.06, 0.08, 0.14, 0.9)
+	bp_style.border_width_left = 1
+	bp_style.border_width_top = 1
+	bp_style.border_width_right = 1
+	bp_style.border_width_bottom = 1
+	bp_style.border_color = Color(0.85, 0.70, 0.25, 0.5)
+	bp_style.corner_radius_top_left = 8
+	bp_style.corner_radius_top_right = 8
+	bp_style.corner_radius_bottom_right = 8
+	bp_style.corner_radius_bottom_left = 8
+	banner_panel.add_theme_stylebox_override("panel", bp_style)
+
+	var b_margin = MarginContainer.new()
+	b_margin.add_theme_constant_override("margin_left", 16)
+	b_margin.add_theme_constant_override("margin_right", 16)
+	b_margin.add_theme_constant_override("margin_top", 12)
+	b_margin.add_theme_constant_override("margin_bottom", 12)
+	banner_panel.add_child(b_margin)
+
+	var b_hbox = HBoxContainer.new()
+	b_hbox.add_theme_constant_override("separation", 16)
+	b_margin.add_child(b_hbox)
+
+	var p_name = str(player_data.get("name", "Người chơi")).strip_edges()
+	var p_title = str(player_data.get("title", "")).strip_edges().to_lower()
+	var p_lvl = int(player_data.get("level", 1))
+	var p_rank_idx = int(player_data.get("rank_index", 0))
+
+	# Avatar icon
+	var av_lbl = Label.new()
+	av_lbl.text = "👤"
+	av_lbl.add_theme_font_size_override("font_size", 38)
+	b_hbox.add_child(av_lbl)
+
+	var name_box = VBoxContainer.new()
+	name_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_box.add_theme_constant_override("separation", 4)
+
+	var name_row = HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 10)
+
+	var name_lbl = Label.new()
+	name_lbl.text = p_name
+	name_lbl.add_theme_font_size_override("font_size", 20)
+	name_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.65))
+	name_row.add_child(name_lbl)
+
+	if not p_title.is_empty():
+		var TitleBadgeScript = preload("res://scripts/ui/title_badge.gd")
+		var tb = TitleBadgeScript.new()
+		tb.set_title(p_title)
+		name_row.add_child(tb)
+
+	name_box.add_child(name_row)
+
+	var sub_lbl = Label.new()
+	sub_lbl.text = "Cấp độ %d • Đại Tướng Quân Đại Việt" % p_lvl
+	sub_lbl.add_theme_font_size_override("font_size", 12)
+	sub_lbl.add_theme_color_override("font_color", Color(0.75, 0.78, 0.85))
+	name_box.add_child(sub_lbl)
+
+	b_hbox.add_child(name_box)
+	vbox.add_child(banner_panel)
+
+	# Stats grid
+	var stats_grid = GridContainer.new()
+	stats_grid.columns = 2
+	stats_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stats_grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	stats_grid.add_theme_constant_override("h_separation", 14)
+	stats_grid.add_theme_constant_override("v_separation", 14)
+
+	# Card 1: Xếp hạng 2v2
+	var r_info = RankSystem.get_rank_info(p_rank_idx) if RankSystem else {}
+	var r_name = RankSystem.get_rank_name(p_rank_idx) if RankSystem else "Dân Binh"
+	var r_badge = str(r_info.get("badge", "🛡️"))
+	var rank_card = _create_battle_profile_stat_card("⚔️ THỨ HẠNG 2v2", "%s %s" % [r_badge, r_name], "Chiến tích mùa giải hiện tại")
+	stats_grid.add_child(rank_card)
+
+	# Card 2: Cấp độ
+	var lvl_card = _create_battle_profile_stat_card("⭐ CẤP ĐỘ", "Cấp %d" % p_lvl, "Kinh nghiệm thực chiến")
+	stats_grid.add_child(lvl_card)
+
+	# Card 3: Nền hồ sơ
+	var bg_name = "Mặc định (Trang nghiêm)"
+	if bg_hero_id > 0 and HeroDatabase:
+		var hd = HeroDatabase.get_hero(bg_hero_id)
+		bg_name = str(hd.get("name", "Danh tướng"))
+	var bg_card = _create_battle_profile_stat_card("🖼️ HÌNH NỀN HỒ SƠ", bg_name, "Tướng đại diện hồ sơ cá nhân")
+	stats_grid.add_child(bg_card)
+
+	# Card 4: Danh hiệu
+	var t_disp = "Chưa trang bị"
+	if p_title == "admin":
+		t_disp = "ADMIN (Bảy sắc cầu vồng)"
+	elif not p_title.is_empty():
+		t_disp = p_title.to_upper()
+	var title_card = _create_battle_profile_stat_card("🏷️ DANH HIỆU", t_disp, "Đặc quyền tướng quân")
+	stats_grid.add_child(title_card)
+
+	vbox.add_child(stats_grid)
+
+	# Nút đóng
+	var btm_box = HBoxContainer.new()
+	btm_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	var close_btn = Button.new()
+	close_btn.text = "ĐÓNG HỒ SƠ"
+	close_btn.custom_minimum_size = Vector2(180, 40)
+	var cb_style = StyleBoxFlat.new()
+	cb_style.bg_color = Color(0.20, 0.25, 0.35, 1.0)
+	cb_style.corner_radius_top_left = 6
+	cb_style.corner_radius_top_right = 6
+	cb_style.corner_radius_bottom_right = 6
+	cb_style.corner_radius_bottom_left = 6
+	close_btn.add_theme_stylebox_override("normal", cb_style)
+	close_btn.pressed.connect(func(): if is_instance_valid(dim): dim.queue_free())
+	btm_box.add_child(close_btn)
+	vbox.add_child(btm_box)
+
+func _create_battle_profile_stat_card(title: String, val_str: String, sub: String) -> PanelContainer:
+	var pc = PanelContainer.new()
+	pc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var ps = StyleBoxFlat.new()
+	ps.bg_color = Color(0.08, 0.10, 0.16, 0.88)
+	ps.border_width_left = 1
+	ps.border_width_top = 1
+	ps.border_width_right = 1
+	ps.border_width_bottom = 1
+	ps.border_color = Color(0.35, 0.45, 0.60, 0.5)
+	ps.corner_radius_top_left = 8
+	ps.corner_radius_top_right = 8
+	ps.corner_radius_bottom_right = 8
+	ps.corner_radius_bottom_left = 8
+	pc.add_theme_stylebox_override("panel", ps)
+
+	var m = MarginContainer.new()
+	m.add_theme_constant_override("margin_left", 14)
+	m.add_theme_constant_override("margin_right", 14)
+	m.add_theme_constant_override("margin_top", 10)
+	m.add_theme_constant_override("margin_bottom", 10)
+	pc.add_child(m)
+
+	var vb = VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 4)
+	m.add_child(vb)
+
+	var t_lbl = Label.new()
+	t_lbl.text = title
+	t_lbl.add_theme_font_size_override("font_size", 11)
+	t_lbl.add_theme_color_override("font_color", Color(0.65, 0.75, 0.90))
+	vb.add_child(t_lbl)
+
+	var v_lbl = Label.new()
+	v_lbl.text = val_str
+	v_lbl.add_theme_font_size_override("font_size", 16)
+	v_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.65))
+	vb.add_child(v_lbl)
+
+	var s_lbl = Label.new()
+	s_lbl.text = sub
+	s_lbl.add_theme_font_size_override("font_size", 10)
+	s_lbl.add_theme_color_override("font_color", Color(0.50, 0.55, 0.65))
+	vb.add_child(s_lbl)
+
+	return pc
+
 func _ready() -> void:
 	randomize()
 	AudioManager.play_bgm("bgm_battle")
@@ -544,6 +812,7 @@ func _ready() -> void:
 	var chat = preload("res://scenes/components/chat_panel.gd").new()
 	chat.channel = "battle"
 	chat.z_index = 40
+	chat.player_profile_requested.connect(_show_battle_player_profile)
 	add_child(chat)
 	for overlay in [dodge_modal, rescue_modal, general_info_modal, victory_defeat_modal, iron_chain_modal, card_pick_modal]:
 		overlay.z_as_relative = false
@@ -1918,6 +2187,9 @@ func _init_generals_from_draft() -> void:
 
 		var avatar_node = seat_to_avatar[s_num]
 		avatar_node.setup_general(slug, h_name, h_faction, h_hp, h_hp, role_str, s_num, slot_user_name, is_p, is_ally)
+		if is_dynasty:
+			var can_guess_role := (not is_p and role_code.is_empty())
+			avatar_node.set_role_guess_enabled(can_guess_role, "?")
 
 		# Explicitly verify portrait texture
 		var trans_path = "res://assets/heroes_transparent/" + slug + ".png"
@@ -1938,6 +2210,7 @@ func _init_generals_from_draft() -> void:
 		avatar_node.clicked.connect(func(): _on_general_avatar_clicked(s_num))
 		avatar_node.info_clicked.connect(func(): _show_general_info_modal(s_num))
 		avatar_node.skill_button_clicked.connect(func(skill_key: String): _on_general_skill_clicked(s_num, skill_key))
+		avatar_node.role_guess_changed.connect(func(guess: String): _on_role_guess_changed(s_num, guess))
 
 		generals_data[s_num] = {
 			"seat": s_num,
@@ -1945,6 +2218,7 @@ func _init_generals_from_draft() -> void:
 			"isAI": is_ai,
 			"isDragon": is_drag,
 			"role": role_code,
+			"role_guess": "?" if (is_dynasty and not is_p and role_code.is_empty()) else "",
 			"name": h_name,
 			"player_name": slot_user_name,
 			"hero_id": int(hero_info.get("id", s_num)),
@@ -6201,6 +6475,13 @@ func _on_network_game_state_updated(state: Dictionary) -> void:
 		return
 	_apply_network_game_state(state)
 
+func _on_role_guess_changed(seat: int, guess: String) -> void:
+	if not generals_data.has(seat):
+		return
+	var g: Dictionary = generals_data[seat]
+	if str(g.get("role", "")).is_empty() and seat != my_seat and battle_mode_id.begins_with("dynasty_"):
+		g["role_guess"] = guess
+
 func _apply_pending_bai_coc_state_sync() -> void:
 	var deferred_state = pending_bai_coc_state
 	pending_bai_coc_state = {}
@@ -6343,8 +6624,19 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		var incoming_role := str(p.get("role", ""))
 		if not incoming_role.is_empty():
 			g["role"] = incoming_role
+			g["role_guess"] = ""
+			if g.has("avatar_node") and is_instance_valid(g["avatar_node"]) and g["avatar_node"].has_method("set_revealed_role"):
+				g["avatar_node"].set_revealed_role(incoming_role)
+		elif battle_mode_id.begins_with("dynasty_") and seat != my_seat and g.get("is_alive", true) and g.get("role", "").is_empty():
+			g["role_guess"] = g.get("role_guess", "?")
+			if g.has("avatar_node") and is_instance_valid(g["avatar_node"]) and g["avatar_node"].has_method("set_role_guess_enabled"):
+				g["avatar_node"].set_role_guess_enabled(true, g["role_guess"])
 		var server_is_alive = bool(p.get("isAlive", g.get("is_alive", true)))
 		var was_alive = bool(g.get("is_alive", true))
+		if not server_is_alive and str(g.get("role", "")).is_empty() and g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
+			g["role_guess"] = ""
+			if g["avatar_node"].has_method("set_role_guess_enabled"):
+				g["avatar_node"].set_role_guess_enabled(false)
 		g["suc_soi_turns_remaining"] = max(0, int(p.get("sucSoiTurnsRemaining", g.get("suc_soi_turns_remaining", 0))))
 		g["nam_quoc_son_ha_range_buff"] = max(0, int(p.get("namQuocSonHaRangeBuff", g.get("nam_quoc_son_ha_range_buff", 0))))
 		g["extra_slash_limit"] = max(0, int(p.get("extraSlashLimit", g.get("extra_slash_limit", 0))))

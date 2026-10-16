@@ -1740,13 +1740,13 @@ func _on_network_connected_for_draft(force: bool = false) -> void:
 
 	var slots_data: Array = []
 	for s in draft_slots:
-			slots_data.append({
-				"seatNumber": int(s.get("seatNumber", 1)),
-				"userId": str(s.get("userId", "")),
-				"userName": str(s.get("userName", "")),
-				"isAI": bool(s.get("isAI", false)),
-				"isDragon": bool(s.get("isDragon", false))
-			})
+		slots_data.append({
+			"seatNumber": int(s.get("seatNumber", 1)),
+			"userId": str(s.get("userId", "")),
+			"userName": str(s.get("userName", "")),
+			"isAI": bool(s.get("isAI", false)),
+			"isDragon": bool(s.get("isDragon", false))
+		})
 
 	print("[HeroSelect] Gửi JOIN_DRAFT: room=%s, seat=%d, user=%s" % [current_room_id, my_seat_num, my_name])
 	var available_ids: Array[int] = []
