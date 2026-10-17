@@ -54,6 +54,15 @@ const lobbyChatStore = createLobbyChatStore({
   documentsPath: `/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents`,
   onCleanupError: (error) => console.error("[Lobby Chat] History cleanup failed:", error.message),
 });
+// Appwrite history is durable, but every read consumes the database read
+// quota. Keep one server-side snapshot so reconnecting lobby clients do not
+// repeatedly query the same 50 messages (and can still open chat during a
+// temporary Appwrite read outage).
+let lobbyChatHistoryCache = [];
+let lobbyChatHistoryLoaded = false;
+let lobbyChatHistoryLoadPromise = null;
+let lobbyChatHistoryRetryAt = 0;
+const LOBBY_CHAT_HISTORY_RETRY_MS = 30000;
 let lobbyChatQueue = Promise.resolve();
 let matchmakingSweepRunning = false;
 // A client can finish the Appwrite lobby flow with the id of a room that was
@@ -578,6 +587,40 @@ function sendChatError(socket, channel, error) {
   if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "CHAT_ERROR", channel, error }));
 }
 
+function copyLobbyChatHistory() {
+  return lobbyChatHistoryCache.map((message) => ({ ...message }));
+}
+
+function cacheLobbyChatMessage(message) {
+  const messageId = String(message?.id || "");
+  if (messageId && lobbyChatHistoryCache.some((cached) => String(cached.id || "") === messageId)) return;
+  lobbyChatHistoryCache = [...lobbyChatHistoryCache, { ...message }].slice(-LOBBY_CHAT_HISTORY_LIMIT);
+}
+
+async function getLobbyChatHistory() {
+  if (lobbyChatHistoryLoaded) return copyLobbyChatHistory();
+  if (Date.now() < lobbyChatHistoryRetryAt) return copyLobbyChatHistory();
+  if (!lobbyChatHistoryLoadPromise) {
+    lobbyChatHistoryLoadPromise = lobbyChatStore.history()
+      .then((history) => {
+        lobbyChatHistoryCache = history.slice(-LOBBY_CHAT_HISTORY_LIMIT).map((message) => ({ ...message }));
+        lobbyChatHistoryLoaded = true;
+        return copyLobbyChatHistory();
+      })
+      .catch((error) => {
+        // A read-limit or short Appwrite outage must not make the chat panel
+        // unusable. New messages continue to update the in-memory snapshot.
+        console.error("[Lobby Chat] History read failed; using cached snapshot:", error.message);
+        lobbyChatHistoryRetryAt = Date.now() + LOBBY_CHAT_HISTORY_RETRY_MS;
+        return copyLobbyChatHistory();
+      })
+      .finally(() => {
+        lobbyChatHistoryLoadPromise = null;
+      });
+  }
+  return lobbyChatHistoryLoadPromise;
+}
+
 async function handleChat(socket, payload, currentRoomId, currentSeat) {
   const { action, channel } = payload;
   if (channel !== "lobby" && channel !== "battle") {
@@ -626,11 +669,7 @@ async function handleChat(socket, payload, currentRoomId, currentSeat) {
 
   if (action === "CHAT_SUBSCRIBE") {
     if (channel === "lobby") {
-      try { history = await lobbyChatStore.history(); }
-      catch (error) {
-        console.error("[Lobby Chat] History read failed:", error.message);
-        return sendChatError(socket, channel, "Chưa tải được lịch sử trò chuyện. Vui lòng thử lại.");
-      }
+      history = await getLobbyChatHistory();
       if (socket.readyState !== WebSocket.OPEN) return;
       lobbyChatSockets.add(socket);
     }
@@ -657,6 +696,7 @@ async function handleChat(socket, payload, currentRoomId, currentSeat) {
       console.error("[Lobby Chat] Message save failed:", error.message);
       return sendChatError(socket, channel, "Chưa lưu được tin nhắn. Vui lòng gửi lại.");
     }
+    cacheLobbyChatMessage(message);
   } else {
     history.push(message);
     if (history.length > CHAT_HISTORY_LIMIT) history.shift();

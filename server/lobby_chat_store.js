@@ -33,8 +33,14 @@ export function createLobbyChatStore({ request, documentsPath, limit = LOBBY_CHA
         || typeof value.userId !== "string" || typeof value.userName !== "string"
         || typeof value.text !== "string" || !value.text.trim() || Array.from(value.text).length > 280
         || !Number.isFinite(value.timestamp)) return null;
-      return { id: value.id, channel: "lobby", roomId: "", userId: value.userId,
+      const normalized = { id: value.id, channel: "lobby", roomId: "", userId: value.userId,
         userName: value.userName, text: value.text, timestamp: value.timestamp };
+      // Keep the public profile fields with durable messages when a client
+      // sends them, while retaining compatibility with older stored records.
+      for (const key of ["title", "profileBg", "level", "rankIndex"]) {
+        if (Object.prototype.hasOwnProperty.call(value, key)) normalized[key] = value[key];
+      }
+      return normalized;
     } catch { return null; }
   }
 
