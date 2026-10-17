@@ -48,7 +48,7 @@ const APPWRITE_MATCHMAKING_PROJECT = "6a885457002da3f3d47e";
 const APPWRITE_MATCHMAKING_DATABASE = "game";
 const APPWRITE_MATCHMAKING_COLLECTION = "matchmaking_queue";
 const APPWRITE_MATCHMAKING_MAX_AGE_MS = 180000;
-const APPWRITE_MATCHMAKING_POLL_MS = 2000;
+const APPWRITE_MATCHMAKING_POLL_MS = 3000;
 const lobbyChatStore = createLobbyChatStore({
   request: appwriteMatchmakingRequest,
   documentsPath: `/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents`,
@@ -70,6 +70,11 @@ let pendingLobbyChatMessages = [];
 let lobbyChatFlushTimer = null;
 let lobbyChatFlushPromise = null;
 let matchmakingSweepRunning = false;
+// Appwrite matchmaking is only swept while at least one connected client is
+// actively searching. This avoids background database reads when the lobby
+// is idle; sockets are removed automatically when a search is cancelled or
+// disconnected.
+const activeMatchmakingSockets = new Set();
 // A client can finish the Appwrite lobby flow with the id of a room that was
 // merged while it was polling. Keep the redirect in Render too, so its first
 // JOIN_DRAFT reaches the same in-memory room as every other player.
@@ -472,6 +477,7 @@ const MAX_WS_MESSAGE_BYTES = 64 * 1024;
 const MAX_ACTIONS_PER_SECOND = 30;
 const ALLOWED_WS_ACTIONS = new Set([
   "JOIN_ROOM", "INIT_GAME", "JOIN_DRAFT", "PICK_HERO", "HOVER_HERO", "GET_STATE", "PING",
+  "MATCHMAKING_START", "MATCHMAKING_STOP",
   "USE_SKILL", "TOGGLE_SKILL", "PLAY_CARD", "RESPOND_ACTION", "END_TURN",
   "DISCARD_CARDS", "AI_STEP", "AI_REACTION", "CHECK_ACTIVE_MATCH", "RECONNECT_GAME",
   "SOCIAL_REGISTER", "FRIEND_LIST", "FRIEND_SEARCH", "FRIEND_REQUEST", "FRIEND_RESPOND",
@@ -913,8 +919,9 @@ setInterval(async () => {
 }, 9 * 60 * 1000);
 
 // Start after boot so an Appwrite outage cannot delay the WebSocket server.
-setInterval(() => { sweepAppwriteMatchmaking(); }, APPWRITE_MATCHMAKING_POLL_MS);
-sweepAppwriteMatchmaking();
+setInterval(() => {
+  if (activeMatchmakingSockets.size > 0) sweepAppwriteMatchmaking();
+}, APPWRITE_MATCHMAKING_POLL_MS);
 setInterval(() => { syncSocialProfilesFromAppwrite(); }, 60000);
 syncSocialProfilesFromAppwrite();
 
@@ -1696,6 +1703,15 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
         const roomId = resolveMatchmakingRoomId(requestedRoomId);
         const requestSeat = normalizeSeat(payload.seat);
 
+        if (action === "MATCHMAKING_START") {
+          activeMatchmakingSockets.add(socket);
+          return socket.send(JSON.stringify({ type: "MATCHMAKING_ACK", active: true }));
+        }
+        if (action === "MATCHMAKING_STOP") {
+          activeMatchmakingSockets.delete(socket);
+          return socket.send(JSON.stringify({ type: "MATCHMAKING_ACK", active: false }));
+        }
+
         if (action.startsWith("CHAT_")) {
           if (payload.channel === "lobby") {
             const operation = lobbyChatQueue.then(() => handleChat(socket, payload, currentRoomId, currentSeat));
@@ -2220,6 +2236,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
     };
 
     socket.onclose = () => {
+      activeMatchmakingSockets.delete(socket);
       lobbyChatSockets.delete(socket);
       if (socket.socialUserId) {
         const social = socialProfiles.get(socket.socialUserId);

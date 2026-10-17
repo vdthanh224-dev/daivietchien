@@ -459,6 +459,14 @@ func send_chat_message(channel: String, text: String) -> bool:
 	send_json(payload)
 	return true
 
+func send_matchmaking_start() -> void:
+	if socket.get_ready_state() == WebSocketPeer.STATE_OPEN:
+		send_json({"action": "MATCHMAKING_START"})
+
+func send_matchmaking_stop() -> void:
+	if socket.get_ready_state() == WebSocketPeer.STATE_OPEN:
+		send_json({"action": "MATCHMAKING_STOP"})
+
 func register_social_profile() -> void:
 	if not AuthManager or AuthManager.current_user_id.is_empty():
 		return

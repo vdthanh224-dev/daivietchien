@@ -27,7 +27,7 @@ const sandbox = {
     upgradeWebSocket(request) { return { socket: request.socket, response: {} }; },
   },
 };
-source += "\nglobalThis.chatTests = { rooms, lobbyChatSockets, waitLobby: () => lobbyChatQueue, flushLobby: () => flushLobbyChatMessages(), pendingLobby: () => pendingLobbyChatMessages };";
+source += "\nglobalThis.chatTests = { rooms, lobbyChatSockets, activeMatchmakingSockets, waitLobby: () => lobbyChatQueue, flushLobby: () => flushLobbyChatMessages(), pendingLobby: () => pendingLobbyChatMessages };";
 vm.runInNewContext(source, sandbox, { filename: "server.js" });
 const { rooms, lobbyChatSockets } = sandbox.chatTests;
 async function connect(userId, appHandler = handler, tests = sandbox.chatTests) {
@@ -53,6 +53,12 @@ const send = (socket, text, channel = "lobby", roomId = "", extra = {}) => socke
 const a = await connect("a");
 const b = await connect("b");
 const guest = await connect();
+await guest.action({ action: "MATCHMAKING_START" });
+assert.equal(last(guest, "MATCHMAKING_ACK").active, true);
+assert(sandbox.chatTests.activeMatchmakingSockets.has(guest));
+await guest.action({ action: "MATCHMAKING_STOP" });
+assert.equal(last(guest, "MATCHMAKING_ACK").active, false);
+assert(!sandbox.chatTests.activeMatchmakingSockets.has(guest));
 await subscribe(guest);
 assert.match(last(guest, "CHAT_ERROR").error, /đăng nhập/);
 await subscribe(a);

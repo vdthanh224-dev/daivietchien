@@ -2403,6 +2403,8 @@ func _show_profile_bg_selection_modal() -> void:
 func _cancel_matchmaking_internal() -> void:
 	mm_is_cancelled = true
 	is_matchmaking_active = false
+	if NetworkClient and NetworkClient.has_method("send_matchmaking_stop"):
+		NetworkClient.send_matchmaking_stop()
 	var my_uid = mm_session_user_id
 	if my_uid.is_empty() and AppwriteMatchmaking:
 		my_uid = AppwriteMatchmaking.my_session_user_id
@@ -10434,6 +10436,8 @@ func _start_2v2_matchmaking(mode_id: String = "2v2") -> void:
 
 	is_matchmaking_active = true
 	mm_is_cancelled = false
+	if NetworkClient and NetworkClient.has_method("send_matchmaking_start"):
+		NetworkClient.send_matchmaking_start()
 	mm_search_started_at_ms = Time.get_ticks_msec()
 	mm_active_room_id = ""
 	mm_is_host = false
@@ -10622,6 +10626,9 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		own_room["slots"].append({"seatNumber": seat, "isDragon": own_dragon_seats.has(seat), "isAI": false, "userId": my_user_id if seat == 1 else "", "userName": my_user_name if seat == 1 else "", "rankPoints": my_rank_points if seat == 1 else 0, "isEmpty": seat != 1})
 	var own_created = await AppwriteMatchmaking.create_waiting_room(own_room)
 	if not own_created:
+		if NetworkClient and NetworkClient.has_method("send_matchmaking_stop"):
+			NetworkClient.send_matchmaking_stop()
+		is_matchmaking_active = false
 		if is_instance_valid(status_lbl):
 			status_lbl.text = "❌ Không thể tham gia hàng chờ. Vui lòng thử lại."
 		return
@@ -10802,7 +10809,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 			continue
 
 		if poll_timer <= 0.0 or is_fast_test:
-			poll_timer = 2.0 # Đặt lại chu kỳ 2s
+			poll_timer = 3.0 # Đặt lại chu kỳ 3s để giảm lượt đọc Appwrite
 
 			# Keep consolidating rooms while they are waiting. Every client moves
 			# toward a room with more real players; ties use roomId for stability.
@@ -11075,6 +11082,8 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		return
 
 	is_matchmaking_active = false
+	if NetworkClient and NetworkClient.has_method("send_matchmaking_stop"):
+		NetworkClient.send_matchmaking_stop()
 	if is_instance_valid(status_lbl):
 		status_lbl.text = "⚔️ ĐÃ TÌM THẤY TRẬN ĐẤU! Bắt đầu vào trận..."
 		status_lbl.add_theme_color_override("font_color", Color(0.3, 0.95, 0.45, 1.0))
