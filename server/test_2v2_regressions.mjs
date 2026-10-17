@@ -2032,7 +2032,7 @@ for (const [subType, name] of [
   state.players[1].heroId = "HERO_1";  // seat 2
   state.players[1].hp = 4;
   put(state, 2, card("OPP_HAND", "Bài trên tay", CARD_SUBTYPES.ATTACK_NORMAL));
-  const slashHigh = { id: "SLASH_K", name: "Trảm", suit: "Spade", rank: 13, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL };
+  const slashHigh = { id: "SLASH_K", name: "Trảm", suit: "Spade", rank: 9, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL };
   const cardLow = { id: "CARD_LOW", name: "Bài Thấp", suit: "Heart", rank: 3, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH };
   put(state, 1, slashHigh);
   put(state, 1, cardLow);
@@ -2072,7 +2072,7 @@ for (const [subType, name] of [
   assert.equal(state.players[0].hand.length, handBeforeTB); // bỏ 1 trang bị (-1) + rút 1 lá (+1)
 
   // Nhiếp Chính: khi người khác nhận sát thương, đấu điểm để hồi máu
-  put(state, 1, { id: "DVN_HIGH", name: "Bài K", suit: "Spade", rank: 13, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL });
+  put(state, 1, { id: "DVN_HIGH", name: "Bài K", suit: "Spade", rank: 9, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL });
   put(state, 3, { id: "S3_LOW", name: "Bài 3", suit: "Heart", rank: 3, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH });
   state.players[1].hp = 2; // seat 2 bị thương
   // Gây sát thương lên seat 2

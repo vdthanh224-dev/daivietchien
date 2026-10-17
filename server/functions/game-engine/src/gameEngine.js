@@ -84,7 +84,7 @@ function migrateLegacyWaterCard(card) {
       name: "Đại Hồng Thủy",
       category: CARD_CATEGORIES.DELAYED_SCROLL,
       subType: CARD_SUBTYPES.DAI_HONG_THUY,
-      desc: "Phán xét: Bài Đen từ 2 đến 9 chịu 3 sát thương Thủy, trượt chuyển người kế"
+      desc: "Phán xét: Bài Đen từ 1 đến 6 chịu 3 sát thương Thủy, trượt chuyển người kế"
     };
   }
 
@@ -103,7 +103,7 @@ function hydrateCard(card) {
     // Persisted partial cards must not erase canonical card fields with blanks.
     const populated = Object.fromEntries(Object.entries(supplied)
       .filter(([, value]) => value !== undefined && value !== null && value !== ""));
-    return normalizeCardRank({ ...canonical, ...populated });
+    return normalizeCardRank({ ...canonical, ...populated, rank: canonical.rank });
   }
   if (migratedCard && typeof migratedCard === "object") return normalizeCardRank({ ...migratedCard });
   return null;
@@ -112,9 +112,12 @@ function hydrateCard(card) {
 function normalizeCardRank(card) {
   if (!card || typeof card !== "object") return card;
   const raw = String(card.rank ?? "").trim().toUpperCase();
-  const aliases = { A: 1, J: 11, Q: 12, K: 13 };
-  const numeric = Object.prototype.hasOwnProperty.call(aliases, raw) ? aliases[raw] : Number(raw);
-  if (Number.isFinite(numeric) && numeric >= 1 && numeric <= 13) return { ...card, rank: numeric };
+  const aliases = { A: 0, J: 8, Q: 8, K: 9 };
+  let numeric = Object.prototype.hasOwnProperty.call(aliases, raw) ? aliases[raw] : Number(raw);
+  if (Number.isFinite(numeric) && numeric >= 10 && numeric <= 13) {
+    numeric = Math.round((numeric - 1) * 9 / 12);
+  }
+  if (Number.isFinite(numeric) && numeric >= 0 && numeric <= 9) return { ...card, rank: numeric };
   return card;
 }
 
@@ -458,34 +461,8 @@ export function hydrateGameState(rawState, roomId = "") {
 
 function formatCardText(card) {
   if (!card) return "";
-  if (!card.suit && !card.rank) return `[${card.name}]`;
-
-  const color = cardColor(card.suit);
-  let colorLabel = "Đen";
-  let colorHex = "#90A4AE";
-  switch (color) {
-    case "RED":
-      colorLabel = "Đỏ";
-      colorHex = "#FF5252";
-      break;
-    case "WHITE":
-      colorLabel = "Trắng";
-      colorHex = "#FAFAFA";
-      break;
-    case "YELLOW":
-      colorLabel = "Vàng";
-      colorHex = "#FFD54F";
-      break;
-    case "BLACK":
-    default:
-      colorLabel = "Đen";
-      colorHex = "#90A4AE";
-      break;
-  }
-
-  const rankStr = String(card.rank);
-
-  return `[${card.name} (${rankStr} <color=${colorHex}>${colorLabel}</color>)]`;
+  if (!card.suit && card.rank === undefined) return `[${card.name}]`;
+  return `[${card.name} (${String(card.rank)})]`;
 }
 
 /**
@@ -1103,7 +1080,7 @@ function cardColor(suit) {
 function daiVietColorChoices() {
   return [["RED", "Đỏ", "Heart"], ["WHITE", "Trắng", "Diamond"],
     ["YELLOW", "Vàng", "Club"], ["BLACK", "Đen", "Spade"]].map(([color, label, suit]) => ({
-    id: `DAI_VIET:${color}`, name: `Đại Việt: ${label}`, suit, rank: 1,
+    id: `DAI_VIET:${color}`, name: `Đại Việt: ${label}`, suit, rank: 0,
     category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE,
     label,
     desc: `Chọn màu ${label} để kích hoạt skill Đại Việt. Mỗi khi đánh lá cùng màu trong lượt này, bạn rút 1 lá.`
@@ -1264,11 +1241,11 @@ function canUseCardAsDodge(player, card) {
 
 function canUseCardAsDodgeAgainstSlash(player, card, attacker, slashCard, gameState = null) {
   if (!canUseCardAsDodge(player, card)) return false;
-  if (getEquippedWeapon(attacker, "Súng Thần Công") && Number(card?.rank || 0) < 7) return false;
-  if (heroHasSkill(attacker, "TRUC_CHIEN") && Number(card?.rank || 0) < 7) return false;
+  if (getEquippedWeapon(attacker, "Súng Thần Công") && Number(card?.rank || 0) < 5) return false;
+  if (heroHasSkill(attacker, "TRUC_CHIEN") && Number(card?.rank || 0) < 5) return false;
   if (heroHasSkill(attacker, "THO_BINH")) {
     const dist = (gameState && gameState.players) ? getDistance(gameState, attacker?.seat, player?.seat) : getDistance({ players: [attacker, player] }, attacker?.seat, player?.seat);
-    if (dist <= 2 && Number(card?.rank || 0) >= 2 && Number(card?.rank || 0) <= 7) return false;
+    if (dist <= 2 && Number(card?.rank || 0) >= 1 && Number(card?.rank || 0) <= 5) return false;
   }
   return true;
 }
@@ -1838,8 +1815,8 @@ function startSlashResolution(state, slashCard, casterSeat, targetSeat, options 
 
   const cannon = getEquippedWeapon(caster, "Súng Thần Công");
   const requiredDodges = state.activeCard.requiredDodgeCount;
-  const thoBinhText = isThoBinh ? " (do [Thổ Binh], không thể dùng lá Đỡ từ 2 đến 7)" : "";
-  const requiredDodgeText = `${requiredDodges > 1 ? ` (cần ${requiredDodges} lá Đỡ do [Dũng Nữ])` : ""}${cannon ? " (chỉ được dùng lá Đỡ từ 7 trở lên)" : ""}${thoBinhText}`;
+  const thoBinhText = isThoBinh ? " (do [Thổ Binh], không thể dùng lá Đỡ từ 1 đến 5)" : "";
+  const requiredDodgeText = `${requiredDodges > 1 ? ` (cần ${requiredDodges} lá Đỡ do [Dũng Nữ])` : ""}${cannon ? " (chỉ được dùng lá Đỡ từ 5 trở lên)" : ""}${thoBinhText}`;
   const skillActivations = [];
   if (isThoBinh) skillActivations.push({ name: "Thổ Binh", seat: casterSeat });
   if (heroHasSkill(caster, "XA_THUAN")) skillActivations.push({ name: "Xạ Thuẫn", seat: casterSeat });
@@ -2622,7 +2599,7 @@ function resolveBaiCocAction(state, continuation, nullified) {
       description: `🛡️ Diệu Kế Phá Mưu đã phá Bãi Cọc Bạch Đằng. ${actor?.generalName || "Người chơi"} được dùng hành động bình thường.`
     });
   } else {
-    const judgeCard = drawJudgementCard(state) || { id: "JUDGECARD", suit: "Heart", rank: 10 };
+    const judgeCard = drawJudgementCard(state) || { id: "JUDGECARD", suit: "Heart", rank: 9 };
     const safe = judgeCard.suit === "Heart" || judgeCard.suit === "Diamond";
     const judgementCount = 1;
     if (trap) trap.baiCocJudgementCount = judgementCount;
@@ -5251,7 +5228,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
           id: `THANG_MOC_${respondentSeat}_${Date.now()}`,
           name: chosen.name,
           suit: "Spade",
-          rank: 10,
+          rank: 9,
           category: CARD_CATEGORIES.DELAYED_SCROLL,
           subType: chosen.subType,
           attachedBySeat: respondentSeat,
@@ -6251,8 +6228,8 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
 
     const cannon = getEquippedWeapon(caster, "Súng Thần Công");
     const requiredDodges = active.requiredDodgeCount;
-    const thoBinhText = isThoBinh ? " (do [Thổ Binh], không thể dùng lá Đỡ từ 2 đến 7)" : "";
-    const requiredDodgeText = `${requiredDodges > 1 ? ` (cần ${requiredDodges} lá Đỡ do [Dũng Nữ])` : ""}${cannon ? " (chỉ được dùng lá Đỡ từ 7 trở lên)" : ""}${thoBinhText}`;
+    const thoBinhText = isThoBinh ? " (do [Thổ Binh], không thể dùng lá Đỡ từ 1 đến 5)" : "";
+    const requiredDodgeText = `${requiredDodges > 1 ? ` (cần ${requiredDodges} lá Đỡ do [Dũng Nữ])` : ""}${cannon ? " (chỉ được dùng lá Đỡ từ 5 trở lên)" : ""}${thoBinhText}`;
     const slashCard = { id: active.cardId, name: active.cardName, subType: active.subType, suit: active.suit };
     const skillActivations = [];
     if (isThoBinh) skillActivations.push({ name: "Thổ Binh", seat: active.casterSeat });
@@ -7121,8 +7098,8 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       if (handIdx < 0 && equipmentIdx < 0) {
         if (caster && heroHasSkill(caster, "THO_BINH") && getDistance(state, caster.seat, respondent.seat) <= 2) {
           const cardCandidate = respondent.hand.find(c => c.id === cardId || c.name === cardId) || (respondent.equipments || []).find(c => c.id === cardId || c.name === cardId);
-          if (cardCandidate && Number(cardCandidate.rank || 0) >= 2 && Number(cardCandidate.rank || 0) <= 7) {
-            return { error: "Do kỹ năng [Thổ Binh] của Tông Đản (Cự ly ≤ 2), không thể dùng lá Đỡ từ 2 đến 7!" };
+          if (cardCandidate && Number(cardCandidate.rank || 0) >= 1 && Number(cardCandidate.rank || 0) <= 6) {
+            return { error: "Do kỹ năng [Thổ Binh] của Tông Đản (Cự ly ≤ 2), không thể dùng lá Đỡ từ 1 đến 5!" };
           }
         }
         return { error: "Lá Đỡ hoặc trang bị không còn hợp lệ cho đòn Trảm này" };
@@ -8397,7 +8374,7 @@ function findNextJudgementRecipient(state, currentSeat, subType) {
 function resolveJudgementCard(state, judgementCard, targetSeat) {
   const target = state.players.find((player) => player.seat === targetSeat);
   if (!target || !judgementCard) return;
-  const judgeCard = drawJudgementCard(state) || { suit: "Heart", rank: 10, name: "Bài Phán Xét", id: "JUDGECARD" };
+  const judgeCard = drawJudgementCard(state) || { suit: "Heart", rank: 9, name: "Bài Phán Xét", id: "JUDGECARD" };
 
   let isHit = false;
   let triggered = false;
@@ -8406,7 +8383,7 @@ function resolveJudgementCard(state, judgementCard, targetSeat) {
   let nextRecipient = 0;
 
   if (judgementCard.subType === CARD_SUBTYPES.DAI_HONG_THUY) {
-    isHit = judgeCard.suit === "Spade" && judgeCard.rank >= 2 && judgeCard.rank <= 9;
+    isHit = judgeCard.suit === "Spade" && judgeCard.rank >= 1 && judgeCard.rank <= 6;
     actionType = isHit ? "DAI_HONG_THUY_HIT" : "DAI_HONG_THUY_PASSED";
     const recipient = !isHit ? findNextJudgementRecipient(state, targetSeat, CARD_SUBTYPES.DAI_HONG_THUY) : null;
     nextRecipient = recipient ? recipient.seat : 0;
@@ -9277,7 +9254,7 @@ export function handleAIReaction(state, aiSeat) {
     const enemies = state.players.filter(p => isLivingPlayer(p) && p.seat !== aiSeat && !areTeammatesInState(state, aiSeat, p.seat) && (p.hand || []).length > 0);
     const opponent = enemies[0];
     const damagedAlly = [...friends].filter((p) => p.hp < p.maxHp).sort((a, b) => a.hp - b.hp)[0];
-    if (highestCard && opponent && damagedAlly && Number(highestCard.rank) >= (damagedAlly.hp <= 1 ? 7 : 9)) {
+    if (highestCard && opponent && damagedAlly && Number(highestCard.rank) >= (damagedAlly.hp <= 1 ? 5 : 6)) {
       return handleRespondAction(state, aiSeat, true, highestCard.id, null, null, opponent.seat, {
         duelTargetSeat: opponent.seat,
         healTargetSeat: damagedAlly.seat

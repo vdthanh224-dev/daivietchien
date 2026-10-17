@@ -42,11 +42,13 @@ func setup_card_data(id: String, p_name: String, rank_val: Variant, suit_str: St
 	res.suit = suit_str
 	var r_str = str(rank_val).to_upper()
 	match r_str:
-		"A", "1": res.rank = 1
-		"J", "11": res.rank = 11
-		"Q", "12": res.rank = 12
-		"K", "13": res.rank = 13
-		_: res.rank = r_str.to_int()
+		"A": res.rank = 0
+		"J", "Q": res.rank = 8
+		"K": res.rank = 9
+		"10": res.rank = 7
+		"11", "12": res.rank = 8
+		"13": res.rank = 9
+		_: res.rank = clampi(r_str.to_int(), 0, 9)
 	res.category = cat
 	if sub_type_val >= 0:
 		res.sub_type = sub_type_val as CardResourceScript.CardSubType
@@ -114,11 +116,8 @@ func update_card(data: Resource) -> void:
 		return
 
 	var rank_str = data.get_rank_string()
-	var suit_name = data.get_suit_name() if data.has_method("get_suit_name") else ""
-	if suit_name != "":
-		suit_rank_lbl.text = "%s %s" % [rank_str, suit_name]
-	else:
-		suit_rank_lbl.text = rank_str
+	# The card background already communicates the suit color; show only its point value.
+	suit_rank_lbl.text = rank_str
 	UIScaleManager.scale_node_font(suit_rank_lbl, 11)
 
 	_apply_card_theme(data)
@@ -145,7 +144,7 @@ func update_card(data: Resource) -> void:
 
 	if click_button:
 		var d_text = data.description if "description" in data and data.description != "" else data.card_name
-		var full_suit_text = ("%s %s" % [rank_str, suit_name]) if suit_name != "" else rank_str
+		var full_suit_text = rank_str
 		click_button.tooltip_text = "[%s] %s\n%s" % [full_suit_text, data.card_name, d_text]
 
 func _apply_card_theme(data: Resource) -> void:

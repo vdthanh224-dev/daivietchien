@@ -1497,7 +1497,7 @@ func _ready() -> void:
 			{"id": "c1", "name": "Trảm", "suit": "Spade", "rank": 7, "cat": 0, "subType": 0, "desc": "Tấn công 1 tướng trong tầm"},
 			{"id": "c2", "name": "Đỡ", "suit": "Diamond", "rank": 2, "cat": 0, "subType": 3, "desc": "Hóa giải Trảm hoặc Mưa Tên"},
 			{"id": "c3", "name": "Bánh Chưng", "suit": "Heart", "rank": 9, "cat": 0, "subType": 4, "desc": "Hồi 1 máu"},
-			{"id": "c4", "name": "Mượn Gươm", "suit": "Club", "rank": 12, "cat": 2, "subType": 14, "desc": "Mượn vũ khí"}
+			{"id": "c4", "name": "Mượn Gươm", "suit": "Club", "rank": 9, "cat": 2, "subType": 14, "desc": "Mượn vũ khí"}
 		]
 		for c in test_hand:
 			var card_ui = CardUIScene.instantiate()
@@ -1531,9 +1531,9 @@ func _ready() -> void:
 		await get_tree().create_timer(0.3).timeout
 		_deal_initial_hands()
 		var sample_cards = [
-			{"id": "d1", "name": "Trảm - Hỏa", "suit": "Heart", "rank": 10, "category": 0, "subType": 1, "desc": "Tấn công 1 tướng trong tầm gây 1 sát thương Hỏa"},
+			{"id": "d1", "name": "Trảm - Hỏa", "suit": "Heart", "rank": 9, "category": 0, "subType": 1, "desc": "Tấn công 1 tướng trong tầm gây 1 sát thương Hỏa"},
 			{"id": "d2", "name": "Đỡ", "suit": "Diamond", "rank": 2, "category": 0, "subType": 3, "desc": "Hóa giải đòn Trảm"},
-			{"id": "d3", "name": "Song Cung Mường Nhạ", "suit": "Spade", "rank": 13, "category": 1, "subType": 6, "desc": "Tầm 2. Khi Trảm bị Đỡ, bỏ 2 lá để bỏ qua Đỡ; Trảm vẫn gây sát thương"},
+			{"id": "d3", "name": "Song Cung Mường Nhạ", "suit": "Spade", "rank": 9, "category": 1, "subType": 6, "desc": "Tầm 2. Khi Trảm bị Đỡ, bỏ 2 lá để bỏ qua Đỡ; Trảm vẫn gây sát thương"},
 			{"id": "d4", "name": "Bánh Chưng", "suit": "Heart", "rank": 8, "category": 0, "subType": 4, "desc": "Hồi 1 đóa sen máu khi bị thương"},
 			{"id": "d5", "name": "Dụng Binh Như Thần", "suit": "Club", "rank": 7, "category": 2, "subType": 13, "desc": "Rút ngay 2 lá bài từ cọc rút"}
 		]
@@ -1892,7 +1892,7 @@ func _ready() -> void:
 				"id": "xichtam_demo",
 				"name": "Xích Tâm Tỏa",
 				"suit": "Spade",
-				"rank": 11,
+				"rank": 9,
 				"cat": 2,
 				"desc": "Chạm avatar để chọn tối đa 2 mục tiêu để đưa họ vào hoặc thoát trạng thái xích (cùng nhận sát thương nguyên tố), có thể đổi thành lá mới"
 			})
@@ -2542,10 +2542,10 @@ func _set_local_che_no_hand(active: bool) -> void:
 		var info = _get_card_info_from_ui(card_ui)
 		if active and _get_card_color(str(info.get("suit", ""))) == "BLACK" and not card_ui.has_meta("che_no_original"):
 			card_ui.set_meta("che_no_original", info.duplicate())
-			card_ui.setup_card_data(str(info.get("id", "")), "Nỏ Thần Kim Quy", info.get("rank", 1), str(info.get("suit", "Spade")), 1, "Tầm 1. Không giới hạn số Trảm trong lượt", 6)
+			card_ui.setup_card_data(str(info.get("id", "")), "Nỏ Thần Kim Quy", info.get("rank", 0), str(info.get("suit", "Spade")), 1, "Tầm 1. Không giới hạn số Trảm trong lượt", 6)
 		elif not active and card_ui.has_meta("che_no_original"):
 			var original = card_ui.get_meta("che_no_original") as Dictionary
-			card_ui.setup_card_data(str(original.get("id", "")), str(original.get("name", "Bài")), original.get("rank", 1), str(original.get("suit", "Spade")), int(original.get("cat", 0)), str(original.get("desc", "")), int(original.get("subType", -1)))
+			card_ui.setup_card_data(str(original.get("id", "")), str(original.get("name", "Bài")), original.get("rank", 0), str(original.get("suit", "Spade")), int(original.get("cat", 0)), str(original.get("desc", "")), int(original.get("subType", -1)))
 			card_ui.remove_meta("che_no_original")
 
 func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
@@ -2898,7 +2898,7 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 				sample_from = "Trảm"
 				sample_to = "Đỡ"
 				var c_id = str(info.get("id", ""))
-				var r = info.get("rank", 1)
+				var r = info.get("rank", 0)
 				var s = str(info.get("suit", ""))
 				var tw = card_ui.create_tween()
 				tw.tween_property(card_ui, "scale:x", 0.05, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
@@ -2912,7 +2912,7 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 				sample_from = "Đỡ"
 				sample_to = "Trảm"
 				var c_id = str(info.get("id", ""))
-				var r = info.get("rank", 1)
+				var r = info.get("rank", 0)
 				var s = str(info.get("suit", ""))
 				var tw = card_ui.create_tween()
 				tw.tween_property(card_ui, "scale:x", 0.05, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
@@ -3073,11 +3073,11 @@ func _refresh_tau_vi_equipped_previews() -> void:
 		var equipment: Dictionary = desired[equipment_id]
 		var card_ui = CardUIScene.instantiate()
 		hand_container.add_child(card_ui)
-		card_ui.setup_card_data(str(equipment.get("id", "")), _get_card_display_name(equipment), equipment.get("rank", 1), str(equipment.get("suit", "Spade")), int(equipment.get("category", 1)), str(equipment.get("desc", "")), int(equipment.get("subType", -1)))
+		card_ui.setup_card_data(str(equipment.get("id", "")), _get_card_display_name(equipment), equipment.get("rank", 0), str(equipment.get("suit", "Spade")), int(equipment.get("category", 1)), str(equipment.get("desc", "")), int(equipment.get("subType", -1)))
 		card_ui.set_meta("tau_vi_equipped_preview", equipment_id)
 		if card_ui.has_method("set_equipped_badge"):
 			card_ui.set_equipped_badge(true)
-		var c_info = {"id": equipment_id, "name": _get_card_display_name(equipment), "rank": equipment.get("rank", 1), "suit": str(equipment.get("suit", "Spade")), "cat": int(equipment.get("category", 1)), "desc": str(equipment.get("desc", "")), "subType": int(equipment.get("subType", -1)), "is_equipped": true, "card_node": card_ui}
+		var c_info = {"id": equipment_id, "name": _get_card_display_name(equipment), "rank": equipment.get("rank", 0), "suit": str(equipment.get("suit", "Spade")), "cat": int(equipment.get("category", 1)), "desc": str(equipment.get("desc", "")), "subType": int(equipment.get("subType", -1)), "is_equipped": true, "card_node": card_ui}
 		card_ui.card_clicked.connect(func(_c): _on_player_hand_card_clicked(card_ui, c_info))
 	_relayout_hand_cards()
 
@@ -3108,11 +3108,11 @@ func _refresh_tran_thu_equipped_previews() -> void:
 		var equipment: Dictionary = desired[equipment_id]
 		var card_ui = CardUIScene.instantiate()
 		hand_container.add_child(card_ui)
-		card_ui.setup_card_data(str(equipment.get("id", "")), _get_card_display_name(equipment), equipment.get("rank", 1), str(equipment.get("suit", "Spade")), int(equipment.get("category", 1)), str(equipment.get("desc", "")), int(equipment.get("subType", -1)))
+		card_ui.setup_card_data(str(equipment.get("id", "")), _get_card_display_name(equipment), equipment.get("rank", 0), str(equipment.get("suit", "Spade")), int(equipment.get("category", 1)), str(equipment.get("desc", "")), int(equipment.get("subType", -1)))
 		card_ui.set_meta("tran_thu_equipped_preview", equipment_id)
 		if card_ui.has_method("set_equipped_badge"):
 			card_ui.set_equipped_badge(true)
-		var c_info = {"id": equipment_id, "name": _get_card_display_name(equipment), "rank": equipment.get("rank", 1), "suit": str(equipment.get("suit", "Spade")), "cat": int(equipment.get("category", 1)), "desc": str(equipment.get("desc", "")), "subType": int(equipment.get("subType", -1)), "is_equipped": true, "card_node": card_ui}
+		var c_info = {"id": equipment_id, "name": _get_card_display_name(equipment), "rank": equipment.get("rank", 0), "suit": str(equipment.get("suit", "Spade")), "cat": int(equipment.get("category", 1)), "desc": str(equipment.get("desc", "")), "subType": int(equipment.get("subType", -1)), "is_equipped": true, "card_node": card_ui}
 		card_ui.card_clicked.connect(func(_c): _on_player_hand_card_clicked(card_ui, c_info))
 	_relayout_hand_cards()
 
@@ -3145,7 +3145,7 @@ func _refresh_song_cung_equipped_previews() -> void:
 		card_ui.setup_card_data(
 			str(equipment.get("id", "")),
 			_get_card_display_name(equipment),
-			equipment.get("rank", 1),
+			equipment.get("rank", 0),
 			str(equipment.get("suit", "Spade")),
 			int(equipment.get("category", 1)),
 			str(equipment.get("desc", "")),
@@ -3157,7 +3157,7 @@ func _refresh_song_cung_equipped_previews() -> void:
 		var c_info = {
 			"id": equipment_id,
 			"name": _get_card_display_name(equipment),
-			"rank": equipment.get("rank", 1),
+			"rank": equipment.get("rank", 0),
 			"suit": str(equipment.get("suit", "Spade")),
 			"cat": int(equipment.get("category", 1)),
 			"desc": str(equipment.get("desc", "")),
@@ -3196,7 +3196,7 @@ func _refresh_trao_bao_equipped_previews() -> void:
 		card_ui.setup_card_data(
 			str(equipment.get("id", "")),
 			_get_card_display_name(equipment),
-			equipment.get("rank", 1),
+			equipment.get("rank", 0),
 			str(equipment.get("suit", "Spade")),
 			int(equipment.get("category", 1)),
 			str(equipment.get("desc", "")),
@@ -3208,7 +3208,7 @@ func _refresh_trao_bao_equipped_previews() -> void:
 		var c_info = {
 			"id": equipment_id,
 			"name": _get_card_display_name(equipment),
-			"rank": equipment.get("rank", 1),
+			"rank": equipment.get("rank", 0),
 			"suit": str(equipment.get("suit", "Spade")),
 			"cat": int(equipment.get("category", 1)),
 			"desc": str(equipment.get("desc", "")),
@@ -3299,7 +3299,7 @@ func _refresh_hung_suc_equipped_weapon_previews() -> void:
 		card_ui.setup_card_data(
 			str(equipment.get("id", "")),
 			_get_card_display_name(equipment),
-			equipment.get("rank", 1),
+			equipment.get("rank", 0),
 			str(equipment.get("suit", "Spade")),
 			int(equipment.get("category", 1)),
 			str(equipment.get("desc", "")),
@@ -3311,7 +3311,7 @@ func _refresh_hung_suc_equipped_weapon_previews() -> void:
 		var c_info = {
 			"id": str(equipment.get("id", "")),
 			"name": _get_card_display_name(equipment),
-			"rank": equipment.get("rank", 1),
+			"rank": equipment.get("rank", 0),
 			"suit": str(equipment.get("suit", "Spade")),
 			"cat": int(equipment.get("category", 1)),
 			"desc": str(equipment.get("desc", "")),
@@ -3599,7 +3599,7 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 	var c_name = c_info.get("name", "")
 	var c_desc = _get_card_description_for_display(card_node, c_info)
 	var suit = c_info.get("suit", "")
-	var rank = c_info.get("rank", 1)
+	var rank = c_info.get("rank", 0)
 
 	if c_name == "Xích Tâm Tỏa":
 		selected_chain_seats.clear()
@@ -3644,7 +3644,7 @@ func _handle_dodge_hand_card_selection(card_node: Control, _c_info: Dictionary) 
 		var atk = generals_data.get(dodge_attacker_seat, {}) if is_current_reaction_slash else {}
 		var slash_suit = atk.get("last_slash_suit", "") if is_current_reaction_slash else ""
 		var card_suit = info.get("suit", "")
-		var card_rank = int(info.get("rank", 1))
+		var card_rank = int(info.get("rank", 0))
 		var is_tho_binh_active = false
 		if is_current_reaction_slash and dodge_attacker_seat > 0:
 			if is_network_mode:
@@ -3656,10 +3656,10 @@ func _handle_dodge_hand_card_selection(card_node: Control, _c_info: Dictionary) 
 				if _calculate_distance(dodge_attacker_seat, my_seat) <= 2:
 					is_tho_binh_active = true
 
-		if is_current_reaction_slash and is_tho_binh_active and card_rank >= 2 and card_rank <= 7:
-			desc_text.text = "❌ Do kỹ năng [Thổ Binh] của Tông Đản (Cự ly ≤ 2), không thể dùng lá Đỡ từ 2 đến 7!"
-		elif is_current_reaction_slash and _has_equipped_weapon_name(atk, "Súng Thần Công Hồ Triều") and card_rank < 7:
-			desc_text.text = "❌ Súng Thần Công chỉ cho phép dùng lá Đỡ từ 7 trở lên!"
+		if is_current_reaction_slash and is_tho_binh_active and card_rank >= 1 and card_rank <= 5:
+			desc_text.text = "❌ Do kỹ năng [Thổ Binh] của Tông Đản (Cự ly ≤ 2), không thể dùng lá Đỡ từ 1 đến 5!"
+		elif is_current_reaction_slash and _has_equipped_weapon_name(atk, "Súng Thần Công Hồ Triều") and card_rank < 5:
+			desc_text.text = "❌ Súng Thần Công chỉ cho phép dùng lá Đỡ từ 5 trở lên!"
 		else:
 			var required_label = _get_reaction_required_label(current_reaction_required_type)
 			desc_text.text = "❌ Lá [%s] không thể dùng cho phản ứng này! Hãy chạm lá [%s] hợp lệ trên tay." % [c_name, required_label]
@@ -3681,7 +3681,7 @@ func _handle_rescue_hand_card_selection(card_node: Control, _c_info: Dictionary)
 			card_node.set_selected(true)
 		AudioManager.play_card_select()
 		var suit_sym = _get_suit_icon(info.get("suit", ""))
-		var rank_str = _format_rank(info.get("rank", 1))
+		var rank_str = _format_rank(info.get("rank", 0))
 		var is_tl_rescue = (c_name != "Bánh Chưng" and c_name != "Hủ Rượu" and _hero_has_skill(generals_data.get(my_seat, {}), "trac_lac") and _is_black_card(info))
 		if is_tl_rescue:
 			rescue_confirm_btn.text = "🍶 TỰ CỨU (TRÁC LẠC) [%s %s]" % [suit_sym, c_name.to_upper()]
@@ -4073,7 +4073,7 @@ func _get_card_info_from_ui(ui_node: Control) -> Dictionary:
 		return {}
 	var c_name = ui_node.get("card_name")
 	var suit = ""
-	var rank = 1
+	var rank = 0
 	var desc = ""
 	var cat = 0
 	var id = ""
@@ -5384,7 +5384,7 @@ func _on_card_play_btn_clicked() -> void:
 		var can_pha_tong: bool = _hero_has_skill(p_gen, "pha_tong") or int(p_gen.get("hero_id", 0)) == 35 or "Lê Hoàn" in str(p_gen.get("name", ""))
 		var slash_rank = int(c_info.get("rank", 0))
 		var pha_tong_options: Array = []
-		if can_pha_tong and slash_rank > 1:
+		if can_pha_tong and slash_rank > 0:
 			for child in hand_container.get_children():
 				if child == selected_card_ui:
 					continue
@@ -6267,7 +6267,7 @@ func _sync_player_hand_from_server(server_hand: Array) -> void:
 			var c_name = str(c.get("name", "Bài"))
 			if _is_dai_hong_thuy_name(c_name):
 				c_name = "Đại Hồng Thủy"
-			var c_rank = c.get("rank", 1)
+			var c_rank = c.get("rank", 0)
 			var c_suit = str(c.get("suit", "Spade"))
 			var c_cat = int(c.get("category", 0))
 			var c_desc = str(c.get("desc", ""))
@@ -6327,7 +6327,7 @@ func _sync_player_hand_from_server(server_hand: Array) -> void:
 				card_ui.set_selected(true)
 				var reaction_info := _get_card_info_from_ui(card_ui)
 				var suit_name := _get_suit_name(reaction_info.get("suit", ""))
-				var rank_str := _format_rank(reaction_info.get("rank", 1))
+				var rank_str := _format_rank(reaction_info.get("rank", 0))
 				var reaction_name := str(reaction_info.get("name", "Bài"))
 				var card_tag := "%s %s" % [rank_str, suit_name] if not suit_name.is_empty() else rank_str
 				dodge_confirm_btn.disabled = false
@@ -7621,7 +7621,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			var wait_name = wait_gen.get("name", "Ghế %d" % server_waiting_seat)
 			if is_tho_binh:
 				turn_indicator.text = "🛡️ ĐANG CHỜ %s ĐỠ [THỔ BINH 2->7] (%ds)..." % [wait_name, server_waiting_timer]
-				desc_text.text = "🛡️ %s bị Trảm bởi Tông Đản [Thổ Binh] (Cự ly ≤ 2: không thể dùng lá Đỡ từ 2 đến 7)..." % wait_name
+				desc_text.text = "🛡️ %s bị Trảm bởi Tông Đản [Thổ Binh] (Cự ly ≤ 2: không thể dùng lá Đỡ từ 1 đến 5)..." % wait_name
 			else:
 				turn_indicator.text = "🛡️ ĐANG CHỜ %s ĐỠ ĐÒN (%ds)..." % [wait_name, server_waiting_timer]
 				desc_text.text = "🛡️ Đang chờ %s phản hồi đòn Trảm..." % wait_name
@@ -9128,7 +9128,7 @@ func _show_remote_card_use(delta: Dictionary, action_label: String) -> void:
 		used_card = _get_showcase_card_info(fallback_name)
 	var card_name = str(used_card.get("name", delta.get("cardName", "Bài")))
 	var suit = _get_suit_icon(str(used_card.get("suit", "")))
-	var rank = _format_rank(used_card.get("rank", 1))
+	var rank = _format_rank(used_card.get("rank", 0))
 	var actor = generals_data[seat].get("name", "Ghế %d" % seat) if generals_data.has(seat) and seat > 0 else "Một người chơi"
 
 	var tien_thoai_conv = delta.get("tienThoaiConvert", null)
@@ -9581,7 +9581,7 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 		var judge_card = _draw_card_from_pile()
 		var is_red = (judge_card.get("suit", "") in ["Heart", "Diamond"])
 		var suit_sym = _get_suit_icon(judge_card.get("suit", ""))
-		var rank_str = _format_rank(judge_card.get("rank", 1))
+		var rank_str = _format_rank(judge_card.get("rank", 0))
 		if is_red:
 			_animate_showcase_card("Khiên Mây Bện", "%s lật [%s %s] (ĐỎ) -> Đỡ thành công!" % [tgt["name"], suit_sym, rank_str], judge_card)
 			_play_armor_effect(target_seat, "Khiên Mây Bện", true)
@@ -9607,14 +9607,14 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 	for idx in range(tgt["hand_cards"].size()):
 		var c = tgt["hand_cards"][idx]
 		if c.get("name", "") == "Đỡ":
-			# Súng Thần Công Hồ Triều chỉ cho phép lá Đỡ từ 7 trở lên.
+			# Súng Thần Công Hồ Triều chỉ cho phép lá Đỡ từ 5 trở lên.
 			var has_sung = _has_equipped_weapon_name(atk, "Súng Thần Công Hồ Triều")
-			if has_sung and int(c.get("rank", 1)) < 7:
+			if has_sung and int(c.get("rank", 0)) < 6:
 				continue
-			# Thổ Binh: Cự ly <= 2 không được dùng Đỡ từ 2..7
+			# Thổ Binh: Cự ly <= 2 không được dùng Đỡ từ 1..6
 			if (_hero_has_skill(atk, "tho_binh") or atk.get("hero_id", -1) == 44) and _calculate_distance(attacker_seat, target_seat) <= 2:
-				var c_rank = int(c.get("rank", 1))
-				if c_rank >= 2 and c_rank <= 7:
+				var c_rank = int(c.get("rank", 0))
+				if c_rank >= 1 and c_rank <= 5:
 					continue
 			dodge_idx = idx
 			break
@@ -9624,11 +9624,11 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 			var c = tgt["hand_cards"][idx]
 			if "Trảm" in c.get("name", ""):
 				var has_sung = _has_equipped_weapon_name(atk, "Súng Thần Công Hồ Triều")
-				if has_sung and int(c.get("rank", 1)) < 7:
+				if has_sung and int(c.get("rank", 0)) < 6:
 					continue
 				if (_hero_has_skill(atk, "tho_binh") or atk.get("hero_id", -1) == 44) and _calculate_distance(attacker_seat, target_seat) <= 2:
-					var c_rank = int(c.get("rank", 1))
-					if c_rank >= 2 and c_rank <= 7:
+					var c_rank = int(c.get("rank", 0))
+					if c_rank >= 1 and c_rank <= 5:
 						continue
 				dodge_idx = idx
 				break
@@ -9639,7 +9639,7 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 		tgt["hand_count"] = tgt["hand_cards"].size()
 		tgt["avatar_node"].update_hand_count(tgt["hand_count"])
 		var suit_sym = _get_suit_icon(used_dodge.get("suit", ""))
-		var rank_str = _format_rank(used_dodge.get("rank", 1))
+		var rank_str = _format_rank(used_dodge.get("rank", 0))
 		var is_tien_thoai_ai_dodge = (tgt.get("hero_id", -1) == 47 or _hero_has_skill(tgt, "tien_thoai")) and ("Trảm" in used_dodge.get("name", ""))
 		if is_tien_thoai_ai_dodge:
 			_animate_tien_thoai_morph(target_seat, "Trảm", "Đỡ", "%s kích hoạt [Tiến Thoái] dùng Trảm như Đỡ hóa giải đòn Trảm!" % tgt["name"], used_dodge)
@@ -9713,10 +9713,10 @@ func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_e
 			is_tho_binh = true
 
 	if is_tho_binh:
-		dodge_desc_lbl.text = "⚠️ [Trảm] của %s đang tác động lên %s.\n[Thổ Binh] Cự ly ≤ 2: KHÔNG THỂ DÙNG lá Đỡ từ 2 đến 7!\nHãy chọn lá Đỡ hợp lệ (từ 8 trở lên) trên tay hoặc bấm [CHỊU ĐÒN]:" % [atk["name"], defender_name]
-		_add_log("⚠️ [THỔ BINH] %s tung chiêu Trảm lên %s (Cự ly ≤ 2): Mục tiêu không thể dùng lá Đỡ từ 2 đến 7!" % [atk["name"], defender_name])
+		dodge_desc_lbl.text = "⚠️ [Trảm] của %s đang tác động lên %s.\n[Thổ Binh] Cự ly ≤ 2: KHÔNG THỂ DÙNG lá Đỡ từ 1 đến 5!\nHãy chọn lá Đỡ hợp lệ (từ 5 trở lên) trên tay hoặc bấm [CHỊU ĐÒN]:" % [atk["name"], defender_name]
+		_add_log("⚠️ [THỔ BINH] %s tung chiêu Trảm lên %s (Cự ly ≤ 2): Mục tiêu không thể dùng lá Đỡ từ 1 đến 5!" % [atk["name"], defender_name])
 	elif has_sung:
-		dodge_desc_lbl.text = "⚠️ [Trảm] của %s đang tác động lên %s.\nSúng Thần Công chỉ cho phép dùng lá Đỡ từ 7 trở lên.\nHãy chọn lá Đỡ hợp lệ trên tay hoặc bấm [CHỊU ĐÒN]:" % [atk["name"], defender_name]
+		dodge_desc_lbl.text = "⚠️ [Trảm] của %s đang tác động lên %s.\nSúng Thần Công chỉ cho phép dùng lá Đỡ từ 5 trở lên.\nHãy chọn lá Đỡ hợp lệ trên tay hoặc bấm [CHỊU ĐÒN]:" % [atk["name"], defender_name]
 	else:
 		dodge_desc_lbl.text = "[Trảm] của %s đang tác động lên %s.\nHãy CHỌN một lá bài trên tay để Đỡ hoặc bấm [CHỊU ĐÒN]:" % [atk["name"], defender_name]
 
@@ -9749,9 +9749,9 @@ func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_e
 			dodge_khien_may_btn.disabled = false
 			dodge_khien_may_btn.text = "🎲 LẬT KHIÊN MÂY (ĐỎ = ĐỠ)"
 			if is_tho_binh:
-				dodge_desc_lbl.text = "⚠️ [Trảm] của %s đang tác động lên %s.\n[Thổ Binh] Cự ly ≤ 2: KHÔNG THỂ DÙNG lá Đỡ từ 2 đến 7!\nBạn có thể [🎲 LẬT KHIÊN MÂY], chọn lá [ĐỠ] hợp lệ (từ 8 trở lên) trên tay hoặc [💥 CHỊU ĐÒN]:" % [atk["name"], defender_name]
+				dodge_desc_lbl.text = "⚠️ [Trảm] của %s đang tác động lên %s.\n[Thổ Binh] Cự ly ≤ 2: KHÔNG THỂ DÙNG lá Đỡ từ 1 đến 5!\nBạn có thể [🎲 LẬT KHIÊN MÂY], chọn lá [ĐỠ] hợp lệ (từ 5 trở lên) trên tay hoặc [💥 CHỊU ĐÒN]:" % [atk["name"], defender_name]
 			elif has_sung:
-				dodge_desc_lbl.text = "⚠️ [Trảm] của %s đang tác động lên %s.\nSúng Thần Công chỉ cho phép dùng lá Đỡ từ 7 trở lên.\nBạn có thể [🎲 LẬT KHIÊN MÂY], chọn lá [ĐỠ] hợp lệ trên tay hoặc [💥 CHỊU ĐÒN]:" % [atk["name"], defender_name]
+				dodge_desc_lbl.text = "⚠️ [Trảm] của %s đang tác động lên %s.\nSúng Thần Công chỉ cho phép dùng lá Đỡ từ 5 trở lên.\nBạn có thể [🎲 LẬT KHIÊN MÂY], chọn lá [ĐỠ] hợp lệ trên tay hoặc [💥 CHỊU ĐÒN]:" % [atk["name"], defender_name]
 			else:
 				dodge_desc_lbl.text = "[Trảm] của %s đang tác động lên %s.\nBạn có thể [🎲 LẬT KHIÊN MÂY], chọn lá [ĐỠ] trên tay hoặc [💥 CHỊU ĐÒN]:" % [atk["name"], defender_name]
 		else:
@@ -9773,7 +9773,7 @@ func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_e
 	if valid_cards.size() > 0:
 		_select_dodge_card(null)
 		if is_tho_binh:
-			desc_text.text = "🛡️ Bị Trảm bởi Tông Đản [Thổ Binh]! Cự ly ≤ 2: Không thể dùng lá Đỡ từ 2 đến 7. Hãy chọn lá Đỡ từ 8 trở lên."
+			desc_text.text = "🛡️ Bị Trảm bởi Tông Đản [Thổ Binh]! Cự ly ≤ 2: Không thể dùng lá Đỡ từ 1 đến 5. Hãy chọn lá Đỡ từ 5 trở lên."
 		else:
 			desc_text.text = "🛡️ Bị Trảm! Hãy chọn lá Đỡ bạn muốn dùng trên tay, rồi bấm nút để xác nhận."
 	else:
@@ -9783,7 +9783,7 @@ func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_e
 		elif has_khien_may and not atk_has_thuan_thien:
 			desc_text.text = "🛡️ Bị Trảm! Bạn có thể bấm [🎲 LẬT KHIÊN MÂY] để phán xét né đòn, hoặc bấm [💥 CHỊU ĐÒN]."
 		elif has_sung:
-			desc_text.text = "⚠️ Bị Trảm bởi Súng Thần Công (chỉ nhận Đỡ từ 7 trở lên) và không có lá Đỡ hợp lệ!"
+			desc_text.text = "⚠️ Bị Trảm bởi Súng Thần Công (chỉ nhận Đỡ từ 5 trở lên) và không có lá Đỡ hợp lệ!"
 		else:
 			desc_text.text = "⚠️ Bị Trảm nhưng không có sẵn lá Đỡ! Bạn hãy bấm [💥 CHỊU ĐÒN] hoặc dùng kỹ năng tướng đổi bài."
 
@@ -9795,24 +9795,24 @@ func _is_card_valid_for_dodge(card_ui: Control, attacker_seat: int, is_slash_att
 	var info = _get_card_info_from_ui(card_ui)
 	var c_name = info.get("name", "")
 	var suit = info.get("suit", "")
-	var rank = int(info.get("rank", 1))
+	var rank = int(info.get("rank", 0))
 
 	var my_gen = generals_data.get(my_seat, {})
 	var atk_gen = generals_data.get(attacker_seat, {}) if attacker_seat > 0 else {}
 
 	# Các điều kiện hạn chế né đòn này CHỈ áp dụng cho đòn TRẢM trực tiếp, không áp dụng cho cẩm nang Mưa Tên Liên Châu:
 	if is_slash_attack and attacker_seat > 0 and atk_gen is Dictionary and not atk_gen.is_empty():
-		# 1. Súng Thần Công Hồ Triều: Mục tiêu không được dùng Đỡ nhỏ hơn 7
+		# 1. Súng Thần Công Hồ Triều: Mục tiêu không được dùng Đỡ nhỏ hơn 5
 		if _has_equipped_weapon_name(atk_gen, "Súng Thần Công Hồ Triều"):
-			if rank < 7:
+			if rank < 5:
 				return false
 
-		# 2. Hero 72: Trần Duệ Tông ("Trực Chiến"): Đỡ phải >= 7
+		# 2. Hero 72: Trần Duệ Tông ("Trực Chiến"): Đỡ phải >= 6
 		if atk_gen.get("hero_id", -1) == 72:
-			if rank < 7:
+			if rank < 5:
 				return false
 
-		# 3. Hero 44: Tông Đản ("Thổ Binh"): Cự ly <= 2 không được dùng Đỡ từ 2..7
+		# 3. Hero 44: Tông Đản ("Thổ Binh"): Cự ly <= 2 không được dùng Đỡ từ 1..6
 		var is_tho_binh = false
 		if is_network_mode:
 			var last_state_dict = NetworkClient.last_state if NetworkClient else {}
@@ -9823,7 +9823,7 @@ func _is_card_valid_for_dodge(card_ui: Control, attacker_seat: int, is_slash_att
 			var dist = _calculate_distance(attacker_seat, my_seat)
 			if dist <= 2:
 				is_tho_binh = true
-		if is_tho_binh and rank >= 2 and rank <= 7:
+		if is_tho_binh and rank >= 1 and rank <= 5:
 			return false
 
 	# Cơ bản: Lá bài "Đỡ"
@@ -9964,7 +9964,7 @@ func _select_dodge_card(card_ui: Control) -> void:
 
 	var info = _get_card_info_from_ui(card_ui)
 	var suit_sym = _get_suit_icon(info.get("suit", ""))
-	var rank_str = _format_rank(info.get("rank", 1))
+	var rank_str = _format_rank(info.get("rank", 0))
 	var c_name = info.get("name", "Bài")
 
 	# The reaction button is enabled only after a valid card is actually selected.
@@ -9998,7 +9998,7 @@ func _on_dodge_khien_may_clicked() -> void:
 
 	var judge_card = _draw_card_from_pile()
 	var j_suit = judge_card.get("suit", "")
-	var j_rank = int(judge_card.get("rank", 1))
+	var j_rank = int(judge_card.get("rank", 0))
 	var suit_sym = _get_suit_icon(j_suit)
 	var rank_str = _format_rank(j_rank)
 	var is_red = (j_suit in ["Heart", "Diamond"])
@@ -10123,7 +10123,7 @@ func _on_dodge_confirmed() -> void:
 	var card_info = _get_card_info_from_ui(chosen_card)
 	var c_name = card_info.get("name", "Bài")
 	var suit_sym = _get_suit_icon(card_info.get("suit", ""))
-	var rank_str = _format_rank(card_info.get("rank", 1))
+	var rank_str = _format_rank(card_info.get("rank", 0))
 	if is_current_reaction_slash:
 		_play_dodge_response_ray(chosen_card, my_seat)
 
@@ -12394,7 +12394,7 @@ func _create_local_borrowed_weapon_card(weapon_name: String) -> Dictionary:
 	return {
 		"id": "borrowed_%s" % weapon_name.to_lower().replace(" ", "_"),
 		"name": weapon_name,
-		"rank": 1,
+		"rank": 0,
 		"suit": "Spade",
 		"cat": 1,
 		"subType": 6,
@@ -12558,17 +12558,17 @@ func _handle_dai_hong_thuy_judgement(seat_num: int) -> void:
 		_trigger_local_giai_ach(g, "Đại Hồng Thủy")
 		return
 	_add_log("🌊 [GIAI ĐOẠN PHÁN XÉT] %s đang mang [Đại Hồng Thủy]! Bắt đầu lật bài phán xét..." % g["name"])
-	_animate_showcase_card("Đại Hồng Thủy", "🌊 [Đại Hồng Thủy]: Phán xét bài Đen 2..9!")
+	_animate_showcase_card("Đại Hồng Thủy", "🌊 [Đại Hồng Thủy]: Phán xét bài Đen 1..6!")
 	await get_tree().create_timer(1.2).timeout
 
 	var judge_card = _draw_card_from_pile()
 	var j_suit = judge_card.get("suit", "")
-	var j_rank = int(judge_card.get("rank", 1))
+	var j_rank = int(judge_card.get("rank", 0))
 	var suit_name = _get_suit_name(j_suit)
 	var rank_str = _format_rank(j_rank)
 
-	# Điều kiện trúng Đại Hồng Thủy: Bài Đen từ 2 đến 9.
-	var is_hit = (_get_card_color(j_suit) == "BLACK" and j_rank >= 2 and j_rank <= 9)
+	# Điều kiện trúng Đại Hồng Thủy: Bài Đen từ 1 đến 6.
+	var is_hit = (_get_card_color(j_suit) == "BLACK" and j_rank >= 1 and j_rank <= 6)
 	if is_hit:
 		g["has_dai_hong_thuy"] = false
 		g["has_lightning"] = false
@@ -12576,7 +12576,7 @@ func _handle_dai_hong_thuy_judgement(seat_num: int) -> void:
 			g["avatar_node"].set_delayed_trick("dai_hong_thuy", false)
 		_animate_showcase_card("Đại Hồng Thủy ập đến!", "🌊🌊🌊 Lật [Bài %s %s]: ĐẠI HỒNG THỦY CUỐN TRÔI %s (-3 MÁU)!" % [rank_str, suit_name, g["name"]], judge_card)
 		_show_judgement_result(true, "Đại Hồng Thủy", judge_card)
-		_add_log("🌊🌊🌊 [Đại Hồng Thủy] ập đến! Lật [Bài %s %s] (bài Đen 2..9) → %s chịu 3 Sát Thương Thủy!" % [rank_str, suit_name, g["name"]])
+		_add_log("🌊🌊🌊 [Đại Hồng Thủy] ập đến! Lật [Bài %s %s] (bài Đen 1..6) → %s chịu 3 Sát Thương Thủy!" % [rank_str, suit_name, g["name"]])
 		AudioManager.play_voice("Đại Hồng Thủy")
 		AudioManager.play_skill()
 		_apply_damage_to_general(seat_num, 3, seat_num, "WATER")
@@ -12616,7 +12616,7 @@ func _handle_supply_shortage_judgement(seat_num: int) -> bool:
 
 	var judge_card = _draw_card_from_pile()
 	var j_suit = judge_card.get("suit", "")
-	var j_rank = int(judge_card.get("rank", 1))
+	var j_rank = int(judge_card.get("rank", 0))
 	var suit_name = _get_suit_name(j_suit)
 	var rank_str = _format_rank(j_rank)
 
@@ -12656,7 +12656,7 @@ func _handle_acedia_judgement(seat_num: int) -> bool:
 
 	var judge_card = _draw_card_from_pile()
 	var j_suit = judge_card.get("suit", "")
-	var j_rank = int(judge_card.get("rank", 1))
+	var j_rank = int(judge_card.get("rank", 0))
 	var suit_name = _get_suit_name(j_suit)
 	var rank_str = _format_rank(j_rank)
 
@@ -12740,7 +12740,7 @@ func _get_showcase_card_info(c_name: String, card_info: Dictionary = {}) -> Dict
 				info = candidate.duplicate()
 				break
 	if info.is_empty():
-		info = {"id": "showcase", "name": c_name, "rank": 1, "suit": "Spade", "category": 0, "desc": ""}
+		info = {"id": "showcase", "name": c_name, "rank": 0, "suit": "Spade", "category": 0, "desc": ""}
 	elif str(info.get("name", info.get("cardName", ""))).strip_edges().is_empty():
 		info["name"] = c_name
 	return info
@@ -12790,7 +12790,7 @@ func _animate_showcase_card(c_name: String, banner_text: String, card_info: Dict
 	card_ui.setup_card_data(
 		str(info.get("id", "showcase")),
 		str(info.get("name", c_name)),
-		info.get("rank", 1),
+		info.get("rank", 0),
 		str(info.get("suit", "Spade")),
 		int(info.get("category", info.get("cat", 0))),
 		str(info.get("desc", "")),
@@ -12824,7 +12824,7 @@ func _animate_tien_thoai_morph(caster_seat: int, from_name: String, to_name: Str
 	var info_to = _get_showcase_card_info(to_name, card_info)
 	if not card_info.is_empty():
 		info_from["suit"] = card_info.get("suit", info_from.get("suit", "Heart"))
-		info_from["rank"] = card_info.get("rank", info_from.get("rank", 1))
+		info_from["rank"] = card_info.get("rank", info_from.get("rank", 0))
 		info_to["suit"] = info_from["suit"]
 		info_to["rank"] = info_from["rank"]
 
@@ -12880,7 +12880,7 @@ func _animate_tien_thoai_morph(caster_seat: int, from_name: String, to_name: Str
 	card_from.setup_card_data(
 		str(info_from.get("id", "morph_from")),
 		from_name,
-		info_from.get("rank", 1),
+		info_from.get("rank", 0),
 		str(info_from.get("suit", "Heart")),
 		int(info_from.get("category", info_from.get("cat", 0))),
 		str(info_from.get("desc", "")),
@@ -12894,7 +12894,7 @@ func _animate_tien_thoai_morph(caster_seat: int, from_name: String, to_name: Str
 	card_to.setup_card_data(
 		str(info_to.get("id", "morph_to")),
 		to_name,
-		info_to.get("rank", 1),
+		info_to.get("rank", 0),
 		str(info_to.get("suit", "Heart")),
 		int(info_to.get("category", info_to.get("cat", 0))),
 		str(info_to.get("desc", "")),
@@ -13394,7 +13394,7 @@ func _show_judgement_result(is_success: bool, judgement_name: String = "", judge
 	root.z_index = 330
 	add_child(root)
 
-	var effect_rank = int(judge_card.get("rank", 1))
+	var effect_rank = int(judge_card.get("rank", 0))
 	_create_judgement_visual_effect(root, judgement_name, is_success, effect_rank)
 
 	# 1. Hộp trung tâm chứa Title, CardUI, và Stamp kết quả
@@ -13447,7 +13447,7 @@ func _show_judgement_result(is_success: bool, judgement_name: String = "", judge
 		c_suit = "Club"
 	elif raw_suit.capitalize() in ["Heart", "Diamond", "Spade", "Club"]:
 		c_suit = raw_suit.capitalize()
-	var c_rank = int(judge_card.get("rank", 1))
+	var c_rank = int(judge_card.get("rank", 0))
 	var c_desc = "Lá bài rút từ chồng bài để phán xét %s" % j_title
 	card_ui.setup_card_data(
 		str(judge_card.get("id", "judge_card")),
@@ -13478,7 +13478,7 @@ func _show_judgement_result(is_success: bool, judgement_name: String = "", judge
 			stamp_text = "✗ THẤT BẠI"
 			stamp_is_green = false
 	elif "Đại Hồng Thủy" in j_title:
-		if c_suit == "Spade" and c_rank >= 2 and c_rank <= 9:
+		if c_suit == "Spade" and c_rank >= 1 and c_rank <= 6:
 			stamp_text = "💥 TRÚNG BÃO LŨ (-3 MÁU)"
 			stamp_is_green = false
 		else:
@@ -13586,7 +13586,7 @@ func _get_equipment_description(item_name: String) -> String:
 		"Nỏ Thần Kim Quy": return "Tầm 1; không giới hạn số lá Trảm trong lượt."
 		"Trường Đao Nam Sơn": return "Tầm 3; khi Trảm bị Đỡ, xem như chưa sử dụng lượt Trảm trong lượt chơi này."
 		"Thương Ngâu Lãng Bạc": return "Tầm 4; Trảm trúng hủy 1 lá tay hoặc trang bị."
-		"Súng Thần Công Hồ Triều": return "Tầm 5; mục tiêu không được dùng Đỡ nhỏ hơn 7."
+		"Súng Thần Công Hồ Triều": return "Tầm 5; mục tiêu không được dùng Đỡ nhỏ hơn 5."
 		"Hỏa Mai Tây Sơn": return "Tầm 4; Trảm Thường có thể xem như Trảm Hỏa."
 		"Liêm Đao Đống Đa": return "Tầm 2; lần đầu mỗi lượt gây sát thương, rút 1 lá."
 		"Đoản Đao Lam Sơn": return "Tầm 2; Trảm trúng có thể hủy 2 lá trên tay hoặc trang bị của mục tiêu thay vì gây sát thương."
@@ -13681,7 +13681,7 @@ func _execute_aoe_attack(caster_seat: int, aoe_name: String, required_card_name:
 				var judge_card = _draw_card_from_pile()
 				var is_red = (_get_card_color(judge_card.get("suit", "")) in ["RED", "WHITE"])
 				var suit_name = _get_suit_name(judge_card.get("suit", ""))
-				var rank_str = _format_rank(judge_card.get("rank", 1))
+				var rank_str = _format_rank(judge_card.get("rank", 0))
 				if is_red:
 					_animate_showcase_card("Khiên Mây Bện", "%s lật [Bài %s %s] (Bài Đỏ/Bài Trắng) -> Đỡ Mưa Tên!" % [tgt["name"], rank_str, suit_name], judge_card)
 					_play_armor_effect(target_seat, "Khiên Mây Bện", true)
@@ -13918,7 +13918,7 @@ func _resolve_local_bai_coc_action(actor_seat: int, attacker_seat: int) -> bool:
 	var exhausted = true
 	actor["bai_coc_judgement_count"] = judgement_count
 	var suit_name = _get_suit_name(suit)
-	var rank_text = _format_rank(judge_card.get("rank", 1))
+	var rank_text = _format_rank(judge_card.get("rank", 0))
 	var judgement_tween = _show_judgement_result(safe, "Bãi Cọc Bạch Đằng", judge_card)
 	if judgement_tween:
 		await judgement_tween.finished
@@ -14043,7 +14043,7 @@ func _show_harvest_modal(pool: Array, local_mode: bool, picked_ids: Array[String
 		card_ui.setup_card_data(
 			str(card_data.get("id", "")),
 			str(card_data.get("name", "Bài")),
-			int(card_data.get("rank", 1)),
+			int(card_data.get("rank", 0)),
 			str(card_data.get("suit", "")),
 			int(card_data.get("category", card_data.get("cat", 0))),
 			str(card_data.get("desc", "")),
@@ -14702,7 +14702,7 @@ func _add_visible_card_pick_option(slot_title: String, item_name: String, option
 	card_ui.setup_card_data(
 		str(info.get("id", "target_card")),
 		str(info.get("name", item_name)),
-		info.get("rank", 1),
+		info.get("rank", 0),
 		str(info.get("suit", "Spade")),
 		int(info.get("category", info.get("cat", 1))),
 		str(info.get("desc", info.get("description", ""))),
@@ -15065,7 +15065,7 @@ func _find_card_dict_by_name(c_name: String) -> Dictionary:
 	for c in deck:
 		if c.get("name", "") == c_name:
 			return c
-	return {"id": "item", "name": c_name, "suit": "Club", "rank": 1, "cat": 1, "desc": c_name}
+	return {"id": "item", "name": c_name, "suit": "Club", "rank": 0, "cat": 1, "desc": c_name}
 
 # ==========================================================
 # 🥁 TRỐNG ĐỒNG ĐÔNG SƠN: ĐIỂM TRỐNG
@@ -15385,7 +15385,7 @@ func _show_drum_reveal_modal(target_seat: int, cards: Array, reveal_source: Stri
 		var c_name = str(c_info.get("name", c_info.get("cardName", "Bài")))
 		var c_id = str(c_info.get("id", ""))
 		var c_suit = str(c_info.get("suit", "Heart")).strip_edges().capitalize()
-		var c_rank = c_info.get("rank", 1)
+		var c_rank = c_info.get("rank", 0)
 		var c_cat = int(c_info.get("category", c_info.get("cat", 0)))
 		var c_sub = int(c_info.get("subType", -1))
 		var c_desc = str(c_info.get("desc", c_info.get("description", "")))
@@ -16343,7 +16343,7 @@ func _show_muu_dinh_modal(cards: Array, empty_status: String = "ĐANG CHỜ DỮ
 			continue
 		var muu_card_id = str(c.get("id", "c_%d" % i))
 		var c_name = str(c.get("name", "Bài"))
-		var c_rank = int(c.get("rank", 1))
+		var c_rank = int(c.get("rank", 0))
 		var c_suit = str(c.get("suit", "SPADE"))
 		var c_cat = int(c.get("category", 1))
 		var c_desc = str(c.get("desc", ""))

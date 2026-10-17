@@ -292,7 +292,7 @@ func _ready() -> void:
 		_on_close_health_spotlight()
 		player_avatar.set_equipment("armor", "Khiên Mây Bện", "K Trắng")
 		await get_tree().process_frame
-		_execute_khien_may_judgement(player_avatar, "Lý Thường Kiệt", "Thủ Lĩnh Sơn Tặc", {"name": "Khiên Mây Bện", "rank": "13", "suit": "Diamond"})
+		_execute_khien_may_judgement(player_avatar, "Lý Thường Kiệt", "Thủ Lĩnh Sơn Tặc", {"name": "Khiên Mây Bện", "rank": "9", "suit": "Diamond"})
 		await get_tree().create_timer(0.6).timeout
 		await get_tree().process_frame
 		var img = get_viewport().get_texture().get_image()
@@ -303,7 +303,7 @@ func _ready() -> void:
 		_on_close_health_spotlight()
 		player_avatar.set_equipment("armor", "Khiên Mây Bện", "K Trắng")
 		await get_tree().process_frame
-		_execute_khien_may_judgement(player_avatar, "Lý Thường Kiệt", "Thủ Lĩnh Sơn Tặc", {"name": "Trảm", "rank": "8", "suit": "Spade"})
+		_execute_khien_may_judgement(player_avatar, "Lý Thường Kiệt", "Thủ Lĩnh Sơn Tặc", {"name": "Trảm", "rank": "7", "suit": "Spade"})
 		await get_tree().create_timer(0.6).timeout
 		await get_tree().process_frame
 		var img = get_viewport().get_texture().get_image()
@@ -395,11 +395,11 @@ func _spawn_initial_cards() -> void:
 		c.queue_free()
 
 	var cards_data = [
-		{"name": "Trảm", "rank": "1", "suit": "Spade", "cat": 0, "sub": 0, "desc": "Tấn công gây 1 sát thương."},
+		{"name": "Trảm", "rank": "0", "suit": "Spade", "cat": 0, "sub": 0, "desc": "Tấn công gây 1 sát thương."},
 		{"name": "Trảm", "rank": "2", "suit": "Spade", "cat": 0, "sub": 0, "desc": "Tấn công gây 1 sát thương."},
 		{"name": "Đỡ", "rank": "3", "suit": "Diamond", "cat": 0, "sub": 3, "desc": "Hóa giải 1 đòn Trảm."},
 		{"name": "Bánh Chưng", "rank": "4", "suit": "Heart", "cat": 0, "sub": 4, "desc": "Hồi phục 1 Máu."},
-		{"name": "Khiên Mây Bện", "rank": "13", "suit": "Diamond", "cat": 1, "sub": 7, "desc": "Phán xét Đỏ tự động Đỡ."}
+		{"name": "Khiên Mây Bện", "rank": "9", "suit": "Diamond", "cat": 1, "sub": 7, "desc": "Phán xét Đỏ tự động Đỡ."}
 	]
 
 	for data in cards_data:
@@ -836,7 +836,7 @@ func _player_turn_start_free_play() -> void:
 
 	var new_cards = [
 		{"name": "Trảm", "rank": "7", "suit": "Spade", "cat": 0, "sub": 0, "desc": "Tấn công gây 1 sát thương."},
-		{"name": "Bánh Chưng", "rank": "8", "suit": "Heart", "cat": 0, "sub": 4, "desc": "Hồi phục 1 Máu."}
+		{"name": "Bánh Chưng", "rank": "7", "suit": "Heart", "cat": 0, "sub": 4, "desc": "Hồi phục 1 Máu."}
 	]
 	for data in new_cards:
 		_create_card_in_hand(data["name"], data["rank"], data["suit"], data["cat"], data["desc"], data.get("sub", -1))
@@ -1711,7 +1711,7 @@ func _execute_khien_may_judgement(defender_avatar: Control, defender_name: Strin
 	else:
 		# Lấy ngẫu nhiên lá bài từ kho bài
 		var possible_suits = ["Heart", "Diamond", "Spade", "Club"]
-		var possible_ranks = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"]
+		var possible_ranks = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 		var possible_names = ["Trảm", "Đỡ", "Bánh Chưng", "Khiên Mây Bện", "Kiếm Thuận Thiên", "Voi Chiến", "Ngựa Trắng"]
 		var s = possible_suits[randi() % possible_suits.size()]
 		var r = possible_ranks[randi() % possible_ranks.size()]

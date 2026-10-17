@@ -47,7 +47,7 @@ enum CardSubType {
 @export var id: String = ""
 @export var card_name: String = ""
 @export var suit: String = "Heart" # Heart, Diamond, Spade, Club
-@export var rank: int = 1 # 1 to 13
+@export var rank: int = 0 # 0 to 9
 @export var category: CardCategory = CardCategory.CO_BAN
 @export var sub_type: CardSubType = CardSubType.TRAM
 @export var description: String = ""
