@@ -64,6 +64,11 @@ let lobbyChatHistoryLoadPromise = null;
 let lobbyChatHistoryRetryAt = 0;
 const LOBBY_CHAT_HISTORY_RETRY_MS = 30000;
 let lobbyChatQueue = Promise.resolve();
+const LOBBY_CHAT_FLUSH_INTERVAL_MS = 30000;
+const LOBBY_CHAT_FLUSH_BATCH_SIZE = 20;
+let pendingLobbyChatMessages = [];
+let lobbyChatFlushTimer = null;
+let lobbyChatFlushPromise = null;
 let matchmakingSweepRunning = false;
 // A client can finish the Appwrite lobby flow with the id of a room that was
 // merged while it was polling. Keep the redirect in Render too, so its first
@@ -597,13 +602,59 @@ function cacheLobbyChatMessage(message) {
   lobbyChatHistoryCache = [...lobbyChatHistoryCache, { ...message }].slice(-LOBBY_CHAT_HISTORY_LIMIT);
 }
 
+function mergeLobbyChatHistory(history) {
+  const merged = new Map();
+  for (const message of [...history, ...lobbyChatHistoryCache]) {
+    if (message?.id) merged.set(String(message.id), { ...message });
+  }
+  lobbyChatHistoryCache = Array.from(merged.values()).slice(-LOBBY_CHAT_HISTORY_LIMIT);
+  return copyLobbyChatHistory();
+}
+
+function scheduleLobbyChatFlush(delay = LOBBY_CHAT_FLUSH_INTERVAL_MS) {
+  if (lobbyChatFlushTimer || !pendingLobbyChatMessages.length) return;
+  lobbyChatFlushTimer = setTimeout(() => {
+    lobbyChatFlushTimer = null;
+    void flushLobbyChatMessages();
+  }, delay);
+}
+
+async function flushLobbyChatMessages() {
+  if (lobbyChatFlushPromise) return lobbyChatFlushPromise;
+  if (!pendingLobbyChatMessages.length) return;
+  lobbyChatFlushPromise = (async () => {
+    while (pendingLobbyChatMessages.length) {
+      const batch = pendingLobbyChatMessages.splice(0);
+      try {
+        await lobbyChatStore.appendMany(batch);
+      } catch (error) {
+        pendingLobbyChatMessages = [...batch, ...pendingLobbyChatMessages];
+        console.error("[Lobby Chat] Batched history save failed:", error.message);
+        break;
+      }
+    }
+  })()
+    .finally(() => {
+      lobbyChatFlushPromise = null;
+      if (pendingLobbyChatMessages.length) scheduleLobbyChatFlush();
+    });
+  return lobbyChatFlushPromise;
+}
+
+function queueLobbyChatMessage(message) {
+  cacheLobbyChatMessage(message);
+  pendingLobbyChatMessages.push({ ...message });
+  if (pendingLobbyChatMessages.length >= LOBBY_CHAT_FLUSH_BATCH_SIZE) void flushLobbyChatMessages();
+  else scheduleLobbyChatFlush();
+}
+
 async function getLobbyChatHistory() {
   if (lobbyChatHistoryLoaded) return copyLobbyChatHistory();
   if (Date.now() < lobbyChatHistoryRetryAt) return copyLobbyChatHistory();
   if (!lobbyChatHistoryLoadPromise) {
     lobbyChatHistoryLoadPromise = lobbyChatStore.history()
       .then((history) => {
-        lobbyChatHistoryCache = history.slice(-LOBBY_CHAT_HISTORY_LIMIT).map((message) => ({ ...message }));
+        mergeLobbyChatHistory(history);
         lobbyChatHistoryLoaded = true;
         return copyLobbyChatHistory();
       })
@@ -669,6 +720,9 @@ async function handleChat(socket, payload, currentRoomId, currentSeat) {
 
   if (action === "CHAT_SUBSCRIBE") {
     if (channel === "lobby") {
+      // Give a reconnecting client a durable boundary without writing every
+      // individual message as it arrives. Failures stay queued for retry.
+      await flushLobbyChatMessages();
       history = await getLobbyChatHistory();
       if (socket.readyState !== WebSocket.OPEN) return;
       lobbyChatSockets.add(socket);
@@ -691,12 +745,9 @@ async function handleChat(socket, payload, currentRoomId, currentSeat) {
     roomId: room ? currentRoomId : "", ...sender, text, timestamp: now,
   };
   if (channel === "lobby") {
-    try { await lobbyChatStore.append(message); }
-    catch (error) {
-      console.error("[Lobby Chat] Message save failed:", error.message);
-      return sendChatError(socket, channel, "Chưa lưu được tin nhắn. Vui lòng gửi lại.");
-    }
-    cacheLobbyChatMessage(message);
+    // Realtime delivery is independent from durable storage. Appwrite writes
+    // are flushed in batches to reduce both write and prune traffic.
+    queueLobbyChatMessage(message);
   } else {
     history.push(message);
     if (history.length > CHAT_HISTORY_LIMIT) history.shift();
@@ -848,6 +899,10 @@ const RENDER_EXTERNAL_URL = (typeof Deno !== "undefined" && Deno.env?.get("RENDE
   || "https://daivietchien.onrender.com";
 
 setInterval(async () => {
+  const hasActiveConnection = [...lobbyChatSockets].some((socket) => socket.readyState === WebSocket.OPEN)
+    || [...socialProfiles.values()].some((profile) => profile.socket?.readyState === WebSocket.OPEN)
+    || [...rooms.values()].some((room) => [...(room.sockets?.values?.() || [])].some((socket) => socket?.readyState === WebSocket.OPEN));
+  if (!hasActiveConnection) return;
   try {
     await fetch(`${RENDER_EXTERNAL_URL}/`, {
       headers: { "User-Agent": "DaiVietChien-KeepAlive/1.0" },

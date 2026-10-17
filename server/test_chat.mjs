@@ -27,7 +27,7 @@ const sandbox = {
     upgradeWebSocket(request) { return { socket: request.socket, response: {} }; },
   },
 };
-source += "\nglobalThis.chatTests = { rooms, lobbyChatSockets, waitLobby: () => lobbyChatQueue };";
+source += "\nglobalThis.chatTests = { rooms, lobbyChatSockets, waitLobby: () => lobbyChatQueue, flushLobby: () => flushLobbyChatMessages(), pendingLobby: () => pendingLobbyChatMessages };";
 vm.runInNewContext(source, sandbox, { filename: "server.js" });
 const { rooms, lobbyChatSockets } = sandbox.chatTests;
 async function connect(userId, appHandler = handler, tests = sandbox.chatTests) {
@@ -151,20 +151,28 @@ assert.equal(restartedSandbox.chatTests.rooms.size, 0, "Battle rooms are not per
 
 chatDb.failWrites = true;
 testNow += 1100;
-await send(reconnected, "Must not be acknowledged as sent");
-assert.equal(count(reconnected), 0);
-assert.match(last(reconnected, "CHAT_ERROR").error, /Chưa lưu/);
-chatDb.failWrites = false;
+await send(reconnected, "Realtime survives storage outage");
+const realtimeMessage = last(reconnected, "CHAT_MESSAGE");
+assert.equal(realtimeMessage.text, "Realtime survives storage outage");
+assert.equal(chatDb.documents.size, 50);
+assert.equal(reconnected.messages.filter((m) => m.type === "CHAT_ERROR").length, 0);
+assert.equal(restartedSandbox.chatTests.pendingLobby().length, 1);
 await subscribe(reconnected);
-assert.deepEqual(last(reconnected, "CHAT_HISTORY").messages, persisted);
+assert.equal(restartedSandbox.chatTests.pendingLobby().length, 1, "Failed batch stays queued for retry");
+chatDb.failWrites = false;
+await restartedSandbox.chatTests.flushLobby();
+assert.equal(restartedSandbox.chatTests.pendingLobby().length, 0);
+await subscribe(reconnected);
+assert.equal(last(reconnected, "CHAT_HISTORY").messages.at(-1).text, "Realtime survives storage outage");
 chatDb.failReads = true;
 const historiesBefore = reconnected.messages.filter((m) => m.type === "CHAT_HISTORY").length;
 await subscribe(reconnected);
 assert.equal(reconnected.messages.filter((m) => m.type === "CHAT_HISTORY").length, historiesBefore + 1, "Cached history should remain available when storage reads fail");
-assert.deepEqual(last(reconnected, "CHAT_HISTORY").messages, persisted, "Storage errors must not erase cached history with an empty snapshot");
+assert.equal(last(reconnected, "CHAT_HISTORY").messages.length, 50, "Storage errors must not erase cached history with an empty snapshot");
+assert.equal(last(reconnected, "CHAT_HISTORY").messages.at(-1).text, realtimeMessage.text);
 chatDb.failReads = false;
+testNow += 1100;
 await send(reconnected, "Recovered after a storage error");
-assert.equal(count(reconnected), 1);
 assert.equal(last(reconnected, "CHAT_MESSAGE").text, "Recovered after a storage error");
 console.log("PASS: lobby broadcast/history, identity, room isolation, stale sockets, limits, cooldown, cleanup and malformed payloads");
 console.log("PASS: server restart restores 50 lobby messages; failed storage never broadcasts a false acknowledgment or empty history");

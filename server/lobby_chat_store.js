@@ -62,11 +62,14 @@ export function createLobbyChatStore({ request, documentsPath, limit = LOBBY_CHA
     }
   }
 
-  return {
-    history: () => serial(async () => (await list()).map(decode).filter(Boolean).reverse()),
-    append: (message) => serial(async () => {
+  async function saveMessages(messages, cleanup = true) {
+    const normalizedMessages = [];
+    for (const message of messages) {
       const normalized = decode({ userId: documentType, userName: JSON.stringify(message) });
       if (!normalized) throw new Error("Invalid lobby message");
+      normalizedMessages.push(normalized);
+    }
+    for (const normalized of normalizedMessages) {
       const id = await documentId(normalized.id);
       const data = { userId: documentType, userName: JSON.stringify(normalized), rankPoints: 0, timestamp: normalized.timestamp };
       const response = await call(documentsPath, { method: "POST", body: JSON.stringify({
@@ -80,10 +83,18 @@ export function createLobbyChatStore({ request, documentsPath, limit = LOBBY_CHA
       } else if (!response?.ok) {
         throw new Error(`Cannot save lobby message (${response?.status || "offline"})`);
       }
-      // A cleanup failure must not turn a successfully saved message into an
-      // apparent send failure. Reads always respect the history limit.
+    }
+    // Cleanup once per batch. This avoids one extra Appwrite read for every
+    // chat message while preserving the same durable history limit.
+    if (cleanup) {
       try { await prune(); } catch (error) { onCleanupError(error); }
-      return normalized;
-    }),
+    }
+    return normalizedMessages;
+  }
+
+  return {
+    history: () => serial(async () => (await list()).map(decode).filter(Boolean).reverse()),
+    append: (message) => serial(async () => (await saveMessages([message]))[0]),
+    appendMany: (messages) => serial(async () => saveMessages(messages)),
   };
 }
