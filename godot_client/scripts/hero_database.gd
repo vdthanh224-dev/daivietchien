@@ -1079,7 +1079,7 @@ func get_weekly_free_hero_ids() -> Array[int]:
 	rng.seed = week_seed
 
 	var is_admin = AuthManager and AuthManager.is_admin()
-	var max_candidate_id = 100 if is_admin else 40
+	var max_candidate_id = 100 if is_admin else 50
 
 	var candidates: Array[int] = []
 	for i in range(1, max_candidate_id + 1):
@@ -1136,8 +1136,8 @@ func get_available_pick_heroes() -> Array[Dictionary]:
 	var available: Array[Dictionary] = []
 	for h in all_heroes:
 		var hid = int(h["id"])
-		# Chỉ xuất hiện các tướng từ 1->40 nếu không phải người có label appwrite Admin
-		if hid < 1 or hid > 40:
+		# Pool thường gồm các tướng từ 1->50.
+		if hid < 1 or hid > 50:
 			continue
 		if hid in free_ids or is_hero_owned(hid):
 			var copy = h.duplicate()
@@ -1228,7 +1228,7 @@ func _init_all_heroes() -> void:
 	_add_hero(41, "Lý Nhật Tôn", "Thăng Long", 4, "Đại Việt", "Đầu lượt, bạn chọn 1 màu bài; trong lượt đó, mỗi khi bạn đánh ra 1 lá bài có màu đã chọn, bạn lập tức được rút 1 lá bài.", "res://assets/ui/ly_nhat_ton.png", "ly_nhat_ton")
 	_add_hero(42, "Lý Đạo Thành", "Thăng Long", 3, "Can Gián", "Khi bất kỳ người chơi nào bị đặt Cẩm Nang Trì Hoãn, bạn có thể bỏ 1 lá bài màu Đỏ trên tay để hủy bỏ hoàn toàn lá Cẩm Nang đó.", "res://assets/ui/ly_dao_thanh.png", "ly_dao_thanh")
 	_add_hero(43, "Ỷ Lan", "Thăng Long", 3, "Nhiếp Chính", "Giai đoạn Rút bài, số lá rút của bạn +1. Trong lượt, bạn có thể tặng 1 lá bài trên tay cho người khác.", "res://assets/ui/y_lan.png", "y_lan")
-	_add_hero(44, "Tông Đản", "Thăng Long", 4, "Thổ Binh", "Khi tấn công mục tiêu ở Khoảng cách <=2, đòn Trảm của bạn không thể bị vô hiệu hóa bởi các lá Đỡ có giá trị từ 2->7.", "res://assets/ui/tong_dan.png", "tong_dan")
+	_add_hero(44, "Tông Đản", "Thăng Long", 4, "Thổ Binh", "Khi tấn công mục tiêu ở Khoảng cách <=2, đòn Trảm của bạn không thể bị vô hiệu hóa bởi các lá Đỡ có giá trị từ 1->5.", "res://assets/ui/tong_dan.png", "tong_dan")
 	_add_hero(45, "Thân Cảnh Phúc", "Thăng Long", 4, "Động Phục", "Mỗi khi bạn chịu sát thương từ các lá Cẩm Nang, bạn lập tức được rút 2 lá bài.", "res://assets/ui/than_canh_phuc.png", "than_canh_phuc")
 	_add_hero(46, "Tô Hiến Thành", "Thăng Long", 3, "Thiết Diện", "Bạn miễn nhiễm hoàn toàn với Vườn Không Nhà Trống và Đột Kích Trộm Lương.", "res://assets/ui/to_hien_thanh.png", "to_hien_thanh")
 	_add_hero(47, "Lý Thường Kiệt", "Thăng Long", 4, "Tiến Thoái", "Bạn có thể sử dụng lá Trảm như lá Đỡ, và sử dụng lá Đỡ như lá Trảm.", "res://assets/ui/ly_thuong_kiet.png", "ly_thuong_kiet")
@@ -1506,7 +1506,7 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 		]
 	elif id == 44:
 		skills = [
-			{"id": "tho_binh", "name": "Thổ Binh", "desc": "Khi tấn công mục tiêu ở Khoảng cách <=2, đòn Trảm của bạn không thể bị vô hiệu hóa bởi các lá Đỡ có giá trị từ 2->7."},
+			{"id": "tho_binh", "name": "Thổ Binh", "desc": "Khi tấn công mục tiêu ở Khoảng cách <=2, đòn Trảm của bạn không thể bị vô hiệu hóa bởi các lá Đỡ có giá trị từ 1->5."},
 			{"id": "son_chien", "name": "Sơn Chiến", "desc": "Bạn có thể dùng lá Chiến Mã trên tay như một lá Trảm Hỏa."}
 		]
 	elif id == 45:

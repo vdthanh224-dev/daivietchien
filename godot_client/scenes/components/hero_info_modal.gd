@@ -25,6 +25,7 @@ signal closed()
 
 # Right Column (Skills & Equipment)
 @onready var skills_container: VBoxContainer = $Dim/Box/Margin/VBox/ContentHBox/RightCol/SkillsSection/Scroll/SkillsList
+@onready var skills_scroll: ScrollContainer = $Dim/Box/Margin/VBox/ContentHBox/RightCol/SkillsSection/Scroll
 @onready var eq_weapon_label: RichTextLabel = $Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotWeapon/Margin/RichText
 @onready var eq_armor_label: RichTextLabel = $Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotArmor/Margin/RichText
 @onready var eq_off_horse_label: RichTextLabel = $Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotOffHorse/Margin/RichText
@@ -37,9 +38,17 @@ const BG_DRAGON_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_green.pn
 const BG_PHOENIX_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_red.png")
 
 var is_animating := false
+var skill_touch_active := false
+var skill_touch_dragging := false
+var skill_touch_last_y := 0.0
+var skill_touch_start_y := 0.0
 
 func _ready() -> void:
 	visible = false
+	if is_instance_valid(skills_scroll):
+		skills_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		skills_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		skills_scroll.mouse_filter = Control.MOUSE_FILTER_PASS
 	if is_instance_valid(close_x_btn):
 		close_x_btn.pressed.connect(close_modal)
 	if is_instance_valid(close_modal_btn):
@@ -51,6 +60,29 @@ func _unhandled_input(event: InputEvent) -> void:
 	if visible and event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		get_viewport().set_input_as_handled()
 		close_modal()
+
+func _input(event: InputEvent) -> void:
+	# Handle finger drags at the modal level because skill cards contain labels
+	# that can otherwise consume the touch before ScrollContainer sees it.
+	if not visible or not is_instance_valid(skills_scroll):
+		return
+	if event is InputEventScreenTouch:
+		if event.pressed and skills_scroll.get_global_rect().has_point(event.position):
+			skill_touch_active = true
+			skill_touch_dragging = false
+			skill_touch_start_y = event.position.y
+			skill_touch_last_y = event.position.y
+		elif not event.pressed and skill_touch_active:
+			skill_touch_active = false
+			skill_touch_dragging = false
+	elif event is InputEventScreenDrag and skill_touch_active:
+		var delta_y: float = event.position.y - skill_touch_last_y
+		skill_touch_last_y = event.position.y
+		if absf(event.position.y - skill_touch_start_y) > 8.0:
+			skill_touch_dragging = true
+		if skill_touch_dragging and absf(delta_y) >= 0.5:
+			skills_scroll.scroll_vertical = maxi(0, int(skills_scroll.scroll_vertical - delta_y))
+			get_viewport().set_input_as_handled()
 
 func _on_dark_mask_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -320,14 +352,14 @@ func _create_skill_card_ui(s_name: String, s_desc: String, s_type: String) -> Co
 	style.corner_radius_top_right = 8
 	style.corner_radius_bottom_right = 8
 	style.corner_radius_bottom_left = 8
-	style.content_margin_left = 12
-	style.content_margin_top = 8
-	style.content_margin_right = 12
-	style.content_margin_bottom = 8
+	style.content_margin_left = 8
+	style.content_margin_top = 6
+	style.content_margin_right = 8
+	style.content_margin_bottom = 6
 	panel.add_theme_stylebox_override("panel", style)
 
 	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 5)
+	vbox.add_theme_constant_override("separation", 4)
 	panel.add_child(vbox)
 
 	# Header: Type Tag + Skill Name
@@ -367,14 +399,14 @@ func _create_skill_card_ui(s_name: String, s_desc: String, s_type: String) -> Co
 
 	var tag_lbl = Label.new()
 	tag_lbl.text = s_type
-	tag_lbl.add_theme_font_size_override("font_size", 10)
+	tag_lbl.add_theme_font_size_override("font_size", 9)
 	tag_lbl.add_theme_color_override("font_color", tag_text_color)
 	tag_panel.add_child(tag_lbl)
 	header.add_child(tag_panel)
 
 	var name_lbl = Label.new()
 	name_lbl.text = s_name
-	name_lbl.add_theme_font_size_override("font_size", 14)
+	name_lbl.add_theme_font_size_override("font_size", 13)
 	name_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.45, 1.0))
 	header.add_child(name_lbl)
 
@@ -385,7 +417,7 @@ func _create_skill_card_ui(s_name: String, s_desc: String, s_type: String) -> Co
 	desc_lbl.fit_content = true
 	desc_lbl.scroll_active = false
 	desc_lbl.mouse_filter = MOUSE_FILTER_IGNORE
-	desc_lbl.add_theme_font_size_override("normal_font_size", 12)
+	desc_lbl.add_theme_font_size_override("normal_font_size", 11)
 	desc_lbl.add_theme_color_override("default_color", Color(0.88, 0.91, 0.95, 1.0))
 	vbox.add_child(desc_lbl)
 
@@ -468,7 +500,7 @@ func _get_equipment_description(item_name: String) -> String:
 		"Nỏ Thần Kim Quy": return "Tầm 1 • Không giới hạn số lá Trảm trong lượt."
 		"Trường Đao Nam Sơn": return "Tầm 3 • Khi Trảm bị Đỡ, không mất lượt dùng Trảm."
 		"Thương Ngâu Lãng Bạc": return "Tầm 4 • Trảm trúng hủy 1 lá trên tay hoặc trang bị."
-		"Súng Thần Công Hồ Triều": return "Tầm 5 • Mục tiêu không được dùng Đỡ nhỏ hơn 7."
+		"Súng Thần Công Hồ Triều": return "Tầm 5 • Mục tiêu không được dùng Đỡ nhỏ hơn 5."
 		"Hỏa Mai Tây Sơn": return "Tầm 4 • Trảm Thường có thể xem như Trảm Hỏa."
 		"Liêm Đao Đống Đa": return "Tầm 2 • Lần đầu mỗi lượt gây sát thương, rút 1 lá."
 		"Đoản Đao Lam Sơn": return "Tầm 2 • Trảm trúng có thể hủy 2 lá bài thay vì gây sát thương."

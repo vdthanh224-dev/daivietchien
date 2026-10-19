@@ -295,12 +295,12 @@ theme_override_constants/separation = 6
 [node name="RightCol" type="VBoxContainer" parent="Dim/Box/Margin/VBox/ContentHBox"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 12
+theme_override_constants/separation = 8
 
 [node name="SkillsSection" type="VBoxContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol"]
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/separation = 6
+theme_override_constants/separation = 4
 
 [node name="Title" type="Label" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/SkillsSection"]
 layout_mode = 2
@@ -309,28 +309,30 @@ theme_override_font_sizes/font_size = 13
 text = "⚡ TUYỆT KỸ CHIẾN TRẬN"
 
 [node name="Scroll" type="ScrollContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/SkillsSection"]
-custom_minimum_size = Vector2(0, 140)
+custom_minimum_size = Vector2(0, 124)
 layout_mode = 2
 size_flags_vertical = 3
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 1
 
 [node name="SkillsList" type="VBoxContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/SkillsSection/Scroll"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 8
+theme_override_constants/separation = 5
 
 [node name="EquipSection" type="VBoxContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol"]
 layout_mode = 2
-theme_override_constants/separation = 6
+theme_override_constants/separation = 4
 
 [node name="Title" type="Label" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.92, 0.78, 0.32, 1)
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 12
 text = "⚔️ VÕ BỊ & THẦN KHÍ (TRANG BỊ ĐANG MANG)"
 
 [node name="EquipGrid" type="VBoxContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection"]
 layout_mode = 2
-theme_override_constants/separation = 4
+theme_override_constants/separation = 3
 
 [node name="SlotWeapon" type="PanelContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid"]
 layout_mode = 2
@@ -338,10 +340,10 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_equip_slot")
 
 [node name="Margin" type="MarginContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotWeapon"]
 layout_mode = 2
-theme_override_constants/margin_left = 8
-theme_override_constants/margin_top = 4
-theme_override_constants/margin_right = 8
-theme_override_constants/margin_bottom = 4
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 3
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 3
 
 [node name="RichText" type="RichTextLabel" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotWeapon/Margin"]
 layout_mode = 2
@@ -350,7 +352,7 @@ text = "🗡️ Vũ Khí: (Trống)"
 fit_content = true
 scroll_active = false
 mouse_filter = 2
-theme_override_font_sizes/normal_font_size = 11
+theme_override_font_sizes/normal_font_size = 10
 
 [node name="SlotArmor" type="PanelContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid"]
 layout_mode = 2
@@ -358,10 +360,10 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_equip_slot")
 
 [node name="Margin" type="MarginContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotArmor"]
 layout_mode = 2
-theme_override_constants/margin_left = 8
-theme_override_constants/margin_top = 4
-theme_override_constants/margin_right = 8
-theme_override_constants/margin_bottom = 4
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 3
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 3
 
 [node name="RichText" type="RichTextLabel" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotArmor/Margin"]
 layout_mode = 2
@@ -370,7 +372,7 @@ text = "🛡️ Phòng Cụ: (Trống)"
 fit_content = true
 scroll_active = false
 mouse_filter = 2
-theme_override_font_sizes/normal_font_size = 11
+theme_override_font_sizes/normal_font_size = 10
 
 [node name="SlotOffHorse" type="PanelContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid"]
 layout_mode = 2
@@ -378,10 +380,10 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_equip_slot")
 
 [node name="Margin" type="MarginContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotOffHorse"]
 layout_mode = 2
-theme_override_constants/margin_left = 8
-theme_override_constants/margin_top = 4
-theme_override_constants/margin_right = 8
-theme_override_constants/margin_bottom = 4
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 3
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 3
 
 [node name="RichText" type="RichTextLabel" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotOffHorse/Margin"]
 layout_mode = 2
@@ -390,7 +392,7 @@ text = "🐎 Ngựa Công: (Trống)"
 fit_content = true
 scroll_active = false
 mouse_filter = 2
-theme_override_font_sizes/normal_font_size = 11
+theme_override_font_sizes/normal_font_size = 10
 
 [node name="SlotDefHorse" type="PanelContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid"]
 layout_mode = 2
@@ -398,10 +400,10 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_equip_slot")
 
 [node name="Margin" type="MarginContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotDefHorse"]
 layout_mode = 2
-theme_override_constants/margin_left = 8
-theme_override_constants/margin_top = 4
-theme_override_constants/margin_right = 8
-theme_override_constants/margin_bottom = 4
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 3
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 3
 
 [node name="RichText" type="RichTextLabel" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotDefHorse/Margin"]
 layout_mode = 2
@@ -410,7 +412,7 @@ text = "🐘 Ngựa Thủ: (Trống)"
 fit_content = true
 scroll_active = false
 mouse_filter = 2
-theme_override_font_sizes/normal_font_size = 11
+theme_override_font_sizes/normal_font_size = 10
 
 [node name="SlotTreasure" type="PanelContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid"]
 layout_mode = 2
@@ -418,10 +420,10 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_equip_slot")
 
 [node name="Margin" type="MarginContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotTreasure"]
 layout_mode = 2
-theme_override_constants/margin_left = 8
-theme_override_constants/margin_top = 4
-theme_override_constants/margin_right = 8
-theme_override_constants/margin_bottom = 4
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 3
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 3
 
 [node name="RichText" type="RichTextLabel" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotTreasure/Margin"]
 layout_mode = 2
@@ -430,7 +432,7 @@ text = "👑 Thần Khí: (Trống)"
 fit_content = true
 scroll_active = false
 mouse_filter = 2
-theme_override_font_sizes/normal_font_size = 11
+theme_override_font_sizes/normal_font_size = 10
 
 [node name="FooterHBox" type="HBoxContainer" parent="Dim/Box/Margin/VBox"]
 custom_minimum_size = Vector2(0, 36)

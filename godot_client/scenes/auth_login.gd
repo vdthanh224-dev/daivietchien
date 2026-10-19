@@ -481,24 +481,14 @@ func _set_modal_status(msg: String, col: Color) -> void:
 func _update_ping_display(ping_ms: int) -> void:
 	if not ping_label:
 		return
-	if ping_ms < 0:
-		if NetworkClient and NetworkClient.is_connected_to_server:
-			ping_label.text = "📶 Đang đo..."
-			ping_label.add_theme_color_override("font_color", Color("#94A3B8"))
-		elif NetworkClient and NetworkClient.is_connecting():
-			ping_label.text = "📶 Đang kết nối..."
-			ping_label.add_theme_color_override("font_color", Color("#FBBF24"))
-		else:
-			ping_label.text = "📶 Mất mạng"
-			ping_label.add_theme_color_override("font_color", Color("#EF4444"))
-	elif ping_ms < 60:
-		ping_label.text = "📶 %dms" % ping_ms
+	if ping_ms >= 0 or (NetworkClient and NetworkClient.is_connected_to_server):
+		ping_label.text = "🟢 Trực tuyến"
 		ping_label.add_theme_color_override("font_color", Color("#4ADE80"))
-	elif ping_ms < 150:
-		ping_label.text = "📶 %dms" % ping_ms
+	elif NetworkClient and NetworkClient.is_connecting():
+		ping_label.text = "🟡 Đang kết nối..."
 		ping_label.add_theme_color_override("font_color", Color("#FBBF24"))
 	else:
-		ping_label.text = "📶 %dms" % ping_ms
+		ping_label.text = "🔴 Mất mạng"
 		ping_label.add_theme_color_override("font_color", Color("#EF4444"))
 
 # --- FONT SCALING HELPERS (135% MOBILE DEFAULT) ---

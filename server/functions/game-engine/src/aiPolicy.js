@@ -54,9 +54,23 @@ export function buildAiTurnPlans(state, ai, rules) {
   const spare = cheap.filter((c) => c !== reserveDodge && keep(c) < 55);
   const allies = friends.filter((p) => p.seat !== ai.seat)
     .sort((a, b) => (a.hand.length + a.hp * 2) - (b.hand.length + b.hp * 2));
+  const dynastyRolePriority = (target) => {
+    if (!String(state.modeId || '').startsWith('dynasty_')) return 0;
+    if (ai.role === 'REBEL') return target.role === 'KING' ? 6000 : 0;
+    if (ai.role === 'KING' || ai.role === 'LOYALIST') {
+      return target.role === 'REBEL' ? 6000 : target.role === 'SPY' ? 5000 : 0;
+    }
+    if (ai.role === 'SPY') {
+      const nonKingEnemies = state.players.filter((player) =>
+        player && player.isAlive !== false && player.hp > 0 && player.seat !== ai.seat && player.role !== 'KING'
+      ).length;
+      return target.role === 'KING' ? (nonKingEnemies > 0 ? -6000 : 6000) : 0;
+    }
+    return 0;
+  };
   const attackScore = (target, damage = 1) => 58 + targetScore(target) / 15
+    + dynastyRolePriority(target)
     + (target.hp <= damage ? 800 : 0)
-    + (String(state.modeId).startsWith('dynasty_') && ai.role === 'REBEL' && target.role === 'KING' ? 1000 : 0)
     - Math.min(target.hand?.length || 0, 5) * 3;
   const add = (kind, score, cardId, targetSeat = 0, extra = {}) => {
     if (Number.isFinite(score) && score > 0) plans.push({ kind, score, cardId, targetSeat, extra });
@@ -158,7 +172,7 @@ export function buildAiTurnPlans(state, ai, rules) {
     }
   }
 
-  const foe = enemies[0];
+  const foe = [...enemies].sort((left, right) => targetScore(right, 'disrupt') - targetScore(left, 'disrupt') || left.seat - right.seat)[0];
   for (const enemy of enemies) {
     const attack = attackScore(enemy);
     if (heroHasSkill(ai, 'TRIEU_DANG') && !used['Triều Dâng'] && !used.trieu_dang && enemy.equipments?.length) {

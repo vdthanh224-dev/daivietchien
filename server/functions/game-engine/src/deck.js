@@ -46,7 +46,15 @@ export const CARD_SUBTYPES = {
 
 export function createCard(id, name, suit, rank, category, subType, desc, range = 1, distMod = 0) {
   if (category === CARD_CATEGORIES.BASIC && subType === CARD_SUBTYPES.ATTACK_NORMAL) name = "Trảm";
-  return { id, name, suit, rank, category, subType, desc, range, distMod };
+  const numericRank = Number(rank);
+  const normalizedRank = Number.isFinite(numericRank) && numericRank >= 10 ? mapLegacyRank(numericRank) : Math.max(0, Math.min(9, numericRank || 0));
+  return { id, name, suit, rank: normalizedRank, category, subType, desc, range, distMod };
+}
+
+function mapLegacyRank(rank) {
+  const numeric = Number(rank);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, Math.min(9, Math.round((numeric - 1) * 9 / 12)));
 }
 
 function mapLegacyRank(rank) {
@@ -169,7 +177,7 @@ export function createDeck80() {
   list.push(createCard("D80_AG_CK_GiapDong", "Giáp Đồng Sơn Vi", "Club", 9, 1, 7, "Vô hiệu hóa toàn bộ đòn Trảm Thường"));
   list.push(createCard("D80_AG_DK_KhienMay", "Khiên Mây Bện", "Diamond", 9, 1, 7, "Khi cần Đỡ: lật phán xét Đỏ hoặc Trắng tự động Đỡ, Vàng hoặc Đen thất bại"));
   list.push(createCard("D80_AG_HA_AoBao", "Áo Bào Hoàng Tộc", "Heart", 0, 1, 7, "Chặn tối đa 2 sát thương, rồi bị hủy"));
-  list.push(createCard("D80_AG_C6_GiapTaySon", "Giáp Tây Sơn", "Club", 4, 1, 7, "Vô hiệu hóa mọi Trảm bài Đen hoặc bài Vàng (Bích hoặc Chuồn)"));
+  list.push(createCard("D80_AG_C6_GiapTaySon", "Giáp Tây Sơn", "Club", 4, 1, 7, "Vô hiệu hóa mọi Trảm bài Đen hoặc bài Vàng"));
 
   // ==========================================
   // 10. CHIẾN MÃ — 4 LÁ
@@ -194,9 +202,9 @@ export function createDeck80() {
   list.push(createCard("D80_CN_D4_MoKho", "Mở Kho Cứu Tế", "Diamond", 2, 2, 16, "Mở kho phát bài cho tất cả người chơi còn sống"));
   list.push(createCard("D80_CN_GiacToi", "Giặc Tới", "Spade", 5, 2, 17, "Ép tất cả người chơi khác phải đánh 1 Trảm hoặc chịu 1 sát thương"));
   list.push(createCard("D80_CN_MuaTen", "Mưa Tên Liên Châu", "Heart", 0, 2, 18, "Ép tất cả người chơi khác phải đánh 1 Đỡ hoặc chịu 1 sát thương"));
-  list.push(createCard("D80_CN_H2_ThuyTrieuRut", "Thủy Triều Rút", "Heart", 1, 2, 23, "Chọn 1 người có bài: họ đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"));
-  list.push(createCard("D80_CN_H3_ThuyTrieuRut", "Thủy Triều Rút", "Heart", 2, 2, 23, "Chọn 1 người có bài: họ đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"));
-  list.push(createCard("D80_CN_DQ_ThuyTrieuRut", "Thủy Triều Rút", "Diamond", 8, 2, 23, "Chọn 1 người có bài: họ đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"));
+  list.push(createCard("D80_CN_H2_ThuyTrieuRut", "Thủy Triều Rút", "Heart", 1, 2, 23, "Chọn 1 người có bài: người đó đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"));
+  list.push(createCard("D80_CN_H3_ThuyTrieuRut", "Thủy Triều Rút", "Heart", 2, 2, 23, "Chọn 1 người có bài: người đó đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"));
+  list.push(createCard("D80_CN_DQ_ThuyTrieuRut", "Thủy Triều Rút", "Diamond", 8, 2, 23, "Chọn 1 người có bài: người đó đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"));
   list.push(createCard("D80_CN_CQ_MuonGuom", "Mượn Gươm Diệt Địch", "Club", 8, 2, 24, "Buộc người có Vũ khí đánh Trảm vào 1 mục tiêu; không đánh thì đưa Vũ khí cho người dùng Mượn Gươm"));
   list.push(createCard("D80_CN_CK_MuonGuom", "Mượn Gươm Diệt Địch", "Club", 9, 2, 24, "Buộc người có Vũ khí đánh Trảm vào 1 mục tiêu; không đánh thì đưa Vũ khí cho người dùng Mượn Gươm"));
   list.push(createCard("D80_CN_HA_MoYenTiec", "Mở Yến Tiệc", "Heart", 0, 2, 25, "Lần lượt từng người chơi bị mất Máu được hồi 1 Máu"));

@@ -13,6 +13,11 @@ signal role_guess_changed(guess: String)
 
 const BG_DRAGON_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_green.png")
 const BG_PHOENIX_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_red.png")
+const BG_ROLE_KING_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_red.png")
+const BG_ROLE_LOYALIST_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_yellow.png")
+const BG_ROLE_REBEL_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_green.png")
+const BG_ROLE_SPY_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_blue.png")
+const BG_GUESS_UNKNOWN_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_white.png")
 const BG_GUESS_TRUNG_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_yellow.png")
 const BG_GUESS_PHAN_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_green.png")
 const BG_GUESS_NOI_TEX = preload("res://assets/ui/hero_backgrounds/bg_hero_blue.png")
@@ -97,10 +102,13 @@ var frame_shake_tween: Tween = null
 var ai_takeover_badge: PanelContainer = null
 var is_ai_takeover: bool = false
 var role_guess_button: Button = null
-var role_guess_background: TextureRect = null
+var role_guess_menu: PanelContainer = null
+var role_guess_menu_open: bool = false
 var role_guess_enabled: bool = false
 var role_guess: String = "?"
 var role_revealed: bool = false
+var base_background_texture: Texture2D = null
+var revealed_role_display: String = ""
 
 const DRAGON_TEAM_COLOR := Color(0.22, 0.82, 0.42, 1.0)
 const PHOENIX_TEAM_COLOR := Color(0.93, 0.24, 0.22, 1.0)
@@ -152,40 +160,92 @@ func _ready() -> void:
 func _build_role_guess_button() -> void:
 	if is_instance_valid(role_guess_button):
 		return
-	role_guess_background = TextureRect.new()
-	role_guess_background.name = "RoleGuessBackground"
-	role_guess_background.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	role_guess_background.position = Vector2(2, 2)
-	role_guess_background.size = Vector2(45, 45)
-	role_guess_background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	role_guess_background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	role_guess_background.clip_contents = true
-	role_guess_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	role_guess_background.visible = false
-	role_guess_background.z_index = 90
-	var circle_shader := Shader.new()
-	circle_shader.code = "shader_type canvas_item; void fragment() { vec2 p = UV - vec2(0.5); if (length(p) > 0.5) { discard; } COLOR = texture(TEXTURE, UV); }"
-	var circle_material := ShaderMaterial.new()
-	circle_material.shader = circle_shader
-	role_guess_background.material = circle_material
-	add_child(role_guess_background)
-
 	role_guess_button = Button.new()
 	role_guess_button.name = "RoleGuessButton"
 	role_guess_button.position = Vector2(2, 2)
-	role_guess_button.size = Vector2(45, 45)
-	role_guess_button.custom_minimum_size = Vector2(45, 45)
+	# Keep the role marker readable without covering a large part of the portrait.
+	role_guess_button.size = Vector2(38, 38)
+	role_guess_button.custom_minimum_size = Vector2(38, 38)
 	role_guess_button.focus_mode = Control.FOCUS_NONE
 	role_guess_button.mouse_filter = Control.MOUSE_FILTER_STOP
 	role_guess_button.z_index = 91
 	role_guess_button.visible = false
-	role_guess_button.add_theme_font_size_override("font_size", 25)
+	role_guess_button.add_theme_font_size_override("font_size", 23)
 	role_guess_button.add_theme_color_override("font_color", Color(1.0, 0.98, 0.86, 1.0))
 	role_guess_button.add_theme_color_override("font_hover_color", Color.WHITE)
 	role_guess_button.add_theme_color_override("font_pressed_color", Color.WHITE)
-	role_guess_button.pressed.connect(_cycle_role_guess)
+	role_guess_button.pressed.connect(_toggle_role_guess_menu)
 	add_child(role_guess_button)
+	_build_role_guess_menu()
 	_update_role_guess_display()
+
+func _build_role_guess_menu() -> void:
+	role_guess_menu = PanelContainer.new()
+	role_guess_menu.name = "RoleGuessMenu"
+	role_guess_menu.position = Vector2(2, 43)
+	role_guess_menu.size = Vector2(120, 78)
+	role_guess_menu.custom_minimum_size = Vector2(120, 78)
+	role_guess_menu.mouse_filter = Control.MOUSE_FILTER_STOP
+	role_guess_menu.z_index = 2000
+	role_guess_menu.visible = false
+	var menu_style := StyleBoxFlat.new()
+	menu_style.bg_color = Color(0.025, 0.04, 0.08, 0.98)
+	menu_style.border_width_left = 2
+	menu_style.border_width_top = 2
+	menu_style.border_width_right = 2
+	menu_style.border_width_bottom = 2
+	menu_style.border_color = Color(1.0, 0.84, 0.28, 0.95)
+	menu_style.corner_radius_top_left = 8
+	menu_style.corner_radius_top_right = 8
+	menu_style.corner_radius_bottom_left = 8
+	menu_style.corner_radius_bottom_right = 8
+	menu_style.content_margin_left = 5
+	menu_style.content_margin_top = 5
+	menu_style.content_margin_right = 5
+	menu_style.content_margin_bottom = 5
+	role_guess_menu.add_theme_stylebox_override("panel", menu_style)
+
+	var choices := GridContainer.new()
+	choices.name = "Choices"
+	choices.columns = 2
+	choices.add_theme_constant_override("h_separation", 4)
+	choices.add_theme_constant_override("v_separation", 4)
+	role_guess_menu.add_child(choices)
+	for choice in [
+		{"code": "?", "label": "?", "color": Color(0.12, 0.15, 0.22, 1.0)},
+		{"code": "LOYALIST", "label": "Trung", "color": Color(0.78, 0.58, 0.08, 1.0)},
+		{"code": "REBEL", "label": "Phản", "color": Color(0.08, 0.48, 0.18, 1.0)},
+		{"code": "SPY", "label": "Nội", "color": Color(0.08, 0.24, 0.68, 1.0)}
+	]:
+		var choice_button := Button.new()
+		choice_button.name = "Choice_%s" % str(choice["code"])
+		choice_button.text = str(choice["label"])
+		choice_button.custom_minimum_size = Vector2(52, 29)
+		choice_button.focus_mode = Control.FOCUS_NONE
+		choice_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		choice_button.add_theme_font_size_override("font_size", 14 if choice["code"] != "?" else 21)
+		choice_button.add_theme_color_override("font_color", Color(1.0, 0.97, 0.85, 1.0))
+		choice_button.add_theme_color_override("font_hover_color", Color.WHITE)
+		choice_button.add_theme_stylebox_override("normal", _role_guess_choice_style(choice["color"]))
+		var hover_style := _role_guess_choice_style(choice["color"].lightened(0.18))
+		choice_button.add_theme_stylebox_override("hover", hover_style)
+		choice_button.pressed.connect(_select_role_guess.bind(str(choice["code"])))
+		choices.add_child(choice_button)
+	add_child(role_guess_menu)
+
+func _role_guess_choice_style(color: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = color
+	style.border_width_left = 1
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.border_color = Color(1.0, 0.88, 0.45, 0.72)
+	style.corner_radius_top_left = 5
+	style.corner_radius_top_right = 5
+	style.corner_radius_bottom_left = 5
+	style.corner_radius_bottom_right = 5
+	return style
 
 func _role_guess_style(color: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -195,10 +255,10 @@ func _role_guess_style(color: Color) -> StyleBoxFlat:
 	style.border_width_right = 3
 	style.border_width_bottom = 3
 	style.border_color = Color(1.0, 0.9, 0.45, 0.95)
-	style.corner_radius_top_left = 23
-	style.corner_radius_top_right = 23
-	style.corner_radius_bottom_left = 23
-	style.corner_radius_bottom_right = 23
+	style.corner_radius_top_left = 24
+	style.corner_radius_top_right = 24
+	style.corner_radius_bottom_left = 24
+	style.corner_radius_bottom_right = 24
 	style.shadow_color = Color(0.0, 0.0, 0.0, 0.65)
 	style.shadow_size = 5
 	return style
@@ -208,23 +268,14 @@ func _update_role_guess_display() -> void:
 		return
 	var is_unknown := role_guess == "?" and not role_revealed
 	role_guess_button.text = "?" if is_unknown else ("Trung" if role_guess == "LOYALIST" else ("Phản" if role_guess == "REBEL" else ("Nội" if role_guess == "SPY" else "?")))
-	role_guess_button.add_theme_font_size_override("font_size", 27 if is_unknown else 14)
-	var bg_tex: Texture2D = null
-	var bg_color := Color(0.05, 0.07, 0.12, 0.28)
-	if role_guess == "?" and is_instance_valid(background_rect):
-		bg_tex = background_rect.texture
-		bg_color = Color(0.05, 0.07, 0.12, 0.22)
+	role_guess_button.add_theme_font_size_override("font_size", 23 if is_unknown else 10)
+	var bg_color := Color(0.05, 0.07, 0.12, 0.94)
 	if role_guess == "LOYALIST":
-		bg_tex = BG_GUESS_TRUNG_TEX
-		bg_color = Color(0.8, 0.62, 0.08, 0.22)
+		bg_color = Color(0.8, 0.62, 0.08, 0.96)
 	elif role_guess == "REBEL":
-		bg_tex = BG_GUESS_PHAN_TEX
-		bg_color = Color(0.08, 0.5, 0.18, 0.22)
+		bg_color = Color(0.08, 0.5, 0.18, 0.96)
 	elif role_guess == "SPY":
-		bg_tex = BG_GUESS_NOI_TEX
-		bg_color = Color(0.08, 0.25, 0.7, 0.22)
-	role_guess_background.texture = bg_tex
-	role_guess_background.visible = role_guess_enabled and not role_revealed and bg_tex != null
+		bg_color = Color(0.08, 0.25, 0.7, 0.96)
 	var normal := _role_guess_style(bg_color)
 	var hover := normal.duplicate() as StyleBoxFlat
 	hover.bg_color = Color(minf(bg_color.r + 0.12, 1.0), minf(bg_color.g + 0.12, 1.0), minf(bg_color.b + 0.12, 1.0), 0.98)
@@ -234,20 +285,64 @@ func _update_role_guess_display() -> void:
 	role_guess_button.add_theme_stylebox_override("hover", hover)
 	role_guess_button.add_theme_stylebox_override("pressed", pressed)
 	role_guess_button.visible = role_guess_enabled and not role_revealed
+	if is_instance_valid(role_guess_menu):
+		role_guess_menu.visible = role_guess_menu_open and role_guess_button.visible
+	_apply_role_guess_background()
 
-func _cycle_role_guess() -> void:
+func _toggle_role_guess_menu() -> void:
 	if not role_guess_enabled or role_revealed:
 		return
-	var guesses := ["?", "LOYALIST", "REBEL", "SPY"]
-	var next_index := (guesses.find(role_guess) + 1) % guesses.size()
-	role_guess = guesses[next_index]
+	role_guess_menu_open = not role_guess_menu_open
+	_update_role_guess_display()
+
+func _select_role_guess(guess: String) -> void:
+	if not role_guess_enabled or role_revealed:
+		return
+	if guess not in ["?", "LOYALIST", "REBEL", "SPY"]:
+		return
+	role_guess = guess
+	role_guess_menu_open = false
 	_update_role_guess_display()
 	role_guess_changed.emit(role_guess)
 
+func _apply_role_guess_background() -> void:
+	if not is_instance_valid(background_rect):
+		return
+	if role_guess_enabled and not role_revealed:
+		if role_guess == "LOYALIST":
+			background_rect.texture = BG_GUESS_TRUNG_TEX
+		elif role_guess == "REBEL":
+			background_rect.texture = BG_GUESS_PHAN_TEX
+		elif role_guess == "SPY":
+			background_rect.texture = BG_GUESS_NOI_TEX
+		else:
+			background_rect.texture = BG_GUESS_UNKNOWN_TEX
+	else:
+		background_rect.texture = base_background_texture
+
+func _role_background_texture(role_or_name: String) -> Texture2D:
+	match role_or_name:
+		"KING", "VUA":
+			return BG_ROLE_KING_TEX
+		"LOYALIST", "Trung Thần":
+			return BG_ROLE_LOYALIST_TEX
+		"REBEL", "Phản Tặc":
+			return BG_ROLE_REBEL_TEX
+		"SPY", "Nội Gián":
+			return BG_ROLE_SPY_TEX
+	return null
+
 func set_role_guess_enabled(enabled: bool, current_guess: String = "?") -> void:
+	var normalized_guess := current_guess if current_guess in ["?", "LOYALIST", "REBEL", "SPY"] else "?"
+	var state_unchanged := role_guess_enabled == enabled and role_guess == normalized_guess and not role_revealed
 	role_guess_enabled = enabled
 	role_revealed = false
-	role_guess = current_guess if current_guess in ["?", "LOYALIST", "REBEL", "SPY"] else "?"
+	role_guess = normalized_guess
+	# Network snapshots refresh this control frequently. Do not close a menu the
+	# player just opened when the snapshot still contains the same guess.
+	if not state_unchanged:
+		role_guess_menu_open = false
+	revealed_role_display = ""
 	if is_instance_valid(role_badge) and enabled:
 		role_badge.visible = false
 	_update_role_guess_display()
@@ -256,18 +351,30 @@ func set_revealed_role(role_code: String) -> void:
 	role_revealed = true
 	role_guess_enabled = false
 	role_guess = "?"
+	role_guess_menu_open = false
+	revealed_role_display = DynastyRoleInfo.display_name(role_code)
+	var role_background := _role_background_texture(role_code)
+	if role_background != null:
+		base_background_texture = role_background
 	if is_instance_valid(role_guess_button):
 		role_guess_button.visible = false
-	if is_instance_valid(role_guess_background):
-		role_guess_background.visible = false
+	if is_instance_valid(role_guess_menu):
+		role_guess_menu.visible = false
+	_apply_role_guess_background()
 	if not is_instance_valid(role_badge):
 		return
-	var display := DynastyRoleInfo.display_name(role_code)
+	var display := revealed_role_display
 	if role_code.is_empty() or display == "?":
 		return
 	role_badge.visible = true
 	role_badge.text = " %s " % display
 	role_badge.add_theme_color_override("font_color", DynastyRoleInfo.get_color(role_code))
+	_update_defeated_role_label()
+
+func _update_defeated_role_label() -> void:
+	if not is_instance_valid(defeated_label):
+		return
+	defeated_label.text = "☠\nTỬ TRẬN" if revealed_role_display.is_empty() or revealed_role_display == "?" else "☠\nTỬ TRẬN\n%s" % revealed_role_display
 
 func _build_distance_label() -> void:
 	if is_instance_valid(bottom_info_container):
@@ -418,12 +525,18 @@ func _apply_team_presentation(p_role: String) -> void:
 			frame_panel.move_child(background_rect, 0)
 
 	if is_instance_valid(background_rect):
-		if p_role.contains("PHƯỢNG"):
+		# Vương Triều dùng màu nền theo thân phận; các trận 2v2 tiếp tục dùng
+		# màu phe Rồng/Phượng như trước.
+		var role_background := _role_background_texture(p_role)
+		if role_background != null:
+			background_rect.texture = role_background
+		elif p_role.contains("PHƯỢNG"):
 			background_rect.texture = BG_PHOENIX_TEX
-			background_rect.visible = true
 		else:
 			background_rect.texture = BG_DRAGON_TEX
-			background_rect.visible = true
+		background_rect.visible = true
+		base_background_texture = background_rect.texture
+		_apply_role_guess_background()
 
 	if is_instance_valid(role_badge):
 		var badge_style := role_badge.get_theme_stylebox("normal") as StyleBoxFlat
@@ -597,19 +710,19 @@ func set_chained(chained: bool) -> void:
 			chain_overlay.tooltip_text = "Xích Liên Hoàn: cùng nhận sát thương nguyên tố với các tướng đang xích."
 			chain_overlay.z_index = 5
 			var chain_icon = Label.new()
-			chain_icon.text = "⛓⛓⛓⛓"
+			chain_icon.text = "⛓"
 			chain_icon.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 			chain_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			chain_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			chain_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			chain_icon.add_theme_font_size_override("font_size", 34)
+			chain_icon.add_theme_font_size_override("font_size", 26)
 			chain_icon.add_theme_color_override("font_color", Color(0.75, 0.91, 0.96, 0.92))
 			chain_icon.add_theme_color_override("font_outline_color", Color(0.04, 0.10, 0.14, 0.92))
 			chain_icon.add_theme_constant_override("outline_size", 3)
 			chain_overlay.add_child(chain_icon)
 			portrait_rect.add_child(chain_overlay)
 		chain_overlay.visible = true
-		chain_overlay.scale = Vector2(1.12, 1.12)
+		chain_overlay.scale = Vector2(1.05, 1.05)
 		create_tween().tween_property(chain_overlay, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK)
 	else:
 		if chain_overlay:
@@ -660,6 +773,15 @@ func set_defeated(defeated: bool) -> void:
 		return
 	is_defeated = defeated
 	if defeated:
+		# A defeated general no longer accepts guesses. Restore the real team
+		# background until the server sends the revealed role badge.
+		role_guess_enabled = false
+		role_guess_menu_open = false
+		_apply_role_guess_background()
+		if is_instance_valid(role_guess_button):
+			role_guess_button.visible = false
+		if is_instance_valid(role_guess_menu):
+			role_guess_menu.visible = false
 		set_near_death(false)
 		if not defeated_overlay:
 			defeated_overlay = ColorRect.new()
@@ -683,6 +805,7 @@ func set_defeated(defeated: bool) -> void:
 			defeated_label.mouse_filter = MOUSE_FILTER_IGNORE
 			defeated_label.z_index = 71
 			add_child(defeated_label)
+		_update_defeated_role_label()
 		defeated_overlay.visible = true
 		defeated_label.visible = true
 		modulate = Color(0.72, 0.72, 0.78, 1.0)
@@ -1056,8 +1179,34 @@ func _format_equip_str(icon: String, suit_rank: String, item_name: String) -> St
 	var name = item_name.strip_edges()
 	if name.is_empty():
 		return ""
+	var display_name := _shorten_equipment_name(name)
 	var rank = suit_rank.strip_edges()
-	return "%s %s %s" % [icon, rank, name] if not rank.is_empty() else "%s %s" % [icon, name]
+	var formatted := "%s %s %s" % [icon, rank, display_name] if not rank.is_empty() else "%s %s" % [icon, display_name]
+	return formatted
+
+func _shorten_equipment_name(item_name: String) -> String:
+	var name := item_name.strip_edges()
+	var abbreviations := {
+		"Súng Thần Công Hồ Triều": "S.úng TCHT",
+		"Trống Đồng Đông Sơn": "Trống Đồng ĐS",
+		"Thuyền Bạch Đằng": "Thuyền BĐ",
+		"Voi Chiến Đại Việt": "Voi Chiến ĐV",
+		"Ngựa Trắng Thuần Nông": "Ngựa Trắng TN",
+		"Kiếm Thuận Thiên": "Kiếm TT",
+		"Song Cung Mường Nhạ": "Song Cung MN",
+		"Nỏ Thần Kim Quy": "Nỏ Thần KQ",
+		"Trường Đao Nam Sơn": "Trường Đao NS",
+		"Thương Ngâu Lãng Bạc": "Thương NL B",
+		"Hỏa Mai Tây Sơn": "Hỏa Mai TS",
+		"Liêm Đao Đống Đa": "Liêm Đao ĐĐ",
+		"Đoản Đao Lam Sơn": "Đoản Đao LS",
+		"Giáp Đồng Sơn Vi": "Giáp ĐSV",
+		"Khiên Mây Bện": "Khiên MB",
+		"Áo Bào Hoàng Tộc": "Áo Bào HT",
+		"Giáp Tây Sơn": "Giáp TS",
+		"Hổ Phù Trần Triều": "Hổ Phù TT"
+	}
+	return str(abbreviations.get(name, name))
 
 func _refresh_mount_labels() -> void:
 	var defensive_modifier := 1 if defensive_mount_equipped else 0
@@ -1408,16 +1557,10 @@ func play_armor_effect(armor_name: String, success: bool = true, charges_left: i
 		tw.parallel().tween_property(fx, "modulate:a", 0.0, 0.32).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		tw.chain().tween_callback(fx.queue_free)
 	else:
-		# Judgement failed: pop up then shake / shatter down
+		# Judgement failed: pop up, then shatter and fade down.
 		tw.parallel().tween_property(shield_root, "scale", Vector2(1.0, 1.0), 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		tw.parallel().tween_property(shield_root, "modulate:a", 1.0, 0.08)
-		# Shake
-		tw.chain().tween_property(shield_root, "position:x", avatar_center.x - 8.0, 0.05)
-		tw.chain().tween_property(shield_root, "position:x", avatar_center.x + 8.0, 0.05)
-		tw.chain().tween_property(shield_root, "position:x", avatar_center.x - 5.0, 0.05)
-		tw.chain().tween_property(shield_root, "position:x", avatar_center.x + 5.0, 0.05)
-		tw.chain().tween_property(shield_root, "position:x", avatar_center.x, 0.05)
-		# Shatter down and fade
+		# Chỉ làm hiệu ứng vỡ và rơi; phán xét thất bại không rung màn hình.
 		tw.chain().tween_property(shield_root, "position:y", avatar_center.y + 25.0, 0.3).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		tw.parallel().tween_property(fx, "modulate:a", 0.0, 0.3)
 		tw.chain().tween_callback(fx.queue_free)
@@ -1630,6 +1773,9 @@ func setup_general(p_id: String, p_name: String, p_faction: String = "Trần", p
 	_refresh_mount_labels()
 	if is_instance_valid(name_label):
 		name_label.text = p_name
+		# Trong Vương Triều, dấu ? nằm sát mép trái của avatar. Căn phải tên
+		# để ký hiệu không che mất phần đầu tên tướng.
+		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT if p_role in ["?", "VUA", "Trung Thần", "Phản Tặc", "Nội Gián"] else HORIZONTAL_ALIGNMENT_LEFT
 	var faction_color := Color.WHITE
 	match p_faction:
 		"Hồng Bàng": faction_color = Color(0.15, 0.85, 0.55, 1.0)
@@ -1702,13 +1848,10 @@ func update_hp(p_hp: int, p_max_hp: int, is_initial: bool = false) -> void:
 	var is_first = is_initial or (not has_initialized_hp)
 	has_initialized_hp = true
 
-	# Tự động kích hoạt hiệu ứng mất máu nếu HP giảm và KHÔNG PHẢI lần khởi tạo đầu tiên, và không phải đang đầy máu
-	if not is_first and old_hp > 0 and current_hp < old_hp and current_hp < max_hp:
-		var dmg = old_hp - current_hp
-		if Time.get_ticks_msec() - last_damage_effect_time > 300:
-			play_damage_effect()
-			spawn_damage_number(dmg)
-	elif not is_first and current_hp > old_hp:
+	# Hiệu ứng mất máu được phát ở battle_2v2 cùng với thuộc tính sát thương
+	# (Thường/Hỏa/Thủy). Không tự suy ra từ HP ở đây, vì HP sync không mang
+	# thuộc tính và sẽ làm phát lại hiệu ứng sai màu hoặc phát đè lên hiệu ứng hồi máu.
+	if not is_first and current_hp > old_hp:
 		play_heal_effect()
 		spawn_heal_number(current_hp - old_hp)
 

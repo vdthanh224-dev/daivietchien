@@ -52,6 +52,18 @@ var admin_gift_reward: String = "5 vé quay tướng"
 var current_title: String = ""
 var current_profile_bg: int = 0
 
+func _normalize_saved_rank_state() -> bool:
+	if not RankSystem:
+		return false
+	var old_idx := current_2v2_rank_index
+	var old_stars := current_2v2_stars
+	var old_acc := current_2v2_accumulation_points
+	var normalized := RankSystem.normalize_rank_stars(old_idx, old_stars)
+	current_2v2_rank_index = int(normalized.rank_index)
+	current_2v2_stars = int(normalized.stars)
+	current_2v2_accumulation_points = clampi(old_acc, 0, RankSystem.MAX_ACCUMULATION_POINTS)
+	return old_idx != current_2v2_rank_index or old_stars != current_2v2_stars or old_acc != current_2v2_accumulation_points
+
 # 12 Tiers of Military Ranks
 const MILITARY_TIERS = [
 	{"tier": 1,  "name": "Tân Binh",       "badge": "🔰", "min": 0,    "max": 99,   "desc": "Chiến sĩ mới gia nhập hàng ngũ nghĩa quân Đại Việt."},
@@ -615,6 +627,10 @@ func fetch_profile_from_appwrite(on_completed: Callable = Callable()) -> void:
 						current_2v2_accumulation_points = 0
 						needs_init_on_appwrite = true
 
+					var normalized_rank := _normalize_saved_rank_state()
+					if normalized_rank:
+						needs_init_on_appwrite = true
+
 					if data.has("wins"):
 						current_wins = max(0, int(data["wins"]))
 					else:
@@ -990,7 +1006,7 @@ func parse_gift_reward(reward_raw: Variant) -> Dictionary:
 		if res["skin_tickets"] > 0:
 			parts.append("%d Vé trang phục" % res["skin_tickets"])
 		if res["gold"] > 0:
-			parts.append("%d Vàng" % res["gold"])
+			parts.append("%d Kim Cương" % res["gold"])
 		if res["silver"] > 0:
 			parts.append("%d Bạc" % res["silver"])
 		if res["exp"] > 0:
@@ -1006,7 +1022,7 @@ func _fill_reward_dict(target: Dictionary, src: Dictionary) -> void:
 	target["hero_tickets"] = int(src.get("hero_tickets", src.get("heroTickets", src.get("ve_quay_tuong", src.get("ve_quay", 0)))))
 	target["skin_tickets"] = int(src.get("skin_tickets", src.get("skinTickets", src.get("ve_trang_phuc", 0))))
 	target["silver"] = int(src.get("silver", src.get("bac", src.get("xu", 0))))
-	target["gold"] = int(src.get("gold", src.get("vang", 0)))
+	target["gold"] = int(src.get("gold", src.get("kim_cuong", src.get("kimcuong", src.get("diamond", src.get("vang", 0))))))
 	target["exp"] = int(src.get("exp", src.get("kinh_nghiem", 0)))
 
 func _parse_reward_text(target: Dictionary, text: String) -> void:
@@ -1039,7 +1055,7 @@ func _parse_reward_text(target: Dictionary, text: String) -> void:
 			target["hero_tickets"] += num
 		elif "bạc" in chunk or "bac" in chunk or "silver" in chunk or "xu" in chunk:
 			target["silver"] += num
-		elif "vàng" in chunk or "vang" in chunk or "gold" in chunk:
+		elif "kim cương" in chunk or "kim cuong" in chunk or "diamond" in chunk or "kc" in chunk or "vàng" in chunk or "vang" in chunk or "gold" in chunk:
 			target["gold"] += num
 		elif "exp" in chunk or "kinh nghiệm" in chunk or "kinh nghiem" in chunk:
 			target["exp"] += num
@@ -1063,7 +1079,7 @@ func apply_gift_reward(reward_dict: Dictionary) -> String:
 	var g = int(reward_dict.get("gold", 0))
 	if g > 0:
 		current_gold += g
-		granted.append("+%d Vàng" % g)
+		granted.append("+%d Kim Cương" % g)
 	var exp_pts = int(reward_dict.get("exp", 0))
 	if exp_pts > 0:
 		add_exp(exp_pts)
@@ -1534,12 +1550,8 @@ func claim_match_reward(result: Dictionary, mode_id: String, stake_recorded: boo
 	else:
 		current_losses += 1
 	if mode_id == "2v2":
-		var star_delta := RankSystem.WIN_STARS if is_win else RankSystem.LOSE_STARS
-		if stake_recorded:
-			star_delta = RankSystem.WIN_STARS + stake_amount if is_win else 0
-		var rank_result = RankSystem.process_match_result_adjusted(is_win, current_2v2_rank_index, current_2v2_stars,
-			current_2v2_accumulation_points, star_delta,
-			RankSystem.WIN_ACCUMULATION_POINTS if is_win else RankSystem.LOSE_ACCUMULATION_POINTS)
+		var rank_result = RankSystem.process_match_result_for_match(is_win, current_2v2_rank_index, current_2v2_stars,
+			current_2v2_accumulation_points, stake_recorded, stake_amount)
 		current_2v2_rank_index = rank_result.rank_index
 		current_2v2_stars = rank_result.stars
 		current_2v2_accumulation_points = rank_result.accumulation_points
@@ -1672,6 +1684,7 @@ func load_saved_session() -> void:
 					current_2v2_rank_index = int(data.get("rank2v2Index", 0))
 					current_2v2_stars = int(data.get("rank2v2Stars", 0))
 					current_2v2_accumulation_points = int(data.get("rank2v2AccPoints", 0))
+					_normalize_saved_rank_state()
 					current_wins = max(0, int(data.get("wins", 0)))
 					current_losses = max(0, int(data.get("losses", 0)))
 					var saved_match_rewards = data.get("claimedMatchRewards", {})

@@ -52,6 +52,83 @@ var is_waiting_dodge_reaction: bool = false
 var is_in_free_discard_phase: bool = false
 var khien_may_reaction_btn: Button = null
 
+# Tutorial dùng cùng nội dung luật với CardDatabase.  Các lá trong màn hướng
+# dẫn được tạo trực tiếp để minh họa nên không phải lúc nào cũng có ID trong
+# bộ bài; giữ bảng ánh xạ theo tên để không hiển thị lại các mô tả cũ.
+func _get_tutorial_card_description(card_name: String, fallback: String = "") -> String:
+	var key := card_name.strip_edges().to_lower()
+	# Ưu tiên catalog hiện hành để tutorial không bị lệch khi luật lá được cập nhật.
+	for catalog in [CardDatabase.create_deck_80(), CardDatabase.create_deck_150()]:
+		for card in catalog:
+			if str(card.get("name", "")).strip_edges().to_lower() == key:
+				return str(card.get("desc", card.get("description", fallback)))
+	var descriptions := {
+		"trảm": "Tấn công gây 1 sát thương thường",
+		"trảm thường": "Tấn công gây 1 sát thương thường",
+		"trảm - thủy": "Tấn công gây 1 sát thương thuộc tính Thủy, lan qua Xích Tâm Tỏa",
+		"trảm thủy": "Tấn công gây 1 sát thương thuộc tính Thủy, lan qua Xích Tâm Tỏa",
+		"trảm - hỏa": "Tấn công gây 1 sát thương thuộc tính Hỏa, lan qua Xích Tâm Tỏa",
+		"trảm hỏa": "Tấn công gây 1 sát thương thuộc tính Hỏa, lan qua Xích Tâm Tỏa",
+		"đỡ": "Hóa giải 1 đòn Trảm",
+		"bánh chưng": "Hồi phục 1 Máu hoặc cứu người chơi Cận Tử",
+		"hủ rượu": "Uống trước Trảm (+1 Sát Thương) hoặc tự cứu khi Cận Tử",
+		"xích tâm tỏa": "Chạm avatar để chọn tối đa 2 mục tiêu để đưa họ vào hoặc thoát trạng thái xích (cùng nhận sát thương nguyên tố), có thể đổi thành lá mới",
+		"kiếm thuận thiên": "Tầm 2. Trảm bỏ qua Trang bị Giáp của mục tiêu",
+		"song cung mường nhạ": "Tầm 2. Khi Trảm bị Đỡ, bỏ 2 lá để bỏ qua Đỡ; Trảm vẫn gây sát thương",
+		"nỏ thần kim quy": "Tầm 1. Không giới hạn số lá Trảm trong lượt",
+		"trường đao nam sơn": "Tầm 3. Khi Trảm bị Đỡ, xem như chưa sử dụng lượt Trảm trong lượt chơi này",
+		"thương ngâu lãng bạc": "Tầm 4. Khi Trảm trúng, hủy 1 lá trên tay hoặc trang bị",
+		"súng thần công hồ triều": "Tầm 5. Mục tiêu không được dùng Đỡ nhỏ hơn 5",
+		"hỏa mai tây sơn": "Tầm 4. Trảm Thường có thể xem như Trảm Hỏa",
+		"liêm đao đống đa": "Tầm 2. Lần đầu mỗi lượt gây sát thương, rút 1 lá",
+		"đoản đao lam sơn": "Tầm 2. Khi Trảm trúng, có thể hủy 2 lá tay hoặc Trang bị của mục tiêu thay vì gây sát thương",
+		"giáp đồng sơn vi": "Vô hiệu hóa toàn bộ đòn Trảm Thường",
+		"khiên mây bện": "Bị Trảm/Mưa Tên: lật phán xét Đỏ hoặc Trắng tự động Đỡ, Vàng hoặc Đen thất bại",
+		"áo bào hoàng tộc": "Chặn tối đa 2 sát thương, rồi bị hủy",
+		"giáp tây sơn": "Vô hiệu hóa mọi Trảm bài Đen hoặc bài Vàng",
+		"voi chiến đại việt": "Ngựa Thủ: Tăng +1 Khoảng cách từ người chơi khác tới bạn",
+		"voi chiến": "Ngựa Thủ: Tăng +1 Khoảng cách từ người chơi khác tới bạn",
+		"ngựa trắng thuần nông": "Ngựa Công: Giảm -1 Khoảng cách từ bạn tới tất cả người khác",
+		"ngựa trắng": "Ngựa Công: Giảm -1 Khoảng cách từ bạn tới tất cả người khác",
+		"thuyền bạch đằng": "Ngựa Công. Trảm Thủy bỏ qua khoảng cách",
+		"trống đồng đông sơn": "Điểm Trống: mục tiêu bỏ 1 lá hoặc lộ toàn bộ bài đến hết lượt",
+		"hổ phù trần triều": "Mỗi lượt đưa 1 lá tay cho người khác. Nếu họ dùng lá đó trước lượt kế tiếp của bạn, bạn rút 1 lá",
+		"diệu kế phá mưu": "Vô hiệu hóa 1 Cẩm Nang",
+		"vườn không nhà trống": "Bỏ 1 lá trong vùng chơi của 1 mục tiêu",
+		"đột kích trộm lương": "Cướp 1 lá trong vùng chơi của 1 mục tiêu trong cự ly 1 của Ngựa",
+		"dụng binh như thần": "Rút ngay 2 lá bài từ xấp bài",
+		"huyết chiến": "Chọn 1 mục tiêu bất kỳ; hai bên luân phiên đánh Trảm, người dừng chịu 1 sát thương, đối phương đánh trước",
+		"mở kho cứu tế": "Mở kho phát bài cho tất cả người chơi còn sống",
+		"giặc tới": "Ép tất cả người chơi khác phải đánh 1 Trảm hoặc chịu 1 sát thương",
+		"mưa tên liên châu": "Ép tất cả người chơi khác phải đánh 1 Đỡ hoặc chịu 1 sát thương",
+		"mưa tên": "Ép tất cả người chơi khác phải đánh 1 Đỡ hoặc chịu 1 sát thương",
+		"thủy triều rút": "Chọn 1 người có bài: người đó đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy",
+		"mượn gươm diệt địch": "Buộc người có Vũ khí đánh Trảm vào 1 mục tiêu; không đánh thì đưa Vũ khí cho người dùng Mượn Gươm",
+		"mở yến tiệc": "Lần lượt người chơi bị mất Máu được hồi 1 Máu",
+		"hịch tướng sĩ": "Bạn và 1 người khác bạn chọn, bỏ 1 lá để nhận Sục Sôi: 1 vòng không giới hạn Trảm, tầm đánh +1. Có thể đổi lá để rút lá khác.",
+		"khổ nhục kế": "Nhận 1 sát thương, sau đó rút 3 lá bài",
+		"tẩu vi thượng sách": "Bỏ 1 Trang bị của chính mình, rút 2 lá bài",
+		"phủ để trừu tân": "Đưa 1 Trang bị của mục tiêu về tay họ, sau đó rút 1 lá bài",
+		"đại hồng thủy": "Phán xét: Bài Đen từ 1 đến 6 chịu 3 sát thương Thủy, trượt chuyển tiếp cho người ngồi kế",
+		"cắt đường lương": "Phán xét: Không phải bài Vàng -> bỏ qua Rút bài",
+		"trầm ảo sa bẫy": "Phán xét: Không phải bài Đỏ -> bỏ qua Ra bài",
+		"bãi cọc bạch đằng": "Khi mục tiêu dùng Trảm hoặc Chiến Mã, phán xét 1 lần: Vàng hoặc Đen hủy hành động và chịu 1 sát thương; Đỏ hoặc Trắng hành động được tiếp tục, sau đó Bãi Cọc rời đi",
+		# Hai tên chỉ dùng cho màn minh họa cũ, không phải lá trong catalog.
+		"đại đao sơn tặc": "Vũ khí đang trang bị của Sơn Tặc",
+		"bảo vật quốc gia": "Bảo vật đang trang bị"
+	}
+	if descriptions.has(key):
+		return descriptions[key]
+	if key.begins_with("trảm"):
+		return descriptions["trảm"]
+	return fallback
+
+func _format_rank(value: Variant) -> String:
+	var rank := int(value)
+	if rank >= 10 and rank <= 13:
+		rank = clampi(int(round(float(rank - 1) * 9.0 / 12.0)), 0, 9)
+	return str(clampi(rank, 0, 9))
+
 func _ready() -> void:
 	# Bắt đầu phát nhạc nền chiến trận hào hùng
 	AudioManager.play_bgm("bgm_battle")
@@ -173,7 +250,7 @@ func _ready() -> void:
 	elif "--screenshot-showcase" in OS.get_cmdline_user_args():
 		_on_close_health_spotlight()
 		_start_step_3_slash()
-		_show_center_card("Trảm", "Lý Thường Kiệt", "1", "Spade", 0, "Tấn công gây 1 sát thương.")
+		_show_center_card("Trảm", "Lý Thường Kiệt", "1", "Spade", 0, _get_tutorial_card_description("Trảm"))
 		await get_tree().create_timer(0.35).timeout
 		await get_tree().process_frame
 		var img = get_viewport().get_texture().get_image()
@@ -228,7 +305,7 @@ func _ready() -> void:
 		# Remove any existing Đỡ cards from hand to test "no dodge" scenario
 		for c in hand_container.get_children():
 			if "Đỡ" in c.card_name:
-				c.setup_card_data(c.card_data.id, "Trảm", "2", "Club", 0, "Tấn công gây 1 sát thương.")
+				c.setup_card_data(c.card_data.id, "Trảm", "2", "Club", 0, _get_tutorial_card_description("Trảm"))
 		_prompt_player_dodge_reaction()
 		await get_tree().process_frame
 		await get_tree().process_frame
@@ -241,7 +318,7 @@ func _ready() -> void:
 		_start_free_battle_mode()
 		for c in hand_container.get_children():
 			if "Đỡ" in c.card_name:
-				c.setup_card_data(c.card_data.id, "Trảm", "2", "Club", 0, "Tấn công gây 1 sát thương.")
+				c.setup_card_data(c.card_data.id, "Trảm", "2", "Club", 0, _get_tutorial_card_description("Trảm"))
 		_prompt_player_dodge_reaction()
 		# Player clicks skill Tiến Thoái!
 		_on_player_skill_clicked()
@@ -395,11 +472,11 @@ func _spawn_initial_cards() -> void:
 		c.queue_free()
 
 	var cards_data = [
-		{"name": "Trảm", "rank": "0", "suit": "Spade", "cat": 0, "sub": 0, "desc": "Tấn công gây 1 sát thương."},
-		{"name": "Trảm", "rank": "2", "suit": "Spade", "cat": 0, "sub": 0, "desc": "Tấn công gây 1 sát thương."},
-		{"name": "Đỡ", "rank": "3", "suit": "Diamond", "cat": 0, "sub": 3, "desc": "Hóa giải 1 đòn Trảm."},
-		{"name": "Bánh Chưng", "rank": "4", "suit": "Heart", "cat": 0, "sub": 4, "desc": "Hồi phục 1 Máu."},
-		{"name": "Khiên Mây Bện", "rank": "9", "suit": "Diamond", "cat": 1, "sub": 7, "desc": "Phán xét Đỏ tự động Đỡ."}
+		{"name": "Trảm", "rank": "0", "suit": "Spade", "cat": 0, "sub": 0, "desc": _get_tutorial_card_description("Trảm")},
+		{"name": "Trảm", "rank": "2", "suit": "Spade", "cat": 0, "sub": 0, "desc": _get_tutorial_card_description("Trảm")},
+		{"name": "Đỡ", "rank": "3", "suit": "Diamond", "cat": 0, "sub": 3, "desc": _get_tutorial_card_description("Đỡ")},
+		{"name": "Bánh Chưng", "rank": "4", "suit": "Heart", "cat": 0, "sub": 4, "desc": _get_tutorial_card_description("Bánh Chưng")},
+		{"name": "Khiên Mây Bện", "rank": "9", "suit": "Diamond", "cat": 1, "sub": 7, "desc": _get_tutorial_card_description("Khiên Mây Bện")}
 	]
 
 	for data in cards_data:
@@ -408,7 +485,7 @@ func _spawn_initial_cards() -> void:
 func _create_card_in_hand(c_name: String, c_rank: String, c_suit: String, c_cat: int, c_desc: String, c_sub: int = -1) -> Control:
 	var card_node = CardUIScene.instantiate()
 	hand_container.add_child(card_node)
-	card_node.setup_card_data("card_" + c_name, c_name, c_rank, c_suit, c_cat, c_desc, c_sub)
+	card_node.setup_card_data("card_" + c_name, c_name, c_rank, c_suit, c_cat, _get_tutorial_card_description(c_name, c_desc), c_sub)
 	card_node.card_selected_state_changed.connect(_on_card_selected_state_changed)
 	card_node.mouse_entered.connect(func(): _on_card_hovered(card_node))
 	return card_node
@@ -416,7 +493,7 @@ func _create_card_in_hand(c_name: String, c_rank: String, c_suit: String, c_cat:
 func _on_card_hovered(c_ui: Control) -> void:
 	if c_ui and c_ui.card_data:
 		var d = c_ui.card_data
-		desc_text.text = "💡 [%s %s %s] %s" % [d.card_name, d.get_suit_symbol() + str(d.rank), d.get_category_name(), d.description]
+		desc_text.text = "💡 [%s %s %s] %s" % [d.card_name, d.get_suit_symbol() + d.get_rank_string(), d.get_category_name(), d.description]
 		desc_text.get_parent().scroll_vertical = 0
 
 func _on_card_selected_state_changed(card_ui: Control, is_sel: bool) -> void:
@@ -641,13 +718,13 @@ func _execute_slash() -> void:
 	boss_hp -= 1
 	boss_avatar.update_hp(boss_hp, 3)
 
-	_show_center_card("Trảm", "Lý Thường Kiệt", "1", "Spade", 0, "Tấn công gây 1 sát thương.")
+	_show_center_card("Trảm", "Lý Thường Kiệt", "1", "Spade", 0, _get_tutorial_card_description("Trảm"))
 	_add_log("⚔️ Bạn đã dùng TRẢM! Thủ Lĩnh Sơn Tặc trúng đòn mất 1 máu (%d/3)." % boss_hp)
 
 	current_step = 4
 	banner.visible = true
 	banner_title.text = "⚠️ QUY TẮC: MỖI TURN CHỈ ĐƯỢC DÙNG 1 LÁ TRẢM"
-	banner_desc.text = "Trong cùng một lượt, mỗi người chơi chỉ được ra TỐI ĐA 1 LÁ TRẢM (trừ khi trang bị Nỏ Thần Kim Quy)!\nBây giờ, hãy tìm hiểu kỹ năng độc quyền của tướng."
+	banner_desc.text = "Mỗi lượt chỉ dùng 1 Trảm."
 	action_btn.visible = true
 	action_btn.disabled = false
 	action_btn.text = "TÌM HIỂU KỸ NĂNG TƯỚNG →"
@@ -673,10 +750,10 @@ func _on_player_skill_clicked() -> void:
 	var count_do = 0
 	for c in hand_container.get_children():
 		if "Trảm" in c.card_name:
-			c.setup_card_data(c.card_data.id, "Đỡ", c.card_data.get_rank_string(), c.card_data.suit, 0, "Hóa giải 1 đòn Trảm.", 3)
+			c.setup_card_data(c.card_data.id, "Đỡ", c.card_data.get_rank_string(), c.card_data.suit, 0, _get_tutorial_card_description("Đỡ"), 3)
 			count_tram += 1
 		elif "Đỡ" in c.card_name:
-			c.setup_card_data(c.card_data.id, "Trảm", c.card_data.get_rank_string(), c.card_data.suit, 0, "Tấn công gây 1 sát thương.", 0)
+			c.setup_card_data(c.card_data.id, "Trảm", c.card_data.get_rank_string(), c.card_data.suit, 0, _get_tutorial_card_description("Trảm"), 0)
 			count_do += 1
 
 	_add_log("✨ LÝ THƯỜNG KIỆT [TIẾN THOÁI]! Đã hoán chuyển %d Trảm → Đỡ và %d Đỡ → Trảm trên tay!" % [count_tram, count_do])
@@ -702,7 +779,7 @@ func _start_step_4_8_discard_lesson() -> void:
 	var hand_count = hand_container.get_child_count()
 	if hand_count <= player_hp:
 		# Rút thêm 1 lá để thừa bài (5 lá trên tay > 4 Máu)
-		_create_card_in_hand("Trảm", "7", "Club", 0, "Tấn công gây 1 sát thương.")
+		_create_card_in_hand("Trảm", "7", "Club", 0, _get_tutorial_card_description("Trảm"))
 		deck_count -= 1
 		deck_label.text = "🎴 %d" % deck_count
 		AudioManager.play_card_draw()
@@ -758,7 +835,7 @@ func _start_step_5_boss_turn() -> void:
 
 	AudioManager.play_voice("Trảm")
 	AudioManager.play_slash()
-	_show_center_card("Trảm Hung Bạo", "Thủ Lĩnh Sơn Tặc", "8", "Spade", 0, "Đòn đánh hung bạo.")
+	_show_center_card("Trảm", "Thủ Lĩnh Sơn Tặc", "8", "Spade", 0, _get_tutorial_card_description("Trảm"))
 	_play_slash_effect(player_avatar.global_position + Vector2(87, 119))
 	_add_log("💥 Sơn Tặc vung đao tung chiêu [TRẢM] nhắm thẳng vào bạn!")
 
@@ -795,7 +872,7 @@ func _execute_dodge() -> void:
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
 
-	_show_center_card("Đỡ", "Lý Thường Kiệt", "3", "Diamond", 0, "Hóa giải 1 đòn Trảm.")
+	_show_center_card("Đỡ", "Lý Thường Kiệt", "3", "Diamond", 0, _get_tutorial_card_description("Đỡ"))
 	_add_log("🛡️ HOÁ GIẢI THÀNH CÔNG! Bạn đã dùng Đỡ né hoàn toàn đòn Trảm của Sơn Tặc! Sinh mệnh 4/4 của bạn được bảo toàn.")
 
 	await get_tree().create_timer(1.2).timeout
@@ -835,8 +912,8 @@ func _player_turn_start_free_play() -> void:
 	AudioManager.play_card_draw()
 
 	var new_cards = [
-		{"name": "Trảm", "rank": "7", "suit": "Spade", "cat": 0, "sub": 0, "desc": "Tấn công gây 1 sát thương."},
-		{"name": "Bánh Chưng", "rank": "7", "suit": "Heart", "cat": 0, "sub": 4, "desc": "Hồi phục 1 Máu."}
+		{"name": "Trảm", "rank": "7", "suit": "Spade", "cat": 0, "sub": 0, "desc": _get_tutorial_card_description("Trảm")},
+		{"name": "Bánh Chưng", "rank": "8", "suit": "Heart", "cat": 0, "sub": 4, "desc": _get_tutorial_card_description("Bánh Chưng")}
 	]
 	for data in new_cards:
 		_create_card_in_hand(data["name"], data["rank"], data["suit"], data["cat"], data["desc"], data.get("sub", -1))
@@ -893,7 +970,7 @@ func _execute_free_card_play() -> void:
 
 		AudioManager.play_voice("Bánh Chưng")
 		AudioManager.play_sfx("sfx_skill")
-		_show_center_card("Bánh Chưng", "Lý Thường Kiệt", "4", "Heart", 0, "Hồi phục 1 Máu.")
+		_show_center_card("Bánh Chưng", "Lý Thường Kiệt", "4", "Heart", 0, _get_tutorial_card_description("Bánh Chưng"))
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
 
@@ -905,7 +982,7 @@ func _execute_free_card_play() -> void:
 		var eq_sr = "%s%s" % [selected_card_ui.card_data.get_suit_symbol(), selected_card_ui.card_data.get_rank_string()] if selected_card_ui and selected_card_ui.card_data else ""
 		AudioManager.play_voice("Khiên Mây Bện")
 		AudioManager.play_parry()
-		_show_center_card(c_name, "Lý Thường Kiệt", "13", "Diamond", 1, "Phán xét Đỏ tự động Đỡ.")
+		_show_center_card(c_name, "Lý Thường Kiệt", "9", "Diamond", 1, _get_tutorial_card_description(c_name))
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
 		player_avatar.set_equipment("armor", c_name, eq_sr)
@@ -914,7 +991,7 @@ func _execute_free_card_play() -> void:
 	elif "Kiếm" in c_name or "Đao" in c_name or "Cung" in c_name or "Nỏ" in c_name:
 		var eq_sr = "%s%s" % [selected_card_ui.card_data.get_suit_symbol(), selected_card_ui.card_data.get_rank_string()] if selected_card_ui and selected_card_ui.card_data else ""
 		AudioManager.play_parry()
-		_show_center_card(c_name, "Lý Thường Kiệt", "1", "Diamond", 1, "Vũ khí trang bị.")
+		_show_center_card(c_name, "Lý Thường Kiệt", "1", "Diamond", 1, _get_tutorial_card_description(c_name))
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
 		player_avatar.set_equipment("weapon", c_name, eq_sr)
@@ -922,7 +999,7 @@ func _execute_free_card_play() -> void:
 
 	elif "Voi" in c_name or "Tuyệt Ảnh" in c_name or "+1" in c_name:
 		var eq_sr = "%s%s" % [selected_card_ui.card_data.get_suit_symbol(), selected_card_ui.card_data.get_rank_string()] if selected_card_ui and selected_card_ui.card_data else ""
-		_show_center_card(c_name, "Lý Thường Kiệt", "13", "Heart", 1, "Ngựa phòng thủ (+1).")
+		_show_center_card(c_name, "Lý Thường Kiệt", "9", "Heart", 1, _get_tutorial_card_description(c_name))
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
 		player_avatar.set_equipment("defensive_mount", c_name, eq_sr)
@@ -930,7 +1007,7 @@ func _execute_free_card_play() -> void:
 
 	elif "Ngựa" in c_name or "Xích Thố" in c_name or "-1" in c_name:
 		var eq_sr = "%s%s" % [selected_card_ui.card_data.get_suit_symbol(), selected_card_ui.card_data.get_rank_string()] if selected_card_ui and selected_card_ui.card_data else ""
-		_show_center_card(c_name, "Lý Thường Kiệt", "5", "Spade", 1, "Ngựa tấn công (-1).")
+		_show_center_card(c_name, "Lý Thường Kiệt", "5", "Spade", 1, _get_tutorial_card_description(c_name))
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
 		player_avatar.set_equipment("offensive_mount", c_name, eq_sr)
@@ -938,7 +1015,7 @@ func _execute_free_card_play() -> void:
 
 	elif "Bảo Vật" in c_name or "Ngọc" in c_name:
 		var eq_sr = "%s%s" % [selected_card_ui.card_data.get_suit_symbol(), selected_card_ui.card_data.get_rank_string()] if selected_card_ui and selected_card_ui.card_data else ""
-		_show_center_card(c_name, "Lý Thường Kiệt", "12", "Heart", 1, "Bảo vật hoàng gia.")
+		_show_center_card(c_name, "Lý Thường Kiệt", "9", "Heart", 1, _get_tutorial_card_description(c_name))
 		_animate_card_play_to_center(selected_card_ui)
 		selected_card_ui = null
 		player_avatar.set_equipment("treasure", c_name, eq_sr)
@@ -1032,7 +1109,7 @@ func _boss_turn_free_play() -> void:
 		# Sơn Tặc tấn công
 		AudioManager.play_voice("Trảm")
 		AudioManager.play_slash()
-		_show_center_card("Trảm Hung Hãn", "Thủ Lĩnh Sơn Tặc", "7", "Club", 0, "Tấn công gây 1 sát thương.")
+		_show_center_card("Trảm", "Thủ Lĩnh Sơn Tặc", "7", "Club", 0, _get_tutorial_card_description("Trảm"))
 		_play_slash_effect(player_avatar.global_position + Vector2(87, 119))
 		_add_log("💥 Sơn Tặc vung đao tung chiêu [TRẢM] nhắm thẳng vào bạn!")
 
@@ -1138,7 +1215,7 @@ func _execute_free_play_dodge() -> void:
 		var c_suit = target_dodge.card_data.suit if target_dodge.card_data else "Diamond"
 		_animate_card_play_to_center(target_dodge)
 		selected_card_ui = null
-		_show_center_card("Đỡ", "Lý Thường Kiệt", c_rank, c_suit, 0, "Hóa giải 1 đòn Trảm.")
+		_show_center_card("Đỡ", "Lý Thường Kiệt", c_rank, c_suit, 0, _get_tutorial_card_description("Đỡ"))
 
 	AudioManager.play_voice("Đỡ")
 	AudioManager.play_parry()
@@ -1360,7 +1437,7 @@ func _show_reward_modal() -> void:
 			"tag_color": Color(0.85, 0.45, 0.05, 1.0)
 		},
 		{
-			"tag": "🥈 QUÂN LƯƠNG",
+			"tag": "🪙 BỔNG LỘC BẠC",
 			"val": "+5,000 BẠC",
 			"desc": "Ngân lượng khởi đầu\nChiêu mộ tướng soái\nRèn đúc binh khí",
 			"tag_color": Color(0.25, 0.45, 0.70, 1.0)
@@ -1543,33 +1620,9 @@ func _show_reward_modal() -> void:
 	tw.tween_property(box, "modulate:a", 1.0, 0.2)
 
 func _get_equipment_description(item_name: String) -> String:
-	var name_lower = item_name.to_lower()
-	if "thuận thiên" in name_lower or "thuan thien" in name_lower:
-		return "Tầm 2. Thanh bảo kiếm hộ quốc của Bình Định Vương, công thủ toàn diện."
-	elif "song cung" in name_lower or "mường nhạ" in name_lower:
-		return "Tầm 2. Khi Trảm bị Đỡ, có thể bỏ 2 bài trên tay ép mục tiêu chịu 1 sát thương."
-	elif "nỏ thần" in name_lower or "kim quy" in name_lower:
-		return "Tầm 3. Không giới hạn số lá Trảm được đánh ra trong cùng một lượt."
-	elif "trường đao" in name_lower or "nam sơn" in name_lower:
-		return "Tầm 3. Khi Trảm bị Đỡ, có thể bỏ thêm 1 lá Trảm ép đối phương Đỡ lần nữa."
-	elif "đại đao" in name_lower:
-		return "Tầm 2. Vũ khí hung hãn của thảo khấu sơn lâm, tăng sát thương công phá."
-	elif "giáp đồng" in name_lower or "sơn vi" in name_lower:
-		return "Vô hiệu hóa toàn bộ mọi đòn Trảm Thường không có thuộc tính."
-	elif "khiên mây" in name_lower:
-		return "Khi cần Đỡ: phán xét bài Đỏ hoặc bài Trắng tự động tính là Đỡ thành công; bài Vàng hoặc bài Đen thất bại."
-	elif "áo bào" in name_lower:
-		return "Tất cả sát thương nhận vào giảm 1 (tối đa 3 lần)."
-	elif "voi chiến" in name_lower:
-		return "Tăng +1 khoảng cách phòng thủ từ tất cả người khác nhắm tới bạn."
-	elif "ngựa trắng" in name_lower or "thuần nông" in name_lower:
-		return "Giảm -1 khoảng cách tấn công từ bạn tới tất cả người khác."
-	elif "bảo vật" in name_lower or "quốc gia" in name_lower or "hoàng gia" in name_lower:
-		return "Bảo vật gia truyền ban phúc lành hộ mệnh, gia tăng phòng hộ và sĩ khí."
-	elif item_name.strip_edges() == "":
+	if item_name.strip_edges() == "":
 		return "Chưa trang bị"
-	else:
-		return "Trang bị đặc biệt kích hoạt hiệu ứng bảo hộ trong trận đấu."
+	return _get_tutorial_card_description(item_name, "Trang bị đang mang; xem luật của lá để biết hiệu ứng.")
 
 func _format_equipment_info(slot_icon: String, slot_name: String, equip_str: String, default_color: String) -> String:
 	var clean_str = equip_str.strip_edges()
@@ -1671,7 +1724,7 @@ func _show_center_card(c_name: String, source: String, c_rank: String = "1", c_s
 	# 2. Khởi tạo lá bài với kích thước chuẩn 1:1 (118x168) tại trung tâm bàn đấu
 	var card_instance = CardUIScene.instantiate()
 	showcase_card_slot.add_child(card_instance)
-	card_instance.setup_card_data("center_" + c_name, c_name, c_rank, c_suit, c_cat, c_desc)
+	card_instance.setup_card_data("center_" + c_name, c_name, c_rank, c_suit, c_cat, _get_tutorial_card_description(c_name, c_desc))
 	if card_instance.click_button:
 		card_instance.click_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -1712,14 +1765,14 @@ func _execute_khien_may_judgement(defender_avatar: Control, defender_name: Strin
 		# Lấy ngẫu nhiên lá bài từ kho bài
 		var possible_suits = ["Heart", "Diamond", "Spade", "Club"]
 		var possible_ranks = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-		var possible_names = ["Trảm", "Đỡ", "Bánh Chưng", "Khiên Mây Bện", "Kiếm Thuận Thiên", "Voi Chiến", "Ngựa Trắng"]
+		var possible_names = ["Trảm", "Đỡ", "Bánh Chưng", "Khiên Mây Bện", "Kiếm Thuận Thiên", "Voi Chiến Đại Việt", "Ngựa Trắng Thuần Nông"]
 		var s = possible_suits[randi() % possible_suits.size()]
 		var r = possible_ranks[randi() % possible_ranks.size()]
 		var n = possible_names[randi() % possible_names.size()]
-		judge_card = {"name": n, "rank": r, "suit": s, "cat": 0, "desc": "Lá bài phán xét lật từ kho bài."}
+		judge_card = {"name": n, "rank": r, "suit": s, "cat": 0, "desc": _get_tutorial_card_description(n, "Lá bài được lật để phán xét")}
 
 	var suit_str = judge_card.get("suit", "Heart")
-	var rank_str = str(judge_card.get("rank", "7"))
+	var rank_str = _format_rank(judge_card.get("rank", 7))
 	var card_name = judge_card.get("name", "Trảm")
 	var s_lower = suit_str.to_lower()
 	var is_red = (s_lower in ["heart", "diamond", "red", "white", "co", "ro", "do", "trang"])
@@ -1740,7 +1793,7 @@ func _execute_khien_may_judgement(defender_avatar: Control, defender_name: Strin
 
 	var card_instance = CardUIScene.instantiate()
 	showcase_card_slot.add_child(card_instance)
-	card_instance.setup_card_data("judge_" + card_name, card_name, rank_str, suit_str, 0, "Phán xét Khiên Mây Bện")
+	card_instance.setup_card_data("judge_" + card_name, card_name, rank_str, suit_str, 0, _get_tutorial_card_description(card_name, "Lá bài được lật để phán xét"))
 	if card_instance.click_button:
 		card_instance.click_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 

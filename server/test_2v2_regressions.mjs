@@ -4,6 +4,7 @@ import {
   handleDiscardCards,
   handleEndTurn,
   handleAIReaction,
+  handleAIStep,
   handlePlayCard,
   handleRespondAction,
   handleUseSkill,
@@ -26,6 +27,23 @@ const players = [1, 2, 3, 4].map((seat) => ({
   generalName: `Test ${seat}`,
   maxHp: 4,
 }));
+
+// Normal 2v2 is team based.  Its internal legacy role fallback must never be
+// sent to the client, where REBEL would be displayed as “Phản Tặc”.
+{
+  const state = initGame("room_2v2_role_visibility", players, "2v2");
+  const localView = sanitizeGameStateForClient(state, 1);
+  assert.ok(localView.players.every((player) => player.role === ""));
+  assert.ok(localView.players.every((player) => !String(player.generalName).includes("Phản Tặc")));
+
+  const dynastyPlayers = [
+    ...players,
+    { seat: 5, userId: "test_5", generalName: "Test 5", maxHp: 4 }
+  ];
+  const dynastyState = initGame("room_dynasty_role_visibility", dynastyPlayers, "dynasty_5");
+  const dynastyView = sanitizeGameStateForClient(dynastyState, 1);
+  assert.equal(dynastyView.players.find((player) => player.seat === 1).role, "KING");
+}
 
 function freshState() {
   const state = initGame("room_2v2_regressions", players);
@@ -58,6 +76,50 @@ assert.deepEqual(HEROES.HERO_6.skills, ["TRINH_LIET", "BAT_NA"]);
 assert.deepEqual(HEROES.HERO_7.skills, ["TIEN_PHONG", "TRAN_TIEN"]);
 assert.deepEqual(HEROES.HERO_8.skills, ["KHOI_BINH", "HUYNH_TRUONG"]);
 assert.equal(HERO_MAX_HP[7], 4);
+
+// Dynasty AI must select according to role objectives rather than always
+// attacking the first seat in turn order.
+{
+  const dynastyPlayers = [1, 2, 3, 4, 5].map((seat) => ({
+    seat,
+    userId: `dynasty_ai_${seat}`,
+    generalName: `Dynasty AI ${seat}`,
+    heroId: "HERO_2",
+    isAI: true,
+    maxHp: 4
+  }));
+  const slash = createDeck(80).find((candidate) => candidate.subType === CARD_SUBTYPES.ATTACK_NORMAL);
+  assert.ok(slash, "test deck should contain a normal Trảm");
+  const runAiSlash = (seat) => {
+    const state = initGame(`room_dynasty_ai_${seat}`, dynastyPlayers, "dynasty_5");
+    for (const player of state.players) {
+      player.hand = [];
+      player.equipments = [];
+      player.judgements = [];
+      player.hp = player.maxHp;
+      player.isAlive = true;
+      player.usedSkills = {};
+    }
+    state.phase = "PLAY";
+    state.turnSeat = seat;
+    state.turnStart = {
+      seat,
+      judgementCards: [],
+      judgementIndex: 0,
+      skipDraw: false,
+      skipPlay: false,
+      drawCount: 0
+    };
+    state.players.find((player) => player.seat === seat).hand = [{ ...slash, id: `${slash.id}_${seat}` }];
+    const result = handleAIStep(state, seat);
+    assert.equal(result.error, undefined);
+    assert.equal(state.lastAction.type, "PLAY_SLASH");
+    return state.lastAction.targetSeat;
+  };
+  assert.equal(runAiSlash(3), 1, "Phản Tặc must prioritize the Vua");
+  assert.equal(runAiSlash(1), 3, "Vua must prioritize a Phản Tặc");
+  assert.equal(runAiSlash(5), 3, "Nội Gián must remove a Phản Tặc before the Vua");
+}
 
 {
   const state = initGame("room_tien_phong", players.map((player) => ({
@@ -337,7 +399,8 @@ assert.equal(HERO_MAX_HP[7], 4);
   assert.equal(state.lastDelta.card.desc, customCard.desc);
   assert.equal(state.lastDelta.cardName, customCard.name);
   assert.equal(state.lastDelta.card.suit, "Diamond");
-  assert.equal(state.lastDelta.card.rank, 13);
+  // Every client-visible card point is normalized to the 0..9 scale.
+  assert.equal(state.lastDelta.card.rank, 9);
 }
 
 function assertTeammateTargetAllowed(subType, name) {
@@ -1901,6 +1964,14 @@ for (const [subType, name] of [
   assert.equal(state.phase, "AWAIT_TARGET_CARD");
   assert.equal(state.targetCardSelection.effectType, "COT_KINH_DISCARD");
   assert.equal(state.waitingTargetSeat, 2);
+  assert.ok(state.targetCardSelection.title.includes("CỘT KINH"));
+  assert.ok(state.targetCardSelection.description.includes("Cột Kinh"));
+  assert.equal(state.targetCardSelection.ownerSeat, 1);
+
+  const clientStateSeat2 = sanitizeGameStateForClient(state, 2);
+  assert.equal(clientStateSeat2.targetCardSelection.ownerSeat, 1);
+  assert.ok(clientStateSeat2.targetCardSelection.title.includes("CỘT KINH"));
+  assert.ok(clientStateSeat2.targetCardSelection.options[0].card !== null);
 
   handleRespondAction(state, 2, true, null, "HAND:0");
   assert.equal(state.players[1].hand.length, 0);

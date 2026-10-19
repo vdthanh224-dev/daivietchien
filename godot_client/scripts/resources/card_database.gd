@@ -5,11 +5,20 @@ const CardResourceScript = preload("res://scripts/resources/card_resource.gd")
 
 static var _cards_cache: Dictionary = {}
 
+static func canonical_id(id: String) -> String:
+	var value := str(id).strip_edges()
+	if value.to_upper().begins_with("EQUIPMENT:"):
+		value = value.substr("EQUIPMENT:".length())
+	if value.to_upper().begins_with("JUDGEMENT:"):
+		value = value.substr("JUDGEMENT:".length())
+	return value.split(":", false, 1)[0]
+
 static func get_card(id: String) -> Resource:
-	if _cards_cache.has(id):
-		return _cards_cache[id]
-	var c = create_card_from_id(id)
-	_cards_cache[id] = c
+	var lookup_id := canonical_id(id)
+	if _cards_cache.has(lookup_id):
+		return _cards_cache[lookup_id]
+	var c = create_card_from_id(lookup_id)
+	_cards_cache[lookup_id] = c
 	return c
 
 static func get_card_info(id: String) -> Dictionary:
@@ -38,6 +47,18 @@ static func create_card_from_dict(data: Dictionary) -> Resource:
 	c.sub_type = int(data.get("subType", 0)) as CardResourceScript.CardSubType
 	c.description = data.get("desc", data.get("description", ""))
 	c.attack_range = int(data.get("range", data.get("attackRange", 1)))
+	# The ID catalog owns card identity and classification.  This also repairs
+	# stale persisted payloads such as Trầm Ảo rendered as armor or Đoản Đao as
+	# a scroll before the card reaches the UI.
+	var canonical := _find_catalog_card(canonical_id(c.id))
+	if not canonical.is_empty():
+		c.card_name = str(canonical.get("name", c.card_name))
+		c.suit = str(canonical.get("suit", c.suit))
+		c.rank = _normalize_rank(canonical.get("rank", c.rank))
+		c.category = int(canonical.get("category", c.category)) as CardResourceScript.CardCategory
+		c.sub_type = int(canonical.get("subType", c.sub_type)) as CardResourceScript.CardSubType
+		c.description = str(canonical.get("desc", c.description))
+		c.attack_range = int(canonical.get("range", c.attack_range))
 	if c.category == CardResourceScript.CardCategory.CO_BAN and c.sub_type == CardResourceScript.CardSubType.TRAM:
 		c.card_name = "Trảm"
 	elif c.sub_type == CardResourceScript.CardSubType.TRAM_THUY:
@@ -50,6 +71,17 @@ static func create_card_from_dict(data: Dictionary) -> Resource:
 		c.card_name = "Hịch Tướng Sĩ"
 		c.description = "Bạn và 1 người khác bạn chọn, bỏ 1 lá để nhận Sục Sôi: 1 vòng không giới hạn Trảm, tầm đánh +1. Có thể đổi lá để rút lá khác."
 	return c
+
+static func _find_catalog_card(id: String) -> Dictionary:
+	if id.is_empty():
+		return {}
+	for entry in create_deck_80():
+		if str(entry.get("id", "")) == id:
+			return entry
+	for entry in create_deck_150():
+		if str(entry.get("id", "")) == id:
+			return entry
+	return {}
 
 static func _normalize_rank(value: Variant) -> int:
 	var raw = str(value).strip_edges().to_upper()
@@ -185,7 +217,7 @@ static func create_deck_80() -> Array:
 	list.append(_make_card_dict("D80_AG_CK_GiapDong", "Giáp Đồng Sơn Vi", "Club", 9, 1, 7, "Vô hiệu hóa toàn bộ đòn Trảm Thường"))
 	list.append(_make_card_dict("D80_AG_DK_KhienMay", "Khiên Mây Bện", "Diamond", 9, 1, 7, "Bị Trảm/Mưa Tên: lật phán xét Đỏ hoặc Trắng tự động Đỡ, Vàng hoặc Đen thất bại"))
 	list.append(_make_card_dict("D80_AG_HA_AoBao", "Áo Bào Hoàng Tộc", "Heart", 0, 1, 7, "Chặn tối đa 2 sát thương, rồi bị hủy"))
-	list.append(_make_card_dict("D80_AG_C6_GiapTaySon", "Giáp Tây Sơn", "Club", 4, 1, 7, "Vô hiệu hóa mọi Trảm bài Đen hoặc bài Vàng (Bích hoặc Chuồn)"))
+	list.append(_make_card_dict("D80_AG_C6_GiapTaySon", "Giáp Tây Sơn", "Club", 4, 1, 7, "Vô hiệu hóa mọi Trảm bài Đen hoặc bài Vàng"))
 
 	# 10. Chiến Mã — 4 lá
 	list.append(_make_card_dict("D80_CM_HK_VoiChien", "Voi Chiến Đại Việt", "Heart", 9, 1, 9, "Ngựa Thủ: Tăng +1 Khoảng cách từ người chơi khác tới bạn", 1, 1))
@@ -206,9 +238,9 @@ static func create_deck_80() -> Array:
 	list.append(_make_card_dict("D80_CN_D4_MoKho", "Mở Kho Cứu Tế", "Diamond", 2, 2, 16, "Mở kho phát bài cho tất cả người chơi còn sống"))
 	list.append(_make_card_dict("D80_CN_GiacToi", "Giặc Tới", "Spade", 5, 2, 17, "Ép tất cả người chơi khác phải đánh 1 Trảm hoặc chịu 1 sát thương"))
 	list.append(_make_card_dict("D80_CN_MuaTen", "Mưa Tên Liên Châu", "Heart", 0, 2, 18, "Ép tất cả người chơi khác phải đánh 1 Đỡ hoặc chịu 1 sát thương"))
-	list.append(_make_card_dict("D80_CN_H2_ThuyTrieuRut", "Thủy Triều Rút", "Heart", 1, 2, 23, "Chọn 1 người có bài: họ đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"))
-	list.append(_make_card_dict("D80_CN_H3_ThuyTrieuRut", "Thủy Triều Rút", "Heart", 2, 2, 23, "Chọn 1 người có bài: họ đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"))
-	list.append(_make_card_dict("D80_CN_DQ_ThuyTrieuRut", "Thủy Triều Rút", "Diamond", 8, 2, 23, "Chọn 1 người có bài: họ đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"))
+	list.append(_make_card_dict("D80_CN_H2_ThuyTrieuRut", "Thủy Triều Rút", "Heart", 1, 2, 23, "Chọn 1 người có bài: người đó đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"))
+	list.append(_make_card_dict("D80_CN_H3_ThuyTrieuRut", "Thủy Triều Rút", "Heart", 2, 2, 23, "Chọn 1 người có bài: người đó đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"))
+	list.append(_make_card_dict("D80_CN_DQ_ThuyTrieuRut", "Thủy Triều Rút", "Diamond", 8, 2, 23, "Chọn 1 người có bài: người đó đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"))
 	list.append(_make_card_dict("D80_CN_CQ_MuonGuom", "Mượn Gươm Diệt Địch", "Club", 8, 2, 24, "Buộc người có Vũ khí đánh Trảm vào 1 mục tiêu; không đánh thì đưa Vũ khí cho người dùng Mượn Gươm"))
 	list.append(_make_card_dict("D80_CN_CK_MuonGuom", "Mượn Gươm Diệt Địch", "Club", 9, 2, 24, "Buộc người có Vũ khí đánh Trảm vào 1 mục tiêu; không đánh thì đưa Vũ khí cho người dùng Mượn Gươm"))
 	list.append(_make_card_dict("D80_CN_HA_MoYenTiec", "Mở Yến Tiệc", "Heart", 0, 2, 25, "Lần lượt người chơi bị mất Máu được hồi 1 Máu"))
@@ -330,9 +362,9 @@ static func create_deck_150() -> Array:
 	list.append(_make_card_dict("D150_CN_SA_HuyetChien", "Huyết Chiến", "Spade", 0, 2, 14, "Chọn 1 mục tiêu bất kỳ; hai bên luân phiên đánh Trảm, người dừng chịu 1 sát thương, đối phương đánh trước"))
 	list.append(_make_card_dict("D150_CN_H3_MoKho", "Mở Kho Cứu Tế", "Heart", 2, 2, 16, "Mở kho phát bài cho tất cả người chơi còn sống"))
 	list.append(_make_card_dict("D150_CN_D4_MoKho", "Mở Kho Cứu Tế", "Diamond", 2, 2, 16, "Mở kho phát bài cho tất cả người chơi còn sống"))
-	list.append(_make_card_dict("D150_CN_H2_ThuyTrieuRut", "Thủy Triều Rút", "Heart", 1, 2, 23, "Chọn 1 người có bài: họ đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"))
-	list.append(_make_card_dict("D150_CN_H3_ThuyTrieuRut", "Thủy Triều Rút", "Heart", 2, 2, 23, "Chọn 1 người có bài: họ đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"))
-	list.append(_make_card_dict("D150_CN_DQ_ThuyTrieuRut", "Thủy Triều Rút", "Diamond", 8, 2, 23, "Chọn 1 người có bài: họ đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"))
+	list.append(_make_card_dict("D150_CN_H2_ThuyTrieuRut", "Thủy Triều Rút", "Heart", 1, 2, 23, "Chọn 1 người có bài: người đó đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"))
+	list.append(_make_card_dict("D150_CN_H3_ThuyTrieuRut", "Thủy Triều Rút", "Heart", 2, 2, 23, "Chọn 1 người có bài: người đó đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"))
+	list.append(_make_card_dict("D150_CN_DQ_ThuyTrieuRut", "Thủy Triều Rút", "Diamond", 8, 2, 23, "Chọn 1 người có bài: người đó đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"))
 	list.append(_make_card_dict("D150_CN_CQ_MuonGuom", "Mượn Gươm Diệt Địch", "Club", 8, 2, 24, "Buộc người có Vũ khí đánh Trảm vào 1 mục tiêu; không đánh thì đưa Vũ khí cho người dùng Mượn Gươm"))
 	list.append(_make_card_dict("D150_CN_CK_MuonGuom", "Mượn Gươm Diệt Địch", "Club", 9, 2, 24, "Buộc người có Vũ khí đánh Trảm vào 1 mục tiêu; không đánh thì đưa Vũ khí cho người dùng Mượn Gươm"))
 	list.append(_make_card_dict("D150_CN_HA_MoYenTiec", "Mở Yến Tiệc", "Heart", 0, 2, 25, "Lần lượt người chơi bị mất Máu được hồi 1 Máu"))
@@ -394,6 +426,24 @@ static func create_card_from_id(id: String) -> Resource:
 		c.sub_type = CardResourceScript.CardSubType.VU_KHI
 		c.attack_range = 2
 		c.description = "Tầm 2. Trảm bỏ qua Trang bị Giáp của mục tiêu"
+	elif id.contains("HoaMai"):
+		c.card_name = "Hỏa Mai Tây Sơn"
+		c.category = CardResourceScript.CardCategory.TRANG_BI
+		c.sub_type = CardResourceScript.CardSubType.VU_KHI
+		c.attack_range = 4
+		c.description = "Tầm 4. Trảm Thường có thể xem như Trảm Hỏa"
+	elif id.contains("LiemDao"):
+		c.card_name = "Liêm Đao Đống Đa"
+		c.category = CardResourceScript.CardCategory.TRANG_BI
+		c.sub_type = CardResourceScript.CardSubType.VU_KHI
+		c.attack_range = 2
+		c.description = "Tầm 2. Lần đầu mỗi lượt gây sát thương, rút 1 lá"
+	elif id.contains("DoanDao"):
+		c.card_name = "Đoản Đao Lam Sơn"
+		c.category = CardResourceScript.CardCategory.TRANG_BI
+		c.sub_type = CardResourceScript.CardSubType.VU_KHI
+		c.attack_range = 2
+		c.description = "Tầm 2. Khi Trảm trúng, có thể hủy 2 lá tay hoặc Trang bị của mục tiêu thay vì gây sát thương"
 	elif id.contains("SongCung"):
 		c.card_name = "Song Cung Mường Nhạ"
 		c.category = CardResourceScript.CardCategory.TRANG_BI
@@ -434,6 +484,11 @@ static func create_card_from_id(id: String) -> Resource:
 		c.category = CardResourceScript.CardCategory.TRANG_BI
 		c.sub_type = CardResourceScript.CardSubType.AO_GIAP
 		c.description = "Vô hiệu hóa toàn bộ Trảm Thường"
+	elif id.contains("GiapTaySon"):
+		c.card_name = "Giáp Tây Sơn"
+		c.category = CardResourceScript.CardCategory.TRANG_BI
+		c.sub_type = CardResourceScript.CardSubType.AO_GIAP
+		c.description = "Vô hiệu hóa mọi Trảm bài Đen hoặc bài Vàng"
 	elif id.contains("AoBao"):
 		c.card_name = "Áo Bào Hoàng Tộc"
 		c.category = CardResourceScript.CardCategory.TRANG_BI
@@ -444,6 +499,11 @@ static func create_card_from_id(id: String) -> Resource:
 		c.category = CardResourceScript.CardCategory.TRANG_BI
 		c.sub_type = CardResourceScript.CardSubType.NGUA_THU
 		c.description = "Ngựa Thủ: Tăng +1 Khoảng cách từ người khác tới bạn"
+	elif id.contains("ThuyenBachDang"):
+		c.card_name = "Thuyền Bạch Đằng"
+		c.category = CardResourceScript.CardCategory.TRANG_BI
+		c.sub_type = CardResourceScript.CardSubType.NGUA_CONG
+		c.description = "Ngựa Công: Trảm Thủy bỏ qua khoảng cách"
 	elif id.contains("NguaTrang"):
 		c.card_name = "Ngựa Trắng Thuần Nông"
 		c.category = CardResourceScript.CardCategory.TRANG_BI
@@ -499,7 +559,7 @@ static func create_card_from_id(id: String) -> Resource:
 		c.category = CardResourceScript.CardCategory.TRI_HOAN
 		c.sub_type = CardResourceScript.CardSubType.BAI_COC_BACH_DANG
 		c.description = "Khi mục tiêu dùng Trảm hoặc Chiến Mã, phán xét 1 lần: Vàng hoặc Đen hủy hành động và chịu 1 sát thương; Đỏ hoặc Trắng hành động được tiếp tục, sau đó Bãi Cọc rời đi"
-	elif id.contains("GiacToi") or id.contains("BaiCoc"):
+	elif id.contains("GiacToi"):
 		c.card_name = "Giặc Tới"
 		c.category = CardResourceScript.CardCategory.CAM_NANG
 		c.sub_type = CardResourceScript.CardSubType.BAI_COC_NGAM
@@ -533,7 +593,7 @@ static func create_card_from_id(id: String) -> Resource:
 		c.card_name = "Thủy Triều Rút"
 		c.category = CardResourceScript.CardCategory.CAM_NANG
 		c.sub_type = CardResourceScript.CardSubType.THUY_TRIEU_RUT
-		c.description = "Chọn 1 người có bài: họ đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"
+		c.description = "Chọn 1 người có bài: người đó đưa bạn 1 lá. Nếu lá đó không phải Bài Cơ Bản, người ít bài hơn sau chuyển chịu 1 sát thương Thủy"
 	elif id.contains("MuonGuom"):
 		c.card_name = "Mượn Gươm Diệt Địch"
 		c.category = CardResourceScript.CardCategory.CAM_NANG

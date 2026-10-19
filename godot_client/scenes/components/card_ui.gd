@@ -35,6 +35,19 @@ func _ready() -> void:
 		update_card(card_data)
 
 func setup_card_data(id: String, p_name: String, rank_val: Variant, suit_str: String, cat: int, desc: String, sub_type_val: int = -1) -> void:
+	# The card ID is authoritative. Network payloads can contain stale names or
+	# categories after a card was migrated; resolve known IDs through the local
+	# canonical catalog before rendering or inferring anything from the name.
+	var canonical_id := CardDatabaseScript.canonical_id(id) if CardDatabaseScript else id
+	if (canonical_id.begins_with("D80_") or canonical_id.begins_with("D150_")) and CardDatabaseScript:
+		var canonical = CardDatabaseScript.get_card(canonical_id)
+		if canonical != null and str(canonical.id) == canonical_id:
+			p_name = canonical.card_name
+			rank_val = canonical.rank
+			suit_str = canonical.suit
+			cat = int(canonical.category)
+			desc = canonical.description
+			sub_type_val = int(canonical.sub_type)
 	card_name = p_name
 	var res = CardResourceScript.new()
 	res.id = id
@@ -67,8 +80,8 @@ static func _infer_sub_type_from_name(p_name: String) -> int:
 	if "đỡ" in n: return CardResourceScript.CardSubType.DO
 	if "bánh chưng" in n: return CardResourceScript.CardSubType.BANH_CHUNG
 	if "rượu" in n: return CardResourceScript.CardSubType.HU_RUOU
-	if "khiên mây" in n or "áo bào" in n or "giáp đồng" in n: return CardResourceScript.CardSubType.AO_GIAP
-	if "thuận thiên" in n or "song cung" in n or "nỏ thần" in n or "trường đao" in n or "thương ngâu" in n or "súng thần công" in n: return CardResourceScript.CardSubType.VU_KHI
+	if "khiên mây" in n or "áo bào" in n or "giáp đồng" in n or "giáp tây" in n: return CardResourceScript.CardSubType.AO_GIAP
+	if "thuận thiên" in n or "song cung" in n or "nỏ thần" in n or "trường đao" in n or "thương ngâu" in n or "súng thần công" in n or "hỏa mai" in n or "liêm đao" in n or "đoản đao" in n: return CardResourceScript.CardSubType.VU_KHI
 	if "ngựa trắng" in n: return CardResourceScript.CardSubType.NGUA_CONG
 	if "voi chiến" in n: return CardResourceScript.CardSubType.NGUA_THU
 	if "trống đồng" in n or "bảo vật" in n: return CardResourceScript.CardSubType.BRONZE_DRUM
@@ -96,7 +109,7 @@ static func _infer_sub_type_from_name(p_name: String) -> int:
 
 static func _infer_category_from_name(p_name: String) -> int:
 	var n = p_name.to_lower()
-	if "khiên mây" in n or "áo bào" in n or "giáp đồng" in n or "thuận thiên" in n or "song cung" in n or "nỏ thần" in n or "trường đao" in n or "thương ngâu" in n or "súng thần công" in n or "ngựa trắng" in n or "voi chiến" in n or "trống đồng" in n or "bảo vật" in n:
+	if "khiên mây" in n or "áo bào" in n or "giáp đồng" in n or "giáp tây" in n or "thuận thiên" in n or "song cung" in n or "nỏ thần" in n or "trường đao" in n or "thương ngâu" in n or "súng thần công" in n or "hỏa mai" in n or "liêm đao" in n or "đoản đao" in n or "ngựa trắng" in n or "voi chiến" in n or "thuyền bạch" in n or "trống đồng" in n or "hổ phù" in n or "bảo vật" in n:
 		return CardResourceScript.CardCategory.TRANG_BI
 	if "đại hồng thủy" in n or "cắt lương" in n or "trầm ảo" in n or "bãi cọc" in n:
 		return CardResourceScript.CardCategory.TRI_HOAN

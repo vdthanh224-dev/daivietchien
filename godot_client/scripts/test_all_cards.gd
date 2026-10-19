@@ -20,7 +20,7 @@ func _init() -> void:
 		# Vũ Khí (6)
 		{"name": "Kiếm Thuận Thiên", "cat": 1, "sub": 6, "range": 2},
 		{"name": "Song Cung Mường Nhạ", "cat": 1, "sub": 6, "range": 2},
-		{"name": "Nỏ Thần Kim Quy", "cat": 1, "sub": 6, "range": 3},
+		{"name": "Nỏ Thần Kim Quy", "cat": 1, "sub": 6, "range": 1},
 		{"name": "Trường Đao Nam Sơn", "cat": 1, "sub": 6, "range": 3},
 		{"name": "Thương Ngâu Lãng Bạc", "cat": 1, "sub": 6, "range": 4},
 		{"name": "Súng Thần Công Hồ Triều", "cat": 1, "sub": 6, "range": 5},

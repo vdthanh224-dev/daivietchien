@@ -201,14 +201,9 @@ func _process(delta: float) -> void:
 				active_server_url = cand["url"]
 			print("[NetworkClient] ⚡ Đã kết nối thành công tới %s (%s)!" % [active_server_name, active_server_url])
 			print("[NetworkClient] DRAFT authority: server=%s" % active_server_url)
+			current_ping = 1
+			ping_updated.emit(1)
 			connection_established.emit()
-			_send_ping()
-
-		# Nhịp đập Heartbeat PING & Đo độ trễ thời gian thực mỗi 3 giây
-		_ping_timer += delta
-		if _ping_timer >= 3.0:
-			_ping_timer = 0.0
-			_send_ping()
 
 		while socket.get_available_packet_count() > 0:
 			var packet = socket.get_packet()
@@ -447,12 +442,24 @@ func send_chat_message(channel: String, text: String) -> bool:
 	if text.is_empty() or text.length() > 280:
 		chat_error.emit(channel, "Nhập tin nhắn từ 1 đến 280 ký tự")
 		return false
+	var mil_pts: int = AuthManager.get_military_points() if AuthManager else 0
 	var payload: Dictionary = {
 		"action": "CHAT_SEND",
 		"channel": channel,
 		"text": text,
+		"userId": AuthManager.current_user_id if AuthManager else "",
+		"userName": AuthManager.current_user_name if AuthManager else "",
 		"title": AuthManager.current_title if AuthManager else "",
-		"profileBg": AuthManager.current_profile_bg if AuthManager else 0
+		"profileBg": AuthManager.current_profile_bg if AuthManager else 0,
+		"level": AuthManager.current_level if AuthManager else 1,
+		"exp": AuthManager.current_exp if AuthManager else 0,
+		"rankIndex": AuthManager.current_2v2_rank_index if AuthManager else 0,
+		"rankStars": AuthManager.current_2v2_stars if AuthManager else 0,
+		"rankAcc": AuthManager.current_2v2_accumulation_points if AuthManager else 0,
+		"militaryPoints": mil_pts,
+		"wins": AuthManager.current_wins if AuthManager else 0,
+		"losses": AuthManager.current_losses if AuthManager else 0,
+		"generalsCount": AuthManager.current_generals.size() if AuthManager else 1
 	}
 	if channel == "battle":
 		payload["roomId"] = room_id
@@ -470,14 +477,22 @@ func send_matchmaking_stop() -> void:
 func register_social_profile() -> void:
 	if not AuthManager or AuthManager.current_user_id.is_empty():
 		return
+	var mil_pts: int = AuthManager.get_military_points() if AuthManager else 0
 	send_json({
 		"action": "SOCIAL_REGISTER",
 		"userId": AuthManager.current_user_id,
 		"userName": AuthManager.current_user_name,
 		"level": AuthManager.current_level if AuthManager else 1,
+		"exp": AuthManager.current_exp if AuthManager else 0,
 		"title": AuthManager.current_title if AuthManager else "",
 		"profileBg": AuthManager.current_profile_bg if AuthManager else 0,
-		"rankIndex": AuthManager.current_2v2_rank_index if AuthManager else 0
+		"rankIndex": AuthManager.current_2v2_rank_index if AuthManager else 0,
+		"rankStars": AuthManager.current_2v2_stars if AuthManager else 0,
+		"rankAcc": AuthManager.current_2v2_accumulation_points if AuthManager else 0,
+		"militaryPoints": mil_pts,
+		"wins": AuthManager.current_wins if AuthManager else 0,
+		"losses": AuthManager.current_losses if AuthManager else 0,
+		"generalsCount": AuthManager.current_generals.size() if AuthManager else 1
 	})
 
 func request_friend_list() -> void:
@@ -520,6 +535,27 @@ func send_join_draft(target_room: String, seat: int, user_id: String, user_name:
 		# An explicitly requested seat is only used for local multi-window debugging.
 		payload["debugSeat"] = my_seat
 	send_json(payload)
+
+func send_matchmaking_start(mode_id: String = "2v2", target_room_id: String = "") -> void:
+	if not is_connected_to_server or socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
+		return
+	var payload: Dictionary = {
+		"action": "MATCHMAKING_START",
+		"modeId": mode_id
+	}
+	if not target_room_id.is_empty():
+		payload["roomId"] = target_room_id
+	send_json(payload)
+	print("[NetworkClient] Gửi MATCHMAKING_START tới Render server (mode: %s, room: %s)" % [mode_id, target_room_id])
+
+func send_matchmaking_stop() -> void:
+	if not is_connected_to_server or socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
+		return
+	var payload: Dictionary = {
+		"action": "MATCHMAKING_STOP"
+	}
+	send_json(payload)
+	print("[NetworkClient] Gửi MATCHMAKING_STOP tới Render server")
 
 func send_pick_hero(hero_id: int, hero_name: String = "") -> void:
 	send_json({

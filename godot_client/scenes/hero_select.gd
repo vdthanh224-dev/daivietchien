@@ -67,6 +67,8 @@ var dynasty_role_description: RichTextLabel
 var dynasty_phase_label: RichTextLabel
 var king_hero_portrait: TextureRect
 var king_hero_name_label: Label
+var king_hero_skill_label: Label
+var dynasty_seat_label: Label
 
 func _ready() -> void:
 	var current_room = AppwriteMatchmaking.current_room if AppwriteMatchmaking else {}
@@ -103,7 +105,7 @@ func _ready() -> void:
 		var filtered_heroes: Array[Dictionary] = []
 		for h in available_heroes:
 			var hid = int(h.get("id", 0))
-			if hid >= 1 and hid <= 40:
+			if hid >= 1 and hid <= 50:
 				filtered_heroes.append(h)
 		available_heroes = filtered_heroes
 	full_available_heroes_pool = available_heroes.duplicate()
@@ -326,7 +328,7 @@ func _setup_local_disjoint_hero_pools(round_num: int) -> void:
 		var half2: Array[Dictionary] = []
 		for h in pool_source:
 			var hid = int(h.get("id", 0))
-			if hid < 1 or hid > 40: continue
+			if hid < 1 or hid > 50: continue
 			if half1.size() < 8:
 				half1.append(h)
 			elif half2.size() < 8:
@@ -349,7 +351,7 @@ func _setup_local_disjoint_hero_pools(round_num: int) -> void:
 		var half4: Array[Dictionary] = []
 		for h in pool_source:
 			var hid = int(h.get("id", 0))
-			if hid < 1 or hid > 40 or hid in selected_hero_ids: continue
+			if hid < 1 or hid > 50 or hid in selected_hero_ids: continue
 			if half3.size() < 8:
 				half3.append(h)
 			elif half4.size() < 8:
@@ -409,7 +411,7 @@ func _show_fallback_candidate_pool() -> void:
 	source.shuffle()
 	for hero in source:
 		var hid := int(hero.get("id", 0))
-		if hid >= 1 and (is_user_admin or hid <= 40) and not selected_hero_ids.has(hid):
+		if hid >= 1 and (is_user_admin or hid <= 50) and not selected_hero_ids.has(hid):
 			fallback.append(hero)
 			if not is_user_admin and fallback.size() >= 8:
 				break
@@ -489,6 +491,12 @@ func _build_dynasty_role_column() -> Control:
 	title.add_theme_font_size_override("font_size", 16)
 	title.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 	col.add_child(title)
+	dynasty_seat_label = Label.new()
+	dynasty_seat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	dynasty_seat_label.add_theme_font_size_override("font_size", 14)
+	dynasty_seat_label.add_theme_color_override("font_color", COLOR_DRAGON_CYAN)
+	dynasty_seat_label.text = "VỊ TRÍ CỦA BẠN: GHẾ %d" % (NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 else 1)
+	col.add_child(dynasty_seat_label)
 	dynasty_role_description = RichTextLabel.new()
 	dynasty_role_description.name = "RoleInstructions"
 	dynasty_role_description.bbcode_enabled = true
@@ -497,7 +505,7 @@ func _build_dynasty_role_column() -> Control:
 	dynasty_role_description.add_theme_font_size_override("normal_font_size", 14)
 	col.add_child(dynasty_role_description)
 	var king_panel = PanelContainer.new()
-	king_panel.custom_minimum_size.y = 220
+	king_panel.custom_minimum_size.y = 300
 	var style = StyleBoxFlat.new()
 	style.bg_color = COLOR_PANEL_BG
 	style.border_color = DynastyRoleInfo.get_color("KING")
@@ -515,7 +523,7 @@ func _build_dynasty_role_column() -> Control:
 	king_title.add_theme_color_override("font_color", DynastyRoleInfo.get_color("KING"))
 	king_box.add_child(king_title)
 	king_hero_portrait = TextureRect.new()
-	king_hero_portrait.custom_minimum_size.y = 128
+	king_hero_portrait.custom_minimum_size.y = 105
 	king_hero_portrait.size_flags_vertical = SIZE_EXPAND_FILL
 	king_hero_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	king_hero_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -526,6 +534,13 @@ func _build_dynasty_role_column() -> Control:
 	king_hero_name_label.add_theme_font_size_override("font_size", 14)
 	king_hero_name_label.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 	king_box.add_child(king_hero_name_label)
+	king_hero_skill_label = Label.new()
+	king_hero_skill_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	king_hero_skill_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	king_hero_skill_label.add_theme_font_size_override("font_size", 12)
+	king_hero_skill_label.add_theme_color_override("font_color", Color(0.88, 0.94, 1.0, 0.95))
+	king_hero_skill_label.text = "Kỹ năng của Vua sẽ hiện sau khi Vua khóa tướng."
+	king_box.add_child(king_hero_skill_label)
 	return col
 
 func _get_king_slot() -> Dictionary:
@@ -543,6 +558,9 @@ func _update_dynasty_draft_ui() -> void:
 		return
 	if is_instance_valid(dynasty_role_description):
 		dynasty_role_description.text = DynastyRoleInfo.instructions(my_role, draft_slots.size())
+	if is_instance_valid(dynasty_seat_label):
+		var own_seat := NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 else 1
+		dynasty_seat_label.text = "VỊ TRÍ CỦA BẠN: GHẾ %d" % own_seat
 	var king_slot := _get_king_slot()
 	var king_locked := bool(king_slot.get("isLocked", false))
 	var phase_text := "VUA đang chọn tướng"
@@ -565,10 +583,17 @@ func _update_dynasty_draft_ui() -> void:
 			king_hero_name_label.text = str(hero.get("name", ""))
 			king_hero_name_label.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 			king_hero_portrait.texture = HeroDatabase.get_avatar_texture(hero.get("avatarPath", "")) if HeroDatabase else null
+			if is_instance_valid(king_hero_skill_label):
+				var hero_id := int(hero.get("id", 0))
+				var skill_summary := HeroDatabase.get_skill_summary(hero_id) if HeroDatabase and hero_id > 0 else "Kỹ năng chưa có dữ liệu"
+				var skill_details := HeroDatabase.get_skill_details(hero_id) if HeroDatabase and hero_id > 0 else ""
+				king_hero_skill_label.text = "⚡ %s\n%s" % [skill_summary if not skill_summary.is_empty() else "Kỹ năng", skill_details if not skill_details.is_empty() else "Chưa có mô tả kỹ năng."]
 		else:
 			king_hero_name_label.text = "VUA chưa chọn tướng"
 			king_hero_name_label.add_theme_color_override("font_color", DynastyRoleInfo.get_color("KING"))
 			king_hero_portrait.texture = null
+			if is_instance_valid(king_hero_skill_label):
+				king_hero_skill_label.text = "Kỹ năng của Vua sẽ hiện sau khi Vua khóa tướng."
 
 func _build_header() -> void:
 	var header = PanelContainer.new()
@@ -1606,7 +1631,7 @@ func _choose_bot_hero(slot: Dictionary = {}) -> Dictionary:
 	if not candidate_ids.is_empty():
 		for cid in candidate_ids:
 			var hid = int(cid)
-			if not hid in selected_hero_ids and hid >= 1 and hid <= 40:
+			if not hid in selected_hero_ids and hid >= 1 and hid <= 50:
 				var h = HeroDatabase.get_hero(hid) if HeroDatabase else {}
 				if not h.is_empty():
 					pool.append(h)
@@ -1614,28 +1639,28 @@ func _choose_bot_hero(slot: Dictionary = {}) -> Dictionary:
 		var all_pool = available_heroes.duplicate()
 		for h in all_pool:
 			var hid = int(h.get("id", 0))
-			if not hid in selected_hero_ids and hid >= 1 and hid <= 40:
+			if not hid in selected_hero_ids and hid >= 1 and hid <= 50:
 				pool.append(h)
 	if pool.is_empty() and HeroDatabase:
 		for h in HeroDatabase.all_heroes:
 			var hid = int(h.get("id", 0))
-			if hid >= 1 and hid <= 40 and not hid in selected_hero_ids:
+			if hid >= 1 and hid <= 50 and not hid in selected_hero_ids:
 				pool.append(h)
 	if not pool.is_empty():
 		pool.shuffle()
 		return pool[0]
-	return HeroDatabase.get_hero(randi_range(1, 40)) if HeroDatabase else {}
+	return HeroDatabase.get_hero(randi_range(1, 50)) if HeroDatabase else {}
 
 func _get_first_available_candidate() -> Dictionary:
 	var is_user_admin := AuthManager != null and AuthManager.is_admin()
 	for h in available_heroes:
 		var hid = int(h.get("id", 0))
-		if not hid in selected_hero_ids and hid >= 1 and (is_user_admin or hid <= 40):
+		if not hid in selected_hero_ids and hid >= 1 and (is_user_admin or hid <= 50):
 			return h
 	if HeroDatabase:
 		for h in HeroDatabase.all_heroes:
 			var hid = int(h.get("id", 0))
-			if not is_user_admin and (hid < 1 or hid > 40):
+			if not is_user_admin and (hid < 1 or hid > 50):
 				continue
 			if not hid in selected_hero_ids:
 				return h

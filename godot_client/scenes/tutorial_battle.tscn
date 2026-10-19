@@ -567,17 +567,14 @@ size_flags_vertical = 3
 theme_override_colors/default_color = Color(0.92, 0.95, 1, 1)
 theme_override_font_sizes/normal_font_size = 13
 bbcode_enabled = true
-text = "• Mỗi tướng sở hữu các đóa sinh mệnh [color=#FFA0C0][b]Hoa Sen 🌸[/b][/color] nằm ở thanh sinh mệnh dọc bên trái avatar.
-• Khi trúng đòn mất máu, hoa sen sẽ [color=#9E9E9E][b]chuyển sang tối màu ⚪[/b][/color].
-• ⚠️ [color=#FF5555][b]QUY TẮC SINH TỬ:[/b][/color] Nếu lượng máu tụt về [b]0[/b], tướng sẽ [color=#FF3333][b]TỬ TRẬN[/b][/color] và thua cuộc!
-• Hãy cùng học cách rút bài, dùng Trảm, Đỡ và tuyệt kỹ của tướng để chiến thắng!"
+text = "Đây là máu."
 
 [node name="StartTutorialBtn" type="Button" parent="HealthSpotlightOverlay/HealthGuideBox/Margin/VBox"]
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 13
-text = "TIẾP TỤC (ĐẦU LƯỢT RÚT BÀI) →"
+text = "TIẾP TỤC"
 
 [node name="BossSpotlightLotus" type="PanelContainer" parent="HealthSpotlightOverlay"]
 custom_minimum_size = Vector2(28, 218)

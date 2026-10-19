@@ -47,7 +47,7 @@ enum CardSubType {
 @export var id: String = ""
 @export var card_name: String = ""
 @export var suit: String = "Heart" # Heart, Diamond, Spade, Club
-@export var rank: int = 0 # 0 to 9
+@export var rank: int = 0 # normalized card point: 0 to 9
 @export var category: CardCategory = CardCategory.CO_BAN
 @export var sub_type: CardSubType = CardSubType.TRAM
 @export var description: String = ""
@@ -153,7 +153,7 @@ func get_suit_symbol() -> String:
 	return ""
 
 func get_rank_string() -> String:
-	return str(rank)
+	return str(clampi(rank, 0, 9))
 
 func get_suit_name() -> String:
 	var s = suit.to_lower()

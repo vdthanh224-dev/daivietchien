@@ -88,6 +88,7 @@ var current_selected_mode: String = "2v2" # "2v2", "dynasty_5", "dynasty_8"
 var mode_selector_btn: Button = null
 var mode_drawer_panel: PanelContainer = null
 var mode_title_lbl: Label = null
+var tutorial_mode_btn: Button = null
 var battle_cta_btn: Button = null
 var quest_nav_btn: Button = null
 var friend_nav_btn: Button = null
@@ -366,6 +367,7 @@ func _build_top_header() -> void:
 	# Silver Capsule
 	var silver_btn = Button.new()
 	silver_btn.custom_minimum_size = Vector2(130, 42)
+	silver_btn.tooltip_text = "🪙 Bạc: %s" % _format_number(current_silver)
 	_style_glass_action_button(silver_btn, 21, Color(0.3, 0.45, 0.65, 0.7))
 	silver_btn.pressed.connect(func(): _show_modal("TRÂN BẢO CÁC", _build_shop_content()))
 
@@ -400,9 +402,10 @@ func _build_top_header() -> void:
 	silver_btn.add_child(s_hbox)
 	header_hbox.add_child(silver_btn)
 
-	# Gold Capsule
+	# Diamond Capsule
 	var gold_btn = Button.new()
 	gold_btn.custom_minimum_size = Vector2(120, 42)
+	gold_btn.tooltip_text = "💎 Kim Cương: %s" % _format_number(current_gold)
 	_style_glass_action_button(gold_btn, 21, Color(0.3, 0.45, 0.65, 0.7))
 	gold_btn.pressed.connect(func(): _show_modal("TRÂN BẢO CÁC", _build_shop_content()))
 
@@ -418,7 +421,7 @@ func _build_top_header() -> void:
 	g_icon.custom_minimum_size = Vector2(20, 20)
 	g_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	g_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	var g_tex = load("res://assets/ui/icon_gold.png")
+	var g_tex = load("res://assets/ui/icon_diamond.png")
 	if g_tex: g_icon.texture = g_tex
 	g_hbox.add_child(g_icon)
 
@@ -849,7 +852,8 @@ func _build_right_action_deck() -> void:
 	var modes_list = [
 		{"id": "2v2", "icon": "⚔️", "title": "Đấu Trường 2v2", "sub": "Xếp Hạng"},
 		{"id": "dynasty_5", "icon": "👑", "title": "Vương Triều 5 người", "sub": "Vương Triều"},
-		{"id": "dynasty_8", "icon": "👑", "title": "Vương Triều 8 người", "sub": "Vương Triều"}
+		{"id": "dynasty_8", "icon": "👑", "title": "Vương Triều 8 người", "sub": "Vương Triều"},
+		{"id": "tutorial", "icon": "📖", "title": "Tutorial", "sub": "Chỉ Admin"}
 	]
 
 	for m in modes_list:
@@ -863,10 +867,13 @@ func _build_right_action_deck() -> void:
 		m_btn.pressed.connect(func():
 			_select_mode(mode_id, m["icon"], m_title_str + " ▾")
 		)
+		if mode_id == "tutorial":
+			tutorial_mode_btn = m_btn
 		md_vbox.add_child(m_btn)
 
 	mode_drawer_panel.add_child(md_vbox)
 	deck.add_child(mode_drawer_panel)
+	_update_tutorial_mode_visibility()
 
 func _build_15day_event_content() -> Control:
 	var container = VBoxContainer.new()
@@ -1720,6 +1727,9 @@ func _toggle_mode_drawer() -> void:
 
 func _select_mode(mode_id: String, icon_str: String, title_str: String) -> void:
 	AudioManager.play_card_select()
+	if mode_id == "tutorial" and (AuthManager == null or not AuthManager.is_admin()):
+		print("[Home] Tài khoản không có quyền truy cập chế độ Tutorial.")
+		return
 	current_selected_mode = mode_id
 	if is_instance_valid(mode_title_lbl):
 		mode_title_lbl.text = title_str
@@ -1735,6 +1745,14 @@ func _on_battle_cta_pressed() -> void:
 			_start_mode_dynasty()
 		"dynasty_8":
 			_start_mode_dynasty()
+		"tutorial":
+			if AuthManager and AuthManager.is_admin():
+				_start_mode_practice()
+			else:
+				current_selected_mode = "2v2"
+				if is_instance_valid(mode_title_lbl):
+					mode_title_lbl.text = "Đấu Trường 2v2 ▾"
+				_start_mode_2v2()
 		_:
 			_start_mode_2v2()
 
@@ -2215,6 +2233,7 @@ func _refresh_user_profile_ui() -> void:
 
 func _load_user_data() -> void:
 	if AuthManager:
+		_update_tutorial_mode_visibility()
 		var name_str = AuthManager.current_user_name
 		if name_str == "" or name_str == "Đại Tướng Quân":
 			if AuthManager.current_user_email != "":
@@ -2258,6 +2277,18 @@ func _load_user_data() -> void:
 		_refresh_inventory_content()
 		_update_mail_badge()
 		_update_checkin_button_status()
+
+func _update_tutorial_mode_visibility() -> void:
+	if not is_instance_valid(tutorial_mode_btn):
+		return
+	var can_access_tutorial := AuthManager != null and AuthManager.is_admin()
+	tutorial_mode_btn.visible = can_access_tutorial
+	if is_instance_valid(mode_drawer_panel):
+		mode_drawer_panel.custom_minimum_size = Vector2(446, 214 if can_access_tutorial else 170)
+	if not can_access_tutorial and current_selected_mode == "tutorial":
+		current_selected_mode = "2v2"
+		if is_instance_valid(mode_title_lbl):
+			mode_title_lbl.text = "Đấu Trường 2v2 ▾"
 
 # --- Ambient Particle Embers ---
 func _start_ambient_effects() -> void:
@@ -2370,6 +2401,9 @@ func _process(delta: float) -> void:
 
 # --- Scene Navigation ---
 func _start_mode_practice() -> void:
+	if AuthManager == null or not AuthManager.is_admin():
+		print("[Home] Tài khoản không có quyền truy cập chế độ Tutorial.")
+		return
 	print("[Home] Chuyển cảnh vào Tập Kích Sơn Tặc (Tutorial Battle)...")
 	get_tree().change_scene_to_file("res://scenes/tutorial_battle.tscn")
 
@@ -2389,7 +2423,24 @@ func _on_profile_clicked() -> void:
 func _show_player_profile(player_data: Dictionary = {}) -> void:
 	var my_uid = AuthManager.current_user_id if AuthManager else ""
 	var p_uid = str(player_data.get("user_id", ""))
-	var is_self = player_data.is_empty() or (not my_uid.is_empty() and p_uid == my_uid)
+	var my_name = AuthManager.current_user_name if AuthManager else ""
+	var p_name = str(player_data.get("name", ""))
+	var is_self = player_data.is_empty() or (not my_uid.is_empty() and p_uid == my_uid) or (my_uid.is_empty() and not my_name.is_empty() and p_name == my_name)
+
+	# If viewing another player, check if we have richer data in _leaderboard_cached_players
+	if not is_self and not player_data.is_empty():
+		for p in _leaderboard_cached_players:
+			if not (p is Dictionary):
+				continue
+			var cached_uid = str(p.get("user_id", ""))
+			var cached_name = str(p.get("name", ""))
+			if (not p_uid.is_empty() and cached_uid == p_uid) or (p_uid.is_empty() and cached_name == p_name):
+				for k in ["wins", "losses", "rank_stars", "rank_acc", "military_points", "generals_count", "exp", "level", "title", "profile_bg", "rank_index"]:
+					if not player_data.has(k) or int(player_data.get(k, 0)) == 0:
+						if p.has(k) and int(p.get(k, 0)) != 0:
+							player_data[k] = p[k]
+				break
+
 	var title_text = "HỒ SƠ TƯỚNG QUÂN" if is_self else ("HỒ SƠ: %s" % str(player_data.get("name", "Đại Tướng Quân")).to_upper())
 	_show_modal(title_text, _build_profile_content(player_data))
 
@@ -2922,7 +2973,7 @@ func _show_level_up_modal(old_lvl: int, new_lvl: int, on_close: Callable = Calla
 
 	var perks = [
 		{"icon": "🔓", "title": "MỞ KHÓA TÍNH NĂNG", "desc": "Đấu Trường 2v2 Xếp Hạng\nVương Triều Tranh Bá", "c": Color(0.75, 0.35, 0.15, 1.0)},
-		{"icon": "🥈", "title": "BỔNG LỘC TRIỀU ĐÌNH", "desc": "+1,000 BẠC\nQuân lương triều đình phong thưởng", "c": Color(0.25, 0.45, 0.70, 1.0)},
+		{"icon": "🪙", "title": "BỔNG LỘC TRIỀU ĐÌNH", "desc": "+1,000 BẠC\nQuân lương triều đình phong thưởng", "c": Color(0.25, 0.45, 0.70, 1.0)},
 		{"icon": "🎖️", "title": "QUÂN CÔNG THĂNG TRẬT", "desc": "Uy Danh Vang Dội Tứ Hải\nTriều Đình Đặc Cách Gia Phong", "c": Color(0.20, 0.55, 0.25, 1.0)}
 	]
 
@@ -4157,7 +4208,7 @@ func _build_7day_rewards_content() -> Control:
 	container.add_theme_constant_override("separation", 14)
 
 	var desc_lbl = Label.new()
-	desc_lbl.text = "Triều đình ban thưởng mỗi ngày đăng nhập! Nhận Vé Quay Tướng để hiệu triệu 40 Hào Kiệt Đại Việt tại Thần Điện."
+	desc_lbl.text = "Triều đình ban thưởng mỗi ngày đăng nhập! Nhận Vé Quay Tướng để hiệu triệu 50 Hào Kiệt Đại Việt tại Thần Điện."
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc_lbl.add_theme_font_size_override("font_size", 13)
 	desc_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
@@ -4300,7 +4351,7 @@ func _build_7day_rewards_content() -> Control:
 		reward_hbox.add_child(t_lbl)
 
 		var s_lbl = Label.new()
-		s_lbl.text = "🥈 +%s" % _format_number(silver)
+		s_lbl.text = "🪙 +%s" % _format_number(silver)
 		s_lbl.add_theme_font_size_override("font_size", 13)
 		s_lbl.add_theme_color_override("font_color", Color(0.95, 0.85, 0.45, 1.0))
 		reward_hbox.add_child(s_lbl)
@@ -4512,7 +4563,7 @@ func _show_fullscreen_than_dien() -> void:
 	title_vbox.add_child(title_lbl)
 
 	var sub_title = Label.new()
-	sub_title.text = "Hiệu triệu 40 Hào Kiệt Đại Việt (Tướng 1 → 40) • Trùng tướng nhận 1,000 Bạc"
+	sub_title.text = "Hiệu triệu 50 Hào Kiệt Đại Việt (Tướng 1 → 50) • Trùng tướng nhận 1,000 Bạc"
 	sub_title.add_theme_font_size_override("font_size", 12)
 	sub_title.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
 	title_vbox.add_child(sub_title)
@@ -4564,7 +4615,7 @@ func _show_fullscreen_than_dien() -> void:
 	silver_pill.add_theme_stylebox_override("panel", sps)
 
 	var sp_lbl = Label.new()
-	sp_lbl.text = "🥈 %s Bạc" % _format_number(AuthManager.current_silver if AuthManager else 0)
+	sp_lbl.text = "🪙 %s Bạc" % _format_number(AuthManager.current_silver if AuthManager else 0)
 	sp_lbl.add_theme_font_size_override("font_size", 13)
 	sp_lbl.add_theme_color_override("font_color", Color(0.95, 0.88, 0.50, 1.0))
 	silver_pill.add_child(sp_lbl)
@@ -4864,7 +4915,7 @@ func _show_fullscreen_than_dien() -> void:
 	sp_owned_panel.add_theme_stylebox_override("panel", spop_style)
 
 	var sp_owned_lbl = Label.new()
-	sp_owned_lbl.text = "✓ ĐÃ SỞ HỮU" if is_spotlight_owned else "✨ CÓ THỂ HIỆU TRIỆU (Xác suất 1/40)"
+	sp_owned_lbl.text = "✓ ĐÃ SỞ HỮU" if is_spotlight_owned else "✨ CÓ THỂ HIỆU TRIỆU (Xác suất 1/50)"
 	sp_owned_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sp_owned_lbl.add_theme_font_size_override("font_size", 11)
 	sp_owned_lbl.add_theme_color_override("font_color", Color(0.65, 1.0, 0.8, 1.0) if is_spotlight_owned else Color(1.0, 0.88, 0.4, 1.0))
@@ -4902,16 +4953,16 @@ func _show_fullscreen_than_dien() -> void:
 	tablet_panel.add_child(tp_vbox)
 
 	# Section 1: Collection Progress Tablet ("Bách Tướng Đồ")
-	var owned_count_40 = 0
-	for hid in range(1, 41):
+	var owned_count_50 = 0
+	for hid in range(1, 51):
 		if HeroDatabase and HeroDatabase.is_hero_owned(hid):
-			owned_count_40 += 1
+			owned_count_50 += 1
 
 	var prog_header = HBoxContainer.new()
 	tp_vbox.add_child(prog_header)
 
 	var prog_title = Label.new()
-	prog_title.text = "📜 BÁCH TƯỚNG BẢNG (TIẾN ĐỘ THU THẬP TƯỚNG 1 → 40)"
+	prog_title.text = "📜 BÁCH TƯỚNG BẢNG (TIẾN ĐỘ THU THẬP TƯỚNG 1 → 50)"
 	prog_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	prog_title.size_flags_horizontal = SIZE_EXPAND_FILL
 	prog_title.add_theme_font_size_override("font_size", 13)
@@ -4923,8 +4974,8 @@ func _show_fullscreen_than_dien() -> void:
 	prog_header.add_child(prog_sp)
 
 	var prog_num_lbl = Label.new()
-	var pct = int((float(owned_count_40) / 40.0) * 100.0)
-	prog_num_lbl.text = "%d / 40 Danh Tướng (%d%%)" % [owned_count_40, pct]
+	var pct = int((float(owned_count_50) / 50.0) * 100.0)
+	prog_num_lbl.text = "%d / 50 Danh Tướng (%d%%)" % [owned_count_50, pct]
 	prog_num_lbl.add_theme_font_size_override("font_size", 13)
 	prog_num_lbl.add_theme_color_override("font_color", Color(0.4, 0.92, 0.6, 1.0))
 	prog_header.add_child(prog_num_lbl)
@@ -4932,8 +4983,8 @@ func _show_fullscreen_than_dien() -> void:
 	# Progress Bar
 	var pbar = ProgressBar.new()
 	pbar.custom_minimum_size = Vector2(0, 12)
-	pbar.max_value = 40
-	pbar.value = owned_count_40
+	pbar.max_value = 50
+	pbar.value = owned_count_50
 	pbar.show_percentage = false
 
 	var pb_bg = StyleBoxFlat.new()
@@ -5092,14 +5143,14 @@ func _show_fullscreen_than_dien() -> void:
 	rpv.add_child(r_title)
 
 	var r1 = Label.new()
-	r1.text = "• Bể Hiệu Triệu gồm toàn bộ 40 Hào Kiệt Đại Việt lịch sử đầu tiên (ID từ 1 đến 40)."
+	r1.text = "• Bể Hiệu Triệu gồm toàn bộ 50 Hào Kiệt Đại Việt lịch sử đầu tiên (ID từ 1 đến 50)."
 	r1.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	r1.add_theme_font_size_override("font_size", 11)
 	r1.add_theme_color_override("font_color", Color(0.85, 0.88, 0.92, 0.95))
 	rpv.add_child(r1)
 
 	var r2 = Label.new()
-	r2.text = "• Khi quay trúng Danh Tướng đã sở hữu → Tự động quy đổi thành +1,000 BẠC 🥈 nạp ngay vào ngân khố!"
+	r2.text = "• Khi quay trúng Danh Tướng đã sở hữu → Tự động quy đổi thành +1,000 BẠC 🪙 nạp ngay vào ngân khố!"
 	r2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	r2.add_theme_font_size_override("font_size", 11)
 	r2.add_theme_color_override("font_color", Color(1.0, 0.90, 0.45, 1.0))
@@ -5156,7 +5207,7 @@ func _show_fullscreen_than_dien() -> void:
 	summon_hbox.add_child(btn_roll_5)
 
 	var note_lbl = Label.new()
-	note_lbl.text = "• Bể hiệu triệu gồm 40 Danh Tướng • Tự động bồi hoàn 1,000 Bạc khi trùng lặp"
+	note_lbl.text = "• Bể hiệu triệu gồm 50 Danh Tướng • Tự động bồi hoàn 1,000 Bạc khi trùng lặp"
 	note_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	note_lbl.add_theme_font_size_override("font_size", 11)
 	note_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
@@ -5176,8 +5227,8 @@ func _execute_gacha_summon(count: int) -> void:
 
 	var results: Array[Dictionary] = []
 	for i in range(count):
-		# Pool: heroes 1 -> 40
-		var rolled_id = randi_range(1, 40)
+		# Pool: heroes 1 -> 50
+		var rolled_id = randi_range(1, 50)
 		var hero = HeroDatabase.get_hero(rolled_id) if HeroDatabase else {}
 		var is_owned = HeroDatabase.is_hero_owned(rolled_id) if HeroDatabase else false
 
@@ -5361,7 +5412,7 @@ func _build_gacha_card(res: Dictionary, is_small: bool) -> Control:
 		conv_panel.add_theme_stylebox_override("panel", cps)
 
 		var conv_lbl = Label.new()
-		conv_lbl.text = "+1,000 BẠC 🥈"
+		conv_lbl.text = "+1,000 BẠC 🪙"
 		conv_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		conv_lbl.add_theme_font_size_override("font_size", 13 if is_small else 15)
 		conv_lbl.add_theme_color_override("font_color", Color(1.0, 0.90, 0.35, 1.0))
@@ -5587,7 +5638,7 @@ func _show_28_heroes_modal() -> void:
 	grid.add_theme_constant_override("v_separation", 10)
 	grid.size_flags_horizontal = SIZE_EXPAND_FILL
 
-	for hid in range(1, 41):
+	for hid in range(1, 51):
 		var h = HeroDatabase.get_hero(hid) if HeroDatabase else {}
 		var is_owned = HeroDatabase.is_hero_owned(hid) if HeroDatabase else false
 
@@ -5697,7 +5748,7 @@ func _show_28_heroes_modal() -> void:
 		grid.add_child(p)
 
 	scroll.add_child(grid)
-	_show_modal("DANH SÁCH 40 HÀO KIỆT THẦN ĐIỆN", scroll)
+	_show_modal("DANH SÁCH 50 HÀO KIỆT THẦN ĐIỆN", scroll)
 
 func _build_equipment_content() -> Control:
 	var container = VBoxContainer.new()
@@ -6333,13 +6384,13 @@ func _create_leaderboard_player_row(rank_num: int, player: Dictionary, is_self: 
 		gen_box.add_theme_constant_override("separation", 2)
 
 		var gen_lbl = Label.new()
-		gen_lbl.text = "👥 %d / 40 Tướng" % gen_cnt
+		gen_lbl.text = "👥 %d / 50 Tướng" % gen_cnt
 		gen_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		gen_lbl.add_theme_font_size_override("font_size", 13)
 		gen_lbl.add_theme_color_override("font_color", COLOR_TEXT_DARK)
 		gen_box.add_child(gen_lbl)
 
-		var pct = int(float(gen_cnt) / 40.0 * 100.0)
+		var pct = int(float(gen_cnt) / 50.0 * 100.0)
 		var pct_lbl = Label.new()
 		pct_lbl.text = "%d%% Danh Tướng" % pct
 		pct_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -6451,7 +6502,7 @@ func _create_my_position_card(my_pos: int, my_data: Dictionary) -> PanelContaine
 		center_box.add_child(stat_lbl)
 
 		var sub_lbl = Label.new()
-		sub_lbl.text = "Đã chiêu mộ: %d / 40 Danh Tướng (%d%% Bộ Sưu Tập)" % [gen_cnt, int(float(gen_cnt) / 40.0 * 100.0)]
+		sub_lbl.text = "Đã chiêu mộ: %d / 50 Danh Tướng (%d%% Bộ Sưu Tập)" % [gen_cnt, int(float(gen_cnt) / 50.0 * 100.0)]
 		sub_lbl.add_theme_font_size_override("font_size", 11)
 		sub_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
 		center_box.add_child(sub_lbl)
@@ -6481,8 +6532,12 @@ func _get_military_info_for_points(pts: int) -> Dictionary:
 	if AuthManager:
 		for i in range(AuthManager.MILITARY_TIERS.size() - 1, -1, -1):
 			if pts >= AuthManager.MILITARY_TIERS[i]["min"]:
-				return AuthManager.MILITARY_TIERS[i]
-	return {"tier": 1, "name": "Tân Binh", "badge": "🔰"}
+				var t = AuthManager.MILITARY_TIERS[i].duplicate()
+				var next_min = AuthManager.MILITARY_TIERS[min(i + 1, AuthManager.MILITARY_TIERS.size() - 1)]["min"] if i < AuthManager.MILITARY_TIERS.size() - 1 else t["max"]
+				t["points"] = pts
+				t["next_min"] = next_min
+				return t
+	return {"tier": 1, "name": "Tân Binh", "badge": "🔰", "points": pts, "next_min": 100}
 
 func _prepare_leaderboard_players(fetched_players: Array) -> Array:
 	var list: Array = []
@@ -6851,7 +6906,7 @@ func _build_quests_content() -> Control:
 
 		# Phần thưởng
 		var rew_lbl = Label.new()
-		var rew_text = "🥈 %d Bạc" % [m_silver]
+		var rew_text = "🪙 %d Bạc" % [m_silver]
 		if m_tickets > 0:
 			rew_text += "\n📜 +%d Vé" % m_tickets
 		rew_lbl.text = rew_text
@@ -7033,12 +7088,6 @@ func _build_inventory_content() -> Control:
 	var skin_tickets: int = AuthManager.current_skin_tickets if AuthManager else current_skin_tickets
 	var silver: int = AuthManager.current_silver if AuthManager else current_silver
 	var gold: int = AuthManager.current_gold if AuthManager else current_gold
-	var m_pts: int = AuthManager.get_military_points() if AuthManager else 5
-	var m_info: Dictionary = _get_military_info_for_points(m_pts)
-	var gen_count: int = AuthManager.current_generals.size() if AuthManager else 1
-	var is_admin_user: bool = AuthManager.is_admin() if AuthManager else false
-	var current_title_id: String = AuthManager.current_title if AuthManager else ""
-
 	# Danh mục tất cả vật phẩm chuẩn RPG
 	var all_items: Array[Dictionary] = [
 		{
@@ -7069,73 +7118,34 @@ func _build_inventory_content() -> Control:
 		},
 		{
 			"id": "silver",
-			"name": "Bạc Quân Lương",
+			"name": "Bạc",
 			"category": 2,
-			"category_name": "Tiền Tệ Triều Đình",
+			"category_name": "Tiền Tệ",
 			"rarity": "common",
-			"rarity_name": "Quân Lương",
-			"rarity_color": Color(0.80, 0.88, 0.98, 1.0),
+			"rarity_name": "Bạc",
+			"rarity_color": Color(0.85, 0.90, 0.98, 1.0),
 			"icon": "🪙",
 			"count": silver,
-			"desc": "Ngân lượng chính thống lưu hành toàn cõi Đại Việt. Dùng để bổng lộc quân sĩ, mua sắm vé triệu hồi và tư trang chiến trận tại Trân Bảo Các.",
-			"usage_tip": "💡 Nhận qua: Chiến thắng trận đấu 2v2, Điểm Danh 7 Ngày, Thưởng Quân Lệnh."
+			"desc": "Tiền tệ phổ biến lưu hành toàn cõi Đại Việt. Dùng để bổng lộc quân sĩ, mua vé triệu hồi danh tướng và trang phục tại Trân Bảo Các.",
+			"usage_tip": "💡 Nhận qua: Chiến thắng trận đấu 2v2, Điểm Danh 7 Ngày, Thưởng Quân Lệnh, Giftcode."
 		},
 		{
 			"id": "gold",
-			"name": "Kim Nguyên Bảo",
+			"name": "Kim Cương",
 			"category": 2,
-			"category_name": "Châu Báu Hoàng Triều",
+			"category_name": "Tiền Tệ Quý",
 			"rarity": "mythic",
-			"rarity_name": "Thần Thoại",
-			"rarity_color": Color(0.20, 0.85, 1.0, 1.0),
+			"rarity_name": "Kim Cương",
+			"rarity_color": Color(0.25, 0.85, 1.0, 1.0),
 			"icon": "💎",
 			"count": gold,
-			"desc": "Vàng thỏi tinh khiết đúc ấn hoàng triều, là tài nguyên quý giá nhất trong thiên hạ. Dùng để quy đổi các bảo vật vô song và đặc quyền tối thượng.",
-			"usage_tip": "💡 Nhận qua: Sự kiện Đua Top 15 Ngày, Điểm Danh 7 Ngày, Quà Tri Ân."
-		},
-		{
-			"id": "military_seal",
-			"name": "Hổ Phù Quân Hàm",
-			"category": 3,
-			"category_name": "Quân Phù Hoàng Triều",
-			"rarity": "legendary",
-			"rarity_name": str(m_info.get("name", "Quân Hàm")),
-			"rarity_color": Color(0.95, 0.70, 0.25, 1.0),
-			"icon": str(m_info.get("badge", "🎖️")),
-			"count": 1,
-			"desc": "Biểu trưng uy quyền quân hàm của Tướng Quân: %s (Bậc %d). Điểm quân hàm tích lũy: %d điểm (5đ/Tướng). Ghi danh trên Bảng Vàng Hoàng Triều." % [str(m_info.get("name", "Tân Binh")), int(m_info.get("tier", 1)), m_pts],
-			"usage_tip": "💡 Tăng điểm quân hàm bằng cách chiêu mộ thêm nhiều Danh Tướng tại Thần Điện."
-		},
-		{
-			"id": "generals_scroll",
-			"name": "Binh Thư Điểm Tướng",
-			"category": 3,
-			"category_name": "Chiến Tướng Đại Việt",
-			"rarity": "epic",
-			"rarity_name": "Sử Thi",
-			"rarity_color": Color(0.70, 0.45, 0.90, 1.0),
-			"icon": "🗂️",
-			"count": gen_count,
-			"desc": "Sổ ghi danh các bậc Hào Kiệt, Danh Tướng Đại Việt đã gia nhập nghĩa quân (%d vị tướng đã chiêu mộ). Sẵn sàng cùng Tướng Quân xung trận mọi thời điểm." % gen_count,
-			"usage_tip": "💡 Xem thông tin chi tiết kỹ năng, tiểu sử và trang phục tướng tại Kho Tướng."
+			"desc": "Đá quý cao cấp và quý giá nhất Đại Việt. Dùng để quy đổi các bảo vật vô song, vé triệu hồi và đặc quyền tối thượng tại Trân Bảo Các.",
+			"usage_tip": "💡 Nhận qua: Sự kiện Đua Top 15 Ngày, Điểm Danh 7 Ngày, Quà Tri Ân, Giftcode."
 		}
 	]
 
-	if is_admin_user or not current_title_id.is_empty():
-		var is_adm = is_admin_user or (current_title_id == "admin")
-		all_items.append({
-			"id": "title_badge",
-			"name": "Lệnh Bài ADMIN (Chí Tôn)" if is_adm else ("Lệnh Bài: %s" % current_title_id.to_upper()),
-			"category": 3,
-			"category_name": "Đặc Quyền Tướng Soái",
-			"rarity": "mythic",
-			"rarity_name": "Chí Tôn Neon" if is_adm else "Đặc Quyền",
-			"rarity_color": Color(1.0, 0.40, 0.90, 1.0),
-			"icon": "👑",
-			"count": 1,
-			"desc": "Lệnh bài đặc quyền cao quý nhất Đại Việt Chiến. Trang bị sẽ kích hoạt hiệu ứng cầu vồng neon 7 sắc nhấp nháy phát sáng trên khung trò chuyện, bảng xếp hạng và hồ sơ cá nhân.",
-			"usage_tip": "💡 Vào mục Hồ Sơ Tướng Quân -> Nút 'Danh Hiệu' để trang bị hoặc gỡ bỏ."
-		})
+	if _inventory_current_tab > 2:
+		_inventory_current_tab = 0
 
 	# Lọc theo tab hiện tại
 	var filtered_items: Array[Dictionary] = []
@@ -7163,8 +7173,7 @@ func _build_inventory_content() -> Control:
 	var tabs_info = [
 		{"idx": 0, "text": "🎒 TẤT CẢ"},
 		{"idx": 1, "text": "📜 LỆNH BÀI"},
-		{"idx": 2, "text": "🪙 TIỀN TỆ"},
-		{"idx": 3, "text": "🎖️ QUÂN CƠ"}
+		{"idx": 2, "text": "🪙 TIỀN TỆ"}
 	]
 
 	for ti in tabs_info:
@@ -7858,83 +7867,6 @@ func _populate_inventory_inspector(inspector_vbox: VBoxContainer, item: Dictiona
 			)
 			act_vbox.add_child(checkin_btn)
 
-		"military_seal":
-			var lb_btn = Button.new()
-			lb_btn.custom_minimum_size = Vector2(0, 36)
-			lb_btn.text = "👑 BẢNG PHONG THẦN (XEM TOP)"
-			var lb_style = StyleBoxFlat.new()
-			lb_style.bg_color = Color(0.85, 0.65, 0.15, 1.0)
-			lb_style.corner_radius_top_left = 6
-			lb_style.corner_radius_top_right = 6
-			lb_style.corner_radius_bottom_right = 6
-			lb_style.corner_radius_bottom_left = 6
-			lb_btn.add_theme_stylebox_override("normal", lb_style)
-			lb_btn.add_theme_color_override("font_color", Color(0.1, 0.08, 0.02, 1.0))
-			lb_btn.pressed.connect(func():
-				AudioManager.play_card_select()
-				_show_modal("BẢNG PHONG THẦN", _build_leaderboard_content())
-			)
-			act_vbox.add_child(lb_btn)
-
-			var gen_btn = Button.new()
-			gen_btn.custom_minimum_size = Vector2(0, 32)
-			gen_btn.text = "🗂️ KHO TƯỚNG QUÂN"
-			_style_white_gold_button(gen_btn, 6, 2, Vector2(0, 1))
-			gen_btn.pressed.connect(func():
-				AudioManager.play_card_select()
-				if is_instance_valid(modal_overlay): modal_overlay.visible = false
-				_show_fullscreen_heroes()
-			)
-			act_vbox.add_child(gen_btn)
-
-		"generals_scroll":
-			var hero_btn = Button.new()
-			hero_btn.custom_minimum_size = Vector2(0, 36)
-			hero_btn.text = "🗂️ XEM DANH SÁCH TƯỚNG"
-			var hb_style = StyleBoxFlat.new()
-			hb_style.bg_color = Color(0.55, 0.25, 0.70, 1.0)
-			hb_style.corner_radius_top_left = 6
-			hb_style.corner_radius_top_right = 6
-			hb_style.corner_radius_bottom_right = 6
-			hb_style.corner_radius_bottom_left = 6
-			hero_btn.add_theme_stylebox_override("normal", hb_style)
-			hero_btn.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
-			hero_btn.pressed.connect(func():
-				AudioManager.play_card_select()
-				if is_instance_valid(modal_overlay): modal_overlay.visible = false
-				_show_fullscreen_heroes()
-			)
-			act_vbox.add_child(hero_btn)
-
-			var td_btn = Button.new()
-			td_btn.custom_minimum_size = Vector2(0, 32)
-			td_btn.text = "⛩️ CHIÊU MỘ TƯỚNG MỚI"
-			_style_white_gold_button(td_btn, 6, 2, Vector2(0, 1))
-			td_btn.pressed.connect(func():
-				AudioManager.play_card_select()
-				if is_instance_valid(modal_overlay): modal_overlay.visible = false
-				_show_fullscreen_than_dien()
-			)
-			act_vbox.add_child(td_btn)
-
-		"title_badge":
-			var t_btn = Button.new()
-			t_btn.custom_minimum_size = Vector2(0, 36)
-			t_btn.text = "🏷️ XEM & TRANG BỊ DANH HIỆU"
-			var tb_style = StyleBoxFlat.new()
-			tb_style.bg_color = Color(0.70, 0.20, 0.75, 1.0)
-			tb_style.corner_radius_top_left = 6
-			tb_style.corner_radius_top_right = 6
-			tb_style.corner_radius_bottom_right = 6
-			tb_style.corner_radius_bottom_left = 6
-			t_btn.add_theme_stylebox_override("normal", tb_style)
-			t_btn.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
-			t_btn.pressed.connect(func():
-				AudioManager.play_card_select()
-				_show_title_selection_modal()
-			)
-			act_vbox.add_child(t_btn)
-
 	inspector_vbox.add_child(act_vbox)
 
 func _build_shop_content() -> Control:
@@ -7991,7 +7923,7 @@ func _build_shop_content() -> Control:
 	b_hbox.add_child(skin_val_lbl)
 
 	var g_val_lbl = Label.new()
-	g_val_lbl.text = "💎 Vàng: %s" % _format_number(AuthManager.current_gold if AuthManager else current_gold)
+	g_val_lbl.text = "💎 Kim Cương: %s" % _format_number(AuthManager.current_gold if AuthManager else current_gold)
 	g_val_lbl.add_theme_font_size_override("font_size", 13)
 	g_val_lbl.add_theme_color_override("font_color", Color(0.20, 0.85, 1.0, 1.0))
 	b_hbox.add_child(g_val_lbl)
@@ -8031,7 +7963,7 @@ func _build_shop_content() -> Control:
 		s_val_lbl.text = "🪙 Bạc: %s" % _format_number(sil)
 		t_val_lbl.text = "🎫 Vé Tướng: %s" % _format_number(tic)
 		skin_val_lbl.text = "👘 Vé Skin: %s" % _format_number(stic)
-		g_val_lbl.text = "💎 Vàng: %s" % _format_number(gol)
+		g_val_lbl.text = "💎 Kim Cương: %s" % _format_number(gol)
 		current_silver = sil
 		current_hero_tickets = tic
 		current_skin_tickets = stic
@@ -8080,7 +8012,7 @@ func _build_shop_content() -> Control:
 	s1_hbox.add_child(s1_sp)
 
 	var sec1_hint = Label.new()
-	sec1_hint.text = "Chiêu mộ & Triệu hồi 40 Danh Tướng Hào Kiệt Đại Việt"
+	sec1_hint.text = "Chiêu mộ & Triệu hồi 50 Danh Tướng Hào Kiệt Đại Việt"
 	sec1_hint.add_theme_font_size_override("font_size", 11)
 	sec1_hint.add_theme_color_override("font_color", Color(0.85, 0.75, 0.60, 0.85))
 	s1_hbox.add_child(sec1_hint)
@@ -8604,7 +8536,7 @@ func _get_all_system_mails() -> Array[Dictionary]:
 			"sub": "Chiếu chỉ ban tặng bổng lộc tân chiến tướng",
 			"content": "Kính gửi Tướng Quân dũng mãnh,\n\nTriều đình vô cùng hân hoan đón chào Tướng Quân đã gia nhập chiến trường Đại Việt Chiến! Non sông gấm vóc ngàn đời đang cần những bậc hào kiệt dốc lòng gìn giữ non sông xã tắc.\n\nĐể trợ lực cho Tướng Quân bước vào những trận đấu oanh liệt đầu tiên, Triều đình xin ban tặng bổng lộc khởi đầu:\n• 5.000 Bạc để chiêu binh mãi mã, chuẩn bị quân nhu.\n• 1 Vé Triệu Hồi Danh Tướng để chiêu hiền đãi sĩ nơi sa trường.\n\nChúc Tướng Quân mưu lược xuất chúng, bách chiến bách thắng!",
 			"rewards": [
-				{"icon": "🥈", "name": "Bạc", "amount": 5000, "text": "+5.000 Bạc"},
+				{"icon": "🪙", "name": "Bạc", "amount": 5000, "text": "+5.000 Bạc"},
 				{"icon": "🎫", "name": "Vé Triệu Hồi", "amount": 1, "text": "x1 Vé Triệu Hồi Tướng"}
 			]
 		}
@@ -9066,7 +8998,7 @@ func _build_settings_content() -> Control:
 	gift_v.add_child(gift_row)
 
 	var gift_status_lbl = Label.new()
-	gift_status_lbl.text = "Nhập mã CODE hợp lệ từ Khởi Nguyên Studio để nhận Vé quay tướng, Bạc, Vàng!"
+	gift_status_lbl.text = "Nhập mã CODE hợp lệ từ Khởi Nguyên Studio để nhận Vé quay tướng, Bạc, Kim Cương!"
 	gift_status_lbl.add_theme_font_size_override("font_size", 11)
 	gift_status_lbl.add_theme_color_override("font_color", Color(0.75, 0.75, 0.8, 1.0))
 	gift_status_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -9191,7 +9123,7 @@ func _build_admin_giftcode_management_content() -> Control:
 	var reward_box = VBoxContainer.new()
 	reward_box.add_theme_constant_override("separation", 4)
 	var r_lbl = Label.new()
-	r_lbl.text = "PHẦN THƯỞNG (VD: '5 vé quay tướng', '10000 bạc', '50 vàng', '2 vé trang phục'):"
+	r_lbl.text = "PHẦN THƯỞNG (VD: '5 vé quay tướng', '10000 bạc', '50 kim cương', '2 vé trang phục'):"
 	r_lbl.add_theme_font_size_override("font_size", 11)
 	r_lbl.add_theme_color_override("font_color", COLOR_TEXT_DARK)
 	reward_box.add_child(r_lbl)
@@ -9259,7 +9191,9 @@ func _build_admin_giftcode_management_content() -> Control:
 func _build_profile_content(player_data: Dictionary = {}) -> Control:
 	var my_uid = AuthManager.current_user_id if AuthManager else ""
 	var p_uid = str(player_data.get("user_id", ""))
-	var is_self = player_data.is_empty() or (not my_uid.is_empty() and p_uid == my_uid)
+	var my_name = AuthManager.current_user_name if AuthManager else ""
+	var p_name = str(player_data.get("name", ""))
+	var is_self = player_data.is_empty() or (not my_uid.is_empty() and p_uid == my_uid) or (my_uid.is_empty() and not my_name.is_empty() and p_name == my_name)
 
 	# Khung bao bọc lớn chia làm 2 cột: BÊN TRÁI là thông tin hồ sơ, BÊN PHẢI là hình nền tướng đẹp rộng rãi
 	var root_wrapper = PanelContainer.new()
@@ -9389,7 +9323,7 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 	# Thẻ 1: CẤP ĐỘ CHIẾN TƯỚNG
 	var lvl = (AuthManager.current_level if AuthManager else 1) if is_self else int(player_data.get("level", 1))
 	var exp_c = (AuthManager.current_exp if AuthManager else 0) if is_self else int(player_data.get("exp", 0))
-	var exp_req = (AuthManager.get_exp_to_next_level() if AuthManager else 20) if is_self else 100
+	var exp_req = (AuthManager.get_exp_to_next_level() if AuthManager else 20) if is_self else max(10, (lvl + 1) * 10)
 	var exp_pct = int(clampf(float(exp_c) / max(1, exp_req) * 100.0, 0.0, 100.0))
 
 	var exp_vbox = VBoxContainer.new()
@@ -9600,14 +9534,14 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 	gen_vbox.add_theme_constant_override("separation", 2)
 
 	var gen_p_lbl = Label.new()
-	gen_p_lbl.text = "Đã chiêu mộ: %d / 40 Danh Tướng (%d%%)" % [generals_cnt, int(float(generals_cnt) / 40.0 * 100.0)]
+	gen_p_lbl.text = "Đã chiêu mộ: %d / 50 Danh Tướng (%d%%)" % [generals_cnt, int(float(generals_cnt) / 50.0 * 100.0)]
 	gen_p_lbl.add_theme_font_size_override("font_size", 11)
 	gen_p_lbl.add_theme_color_override("font_color", Color(0.95, 0.85, 0.45))
 	gen_vbox.add_child(gen_p_lbl)
 
 	var gen_pbar = ProgressBar.new()
 	gen_pbar.custom_minimum_size = Vector2(0, 8)
-	gen_pbar.max_value = 40
+	gen_pbar.max_value = 50
 	gen_pbar.value = generals_cnt
 	gen_pbar.show_percentage = false
 	var g_fg = StyleBoxFlat.new()
@@ -9628,7 +9562,7 @@ func _build_profile_content(player_data: Dictionary = {}) -> Control:
 	cards_vbox.add_child(_create_profile_card_row(
 		gen_icon,
 		"BỘ SƯU TẬP DANH TƯỚNG",
-		"%d / 40 TƯỚNG" % generals_cnt,
+		"%d / 50 TƯỚNG" % generals_cnt,
 		Color(1.0, 0.85, 0.35),
 		gen_vbox
 	))
@@ -10640,6 +10574,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	if NetworkClient:
 		NetworkClient.my_seat = inst_idx
 		NetworkClient.update_debug_window_title(my_user_name)
+		NetworkClient.send_matchmaking_start(mode_id, own_room_id)
 
 	# Include our own room in this first election. If every client excludes its
 	# own host room, the smallest two rooms can make a cycle (A joins B while B

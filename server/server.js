@@ -366,6 +366,43 @@ async function sweepAppwriteMatchmaking() {
   }
 }
 
+const activeMatchmakingSockets = new Set();
+let matchmakingSweepTimer = null;
+
+function startMatchmakingSweep() {
+  // Quét ngay lập tức không độ trễ khi có người tìm trận
+  sweepAppwriteMatchmaking();
+  if (!matchmakingSweepTimer) {
+    matchmakingSweepTimer = setInterval(() => {
+      sweepAppwriteMatchmaking();
+    }, APPWRITE_MATCHMAKING_POLL_MS);
+    console.log(`[Render Matchmaking] Bắt đầu quét ghép trận theo yêu cầu (người tìm trận: ${activeMatchmakingSockets.size}).`);
+  }
+}
+
+function stopMatchmakingSweep() {
+  if (matchmakingSweepTimer && activeMatchmakingSockets.size === 0) {
+    clearInterval(matchmakingSweepTimer);
+    matchmakingSweepTimer = null;
+    console.log("[Render Matchmaking] Dừng quét ghép trận (không còn ai trong hàng chờ).");
+  }
+}
+
+function registerMatchmakingSocket(socket) {
+  if (!socket) return;
+  activeMatchmakingSockets.add(socket);
+  startMatchmakingSweep();
+}
+
+function unregisterMatchmakingSocket(socket) {
+  if (!socket) return;
+  if (activeMatchmakingSockets.delete(socket)) {
+    if (activeMatchmakingSockets.size === 0) {
+      stopMatchmakingSweep();
+    }
+  }
+}
+
 function clusterBroadcast(data) {
   if (clusterChannel) {
     try {
@@ -481,7 +518,7 @@ const ALLOWED_WS_ACTIONS = new Set([
   "USE_SKILL", "TOGGLE_SKILL", "PLAY_CARD", "RESPOND_ACTION", "END_TURN",
   "DISCARD_CARDS", "AI_STEP", "AI_REACTION", "CHECK_ACTIVE_MATCH", "RECONNECT_GAME",
   "SOCIAL_REGISTER", "FRIEND_LIST", "FRIEND_SEARCH", "FRIEND_REQUEST", "FRIEND_RESPOND",
-  "CHAT_SUBSCRIBE", "CHAT_UNSUBSCRIBE", "CHAT_SEND"
+  "CHAT_SUBSCRIBE", "CHAT_UNSUBSCRIBE", "CHAT_SEND", "MATCHMAKING_START", "MATCHMAKING_STOP"
 ]);
 
 const SOCIAL_ACTIONS = new Set(["SOCIAL_REGISTER", "FRIEND_LIST", "FRIEND_SEARCH", "FRIEND_REQUEST", "FRIEND_RESPOND"]);
@@ -533,11 +570,31 @@ async function syncSocialProfilesFromAppwrite() {
             if (existing) {
               existing.userName = name;
               existing.level = level;
+              if (parsed.exp !== undefined) existing.exp = Number(parsed.exp);
+              if (parsed.title !== undefined) existing.title = String(parsed.title);
+              if (parsed.profile_bg !== undefined) existing.profileBg = Number(parsed.profile_bg);
+              if (parsed.rank_index !== undefined) existing.rankIndex = Number(parsed.rank_index);
+              if (parsed.rank_stars !== undefined) existing.rankStars = Number(parsed.rank_stars);
+              if (parsed.rank_acc !== undefined) existing.rankAcc = Number(parsed.rank_acc);
+              if (parsed.military_points !== undefined) existing.militaryPoints = Number(parsed.military_points);
+              if (parsed.wins !== undefined) existing.wins = Number(parsed.wins);
+              if (parsed.losses !== undefined) existing.losses = Number(parsed.losses);
+              if (parsed.generals_count !== undefined) existing.generalsCount = Number(parsed.generals_count);
             } else {
               socialProfiles.set(uid, {
                 userId: uid,
                 userName: name,
                 level,
+                exp: Number(parsed.exp || 0),
+                title: String(parsed.title || ""),
+                profileBg: Number(parsed.profile_bg || 0),
+                rankIndex: Number(parsed.rank_index || 0),
+                rankStars: Number(parsed.rank_stars || 0),
+                rankAcc: Number(parsed.rank_acc || 0),
+                militaryPoints: Number(parsed.military_points || 0),
+                wins: Number(parsed.wins || 0),
+                losses: Number(parsed.losses || 0),
+                generalsCount: Number(parsed.generals_count || 1),
                 socket: null
               });
             }
@@ -696,13 +753,32 @@ async function handleChat(socket, payload, currentRoomId, currentSeat) {
     if (!profile || profile.socket !== socket) {
       return sendChatError(socket, channel, "Vui lòng đăng nhập để trò chuyện");
     }
+    if (payload.title !== undefined) profile.title = String(payload.title);
+    if (payload.profileBg !== undefined) profile.profileBg = Number(payload.profileBg);
+    if (payload.level !== undefined) profile.level = Math.max(1, Number(payload.level));
+    if (payload.exp !== undefined) profile.exp = Number(payload.exp);
+    if (payload.rankIndex !== undefined) profile.rankIndex = Number(payload.rankIndex);
+    if (payload.rankStars !== undefined) profile.rankStars = Number(payload.rankStars);
+    if (payload.rankAcc !== undefined) profile.rankAcc = Number(payload.rankAcc);
+    if (payload.militaryPoints !== undefined) profile.militaryPoints = Number(payload.militaryPoints);
+    if (payload.wins !== undefined) profile.wins = Number(payload.wins);
+    if (payload.losses !== undefined) profile.losses = Number(payload.losses);
+    if (payload.generalsCount !== undefined) profile.generalsCount = Number(payload.generalsCount);
+
     sender = {
       userId: profile.userId,
       userName: profile.userName,
-      title: profile.title || payload.title || "",
-      profileBg: profile.profileBg || payload.profileBg || 0,
+      title: profile.title || "",
+      profileBg: profile.profileBg || 0,
       level: profile.level || 1,
-      rankIndex: profile.rankIndex || 0
+      exp: profile.exp || 0,
+      rankIndex: profile.rankIndex || 0,
+      rankStars: profile.rankStars || 0,
+      rankAcc: profile.rankAcc || 0,
+      militaryPoints: profile.militaryPoints || 0,
+      wins: profile.wins || 0,
+      losses: profile.losses || 0,
+      generalsCount: profile.generalsCount || 1
     };
   } else {
     room = rooms.get(currentRoomId);
@@ -712,14 +788,22 @@ async function handleChat(socket, payload, currentRoomId, currentSeat) {
     // Only expose the player's public name and seat; dynasty roles stay private.
     const player = room.draft?.slots?.find((p) => p.seat === currentSeat)
       || room.state?.players?.find((p) => p.seat === currentSeat);
+    const profile = socket.socialUserId ? socialProfiles.get(socket.socialUserId) : null;
     sender = {
       seat: currentSeat,
-      userId: player?.userId || socket.socialUserId || "",
-      userName: socialUserName(player?.userName || `Người chơi ${currentSeat}`),
-      title: player?.title || payload.title || "",
-      profileBg: player?.profileBg || payload.profileBg || 0,
-      level: player?.level || 1,
-      rankIndex: player?.rankIndex || 0
+      userId: player?.userId || profile?.userId || socket.socialUserId || payload.userId || "",
+      userName: socialUserName(player?.userName || profile?.userName || payload.userName || `Người chơi ${currentSeat}`),
+      title: payload.title !== undefined ? String(payload.title) : (player?.title || profile?.title || ""),
+      profileBg: payload.profileBg !== undefined ? Number(payload.profileBg) : (player?.profileBg || profile?.profileBg || 0),
+      level: payload.level !== undefined ? Number(payload.level) : (player?.level || profile?.level || 1),
+      exp: payload.exp !== undefined ? Number(payload.exp) : (player?.exp || profile?.exp || 0),
+      rankIndex: payload.rankIndex !== undefined ? Number(payload.rankIndex) : (player?.rankIndex || profile?.rankIndex || 0),
+      rankStars: payload.rankStars !== undefined ? Number(payload.rankStars) : (player?.rankStars || profile?.rankStars || 0),
+      rankAcc: payload.rankAcc !== undefined ? Number(payload.rankAcc) : (player?.rankAcc || profile?.rankAcc || 0),
+      militaryPoints: payload.militaryPoints !== undefined ? Number(payload.militaryPoints) : (player?.militaryPoints || profile?.militaryPoints || 0),
+      wins: payload.wins !== undefined ? Number(payload.wins) : (player?.wins || profile?.wins || 0),
+      losses: payload.losses !== undefined ? Number(payload.losses) : (player?.losses || profile?.losses || 0),
+      generalsCount: payload.generalsCount !== undefined ? Number(payload.generalsCount) : (player?.generalsCount || profile?.generalsCount || 1)
     };
     history = room.chatMessages ||= [];
   }
@@ -774,7 +858,7 @@ function validateClientPayload(payload, rawBytes) {
   for (const key of ["cardId", "targetCardId", "skillId", "heroName", "userId", "userName", "targetUserId", "query", "requestId", "fromUserId", "fromUserName", "title"]) {
     if (payload[key] !== undefined && (typeof payload[key] !== "string" || payload[key].length > 256)) return `${key} không hợp lệ`;
   }
-  for (const key of ["seat", "targetSeat", "targetSeat2", "expectedVersion", "level", "profileBg", "rankIndex"]) {
+  for (const key of ["seat", "targetSeat", "targetSeat2", "expectedVersion", "level", "profileBg", "rankIndex", "rankStars", "rankAcc", "militaryPoints", "wins", "losses", "generalsCount", "exp"]) {
     if (payload[key] !== undefined && (!Number.isInteger(Number(payload[key])) || Number(payload[key]) < 0)) return `${key} không hợp lệ`;
   }
   if (payload.cardIds !== undefined && (!Array.isArray(payload.cardIds) || payload.cardIds.length > 20 || payload.cardIds.some((id) => typeof id !== "string" || id.length > 256))) return "Danh sách lá bài không hợp lệ";
@@ -1294,9 +1378,9 @@ function generate2v2RoundPools(draft, _round) {
     ...(draft.availableHeroIds || []),
     ...draft.slots.flatMap((slot) => slot.availableHeroIds || []),
   ];
-  const allIds = Array.from(new Set(requestedIds.length > 0 ? requestedIds : Array.from({ length: 40 }, (_, i) => i + 1)))
+  const allIds = Array.from(new Set(requestedIds.length > 0 ? requestedIds : Array.from({ length: 50 }, (_, i) => i + 1)))
     .map(Number)
-    .filter((id) => Number.isInteger(id) && id >= 1 && id <= 40);
+    .filter((id) => Number.isInteger(id) && id >= 1 && id <= 50);
   for (let i = allIds.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [allIds[i], allIds[j]] = [allIds[j], allIds[i]];
@@ -1534,7 +1618,7 @@ async function tickDraftRoom(roomId, room) {
       }
       const candidates = (currentSlot.candidateHeroIds && currentSlot.candidateHeroIds.length > 0)
         ? currentSlot.candidateHeroIds.filter((id) => !used.has(id))
-        : Array.from({ length: 40 }, (_, i) => i + 1).filter((id) => !used.has(id));
+        : Array.from({ length: 50 }, (_, i) => i + 1).filter((id) => !used.has(id));
       const heroId = candidates.length > 0
         ? candidates[Math.floor(Math.random() * candidates.length)]
         : 1;
@@ -1688,6 +1772,19 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
             timestamp: Date.now()
           }));
         }
+        if (payload.action === "MATCHMAKING_START") {
+          registerMatchmakingSocket(socket);
+          return socket.send(JSON.stringify({
+            type: "MATCHMAKING_SWEEP_ACK",
+            activeQueueCount: activeMatchmakingSockets.size
+          }));
+        }
+        if (payload.action === "MATCHMAKING_STOP") {
+          unregisterMatchmakingSocket(socket);
+          return socket.send(JSON.stringify({
+            type: "MATCHMAKING_STOPPED_ACK"
+          }));
+        }
         if (payload.action !== "PING") {
           const now = Date.now();
           if (now - rateWindowStartedAt >= 1000) {
@@ -1732,9 +1829,16 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
               userId: socialId,
               userName: name,
               level: level || previous?.level || 1,
-              title: String(payload.title || previous?.title || ""),
-              profileBg: Number(payload.profileBg || previous?.profileBg || 0),
+              exp: payload.exp !== undefined ? Number(payload.exp) : (previous?.exp || 0),
+              title: String(payload.title !== undefined ? payload.title : (previous?.title || "")),
+              profileBg: Number(payload.profileBg !== undefined ? payload.profileBg : (previous?.profileBg || 0)),
               rankIndex: payload.rankIndex !== undefined ? Number(payload.rankIndex) : (previous?.rankIndex || 0),
+              rankStars: payload.rankStars !== undefined ? Number(payload.rankStars) : (previous?.rankStars || 0),
+              rankAcc: payload.rankAcc !== undefined ? Number(payload.rankAcc) : (previous?.rankAcc || 0),
+              militaryPoints: payload.militaryPoints !== undefined ? Number(payload.militaryPoints) : (previous?.militaryPoints || 0),
+              wins: payload.wins !== undefined ? Number(payload.wins) : (previous?.wins || 0),
+              losses: payload.losses !== undefined ? Number(payload.losses) : (previous?.losses || 0),
+              generalsCount: payload.generalsCount !== undefined ? Number(payload.generalsCount) : (previous?.generalsCount || 1),
               socket
             });
             if (previous?.socket && previous.socket !== socket) previous.socket = null;
@@ -1865,6 +1969,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
         const isJoinAction = action === "JOIN_ROOM" || action === "INIT_GAME" || action === "JOIN_DRAFT" || action === "RECONNECT_GAME" || action === "CHECK_ACTIVE_MATCH";
 
         if (isJoinAction) {
+          unregisterMatchmakingSocket(socket);
           if (requestSeat === 0) {
             return socket.send(JSON.stringify({ type: "ERROR", error: "Ghế không hợp lệ" }));
           }
@@ -1970,7 +2075,8 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           }
 
           const heroId = Number(payload.heroId || payload.hero_id || 0);
-          if (!Number.isInteger(heroId) || heroId < 1 || heroId > 100) {
+          const adminMayPickExtendedHero = requestedSlot.isAdmin === true;
+          if (!Number.isInteger(heroId) || heroId < 1 || heroId > (adminMayPickExtendedHero ? 100 : 50)) {
             return socket.send(JSON.stringify({ type: "ERROR", error: "Tướng không hợp lệ" }));
           }
           const selectedHeroIds = room.draft.slots.filter((entry) => entry.isLocked).map((entry) => entry.heroId);

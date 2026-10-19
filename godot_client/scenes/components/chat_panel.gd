@@ -15,6 +15,7 @@ var _history_requested: bool = false
 var _pending_text: String = ""
 var _send_started_at: int = 0
 var _network_ready: bool = false
+var _meta_cache: Array = []
 
 func _ready() -> void:
 	name = "ChatPanel"
@@ -23,6 +24,8 @@ func _ready() -> void:
 	_build_ui()
 	if not _connect_network():
 		return
+	if AuthManager and AuthManager.has_signal("profile_updated") and not AuthManager.profile_updated.is_connected(_on_profile_updated):
+		AuthManager.profile_updated.connect(_on_profile_updated)
 	_on_connected()
 	_render_messages()
 
@@ -130,9 +133,13 @@ func _build_ui() -> void:
 	messages_view.bbcode_enabled = true
 	messages_view.scroll_following = true
 	messages_view.selection_enabled = true
-	messages_view.meta_clicked.connect(_on_meta_clicked)
 	messages_view.add_theme_font_size_override("normal_font_size", 12)
+	messages_view.add_theme_font_size_override("bold_font_size", 12)
+	messages_view.add_theme_font_size_override("italics_font_size", 12)
+	messages_view.add_theme_font_size_override("bold_italics_font_size", 12)
+	messages_view.add_theme_font_size_override("mono_font_size", 12)
 	messages_view.add_theme_color_override("default_color", Color(0.90, 0.92, 0.96))
+	messages_view.meta_clicked.connect(_on_meta_clicked)
 	content.add_child(messages_view)
 	status_label = Label.new()
 	status_label.text = "Đang kết nối trò chuyện..."
@@ -200,7 +207,18 @@ func _on_connected() -> void:
 	status_label.text = "Đang đồng bộ trò chuyện..."
 	if channel == "lobby":
 		NetworkClient.register_social_profile()
-		_request_history()
+		if AuthManager and not AuthManager.current_user_id.is_empty():
+			_request_history()
+		else:
+			status_label.text = "Đang đồng bộ tài khoản..."
+
+func _on_profile_updated() -> void:
+	if channel != "lobby" or not _network_ready or not NetworkClient.is_connected_to_server:
+		return
+	if not AuthManager or AuthManager.current_user_id.is_empty() or _history_requested:
+		return
+	NetworkClient.register_social_profile()
+	_request_history()
 
 func _on_disconnected() -> void:
 	_history_requested = false
@@ -229,10 +247,18 @@ func _on_history(received_channel: String, target_room: String) -> void:
 
 func _on_meta_clicked(meta: Variant) -> void:
 	var p_data: Dictionary = {}
-	if meta is String:
-		var parsed = JSON.parse_string(meta)
-		if parsed is Dictionary:
-			p_data = parsed
+	if meta is int:
+		if meta >= 0 and meta < _meta_cache.size():
+			p_data = _meta_cache[meta]
+	elif meta is String:
+		if meta.is_valid_int():
+			var idx = meta.to_int()
+			if idx >= 0 and idx < _meta_cache.size():
+				p_data = _meta_cache[idx]
+		else:
+			var parsed = JSON.parse_string(meta)
+			if parsed is Dictionary:
+				p_data = parsed
 	elif meta is Dictionary:
 		p_data = meta
 	if not p_data.is_empty():
@@ -240,6 +266,7 @@ func _on_meta_clicked(meta: Variant) -> void:
 
 func _render_messages() -> void:
 	messages_view.clear()
+	_meta_cache.clear()
 	var messages := NetworkClient.get_chat_messages(channel)
 	if messages.is_empty():
 		messages_view.add_text("Chưa có tin nhắn. Hãy gửi lời chào!")
@@ -258,16 +285,24 @@ func _render_messages() -> void:
 			"title": title_id,
 			"profile_bg": int(message.get("profileBg", message.get("profile_bg", 0))),
 			"level": int(message.get("level", 1)),
-			"rank_index": int(message.get("rankIndex", 0))
+			"exp": int(message.get("exp", 0)),
+			"rank_index": int(message.get("rankIndex", message.get("rank_index", 0))),
+			"rank_stars": int(message.get("rankStars", message.get("rank_stars", 0))),
+			"rank_acc": int(message.get("rankAcc", message.get("rank_acc", 0))),
+			"military_points": int(message.get("militaryPoints", message.get("military_points", 0))),
+			"wins": int(message.get("wins", 0)),
+			"losses": int(message.get("losses", 0)),
+			"generals_count": int(message.get("generalsCount", message.get("generals_count", 1)))
 		}
-		var meta_str = JSON.stringify(player_meta)
+		var meta_idx = _meta_cache.size()
+		_meta_cache.append(player_meta)
 		# Tên người chơi có link để click xem hồ sơ
-		messages_view.append_text("[url=%s][b][color=#fadb72]%s[/color][/b][/url]" % [meta_str, sender_disp])
+		messages_view.append_text("[url=%d][color=#fadb72]%s[/color][/url]" % [meta_idx, sender_disp])
 		# Danh hiệu bên cạnh tên (ví dụ: ADMIN 7 sắc cầu vồng nhấp nháy neon)
 		if title_id == "admin":
-			messages_view.append_text(" [url=%s][rainbow freq=0.6 sat=1.0 val=1.0][b]ADMIN[/b][/rainbow][/url]" % meta_str)
+			messages_view.append_text(" [url=%d][rainbow freq=0.6 sat=1.0 val=1.0]ADMIN[/rainbow][/url]" % meta_idx)
 		elif not title_id.is_empty():
-			messages_view.append_text(" [url=%s][b][color=#e0b0ff][%s][/color][/b][/url]" % [meta_str, title_id.to_upper()])
+			messages_view.append_text(" [url=%d][color=#e0b0ff][%s][/color][/url]" % [meta_idx, title_id.to_upper()])
 		messages_view.append_text(": ")
 		# add_text bảo vệ tin nhắn của người chơi tránh bị tiêm BBCode
 		messages_view.add_text(str(message.get("text", "")) + "\n")
@@ -291,6 +326,7 @@ func _on_message(message: Dictionary) -> void:
 func _on_error(received_channel: String, message: String) -> void:
 	if received_channel != channel:
 		return
+	_history_requested = false
 	_pending_text = ""
 	status_label.text = message
 	status_label.tooltip_text = message

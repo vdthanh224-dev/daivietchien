@@ -144,10 +144,24 @@ func get_rank_icon_path(rank_idx: int) -> String:
 	return str(get_rank_info(rank_idx).get("icon_path", ""))
 
 func get_rank_display(rank_idx: int, stars: int) -> String:
-	var info := get_rank_info(rank_idx)
-	if rank_idx >= 11:
-		return "%s (%d⭐)" % [info.name, stars]
-	return "%s (%d/5⭐)" % [info.name, stars]
+	var normalized := normalize_rank_stars(rank_idx, stars)
+	var display_rank := int(normalized.rank_index)
+	var display_stars := int(normalized.stars)
+	var info := get_rank_info(display_rank)
+	if display_rank >= 11:
+		return "%s (%d⭐)" % [info.name, display_stars]
+	return "%s (%d/5⭐)" % [info.name, display_stars]
+
+# Chuẩn hóa dữ liệu cũ trước khi đưa lên giao diện hoặc lưu lại. Mỗi bậc
+# thường có 6 mốc sao (0..5); mốc thứ 6 là điều kiện lên bậc kế tiếp.
+func normalize_rank_stars(rank_idx: int, stars: int) -> Dictionary:
+	var total_stars := maxi(0, clampi(rank_idx, 0, RANK_DATA.size() - 1) * (STARS_PER_TIER + 1) + stars)
+	var normalized_rank := mini(RANK_DATA.size() - 1, total_stars / (STARS_PER_TIER + 1))
+	var normalized_stars := total_stars % (STARS_PER_TIER + 1)
+	if normalized_rank >= RANK_DATA.size() - 1:
+		# Hoàng Đế không có giới hạn 5 sao.
+		normalized_stars = maxi(0, stars) if rank_idx >= RANK_DATA.size() - 1 else normalized_stars
+	return {"rank_index": normalized_rank, "stars": normalized_stars}
 
 # Xử lý kết quả trận đấu 2v2:
 # Trả về Dictionary chứa:
@@ -175,6 +189,30 @@ func process_match_result(
 		WIN_ACCUMULATION_POINTS if is_win else LOSE_ACCUMULATION_POINTS
 	)
 
+# Tính kết quả duy nhất cho cả cửa sổ kết quả và lúc nhận thưởng. Sao cược
+# được trừ lúc vào trận; nếu thắng thì hoàn lại rồi cộng thêm sao thắng, còn
+# nếu thua thì không trừ lần hai.
+func process_match_result_for_match(
+	is_win: bool,
+	current_rank_idx: int,
+	current_stars: int,
+	current_acc_points: int,
+	stake_recorded: bool = false,
+	stake_amount: int = 0
+) -> Dictionary:
+	var star_delta := WIN_STARS if is_win else LOSE_STARS
+	var clean_stake := clampi(stake_amount, 0, 1) if stake_recorded else 0
+	if stake_recorded:
+		star_delta = WIN_STARS + clean_stake if is_win else 0
+	return process_match_result_adjusted(
+		is_win,
+		current_rank_idx,
+		current_stars,
+		current_acc_points,
+		star_delta,
+		WIN_ACCUMULATION_POINTS if is_win else LOSE_ACCUMULATION_POINTS
+	)
+
 # Xử lý kết quả với số sao/điểm tích lũy tùy chỉnh. Dùng cho trận đã trừ
 # sao đặt cược ngay khi vào trận, để kết quả cuối không trừ sao lần nữa.
 func process_match_result_adjusted(
@@ -185,8 +223,9 @@ func process_match_result_adjusted(
 	star_delta: int,
 	accumulation_delta: int
 ) -> Dictionary:
-	var old_rank_idx: int = clampi(current_rank_idx, 0, 11)
-	var old_stars: int = maxi(0, current_stars)
+	var normalized_old := normalize_rank_stars(current_rank_idx, current_stars)
+	var old_rank_idx: int = int(normalized_old.rank_index)
+	var old_stars: int = int(normalized_old.stars)
 	var old_acc: int = clampi(current_acc_points, 0, MAX_ACCUMULATION_POINTS)
 
 	var rank_idx: int = old_rank_idx
@@ -200,26 +239,18 @@ func process_match_result_adjusted(
 	acc_points += accumulation_delta
 
 	# Đủ 100 điểm tích lũy: tiêu thụ 100 điểm và cộng thêm 1 sao
-	if accumulation_delta > 0 and acc_points >= MAX_ACCUMULATION_POINTS:
+	while accumulation_delta > 0 and acc_points >= MAX_ACCUMULATION_POINTS:
 		acc_points -= MAX_ACCUMULATION_POINTS
 		stars += 1
 		star_bonus = true
 
-	# Kiểm tra Thăng hạng (riêng Hoàng Đế tích sao vô hạn)
-	if rank_idx < 11:
-		while stars > STARS_PER_TIER and rank_idx < 11:
-			stars -= (STARS_PER_TIER + 1) # 5 sao + 1 sao = 0 sao ở rank kế
-			rank_idx += 1
-			promoted = true
-	
-	# Kiểm tra Rớt hạng nếu sao âm
-	if stars < 0:
-		if rank_idx > 0:
-			rank_idx -= 1
-			stars = STARS_PER_TIER # Rớt về 5 sao của rank trước
-			demoted = true
-		else:
-			stars = 0 # Sàn Dân Binh 0 sao không trừ âm
+	# Chuẩn hóa một lần sau khi cộng/trừ để xử lý đúng cả trường hợp dữ liệu
+	# cũ có hơn 5 sao hoặc bị âm nhiều hơn 1 sao.
+	var normalized_new := normalize_rank_stars(rank_idx, stars)
+	rank_idx = int(normalized_new.rank_index)
+	stars = int(normalized_new.stars)
+	promoted = rank_idx > old_rank_idx
+	demoted = rank_idx < old_rank_idx
 
 	return {
 		"is_win": is_win,
@@ -229,7 +260,11 @@ func process_match_result_adjusted(
 		"rank_index": rank_idx,
 		"stars": stars,
 		"accumulation_points": acc_points,
-		"stars_delta": (stars - old_stars) if not (promoted or demoted) else (1 if is_win else -1),
+		"stars_delta": (rank_idx * (STARS_PER_TIER + 1) + stars) - (old_rank_idx * (STARS_PER_TIER + 1) + old_stars),
+		"star_delta_applied": star_delta,
+		"match_star_delta": WIN_STARS if is_win else LOSE_STARS,
+		"stake_returned": maxi(0, star_delta - (WIN_STARS if is_win else 0)),
+		"star_bonus_delta": 1 if star_bonus else 0,
 		"acc_points_delta": accumulation_delta,
 		"tier_changed": promoted or demoted,
 		"promoted": promoted,
