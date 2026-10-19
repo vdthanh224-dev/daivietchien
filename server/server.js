@@ -366,7 +366,6 @@ async function sweepAppwriteMatchmaking() {
   }
 }
 
-const activeMatchmakingSockets = new Set();
 let matchmakingSweepTimer = null;
 
 function startMatchmakingSweep() {
@@ -1770,19 +1769,6 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
             type: "PONG",
             clientTime: payload.clientTime ?? null,
             timestamp: Date.now()
-          }));
-        }
-        if (payload.action === "MATCHMAKING_START") {
-          registerMatchmakingSocket(socket);
-          return socket.send(JSON.stringify({
-            type: "MATCHMAKING_SWEEP_ACK",
-            activeQueueCount: activeMatchmakingSockets.size
-          }));
-        }
-        if (payload.action === "MATCHMAKING_STOP") {
-          unregisterMatchmakingSocket(socket);
-          return socket.send(JSON.stringify({
-            type: "MATCHMAKING_STOPPED_ACK"
           }));
         }
         if (payload.action !== "PING") {

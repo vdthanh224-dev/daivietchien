@@ -57,12 +57,6 @@ function mapLegacyRank(rank) {
   return Math.max(0, Math.min(9, Math.round((numeric - 1) * 9 / 12)));
 }
 
-function mapLegacyRank(rank) {
-  const numeric = Number(rank);
-  if (!Number.isFinite(numeric)) return 0;
-  return Math.max(0, Math.min(9, Math.round((numeric - 1) * 9 / 12)));
-}
-
 export function createDeck80() {
   const list = [];
 

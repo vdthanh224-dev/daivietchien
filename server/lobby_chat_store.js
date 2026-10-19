@@ -37,7 +37,7 @@ export function createLobbyChatStore({ request, documentsPath, limit = LOBBY_CHA
         userName: value.userName, text: value.text, timestamp: value.timestamp };
       // Keep the public profile fields with durable messages when a client
       // sends them, while retaining compatibility with older stored records.
-      for (const key of ["title", "profileBg", "level", "rankIndex"]) {
+      for (const key of ["title", "profileBg", "level", "rankIndex", "rankStars", "rankAcc", "militaryPoints", "wins", "losses", "generalsCount", "exp"]) {
         if (Object.prototype.hasOwnProperty.call(value, key)) normalized[key] = value[key];
       }
       return normalized;
