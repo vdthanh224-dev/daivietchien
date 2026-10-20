@@ -267,7 +267,7 @@ func _on_meta_clicked(meta: Variant) -> void:
 func _render_messages() -> void:
 	messages_view.clear()
 	_meta_cache.clear()
-	var messages := NetworkClient.get_chat_messages(channel)
+	var messages: Array = NetworkClient.get_chat_messages(channel) if NetworkClient else []
 	if messages.is_empty():
 		messages_view.add_text("Chưa có tin nhắn. Hãy gửi lời chào!")
 		return

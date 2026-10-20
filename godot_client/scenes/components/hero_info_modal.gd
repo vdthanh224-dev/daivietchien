@@ -31,6 +31,7 @@ signal closed()
 @onready var eq_off_horse_label: RichTextLabel = $Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotOffHorse/Margin/RichText
 @onready var eq_def_horse_label: RichTextLabel = $Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotDefHorse/Margin/RichText
 @onready var eq_treasure_label: RichTextLabel = $Dim/Box/Margin/VBox/ContentHBox/RightCol/EquipSection/EquipGrid/SlotTreasure/Margin/RichText
+@onready var judgment_container: VBoxContainer = $Dim/Box/Margin/VBox/ContentHBox/RightCol/JudgmentSection/JudgmentList
 
 @onready var close_modal_btn: Button = $Dim/Box/Margin/VBox/FooterHBox/CloseModalBtn
 
@@ -207,6 +208,9 @@ func display_general(g: Dictionary, my_seat: int = 1) -> void:
 
 	# 4. Right Column: Equipment
 	_populate_equipments(g)
+
+	# 5. Right Column: Judgments (Delayed Tricks)
+	_populate_judgments(g)
 
 	open_modal()
 
@@ -521,3 +525,154 @@ func _get_equipment_description(item_name: String) -> String:
 			elif "ngựa" in item_name.to_lower() or "voi" in item_name.to_lower():
 				return "Chiến thú trợ trận, cải thiện khoảng cách chiến lược."
 			return "Bảo vật linh thiêng phù trợ tướng quân trong chiến trận."
+
+func _populate_judgments(g: Dictionary) -> void:
+	if not is_instance_valid(judgment_container):
+		return
+	for c in judgment_container.get_children():
+		c.queue_free()
+
+	var active_tricks: Array[String] = []
+	var avatar = g.get("avatar_node", null)
+	if is_instance_valid(avatar) and avatar.get("active_delayed_tricks") is Dictionary:
+		for k in avatar.active_delayed_tricks.keys():
+			var sk = str(k).to_lower().strip_edges()
+			if not sk in active_tricks:
+				active_tricks.append(sk)
+
+	if bool(g.get("has_dai_hong_thuy", false)) or bool(g.get("has_lightning", false)):
+		if not "dai_hong_thuy" in active_tricks: active_tricks.append("dai_hong_thuy")
+	if bool(g.get("has_cat_luong", false)):
+		if not "cat_luong" in active_tricks: active_tricks.append("cat_luong")
+	if bool(g.get("has_tram_ao", false)):
+		if not "tram_ao" in active_tricks: active_tricks.append("tram_ao")
+	if bool(g.get("has_bai_coc", false)):
+		if not "bai_coc" in active_tricks: active_tricks.append("bai_coc")
+
+	if g.has("judgements") and g["judgements"] is Array:
+		for j in g["judgements"]:
+			var j_sub = ""
+			var j_name = ""
+			if j is Dictionary:
+				j_sub = str(j.get("subType", "")).to_lower()
+				j_name = str(j.get("name", "")).to_lower()
+			elif j is String:
+				j_name = j.to_lower()
+			if "hong_thuy" in j_sub or "hong_thuy" in j_name or "dai_hong_thuy" in j_sub:
+				if not "dai_hong_thuy" in active_tricks: active_tricks.append("dai_hong_thuy")
+			elif "supply" in j_sub or "luong" in j_name or "cat_luong" in j_sub:
+				if not "cat_luong" in active_tricks: active_tricks.append("cat_luong")
+			elif "acedia" in j_sub or "tram_ao" in j_name:
+				if not "tram_ao" in active_tricks: active_tricks.append("tram_ao")
+			elif "bai_coc" in j_sub or "bai_coc" in j_name:
+				if not "bai_coc" in active_tricks: active_tricks.append("bai_coc")
+
+	if active_tricks.is_empty():
+		var empty_panel = PanelContainer.new()
+		var empty_style = StyleBoxFlat.new()
+		empty_style.bg_color = Color(0.045, 0.065, 0.11, 0.9)
+		empty_style.border_color = Color(0.4, 0.5, 0.6, 0.35)
+		empty_style.border_width_left = 1
+		empty_style.border_width_top = 1
+		empty_style.border_width_right = 1
+		empty_style.border_width_bottom = 1
+		empty_style.corner_radius_top_left = 6
+		empty_style.corner_radius_top_right = 6
+		empty_style.corner_radius_bottom_right = 6
+		empty_style.corner_radius_bottom_left = 6
+		empty_style.content_margin_left = 8
+		empty_style.content_margin_top = 4
+		empty_style.content_margin_right = 8
+		empty_style.content_margin_bottom = 4
+		empty_panel.add_theme_stylebox_override("panel", empty_style)
+
+		var empty_lbl = RichTextLabel.new()
+		empty_lbl.bbcode_enabled = true
+		empty_lbl.text = "[b][color=#78909C]⚖️ Vùng Phán Xét:[/color][/b] [color=#90A4AE](Trống - Hiện danh tướng không bị cẩm nang phán xét nào tác động)[/color]\n[color=#546E7A]↳ Vùng phán xét là nơi lưu giữ cẩm nang trì hoãn: Đại Hồng Thủy, Cắt Lương, Trầm Ảo hoặc bẫy Bãi Cọc khi bị đặt vào.[/color]"
+		empty_lbl.fit_content = true
+		empty_lbl.scroll_active = false
+		empty_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		empty_lbl.add_theme_font_size_override("normal_font_size", 10)
+		empty_panel.add_child(empty_lbl)
+		judgment_container.add_child(empty_panel)
+		return
+
+	for key in active_tricks:
+		var card_ui = _create_judgment_card_ui(key)
+		if card_ui:
+			judgment_container.add_child(card_ui)
+
+func _create_judgment_card_ui(key: String) -> Control:
+	var desc = ""
+	var tag_title = ""
+	var tag_bg = Color(0.2, 0.2, 0.2, 0.95)
+	var tag_border = Color(0.7, 0.7, 0.7, 1.0)
+	var tag_text_col = Color(1.0, 1.0, 1.0)
+
+	match key:
+		"dai_hong_thuy":
+			tag_title = "🌊 ĐẠI HỒNG THỦY"
+			tag_bg = Color(0.08, 0.16, 0.32, 0.95)
+			tag_border = Color(0.25, 0.75, 1.0, 0.95)
+			tag_text_col = Color(0.65, 0.95, 1.0)
+			desc = "[b][color=#40C4FF]Hiệu ứng:[/color][/b] Phán xét ở đầu lượt tướng này: Lật 1 lá từ xấp bài. Nếu là [b][color=#FF5252]chất Đen[/color][/b] (♠, ♣) có điểm từ [b]1 đến 6[/b]: Lập tức chịu [b][color=#EF5350]3 sát thương Thủy[/color][/b]. Nếu không trúng: Chuyển lá bài này sang Vùng Phán Xét của người chơi kế tiếp theo chiều kim đồng hồ."
+		"cat_luong":
+			tag_title = "🌾 CẮT ĐƯỜNG LƯƠNG"
+			tag_bg = Color(0.28, 0.18, 0.05, 0.95)
+			tag_border = Color(1.0, 0.82, 0.25, 0.95)
+			tag_text_col = Color(1.0, 0.9, 0.4)
+			desc = "[b][color=#FFD54F]Hiệu ứng:[/color][/b] Phán xét ở đầu lượt tướng này: Lật 1 lá từ xấp bài. Nếu kết quả [b][color=#FF5252]KHÔNG PHẢI chất Vàng (♣)[/color][/b]: Danh tướng bị cắt đứt nguồn tiếp tế, [b][color=#EF5350]bỏ qua Giai đoạn Rút Bài[/color][/b] trong lượt này. (Nếu lật trúng Vàng ♣: Thoát hiệu ứng và rút bài bình thường)."
+		"tram_ao":
+			tag_title = "🕸️ TRẦM ẢO SA BẪY"
+			tag_bg = Color(0.24, 0.08, 0.28, 0.95)
+			tag_border = Color(0.9, 0.45, 0.9, 0.95)
+			tag_text_col = Color(1.0, 0.7, 0.95)
+			desc = "[b][color=#CE93D8]Hiệu ứng:[/color][/b] Phán xét ở đầu lượt tướng này: Lật 1 lá từ xấp bài. Nếu kết quả [b][color=#FF5252]KHÔNG PHẢI chất Đỏ (♥)[/color][/b]: Danh tướng bị mê hoặc trầm luân, [b][color=#EF5350]bỏ qua Giai đoạn Ra Bài[/color][/b] trong lượt này. (Nếu lật trúng Đỏ ♥: Thoát hiệu ứng và ra bài bình thường)."
+		"bai_coc":
+			tag_title = "🪵 BÃI CỌC BẠCH ĐẰNG"
+			tag_bg = Color(0.08, 0.24, 0.18, 0.95)
+			tag_border = Color(0.3, 0.85, 0.65, 0.95)
+			tag_text_col = Color(0.65, 1.0, 0.85)
+			desc = "[b][color=#69F0AE]Hiệu ứng:[/color][/b] Bẫy cọc sông hiểm địa: Mỗi khi danh tướng sử dụng [b][color=#FFB74D]Trảm[/color][/b] hoặc gắn/dùng [b][color=#81D4FA]Chiến Mã[/color][/b]: Phải lật 1 lá bài phán xét. Nếu ra bài [b][color=#FF5252]Vàng (♣) hoặc Đen (♠)[/color][/b]: Hành động bị hủy bỏ và chịu ngay [b][color=#EF5350]1 sát thương[/color][/b]. Nếu ra bài Đỏ (♥) hoặc Trắng (♦): Hành động tiếp tục bình thường."
+		_:
+			tag_title = "⚖️ " + key.to_upper()
+			desc = "[color=#CFD8DC]Cẩm nang trì hoãn đang chờ phán xét tại lượt tướng này.[/color]"
+
+	var panel = PanelContainer.new()
+	var style = StyleBoxFlat.new()
+	style.bg_color = tag_bg
+	style.border_color = tag_border
+	style.border_width_left = 2
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.corner_radius_top_left = 6
+	style.corner_radius_top_right = 6
+	style.corner_radius_bottom_right = 6
+	style.corner_radius_bottom_left = 6
+	style.content_margin_left = 8
+	style.content_margin_top = 4
+	style.content_margin_right = 8
+	style.content_margin_bottom = 4
+	panel.add_theme_stylebox_override("panel", style)
+
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 2)
+	panel.add_child(vbox)
+
+	var header_lbl = Label.new()
+	header_lbl.text = "⚠️ " + tag_title + " (ĐANG ĐẶT TRÊN TƯỚNG)"
+	header_lbl.add_theme_font_size_override("font_size", 11)
+	header_lbl.add_theme_color_override("font_color", tag_text_col)
+	vbox.add_child(header_lbl)
+
+	var desc_lbl = RichTextLabel.new()
+	desc_lbl.bbcode_enabled = true
+	desc_lbl.text = desc
+	desc_lbl.fit_content = true
+	desc_lbl.scroll_active = false
+	desc_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	desc_lbl.add_theme_font_size_override("normal_font_size", 10)
+	vbox.add_child(desc_lbl)
+
+	return panel

@@ -5297,9 +5297,16 @@ func _build_gacha_card(res: Dictionary, is_small: bool) -> Control:
 	var silver_gain: int = res.get("silver_gain", 0)
 
 	var card = PanelContainer.new()
-	var card_size = Vector2(215, 380) if is_small else Vector2(340, 510)
+	var card_size = Vector2(215, 395) if is_small else Vector2(340, 520)
 	card.custom_minimum_size = card_size
 	card.pivot_offset = card_size / 2.0
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	card.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			AudioManager.play_card_select()
+			_show_hero_detail_popup(hero, true, _gacha_reveal_layer)
+	)
 
 	var cs = StyleBoxFlat.new()
 	if is_new:
@@ -5449,6 +5456,34 @@ func _build_gacha_card(res: Dictionary, is_small: bool) -> Control:
 		conv_panel.add_child(conv_lbl)
 		vbox.add_child(conv_panel)
 
+	# 5. Button Xem Kỹ Năng
+	var btn_view_skill = Button.new()
+	btn_view_skill.text = "🔍 Xem Kỹ Năng"
+	btn_view_skill.custom_minimum_size = Vector2(0, 26 if is_small else 32)
+	btn_view_skill.add_theme_font_size_override("font_size", 10 if is_small else 12)
+	btn_view_skill.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	btn_view_skill.focus_mode = Control.FOCUS_NONE
+	var bvs_style = StyleBoxFlat.new()
+	bvs_style.bg_color = Color(0.12, 0.18, 0.28, 0.95)
+	bvs_style.border_color = Color(0.40, 0.70, 0.95, 0.8)
+	bvs_style.border_width_left = 1
+	bvs_style.border_width_right = 1
+	bvs_style.border_width_top = 1
+	bvs_style.border_width_bottom = 1
+	bvs_style.corner_radius_top_left = 6
+	bvs_style.corner_radius_top_right = 6
+	bvs_style.corner_radius_bottom_right = 6
+	bvs_style.corner_radius_bottom_left = 6
+	btn_view_skill.add_theme_stylebox_override("normal", bvs_style)
+	var bvs_hover = bvs_style.duplicate()
+	bvs_hover.bg_color = Color(0.20, 0.30, 0.45, 1.0)
+	btn_view_skill.add_theme_stylebox_override("hover", bvs_hover)
+	btn_view_skill.pressed.connect(func():
+		AudioManager.play_card_select()
+		_show_hero_detail_popup(hero, true, _gacha_reveal_layer)
+	)
+	vbox.add_child(btn_view_skill)
+
 	return card
 
 func _play_gacha_reveal_animation(results: Array, count: int) -> void:
@@ -5521,7 +5556,7 @@ func _play_gacha_reveal_animation(results: Array, count: int) -> void:
 	main_vbox.add_child(title_lbl)
 
 	var sub_lbl = Label.new()
-	sub_lbl.text = "Khí thiêng sông núi hội tụ, Hào Kiệt giáng thế phù trợ nghĩa quân!"
+	sub_lbl.text = "Khí thiêng sông núi hội tụ, Hào Kiệt giáng thế phù trợ nghĩa quân! (Nhấn vào tướng để xem kỹ năng)"
 	sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sub_lbl.add_theme_font_size_override("font_size", 13)
 	sub_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)

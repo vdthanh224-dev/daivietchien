@@ -1753,7 +1753,14 @@ func _display_next_skill_banner() -> void:
 	label.add_theme_constant_override("outline_size", 7)
 	add_child(label)
 	if bool(banner_data.get("play_voice", false)):
-		AudioManager.play_voice(skill_name)
+		var is_fem := false
+		var hero_db = get_node_or_null("/root/HeroDatabase")
+		if hero_db and hero_db.has_method("is_female_hero"):
+			if is_instance_valid(name_label) and not name_label.text.is_empty():
+				is_fem = hero_db.is_female_hero(name_label.text)
+			if not is_fem:
+				is_fem = hero_db.is_female_hero(general_id)
+		AudioManager.play_voice(skill_name, is_fem)
 		AudioManager.play_skill()
 	var tween = create_tween()
 	tween.tween_property(label, "modulate:a", 1.0, 0.12)

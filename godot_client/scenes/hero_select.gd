@@ -399,9 +399,15 @@ func _rebuild_hero_grid(heroes_to_show: Array[Dictionary]) -> void:
 		var card = _create_hero_grid_card(hero)
 		grid.add_child(card)
 		hero_card_nodes[hero["id"]] = card
-		if int(hero.get("id", 0)) in selected_hero_ids:
-			card.modulate = Color(0.4, 0.4, 0.4, 0.8)
-	if not available_heroes.is_empty():
+		var hid_val := int(hero.get("id", 0))
+		if hid_val in selected_hero_ids:
+			if not is_player_locked or heroes_to_show.size() > 1:
+				card.visible = false
+				card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var first_cand := _get_first_available_candidate()
+	if not first_cand.is_empty():
+		_inspect_hero(first_cand)
+	elif not available_heroes.is_empty():
 		_inspect_hero(available_heroes[0])
 
 func _show_fallback_candidate_pool() -> void:
@@ -1520,7 +1526,28 @@ func _run_local_draft_loop() -> void:
 
 			await get_tree().create_timer(0.5).timeout
 	else:
-		for slot_idx in range(draft_slots.size()):
+		var pick_order: Array[int] = []
+		if current_mode_id.begins_with("dynasty_"):
+			var king_idx := -1
+			for i in range(draft_slots.size()):
+				if draft_slots[i].get("role", "") == "KING":
+					king_idx = i
+					break
+			if king_idx < 0 and not draft_slots.is_empty():
+				king_idx = 0
+			if king_idx >= 0:
+				pick_order.append(king_idx)
+			for i in range(draft_slots.size()):
+				if i != king_idx and bool(draft_slots[i].get("isPlayer", false)) and not bool(draft_slots[i].get("isAI", false)):
+					pick_order.append(i)
+			for i in range(draft_slots.size()):
+				if not pick_order.has(i):
+					pick_order.append(i)
+		else:
+			for i in range(draft_slots.size()):
+				pick_order.append(i)
+
+		for slot_idx in pick_order:
 			if not is_draft_active:
 				return
 			current_picker_index = slot_idx
@@ -1592,12 +1619,25 @@ func _lock_hero_for_slot(slot: Dictionary, hero: Dictionary) -> void:
 	slot["chosenHero"] = hero
 	slot["isLocked"] = true
 
-	if slot["isPlayer"]:
+	if slot.get("isPlayer", false):
 		is_player_locked = true
-	if not _can_reveal_draft_hero(slot):
-		return
+
 	if not hid in selected_hero_ids:
 		selected_hero_ids.append(hid)
+
+	if hero_card_nodes.has(hid):
+		if not bool(slot.get("isPlayer", false)):
+			hero_card_nodes[hid].visible = false
+			hero_card_nodes[hid].mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var cur_inspect_id = int(inspecting_hero.get("id", 0)) if inspecting_hero is Dictionary else 0
+	if cur_inspect_id == hid and not is_player_locked:
+		var next_cand = _get_first_available_candidate()
+		if not next_cand.is_empty():
+			_inspect_hero(next_cand)
+
+	if not _can_reveal_draft_hero(slot):
+		return
 
 	AudioManager.play_card_select()
 
@@ -1695,6 +1735,9 @@ func _on_confirm_pick_pressed() -> void:
 		var slot = draft_slots[pick_index]
 		var hid = int(inspecting_hero.get("id", 0))
 		var hname = inspecting_hero.get("name", "")
+		if hid in selected_hero_ids:
+			_update_lock_in_button_state()
+			return
 
 		if NetworkClient and NetworkClient.is_connected_to_server:
 			# Network draft is authoritative. Keep the pick pending until the next
@@ -1858,7 +1901,7 @@ func _on_network_draft_closed() -> void:
 	_server_state_received = false
 	draft_status_lbl.text = "⚠️ Mất kết nối máy chủ chọn tướng, đang kết nối lại..."
 
-func _apply_authoritative_draft_slots(server_slots: Array, reveal_for_battle: bool = false) -> void:
+func _apply_authoritative_draft_slots(server_slots: Array, reveal_for_battle: bool = false, server_selected_ids: Array = []) -> void:
 	if server_slots.is_empty():
 		return
 	for s_info in server_slots:
@@ -1972,14 +2015,35 @@ func _apply_authoritative_draft_slots(server_slots: Array, reveal_for_battle: bo
 				break
 			break
 	selected_hero_ids.clear()
+	for s_hid in server_selected_ids:
+		var hid_val := int(s_hid)
+		if hid_val > 0 and not selected_hero_ids.has(hid_val):
+			selected_hero_ids.append(hid_val)
 	for local_s in draft_slots:
-		if local_s.get("isLocked", false) and _can_reveal_draft_hero(local_s):
+		if local_s.get("isLocked", false):
 			var chosen = local_s.get("chosenHero", {})
 			if chosen is Dictionary and chosen.has("id"):
-				selected_hero_ids.append(int(chosen["id"]))
+				var hid_val := int(chosen["id"])
+				if hid_val > 0 and not selected_hero_ids.has(hid_val):
+					selected_hero_ids.append(hid_val)
+	var own_hero_id := 0
+	for local_s in draft_slots:
+		if local_s.get("isPlayer", false):
+			var chosen = local_s.get("chosenHero", {})
+			if chosen is Dictionary and chosen.has("id"):
+				own_hero_id = int(chosen["id"])
+			break
 	for hid in selected_hero_ids:
 		if hero_card_nodes.has(hid):
+			if hid != own_hero_id or not is_player_locked:
+				hero_card_nodes[hid].visible = false
+				hero_card_nodes[hid].mouse_filter = Control.MOUSE_FILTER_IGNORE
 			hero_card_nodes[hid].modulate = Color(0.4, 0.4, 0.4, 0.8)
+	var cur_inspect_id := int(inspecting_hero.get("id", 0)) if inspecting_hero is Dictionary else 0
+	if cur_inspect_id > 0 and cur_inspect_id in selected_hero_ids and not is_player_locked:
+		var next_cand := _get_first_available_candidate()
+		if not next_cand.is_empty():
+			_inspect_hero(next_cand)
 	if _pending_pick_hero_id > 0:
 		var my_slot: Dictionary = {}
 		for local_s in draft_slots:
@@ -2055,8 +2119,9 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 
 	# Đồng bộ trạng thái khóa và phe từ Server.
 	var server_slots = data.get("slots", [])
+	var server_selected_ids = data.get("selectedHeroIds", [])
 	if server_slots is Array:
-		_apply_authoritative_draft_slots(server_slots)
+		_apply_authoritative_draft_slots(server_slots, false, server_selected_ids if server_selected_ids is Array else [])
 		var is_my_active_seat := _is_my_turn()
 		# Đồng bộ danh sách tướng ứng cử viên riêng biệt của người chơi này (disjoint candidateHeroIds)
 		for s_info in server_slots:
@@ -2156,8 +2221,9 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 func _on_server_draft_completed(data: Dictionary) -> void:
 	if is_draft_active:
 		var server_slots = data.get("slots", [])
+		var server_selected_ids = data.get("selectedHeroIds", [])
 		if server_slots is Array:
-			_apply_authoritative_draft_slots(server_slots, true)
+			_apply_authoritative_draft_slots(server_slots, true, server_selected_ids if server_selected_ids is Array else [])
 		current_picker_index = draft_slots.size()
 		_on_draft_completed()
 

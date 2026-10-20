@@ -2047,6 +2047,8 @@ for (const [subType, name] of [
   // Chọn target 2: seat 3 (seat 3 rút 1) -> hoàn tất Khoan Hòa
   handleUseSkill(state, 1, "Khoan Hòa", 3);
   assert.equal(state.players[2].hand.length, 1);
+  assert.notEqual(state.phase, "DISCARD");
+  assert.equal(state.turnSeat, 2);
 }
 
 {

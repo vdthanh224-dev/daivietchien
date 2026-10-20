@@ -5359,8 +5359,9 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       description: `⚔️ <b>${respondent.generalName}</b> không ra Trảm, chịu 1 sát thương từ [Chuyên Chế]!`
     });
     applyDamageToPlayer(state, respondentSeat, 1, "Chuyên Chế", "NORMAL", false, {
-      attackerSeat: Number(state.activeCard?.casterSeat) || Number(state.turnSeat) || 0
+      attackerSeat: Number(state.activeCard?.casterSeat) || Number(state.chuyenCheSourceSeat) || Number(state.turnSeat) || 0
     });
+    state.chuyenCheSourceSeat = null;
     if (state.phase === "PLAY") resetWaitingState(state);
     return { success: true, state };
   }
@@ -5655,8 +5656,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     recordAction(state, { type: "KHOAN_HOA_DRAW", casterSeat: respondentSeat, skillActivations: [{ name: "Khoan Hòa", seat: respondentSeat }], description: `🤝 ${respondent.generalName} kích hoạt [Khoan Hòa] và rút 1 lá.` });
     state.khoanHoaTargets = null;
     resetWaitingState(state);
-    state.phase = "PLAY";
-    return handleEndTurn(state, respondentSeat);
+    return finishTurnEndSkills(state, respondent);
   }
 
   if (state.phase === "AWAIT_AN_DAN") {
@@ -8547,6 +8547,11 @@ export function handleDiscardCards(state, seat, cardIds) {
     }
   }
 
+  return finishTurnEndSkills(state, p);
+}
+
+export function finishTurnEndSkills(state, p) {
+  const seat = p.seat;
   p.thaiBinhBuff = 0;
   p.extraSlashLimit = 0;
 
@@ -10769,7 +10774,7 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
     }
     state.khoanHoaTargets = null;
     resetWaitingState(state);
-    return handleEndTurn(state, seat);
+    return finishTurnEndSkills(state, player);
   }
 
   if (norm.includes("uất khí") || norm.includes("uat khi")) {

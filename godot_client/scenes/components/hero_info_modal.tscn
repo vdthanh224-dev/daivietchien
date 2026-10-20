@@ -434,6 +434,20 @@ scroll_active = false
 mouse_filter = 2
 theme_override_font_sizes/normal_font_size = 10
 
+[node name="JudgmentSection" type="VBoxContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Title" type="Label" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/JudgmentSection"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.78, 0.32, 1)
+theme_override_font_sizes/font_size = 12
+text = "⚖️ VÙNG PHÁN XÉT (CẨM NANG TRÌ HOÃN)"
+
+[node name="JudgmentList" type="VBoxContainer" parent="Dim/Box/Margin/VBox/ContentHBox/RightCol/JudgmentSection"]
+layout_mode = 2
+theme_override_constants/separation = 3
+
 [node name="FooterHBox" type="HBoxContainer" parent="Dim/Box/Margin/VBox"]
 custom_minimum_size = Vector2(0, 36)
 layout_mode = 2

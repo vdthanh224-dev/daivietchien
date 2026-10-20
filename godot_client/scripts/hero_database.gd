@@ -1617,3 +1617,32 @@ static func get_faction_color(faction: String) -> Color:
 		"Đông A": return Color(0.95, 0.45, 0.2, 1.0)
 		"Đại Nam": return Color(0.95, 0.4, 0.65, 1.0)
 		_: return Color(0.85, 0.85, 0.85, 1.0)
+
+const FEMALE_HERO_IDS: Array[int] = [4, 5, 6, 7, 9, 36, 43]
+const FEMALE_HERO_NAMES := [
+	"lê chân", "thánh thiên", "vũ thị thục", "nàng nội", "triệu thị trinh", "bà triệu", "dương vân nga", "ỷ lan"
+]
+const FEMALE_HERO_SLUGS := [
+	"le_chan", "thanh_thien", "bat_nan", "nang_noi", "ba_trieu", "duong_van_nga", "y_lan"
+]
+
+func is_female_hero(hero_identifier) -> bool:
+	if hero_identifier is int:
+		return int(hero_identifier) in FEMALE_HERO_IDS
+	elif hero_identifier is String:
+		var s = str(hero_identifier).to_lower().strip_edges()
+		if s in FEMALE_HERO_NAMES or s in FEMALE_HERO_SLUGS:
+			return true
+		for hid in FEMALE_HERO_IDS:
+			if str(hid) == s or ("hero_" + str(hid)) == s:
+				return true
+		if hero_dict.has(hero_identifier):
+			return int(hero_dict[hero_identifier].get("id", -1)) in FEMALE_HERO_IDS
+	elif hero_identifier is Dictionary:
+		var hid = int(hero_identifier.get("id", hero_identifier.get("hero_id", -1)))
+		if hid in FEMALE_HERO_IDS:
+			return true
+		var hname = str(hero_identifier.get("name", hero_identifier.get("generalName", "")))
+		if not hname.is_empty():
+			return is_female_hero(hname)
+	return false

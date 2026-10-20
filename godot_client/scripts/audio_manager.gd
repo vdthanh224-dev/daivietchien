@@ -44,6 +44,17 @@ const SKILL_VOICE_KEYS := {
 	"hùng sức": "hung_suc"
 }
 
+const FEMALE_SKILL_VOICE_KEYS := {
+	"triều dâng": true, "trieu_dang": true,
+	"dũng nữ": true, "dung_nu": true,
+	"trinh liệt": true, "trinh_liet": true,
+	"tiên phong": true, "tien_phong": true,
+	"chiến tượng": true, "chien_tuong": true,
+	"bát nạ": true, "bat_na": true,
+	"trao bào": true, "trao_bao": true,
+	"nhiếp chính": true, "nhiep_chinh": true
+}
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
@@ -125,8 +136,8 @@ func play_card_select() -> void:
 func play_card_cancel() -> void:
 	play_sfx("sfx_parry", 1.0)
 
-func play_card_sound(card_name: String) -> void:
-	play_voice(card_name)
+func play_card_sound(card_name: String, is_female: bool = false) -> void:
+	play_voice(card_name, is_female)
 
 func play_victory() -> void:
 	play_sfx("sfx_victory", 3.0)
@@ -150,25 +161,59 @@ func play_exp_fill(vol_db: float = 0.0) -> void:
 func play_levelup(vol_db: float = 2.0) -> void:
 	play_sfx("sfx_levelup", vol_db)
 
-func play_voice(card_or_skill_name: String) -> void:
+func play_voice(card_or_skill_name: String, is_female: bool = false) -> void:
 	var key = _normalize_voice_key(card_or_skill_name)
 	if key == "":
 		return
 
-	if not voice_cache.has(key):
-		var path = "res://assets/audio/Voice/%s.wav" % key
-		if not ResourceLoader.exists(path):
-			path = "res://assets/audio/voice/%s.wav" % key
-		if ResourceLoader.exists(path):
-			voice_cache[key] = load(path)
+	var raw_lower = card_or_skill_name.to_lower().strip_edges()
+	var effective_female = is_female or FEMALE_SKILL_VOICE_KEYS.has(raw_lower) or FEMALE_SKILL_VOICE_KEYS.has(key)
 
-	if voice_cache.has(key) and voice_cache[key] != null:
+	var female_key = key + "_female"
+	var chosen_stream: AudioStream = null
+
+	if effective_female:
+		if not voice_cache.has(female_key):
+			var female_path = "res://assets/audio/Voice/%s.wav" % female_key
+			if not ResourceLoader.exists(female_path):
+				female_path = "res://assets/audio/voice/%s.wav" % female_key
+			if ResourceLoader.exists(female_path):
+				voice_cache[female_key] = load(female_path)
+			else:
+				voice_cache[female_key] = null
+		if voice_cache.get(female_key, null) != null:
+			chosen_stream = voice_cache[female_key]
+
+	if chosen_stream == null:
+		if not voice_cache.has(key):
+			var path = "res://assets/audio/Voice/%s.wav" % key
+			if not ResourceLoader.exists(path):
+				path = "res://assets/audio/voice/%s.wav" % key
+			if ResourceLoader.exists(path):
+				voice_cache[key] = load(path)
+		if voice_cache.has(key):
+			chosen_stream = voice_cache[key]
+
+	if chosen_stream != null:
 		var p = AudioStreamPlayer.new()
-		p.stream = voice_cache[key]
-		p.volume_db = 2.0
+		p.stream = chosen_stream
+		if effective_female and voice_cache.get(female_key, null) == null:
+			# Female voice pitch shift (+4.2 semitones up for natural female voice tone)
+			p.pitch_scale = 1.28
+			p.volume_db = 2.8
+		else:
+			p.pitch_scale = 1.0
+			p.volume_db = 2.0
 		add_child(p)
 		p.play()
 		p.finished.connect(p.queue_free)
+
+func play_voice_for_hero(card_or_skill_name: String, hero_identifier) -> void:
+	var is_fem := false
+	var hero_db = get_node_or_null("/root/HeroDatabase")
+	if hero_db and hero_db.has_method("is_female_hero"):
+		is_fem = hero_db.is_female_hero(hero_identifier)
+	play_voice(card_or_skill_name, is_fem)
 
 func has_voice(card_or_skill_name: String) -> bool:
 	var key = _normalize_voice_key(card_or_skill_name)

@@ -397,6 +397,7 @@ var is_targeting_dinh_quoc: bool = false
 var is_targeting_trao_bao: bool = false
 var is_targeting_nhiep_chinh_y_lan: bool = false
 var is_targeting_dinh_trieu: bool = false
+var is_targeting_chuyen_che: bool = false
 var selected_two_card_skill_nodes: Array[Control] = []
 var is_targeting_chinh_thong: bool = false
 var is_targeting_khoan_hoa: bool = false
@@ -2331,7 +2332,7 @@ func _init_generals_from_draft() -> void:
 		my_name = AuthManager.current_user_name
 
 	my_seat = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 and NetworkClient.my_seat <= 8 else 1
-	var mode_id := str(AppwriteMatchmaking.current_room.get("modeId", "2v2")) if AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary else (NetworkClient.active_mode_id if NetworkClient else "2v2")
+	var mode_id: String = str(AppwriteMatchmaking.current_room.get("modeId", "2v2")) if AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary else (NetworkClient.active_mode_id if NetworkClient else "2v2")
 	battle_mode_id = mode_id
 	if mode_id == "dynasty_5" and draft.size() < 5:
 		battle_seat_count = 5
@@ -2557,6 +2558,8 @@ func _hero_has_skill(g: Dictionary, skill_id: String) -> bool:
 		return hero_id == 43
 	if s_id == "nhiep_chinh":
 		return hero_id == 36
+	if s_id == "chuyen_che":
+		return hero_id == 49
 	if hero_id == 37 and (s_id == "trac_lac" or s_id == "bao_no" or s_id == "ngoa_trieu"):
 		return true
 	var skills_arr = g.get("skills", [])
@@ -2700,6 +2703,24 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 			buttons.append({"id": "dinh_trieu", "text": "📜 ĐÃ DÙNG ĐỊNH TRIỀU", "description": "Định Triều chỉ dùng 1 lần mỗi lượt.", "disabled": true})
 		else:
 			buttons.append({"id": "dinh_trieu", "text": "📜 ĐỊNH TRIỀU", "description": "Giai đoạn ra bài: đưa 1 lá Cẩm Nang trên tay cho 1 người khác, rồi rút 1 lá.", "selected": is_targeting_dinh_trieu})
+	if seat == my_seat and _hero_has_skill(g, "chuyen_che") and current_server_phase == "PLAY" and current_turn_seat == my_seat:
+		var has_hand_cards := false
+		if is_instance_valid(hand_container) and hand_container.get_child_count() > 0:
+			has_hand_cards = true
+		var has_opp_equip := false
+		for s in generals_data.keys():
+			if s != my_seat and generals_data[s].get("is_alive", false):
+				var tgt_g = generals_data[s]
+				var tgt_has_eq = not str(tgt_g.get("equipped_weapon", "")).is_empty() or not str(tgt_g.get("equipped_armor", "")).is_empty() or not str(tgt_g.get("equipped_def_horse", "")).is_empty() or not str(tgt_g.get("equipped_off_horse", "")).is_empty() or not str(tgt_g.get("equipped_treasure", "")).is_empty() or (tgt_g.get("equipment_cards", []) is Array and tgt_g.get("equipment_cards", []).size() > 0)
+				if tgt_has_eq:
+					has_opp_equip = true
+					break
+		if not has_hand_cards:
+			buttons.append({"id": "chuyen_che", "text": "⚔️ CHUYÊN CHẾ", "description": "Cần có ít nhất 1 lá bài trên tay để bỏ.", "disabled": true})
+		elif not has_opp_equip:
+			buttons.append({"id": "chuyen_che", "text": "⚔️ CHUYÊN CHẾ", "description": "Không có người chơi nào khác đang có trang bị.", "disabled": true})
+		else:
+			buttons.append({"id": "chuyen_che", "text": "⚔️ CHUYÊN CHẾ", "description": "Bỏ 1 lá bài trên tay để hủy 1 trang bị của người khác; họ phải ra 1 Trảm hoặc mất 1 Máu.", "selected": is_targeting_chuyen_che})
 	if seat == my_seat and (int(g.get("hero_id", 0)) == 47 or _hero_has_skill(g, "tien_thoai")):
 		buttons.append({"id": "tien_thoai", "text": "⚡ TIẾN THOÁI", "description": "Hoán chuyển Trảm ⟷ Đỡ trên tay để sử dụng."})
 	var treasure = str(g.get("equipped_treasure", ""))
@@ -2726,6 +2747,7 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 		avatar.set_skill_button_selected("nhiep_chinh_y_lan", is_targeting_nhiep_chinh_y_lan)
 		avatar.set_skill_button_selected("trac_lac", is_using_trac_lac)
 		avatar.set_skill_button_selected("dinh_trieu", is_targeting_dinh_trieu)
+		avatar.set_skill_button_selected("chuyen_che", is_targeting_chuyen_che)
 	if avatar.has_method("set_treasure_skill_selected"):
 		avatar.set_treasure_skill_selected(is_targeting_drum_skill or is_targeting_ho_phu_skill)
 	_relayout_hand_cards()
@@ -2751,6 +2773,8 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 		is_targeting_nhiep_chinh_y_lan = false
 	if s_num == my_seat and skill_key != "dinh_trieu" and is_targeting_dinh_trieu:
 		is_targeting_dinh_trieu = false
+	if s_num == my_seat and skill_key != "chuyen_che" and is_targeting_chuyen_che:
+		is_targeting_chuyen_che = false
 	var g = generals_data[s_num]
 	var h_data = g.get("hero_data", {})
 	if not (h_data is Dictionary):
@@ -3055,6 +3079,32 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 			turn_indicator.text = "📜 ĐỊNH TRIỀU: CHỌN CẨM NANG VÀ NGƯỜI NHẬN"
 		else:
 			desc_text.text = "📜 Đã hủy chọn [ĐỊNH TRIỀU]."
+		_refresh_local_skill_buttons(s_num)
+		_update_action_btn()
+		return
+	if s_num == my_seat and skill_key == "chuyen_che":
+		if not is_player_turn or (is_network_mode and current_server_phase != "PLAY"):
+			desc_text.text = "⚠️ [CHUYÊN CHẾ] chỉ dùng trong Giai đoạn Ra bài của bạn."
+			return
+		is_targeting_chuyen_che = not is_targeting_chuyen_che
+		is_targeting_trao_bao = false
+		is_targeting_dinh_quoc = false
+		is_targeting_dinh_trieu = false
+		is_targeting_nhiep_chinh_y_lan = false
+		_clear_trao_bao_equipped_previews()
+		_clear_hung_suc_equipped_weapon_previews()
+		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
+			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
+		selected_target_seat = -1
+		if selected_card_ui and is_instance_valid(selected_card_ui):
+			selected_card_ui.set_selected(false)
+			selected_card_ui = null
+		if is_targeting_chuyen_che:
+			desc_text.text = "⚔️ [CHUYÊN CHẾ] Chọn 1 lá bài trên tay và 1 người chơi có trang bị."
+			turn_indicator.text = "⚔️ CHUYÊN CHẾ: CHỌN BÀI VÀ MỤC TIÊU CÓ TRANG BỊ"
+			AudioManager.play_card_select()
+		else:
+			desc_text.text = "⚔️ Đã hủy chọn [CHUYÊN CHẾ]."
 		_refresh_local_skill_buttons(s_num)
 		_update_action_btn()
 		return
@@ -3763,6 +3813,22 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 		desc_text.text = "📜 [ĐỊNH TRIỀU] Đã chọn [%s]. Chọn 1 người chơi nhận bài." % c_name_dt
 		_update_action_btn()
 		return
+	if is_targeting_chuyen_che:
+		if card_node.has_meta("trao_bao_equipped_preview") or card_node.has_meta("hung_suc_equipped_preview"):
+			desc_text.text = "⚠️ [CHUYÊN CHẾ] chỉ bỏ lá bài trên tay."
+			return
+		if selected_card_ui == card_node:
+			selected_card_ui.set_selected(false)
+			selected_card_ui = null
+		else:
+			if selected_card_ui and is_instance_valid(selected_card_ui):
+				selected_card_ui.set_selected(false)
+			selected_card_ui = card_node
+			card_node.set_selected(true)
+		AudioManager.play_card_select()
+		desc_text.text = "⚔️ [CHUYÊN CHẾ] Đã chọn [%s]. Chọn 1 người chơi có trang bị." % str(c_info.get("name", "Bài")) if selected_card_ui else "⚔️ [CHUYÊN CHẾ] Chọn 1 lá bài trên tay và 1 người chơi có trang bị."
+		_update_action_btn()
+		return
 	if is_targeting_binh_san:
 		if int(c_info.get("cat", c_info.get("category", -1))) != 1 and not card_node.has_meta("hung_suc_equipped_preview"):
 			desc_text.text = "⚠️ [BÌNH SẠN] chỉ bỏ được lá trang bị."
@@ -4082,6 +4148,28 @@ func _on_general_avatar_clicked(seat_num: int) -> void:
 		card_play_btn.visible = true
 		desc_text.text = "🌊 [TRIỀU DÂNG] Chọn 1 trang bị của %s để hủy." % g["name"]
 		AudioManager.play_card_select()
+		return
+
+	if is_targeting_chuyen_che:
+		if seat_num == my_seat:
+			desc_text.text = "⚠️ [CHUYÊN CHẾ] phải chọn một người khác."
+			AudioManager.play_skill()
+			return
+		if not g.get("is_alive", false):
+			desc_text.text = "⚠️ Không thể chọn người chơi đã tử trận."
+			AudioManager.play_skill()
+			return
+		var has_equipment = not str(g.get("equipped_weapon", "")).is_empty() or not str(g.get("equipped_armor", "")).is_empty() or not str(g.get("equipped_def_horse", "")).is_empty() or not str(g.get("equipped_off_horse", "")).is_empty() or not str(g.get("equipped_treasure", "")).is_empty() or (g.get("equipment_cards", []) is Array and g.get("equipment_cards", []).size() > 0)
+		if not has_equipment:
+			desc_text.text = "⚠️ %s không có trang bị nào để hủy." % g.get("name", "Người chơi")
+			AudioManager.play_skill()
+			return
+		if selected_target_seat > 0 and selected_target_seat != seat_num and generals_data.has(selected_target_seat):
+			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
+		selected_target_seat = seat_num
+		g["avatar_node"].set_target_highlight(true)
+		AudioManager.play_card_select()
+		_update_action_btn()
 		return
 
 	if is_targeting_dan_cau:
@@ -4687,6 +4775,27 @@ func _update_action_btn() -> void:
 			card_play_btn.text = "📜 ĐỊNH TRIỀU: CHỌN CẨM NANG..."
 		else:
 			card_play_btn.text = "📜 ĐỊNH TRIỀU: CHỌN CẨM NANG VÀ NGƯỜI NHẬN"
+		return
+	if is_targeting_chuyen_che:
+		var cc_target_valid = selected_target_seat > 0 and selected_target_seat != my_seat and generals_data.has(selected_target_seat) and generals_data[selected_target_seat].get("is_alive", false)
+		if cc_target_valid:
+			var tgt_g = generals_data[selected_target_seat]
+			var tgt_has_eq = not str(tgt_g.get("equipped_weapon", "")).is_empty() or not str(tgt_g.get("equipped_armor", "")).is_empty() or not str(tgt_g.get("equipped_def_horse", "")).is_empty() or not str(tgt_g.get("equipped_off_horse", "")).is_empty() or not str(tgt_g.get("equipped_treasure", "")).is_empty() or (tgt_g.get("equipment_cards", []) is Array and tgt_g.get("equipment_cards", []).size() > 0)
+			if not tgt_has_eq:
+				cc_target_valid = false
+		var cc_card_info = _get_card_info_from_ui(selected_card_ui) if selected_card_ui != null and is_instance_valid(selected_card_ui) else {}
+		var cc_card_valid = not cc_card_info.is_empty() and not (selected_card_ui != null and (selected_card_ui.has_meta("trao_bao_equipped_preview") or selected_card_ui.has_meta("hung_suc_equipped_preview")))
+		card_play_btn.visible = true
+		card_play_btn.disabled = not (cc_target_valid and cc_card_valid)
+		var card_name_str = str(cc_card_info.get("name", "BÀI"))
+		if cc_target_valid and cc_card_valid:
+			card_play_btn.text = "⚔️ CHUYÊN CHẾ [%s] → %s" % [card_name_str.to_upper(), generals_data[selected_target_seat]["name"].to_upper()]
+		elif cc_card_valid:
+			card_play_btn.text = "⚔️ CHUYÊN CHẾ: CHỌN MỤC TIÊU CÓ TRANG BỊ..."
+		elif cc_target_valid:
+			card_play_btn.text = "⚔️ CHUYÊN CHẾ: CHỌN 1 LÁ BÀI TRÊN TAY..."
+		else:
+			card_play_btn.text = "⚔️ CHUYÊN CHẾ: CHỌN 1 LÁ VÀ MỤC TIÊU"
 		return
 	if is_targeting_ho_phu_skill:
 		var ho_phu_target_valid = selected_target_seat > 0 and selected_target_seat != my_seat and generals_data.has(selected_target_seat) and generals_data[selected_target_seat].get("is_alive", false)
@@ -5447,6 +5556,32 @@ func _on_card_play_btn_clicked() -> void:
 		selected_card_ui = null
 		_refresh_local_skill_buttons(my_seat)
 		card_play_btn.disabled = true
+		return
+
+	if is_targeting_chuyen_che:
+		if selected_card_ui == null or not is_instance_valid(selected_card_ui) or selected_target_seat <= 0 or selected_target_seat == my_seat:
+			desc_text.text = "⚠️ [CHUYÊN CHẾ] cần chọn 1 lá bài trên tay và 1 người chơi có trang bị."
+			return
+		var cc_card_info = _get_card_info_from_ui(selected_card_ui)
+		var cost_card_id := str(cc_card_info.get("id", ""))
+		if cost_card_id.is_empty():
+			cost_card_id = str(cc_card_info.get("name", ""))
+		if cost_card_id.is_empty():
+			desc_text.text = "⚠️ Không tìm thấy lá bài cần bỏ."
+			return
+		var cc_target_seat := selected_target_seat
+		if is_network_mode:
+			NetworkClient.send_use_skill("Chuyên Chế", cc_target_seat, cost_card_id)
+		is_targeting_chuyen_che = false
+		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
+			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
+		selected_target_seat = -1
+		if selected_card_ui and is_instance_valid(selected_card_ui):
+			selected_card_ui.set_selected(false)
+		selected_card_ui = null
+		_refresh_local_skill_buttons(my_seat)
+		card_play_btn.disabled = true
+		card_play_btn.visible = false
 		return
 
 	if is_targeting_hung_suc:
@@ -6435,7 +6570,7 @@ func _on_network_connected() -> void:
 			r_id = appwrite_r_id
 	elif NetworkClient and NetworkClient.room_id != "":
 		r_id = NetworkClient.room_id
-	var mode_id := str(AppwriteMatchmaking.current_room.get("modeId", "2v2")) if AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary else (NetworkClient.active_mode_id if NetworkClient else "2v2")
+	var mode_id: String = str(AppwriteMatchmaking.current_room.get("modeId", "2v2")) if AppwriteMatchmaking and AppwriteMatchmaking.current_room is Dictionary else (NetworkClient.active_mode_id if NetworkClient else "2v2")
 	var initial_players = _build_initial_server_players()
 	NetworkClient.send_join_room(r_id, my_seat, initial_players, mode_id)
 	var s_name = NetworkClient.active_server_name if ("active_server_name" in NetworkClient and not NetworkClient.active_server_name.is_empty()) else "Game Server"
@@ -8118,6 +8253,33 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			if not phuc_ho_note.is_empty():
 				desc_text.text += "\n🐯 " + phuc_ho_note
 
+	elif server_phase == "AWAIT_CHUYEN_CHE_RESPOND":
+		var caster_s = int(state.get("chuyenCheSourceSeat", 0))
+		if caster_s <= 0 and server_turn_seat > 0:
+			caster_s = server_turn_seat
+		var caster_gen = generals_data.get(caster_s, {})
+		var caster_name = caster_gen.get("name", "Trần Thủ Độ") if caster_gen is Dictionary else "Trần Thủ Độ"
+		var wait_gen = generals_data.get(server_waiting_seat, {})
+		var wait_name = wait_gen.get("name", "Ghế %d" % server_waiting_seat) if wait_gen is Dictionary else "Ghế %d" % server_waiting_seat
+
+		if server_waiting_seat == my_seat:
+			if not is_waiting_dodge:
+				dodge_attacker_seat = caster_s
+				var prompt_title = "⚔️ CHUYÊN CHẾ ĐÒI TRẢM"
+				var prompt_desc = "⚠️ [%s] vừa dùng [Chuyên Chế] hủy trang bị của bạn!\nHãy chạm chọn 1 lá Trảm để đáp trả hoặc bấm [CHỊU 1 SÁT THƯƠNG]." % caster_name
+				var pass_txt = "CHỊU 1 SÁT THƯƠNG"
+				var confirm_txt = "⚔️ ĐÁP TRẢ [TRẢM]"
+				_prompt_reaction_modal(prompt_title, prompt_desc, "Trảm", pass_txt, confirm_txt, server_waiting_timer, false, true, true, false)
+			if dodge_timer_lbl:
+				dodge_timer_lbl.text = "⏳ Còn lại: %ds" % server_waiting_timer
+			turn_indicator.text = "⚔️ CHUYÊN CHẾ: ĐÁP TRẢ 1 LÁ TRẢM HOẶC MẤT 1 MÁU (%ds)!" % server_waiting_timer
+		else:
+			if is_waiting_dodge:
+				dodge_modal.visible = false
+				is_waiting_dodge = false
+			turn_indicator.text = "⚔️ CHUYÊN CHẾ: ĐANG CHỜ %s ĐÁNH TRẢM (%ds)..." % [wait_name, server_waiting_timer]
+			desc_text.text = "⚔️ Đang chờ %s ra 1 lá Trảm đối kháng [Chuyên Chế] của %s..." % [wait_name, caster_name]
+
 	elif server_phase == "AWAIT_NULLIFY":
 		var chain = state.get("nullifyChain", {})
 		if not (chain is Dictionary):
@@ -9255,13 +9417,13 @@ func _on_network_action_received(delta: Dictionary) -> void:
 			var is_tien_thoai_defense = delta.has("tienThoaiConvert") or defense_skill == "Tiến Thoái"
 			if not is_tien_thoai_defense:
 				if AudioManager.has_voice(card_name):
-					AudioManager.play_voice(card_name)
+					_play_card_voice(card_name, resp_seat)
 				else:
 					var resolved_name = _get_friendly_card_name(card_id)
 					if AudioManager.has_voice(resolved_name):
-						AudioManager.play_voice(resolved_name)
+						_play_card_voice(resolved_name, resp_seat)
 					else:
-						AudioManager.play_voice("Đỡ")
+						_play_card_voice("Đỡ", resp_seat)
 				AudioManager.play_parry()
 		else:
 			_add_log("💥 Tướng Ghế %d không đỡ đòn!" % resp_seat)
@@ -9395,6 +9557,25 @@ func _on_network_action_received(delta: Dictionary) -> void:
 		_play_smart_card_rays("Định Triều", caster_seat, [target_seat])
 		_animate_showcase_card("Định Triều", str(delta.get("description", "Định Triều đã được hoàn tất.")), played_card if not played_card.is_empty() else _get_showcase_card_info(card_name))
 		AudioManager.play_skill()
+	elif act_type == "CHUYEN_CHE_PROMPT":
+		if caster_seat == my_seat:
+			is_targeting_chuyen_che = false
+			if selected_target_seat > 0 and generals_data.has(selected_target_seat):
+				generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
+			selected_target_seat = -1
+			selected_card_ui = null
+			_refresh_local_skill_buttons(my_seat)
+			card_play_btn.visible = false
+		_play_smart_card_rays("Chuyên Chế", caster_seat, [target_seat])
+		_animate_showcase_card("Chuyên Chế", str(delta.get("description", "Chuyên Chế được kích hoạt.")), played_card if not played_card.is_empty() else _get_showcase_card_info(card_name))
+		AudioManager.play_skill()
+	elif act_type == "CHUYEN_CHE_SLASH_SUCCESS":
+		_show_remote_card_use(delta, "ra Trảm hóa giải Chuyên Chế")
+		_animate_showcase_card("Chuyên Chế", str(delta.get("description", "Hóa giải Chuyên Chế thành công.")))
+		AudioManager.play_slash()
+	elif act_type == "CHUYEN_CHE_FAILED":
+		_animate_showcase_card("Chuyên Chế", str(delta.get("description", "Không ra Trảm, chịu 1 sát thương từ Chuyên Chế.")))
+		AudioManager.play_damage()
 	elif act_type == "HUNG_SUC_TRIGGERED":
 		hung_suc_submission_pending = false
 		is_targeting_hung_suc = false
@@ -9607,7 +9788,7 @@ func _show_remote_card_use(delta: Dictionary, action_label: String) -> void:
 		banner = "%s dùng [%s %s %s] %s [%s]." % [actor, suit, rank, card_name, action_label, source]
 	_animate_showcase_card(card_name, banner, card_payload)
 	if AudioManager.has_voice(card_name):
-		AudioManager.play_voice(card_name)
+		_play_card_voice(card_name, seat)
 
 func _relayout_hand_cards() -> void:
 	if not hand_container or not is_instance_valid(hand_container):
@@ -11897,13 +12078,13 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 		if not is_network_mode:
 			caster["hp"] = min(caster["max_hp"], caster["hp"] + 1)
 			caster["avatar_node"].update_hp(caster["hp"], caster["max_hp"])
-		AudioManager.play_voice(card_name)
+		_play_card_voice(card_name, caster_seat)
 		_animate_showcase_card(card_name, "%s dùng [Bánh Chưng] hồi 1 Máu!" % caster["name"], used_card)
 		_add_log("🍲 %s dùng [Bánh Chưng] hồi 1 Máu." % caster["name"])
 	elif card_name == "Hủ Rượu":
 		caster["is_wine_buff_active"] = true
 		caster["wine_used_this_turn"] = true
-		AudioManager.play_voice("Hủ Rượu")
+		_play_card_voice("Hủ Rượu", caster_seat)
 		AudioManager.play_skill()
 		_animate_showcase_card(card_name, "%s uống Hủ Rượu (+1 Sát Thương)!" % caster["name"], used_card)
 		_add_log("🍶 %s đã uống [Hủ Rượu]!" % caster["name"])
@@ -11912,12 +12093,12 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 		caster["has_lightning"] = true # Legacy state alias.
 		if caster.has("avatar_node") and is_instance_valid(caster["avatar_node"]):
 			caster["avatar_node"].set_delayed_trick("dai_hong_thuy", true)
-		AudioManager.play_voice("Đại Hồng Thủy")
+		_play_card_voice("Đại Hồng Thủy", caster_seat)
 		AudioManager.play_skill()
 		_animate_showcase_card("Đại Hồng Thủy", "%s đặt [Đại Hồng Thủy] vào khu phán xét!" % caster["name"], used_card)
 		_add_log("🌊 %s đã tự gắn [Đại Hồng Thủy] vào khu phán xét!" % caster["name"])
 	elif card_name == "Giặc Tới":
-		AudioManager.play_voice("Giặc Tới")
+		_play_card_voice("Giặc Tới", caster_seat)
 		AudioManager.play_skill()
 		_animate_showcase_card("Giặc Tới", "%s phát động [Giặc Tới]!" % caster["name"], used_card)
 		_add_log("🪵 %s phát động [Giặc Tới]! Toàn bộ người chơi khác phải đánh 1 Trảm." % caster["name"])
@@ -11936,7 +12117,7 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 				_animate_showcase_card(card_name, "%s gài [Bãi Cọc Bạch Đằng] lên mục tiêu!" % caster["name"], used_card)
 				_add_log("🪵 %s gài [Bãi Cọc Bạch Đằng] lên %s!" % [caster["name"], trap_target["name"]])
 	elif card_name == "Mưa Tên Liên Châu":
-		AudioManager.play_voice("Mưa Tên Liên Châu")
+		_play_card_voice("Mưa Tên Liên Châu", caster_seat)
 		AudioManager.play_skill()
 		_animate_showcase_card("Mưa Tên Liên Châu", "%s phát động [Mưa Tên Liên Châu]!" % caster["name"], used_card)
 		_add_log("🏹 %s phát động [Mưa Tên Liên Châu]! Toàn bộ người chơi khác phải đánh 1 Đỡ." % caster["name"])
@@ -11945,31 +12126,31 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 	elif card_name == "Huyết Chiến":
 		if target_seat > 0 and generals_data.has(target_seat):
 			var tgt_duel = generals_data[target_seat]
-			AudioManager.play_voice("Huyết Chiến")
+			_play_card_voice("Huyết Chiến", caster_seat)
 			AudioManager.play_slash()
 			_animate_showcase_card("Huyết Chiến", "%s huyết chiến %s!" % [caster["name"], tgt_duel["name"]], used_card)
 			_add_log("⚔️ %s phát động [Huyết Chiến] lên %s!" % [caster["name"], tgt_duel["name"]])
 			if not is_network_mode:
 				_execute_duel(caster_seat, target_seat)
 	elif card_name == "Mở Kho Cứu Tế":
-		AudioManager.play_voice("Mở Kho Cứu Tế")
+		_play_card_voice("Mở Kho Cứu Tế", caster_seat)
 		AudioManager.play_skill()
 		_animate_showcase_card("Mở Kho Cứu Tế", "%s phát động [Mở Kho Cứu Tế]!" % caster["name"], used_card)
 		_add_log("🌾 %s phát động [Mở Kho Cứu Tế]! Mở kho phát lương cho toàn bàn." % caster["name"])
 		if not is_network_mode:
 			_execute_harvest(caster_seat)
 	elif card_name == "Thủy Triều Rút":
-		AudioManager.play_voice("Thủy Triều Rút")
+		_play_card_voice("Thủy Triều Rút", caster_seat)
 		AudioManager.play_skill()
 		_animate_showcase_card(card_name, "%s dùng [Thủy Triều Rút]!" % caster["name"], used_card)
 		_add_log("🌊 %s dùng [Thủy Triều Rút]." % caster["name"])
 	elif card_name == "Mượn Gươm Diệt Địch":
-		AudioManager.play_voice("Mượn Gươm Diệt Địch")
+		_play_card_voice("Mượn Gươm Diệt Địch", caster_seat)
 		AudioManager.play_skill()
 		_animate_showcase_card(card_name, "%s dùng [Mượn Gươm Diệt Địch]!" % caster["name"], used_card)
 		_add_log("🗡️ %s dùng [Mượn Gươm Diệt Địch]." % caster["name"])
 	elif card_name == "Mở Yến Tiệc":
-		AudioManager.play_voice("Mở Yến Tiệc")
+		_play_card_voice("Mở Yến Tiệc", caster_seat)
 		AudioManager.play_skill()
 		_animate_showcase_card(card_name, "%s mở [Mở Yến Tiệc]!" % caster["name"], used_card)
 		_add_log("🍽️ %s mở [Mở Yến Tiệc]." % caster["name"])
@@ -11984,7 +12165,7 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 			var drum_rank = _format_rank(used_card.get("rank", 0)) if int(used_card.get("rank", 0)) > 0 else ""
 			caster["avatar_node"].set_equipment("treasure", card_name, (drum_suit + drum_rank).strip_edges())
 			caster["avatar_node"].set_skill("🥁 ĐIỂM TRỐNG" if caster_seat == my_seat else "")
-		AudioManager.play_voice("Trống Đồng Đông Sơn")
+		_play_card_voice("Trống Đồng Đông Sơn", caster_seat)
 		AudioManager.play_skill()
 		_animate_showcase_card(card_name, "%s trang bị [Trống Đồng Đông Sơn]!" % caster["name"], used_card)
 		_add_log("🥁 %s trang bị [Trống Đồng Đông Sơn]." % caster["name"])
@@ -11993,7 +12174,7 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 			var draw_num = 3 if caster.get("hero_id", 0) == 68 else 2
 			caster["hand_count"] += draw_num
 			caster["avatar_node"].update_hand_count(caster["hand_count"])
-		AudioManager.play_voice("Dụng Binh Như Thần")
+		_play_card_voice("Dụng Binh Như Thần", caster_seat)
 		AudioManager.play_skill()
 		_animate_showcase_card("Dụng Binh Như Thần", "%s dùng [Dụng Binh Như Thần] rút bài!" % caster["name"], used_card)
 		_add_log("📜 %s dùng [Dụng Binh Như Thần]!" % caster["name"])
@@ -12015,7 +12196,7 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 					tgt_d["avatar_node"].update_hand_count(tgt_d["hand_count"])
 				caster["hand_count"] += 1
 				caster["avatar_node"].update_hand_count(caster["hand_count"])
-			AudioManager.play_voice("Đột Kích Trộm Lương")
+			_play_card_voice("Đột Kích Trộm Lương", caster_seat)
 			AudioManager.play_skill()
 			_animate_showcase_card("Đột Kích Trộm Lương", "%s cướp 1 lá của %s!" % [caster["name"], tgt_d["name"]], used_card)
 			_add_log("🗡️ %s dùng [Đột Kích Trộm Lương] cướp bài của %s!" % [caster["name"], tgt_d["name"]])
@@ -12035,14 +12216,14 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 				else:
 					tgt_v["hand_count"] = max(0, tgt_v["hand_count"] - 1)
 					tgt_v["avatar_node"].update_hand_count(tgt_v["hand_count"])
-			AudioManager.play_voice(card_name)
+			_play_card_voice(card_name, caster_seat)
 			AudioManager.play_skill()
 			_animate_showcase_card(card_name, "%s phá hủy 1 lá của %s!" % [caster["name"], tgt_v["name"]], used_card)
 			_add_log("🌾 %s dùng [%s] phá hủy 1 lá bài của %s!" % [caster["name"], card_name, tgt_v["name"]])
 	elif card_name in ["Kiếm Thuận Thiên", "Song Cung Mường Nhạ", "Nỏ Thần Kim Quy", "Trường Đao Nam Sơn", "Thương Ngâu Lãng Bạc", "Súng Thần Công Hồ Triều", "Hỏa Mai Tây Sơn", "Liêm Đao Đống Đa", "Đoản Đao Lam Sơn"]:
 		caster["equipped_weapon"] = card_name
 		caster["avatar_node"].set_equipment("weapon", card_name, "")
-		AudioManager.play_voice(card_name)
+		_play_card_voice(card_name, caster_seat)
 		AudioManager.play_skill()
 		_animate_showcase_card(card_name, "%s trang bị vũ khí [%s]!" % [caster["name"], card_name], used_card)
 		_add_log("🗡️ %s trang bị Vũ Khí: [%s]!" % [caster["name"], card_name])
@@ -12050,7 +12231,7 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 		caster["equipped_armor"] = card_name
 		if card_name == "Áo Bào Hoàng Tộc": caster["ao_bao_charges"] = 2
 		caster["avatar_node"].set_equipment("armor", card_name, "")
-		AudioManager.play_voice(card_name)
+		_play_card_voice(card_name, caster_seat)
 		AudioManager.play_skill()
 		_animate_showcase_card(card_name, "%s trang bị áo giáp [%s]!" % [caster["name"], card_name], used_card)
 		_add_log("🛡️ %s trang bị Áo Giáp: [%s]!" % [caster["name"], card_name])
@@ -12059,12 +12240,12 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 		caster["equipped_" + slot_m] = card_name
 		if caster.has("avatar_node") and is_instance_valid(caster["avatar_node"]):
 			caster["avatar_node"].set_equipment(slot_m, card_name, "")
-		AudioManager.play_voice(card_name)
+		_play_card_voice(card_name, caster_seat)
 		AudioManager.play_skill()
 		_animate_showcase_card(card_name, "%s trang bị [%s]!" % [caster["name"], card_name], used_card)
 		_add_log("🐎 %s trang bị Chiến Mã: [%s]!" % [caster["name"], card_name])
 	elif card_name == "Xích Tâm Tỏa":
-		AudioManager.play_voice(card_name)
+		_play_card_voice(card_name, caster_seat)
 		AudioManager.play_skill()
 		var chain_targets: Array = []
 		for raw_target in target_seats:
@@ -12095,7 +12276,7 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 			tgt_c["has_cat_luong"] = true
 			if tgt_c.has("avatar_node") and is_instance_valid(tgt_c["avatar_node"]):
 				tgt_c["avatar_node"].set_delayed_trick("supply_shortage", true)
-		AudioManager.play_voice("Cắt Đường Lương")
+		_play_card_voice("Cắt Đường Lương", caster_seat)
 		AudioManager.play_skill()
 		_animate_showcase_card("Cắt Đường Lương", "%s đặt [Cắt Đường Lương] lên đối thủ!" % caster["name"], used_card)
 		_add_log("🌾 %s đặt [Cắt Đường Lương] vào khu phán xét của Ghế %d!" % [caster["name"], target_seat])
@@ -12105,7 +12286,7 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 			tgt_t["has_tram_ao"] = true
 			if tgt_t.has("avatar_node") and is_instance_valid(tgt_t["avatar_node"]):
 				tgt_t["avatar_node"].set_delayed_trick("acedia", true)
-		AudioManager.play_voice("Trầm Ảo Sa Bẫy")
+		_play_card_voice("Trầm Ảo Sa Bẫy", caster_seat)
 		AudioManager.play_skill()
 		_animate_showcase_card("Trầm Ảo Sa Bẫy", "%s đặt [Trầm Ảo Sa Bẫy] lên đối thủ!" % caster["name"], used_card)
 		_add_log("🕸️ %s đặt [Trầm Ảo Sa Bẫy] vào khu phán xét của Ghế %d!" % [caster["name"], target_seat])
@@ -12146,7 +12327,7 @@ func _handle_remote_card_play(caster_seat: int, card_id: String, target_seat: in
 				target_seat
 			])
 		else:
-			AudioManager.play_voice(card_name)
+			_play_card_voice(card_name, caster_seat)
 			AudioManager.play_slash()
 			_animate_showcase_card(card_name, "%s dùng [%s] tấn công %s!" % [caster["name"], card_name, tgt["name"]], used_card)
 			_add_log("⚔️ %s dùng [%s]%s lên %s (Ghế %d)." % [caster["name"], card_name, " (kèm Hủ Rượu: +1 Sát Thương)" if used_wine else "", tgt["name"], target_seat])
@@ -12869,6 +13050,9 @@ func _on_end_turn_btn_clicked() -> void:
 	if is_targeting_dinh_trieu:
 		is_targeting_dinh_trieu = false
 		_refresh_local_skill_buttons(my_seat)
+	if is_targeting_chuyen_che:
+		is_targeting_chuyen_che = false
+		_refresh_local_skill_buttons(my_seat)
 	if excess > 0:
 		_enter_discard_phase(excess)
 		if is_network_mode:
@@ -12890,6 +13074,8 @@ func _on_player_turn_timeout() -> void:
 		_clear_trao_bao_equipped_previews()
 	if is_targeting_dinh_trieu:
 		is_targeting_dinh_trieu = false
+	if is_targeting_chuyen_che:
+		is_targeting_chuyen_che = false
 	var p_gen = generals_data[my_seat]
 	var hand_limit = _get_general_hand_limit(p_gen)
 	var auto_discard_ids: Array = []
@@ -12936,6 +13122,7 @@ func _finish_player_end_turn(send_network_end_turn: bool = true) -> void:
 	is_targeting_dinh_quoc = false
 	is_targeting_trao_bao = false
 	is_targeting_dinh_trieu = false
+	is_targeting_chuyen_che = false
 	is_using_trac_lac = false
 	hung_suc_submission_pending = false
 	_clear_hung_suc_equipped_weapon_previews()
@@ -14174,6 +14361,25 @@ func _hide_general_info_modal() -> void:
 	else:
 		general_info_modal.visible = false
 
+func _is_seat_female(seat: int) -> bool:
+	var g = generals_data.get(seat, {})
+	if g.is_empty():
+		return false
+	var hero_id = int(g.get("hero_id", -1))
+	var hero_name = str(g.get("name", ""))
+	var hero_db = get_node_or_null("/root/HeroDatabase")
+	if hero_db and hero_db.has_method("is_female_hero"):
+		if hero_id > 0 and hero_db.is_female_hero(hero_id):
+			return true
+		if not hero_name.is_empty() and hero_db.is_female_hero(hero_name):
+			return true
+	return false
+
+func _play_card_voice(card_name: String, seat: int = 0) -> void:
+	var target_seat = seat if seat > 0 else current_turn_seat
+	var is_fem = _is_seat_female(target_seat)
+	AudioManager.play_voice(card_name, is_fem)
+
 func _get_equipment_description(item_name: String) -> String:
 	match item_name:
 		"Kiếm Thuận Thiên": return "Tầm 2; Trảm bỏ qua giáp mục tiêu."
@@ -14262,7 +14468,7 @@ func _execute_aoe_attack(caster_seat: int, aoe_name: String, required_card_name:
 			if satisfied:
 				_animate_showcase_card(required_card_name, "Bạn né [%s] thành công!" % aoe_name, last_custom_reaction_card_info)
 				_add_log("🛡️ Bạn đã né [%s] thành công!" % aoe_name)
-				AudioManager.play_voice("Trảm" if is_giac_toi else (required_card_name if AudioManager.has_voice(required_card_name) else "Đỡ"))
+				_play_card_voice("Trảm" if is_giac_toi else (required_card_name if AudioManager.has_voice(required_card_name) else "Đỡ"), my_seat)
 				AudioManager.play_parry()
 			else:
 				_add_log("💥 Bạn không đánh lá [%s], chịu %d sát thương từ [%s]!" % [required_card_name, incoming_damage, aoe_name])
@@ -14280,7 +14486,7 @@ func _execute_aoe_attack(caster_seat: int, aoe_name: String, required_card_name:
 				if is_red:
 					_animate_showcase_card("Khiên Mây Bện", "%s lật [Bài %s %s] (Bài Đỏ/Bài Trắng) -> Đỡ Mưa Tên!" % [tgt["name"], rank_str, suit_name], judge_card)
 					_play_armor_effect(target_seat, "Khiên Mây Bện", true)
-					AudioManager.play_voice("Khiên Mây Bện")
+					_play_card_voice("Khiên Mây Bện", target_seat)
 					_show_judgement_result(true, "Khiên Mây Bện", judge_card)
 					_add_log("🛡️ [Khiên Mây Bện] của %s lật [Bài %s %s] (Bài Đỏ/Bài Trắng) -> Tự động Đỡ Mưa Tên thành công!" % [tgt["name"], rank_str, suit_name])
 					AudioManager.play_parry()
@@ -14289,7 +14495,7 @@ func _execute_aoe_attack(caster_seat: int, aoe_name: String, required_card_name:
 				else:
 					_animate_showcase_card("Khiên Mây Bện", "%s lật [Bài %s %s] (Bài Vàng/Bài Đen) -> Phán xét thất bại!" % [tgt["name"], rank_str, suit_name], judge_card)
 					_play_armor_effect(target_seat, "Khiên Mây Bện", false)
-					AudioManager.play_voice("Khiên Mây Bện")
+					_play_card_voice("Khiên Mây Bện", target_seat)
 					_show_judgement_result(false, "Khiên Mây Bện", judge_card)
 					_add_log("🛡️ [Khiên Mây Bện] của %s lật [Bài %s %s] (Bài Vàng/Bài Đen) -> Phán xét thất bại!" % [tgt["name"], rank_str, suit_name])
 					await get_tree().create_timer(0.5).timeout
@@ -14315,7 +14521,7 @@ func _execute_aoe_attack(caster_seat: int, aoe_name: String, required_card_name:
 				tgt["avatar_node"].update_hand_count(tgt["hand_count"])
 				_animate_showcase_card(required_card_name, "%s dùng [%s] né [%s]!" % [tgt["name"], required_card_name, aoe_name], used_c)
 				_add_log("🛡️ %s đã đánh 1 lá [%s] né [%s]!" % [tgt["name"], required_card_name, aoe_name])
-				AudioManager.play_voice(required_card_name)
+				_play_card_voice(required_card_name, target_seat)
 				AudioManager.play_parry()
 			else:
 				_add_log("💥 %s không có lá [%s], chịu %d sát thương từ [%s]!" % [tgt["name"], required_card_name, incoming_damage, aoe_name])
@@ -14333,7 +14539,7 @@ func _execute_duel(caster_seat: int, target_seat: int) -> void:
 
 	_animate_showcase_card("Huyết Chiến", "⚔️ HUYẾT CHIẾN: %s ⚔️ %s!" % [caster_name, target_name])
 	_add_log("⚔️ <b>HUYẾT CHIẾN PHÁT ĐỘNG!</b> %s huyết chiến %s! Hai bên luân phiên đánh Trảm." % [caster_name, target_name])
-	AudioManager.play_voice("Huyết Chiến")
+	_play_card_voice("Huyết Chiến", caster_seat)
 	AudioManager.play_slash()
 
 	var current_duelist = target_seat
@@ -14381,7 +14587,7 @@ func _execute_duel(caster_seat: int, target_seat: int) -> void:
 					cur_gen["avatar_node"].update_hand_count(cur_gen["hand_count"])
 					_animate_showcase_card("Trảm", "%s đáp trả [Trảm] trong Huyết Chiến!" % cur_gen["name"], s_card)
 					_add_log("⚔️ %s đáp trả 1 lá [Trảm] trong Huyết Chiến!" % cur_gen["name"])
-					AudioManager.play_voice("Trảm")
+					_play_card_voice("Trảm", current_duelist)
 					AudioManager.play_slash()
 					slash_played = true
 			if slash_played:
@@ -14389,7 +14595,7 @@ func _execute_duel(caster_seat: int, target_seat: int) -> void:
 				if cur_gen["isPlayer"]:
 					_animate_showcase_card("Trảm", "Bạn đáp trả 1 lá [Trảm] trong Huyết Chiến!", last_custom_reaction_card_info)
 					_add_log("⚔️ Bạn đáp trả 1 lá [Trảm] trong Huyết Chiến!")
-					AudioManager.play_voice("Trảm")
+					_play_card_voice("Trảm", my_seat)
 					AudioManager.play_slash()
 			else:
 				played_slash = false
