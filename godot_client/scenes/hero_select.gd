@@ -404,11 +404,35 @@ func _rebuild_hero_grid(heroes_to_show: Array[Dictionary]) -> void:
 			if not is_player_locked or heroes_to_show.size() > 1:
 				card.visible = false
 				card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var first_cand := _get_first_available_candidate()
-	if not first_cand.is_empty():
-		_inspect_hero(first_cand)
-	elif not available_heroes.is_empty():
-		_inspect_hero(available_heroes[0])
+
+	# Nếu người chơi đã khóa tướng, ưu tiên hiển thị và soi chính tướng đã chọn của mình
+	if is_player_locked:
+		var my_seat_num = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 and NetworkClient.my_seat <= 8 else 1
+		var own_idx := _find_draft_slot_index(my_seat_num)
+		var own_hero: Dictionary = draft_slots[own_idx].get("chosenHero", {}) if own_idx >= 0 else {}
+		if own_hero is Dictionary and not own_hero.is_empty():
+			_inspect_hero(own_hero)
+		elif not heroes_to_show.is_empty():
+			_inspect_hero(heroes_to_show[0])
+		return
+
+	if heroes_to_show.is_empty():
+		return
+
+	var cur_id := int(inspecting_hero.get("id", 0)) if inspecting_hero is Dictionary else 0
+	var inspect_valid := false
+	if cur_id > 0 and not cur_id in selected_hero_ids:
+		for h in heroes_to_show:
+			if int(h.get("id", 0)) == cur_id:
+				inspect_valid = true
+				break
+
+	if not inspect_valid:
+		var first_cand := _get_first_available_candidate()
+		if not first_cand.is_empty():
+			_inspect_hero(first_cand)
+		elif not available_heroes.is_empty():
+			_inspect_hero(available_heroes[0])
 
 func _show_fallback_candidate_pool() -> void:
 	var fallback: Array[Dictionary] = []
@@ -1300,7 +1324,7 @@ func _inspect_hero(hero: Dictionary) -> void:
 	inspect_skill_title_lbl.text = "⚡ TUYỆT KỸ: [%s]" % HeroDatabase.get_skill_summary(int(hero.get("id", 0))).to_upper()
 	inspect_skill_desc_lbl.text = HeroDatabase.get_skill_details(int(hero.get("id", 0)))
 
-	if NetworkClient and NetworkClient.is_connected_to_server:
+	if _is_my_turn() and not is_player_locked and NetworkClient and NetworkClient.is_connected_to_server:
 		NetworkClient.send_hover_hero(hid, hname)
 
 	var my_seat_num = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 and NetworkClient.my_seat <= 8 else 1
@@ -1616,11 +1640,15 @@ func _highlight_active_picker(idx: int = -1) -> void:
 
 func _lock_hero_for_slot(slot: Dictionary, hero: Dictionary) -> void:
 	var hid = int(hero.get("id", 1))
+	var hname = str(hero.get("name", ""))
 	slot["chosenHero"] = hero
+	slot["heroId"] = hid
+	slot["heroName"] = hname
 	slot["isLocked"] = true
 
 	if slot.get("isPlayer", false):
 		is_player_locked = true
+		_inspect_hero(hero)
 
 	if not hid in selected_hero_ids:
 		selected_hero_ids.append(hid)
@@ -1940,6 +1968,8 @@ func _apply_authoritative_draft_slots(server_slots: Array, reveal_for_battle: bo
 					if locked_hero.is_empty():
 						locked_hero = {"id": hid, "name": s_info.get("heroName", "Tướng %d" % hid), "maxHp": int(s_info.get("maxHp", 4))}
 					local_s["chosenHero"] = locked_hero
+					local_s["heroId"] = hid
+					local_s["heroName"] = locked_hero.get("name", s_info.get("heroName", ""))
 				else:
 					local_s["chosenHero"] = null
 				local_s["isLocked"] = true
@@ -1949,6 +1979,8 @@ func _apply_authoritative_draft_slots(server_slots: Array, reveal_for_battle: bo
 				if not was_locked or old_hid != hid:
 					if not locked_hero.is_empty():
 						_lock_hero_for_slot(local_s, locked_hero)
+				if is_own_slot and not locked_hero.is_empty():
+					_inspect_hero(locked_hero)
 				for node in left_slot_nodes:
 					if int(node.get("data", {}).get("seatNumber", 0)) == s_num:
 						var hidden_status: Label = node["status"]
@@ -2238,7 +2270,8 @@ func _on_draft_completed() -> void:
 
 	# Đảm bảo tất cả các ghế đều đã có tướng hợp lệ
 	for slot in draft_slots:
-		if not slot.get("isLocked", false) or not slot.has("chosenHero"):
+		var hero = slot.get("chosenHero", null)
+		if not bool(slot.get("isLocked", false)) or hero == null or not (hero is Dictionary) or hero.is_empty():
 			var cand = _get_first_available_candidate()
 			_lock_hero_for_slot(slot, cand)
 

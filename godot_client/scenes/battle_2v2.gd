@@ -2408,7 +2408,7 @@ func _init_generals_from_draft() -> void:
 		# heroId is authoritative.  A draft snapshot can retain chosenHero from
 		# the previous pick, which used to give Ỷ Lan Dương Vân Nga's buttons.
 		var hero_info = null
-		var raw_hid = slot_data.get("heroId", 0)
+		var raw_hid = slot_data.get("heroId", slot_data.get("hero_id", 0))
 		var hid = 0
 		if raw_hid is int or raw_hid is float:
 			hid = int(raw_hid)
@@ -11499,7 +11499,26 @@ func _handle_general_death(seat_num: int) -> void:
 	if not uat_khi_pending:
 		_update_dead_exit_button_visibility()
 
+func _is_near_death_active() -> bool:
+	if is_waiting_rescue:
+		return true
+	if current_server_phase == "AWAIT_NEAR_DEATH":
+		return true
+	if latest_server_state is Dictionary and str(latest_server_state.get("phase", "")) == "AWAIT_NEAR_DEATH":
+		return true
+	if near_death_victim_seat > 0:
+		return true
+	if rescue_modal and is_instance_valid(rescue_modal) and rescue_modal.visible:
+		return true
+	if generals_data.has(my_seat):
+		var my_gen = generals_data[my_seat]
+		if bool(my_gen.get("is_alive", true)) and int(my_gen.get("hp", 1)) <= 0:
+			return true
+	return false
+
 func _show_dead_player_exit() -> void:
+	if not generals_data.has(my_seat) or bool(generals_data[my_seat].get("is_alive", true)) or _is_near_death_active():
+		return
 	_clear_normal_hand_selection()
 	for child in hand_container.get_children():
 		child.queue_free()
@@ -11528,8 +11547,10 @@ func _should_show_dead_exit_button() -> bool:
 	if not generals_data.has(my_seat):
 		return false
 	var my_gen = generals_data[my_seat]
-	var my_alive = bool(my_gen.get("is_alive", true)) and int(my_gen.get("hp", 1)) > 0
-	if my_alive:
+	# Người chơi chưa chết (còn sống hoặc đang hấp hối chờ cứu) thì tuyệt đối không hiện nút thoát / tua nhanh
+	if bool(my_gen.get("is_alive", true)):
+		return false
+	if _is_near_death_active():
 		return false
 	if uat_khi_pending:
 		return false
@@ -11542,7 +11563,7 @@ func _should_show_dead_exit_button() -> bool:
 		if not generals_data.has(s_num):
 			continue
 		var g = generals_data[s_num]
-		var is_alive = bool(g.get("is_alive", true)) and int(g.get("hp", 1)) > 0
+		var is_alive = bool(g.get("is_alive", false))
 		if is_alive:
 			living_other_count += 1
 			if _is_seat_ai(s_num):
@@ -11575,9 +11596,10 @@ func _update_dead_exit_button_visibility() -> void:
 	if not generals_data.has(my_seat):
 		return
 	var my_gen = generals_data[my_seat]
-	var my_alive = bool(my_gen.get("is_alive", true)) and int(my_gen.get("hp", 1)) > 0
+	var is_actually_dead = not bool(my_gen.get("is_alive", true))
 
-	if my_alive:
+	# Nếu người chơi chưa chết (còn sống hoặc đang hấp hối), ẩn nút thoát trận và không ghi đè trạng thái
+	if not is_actually_dead or _is_near_death_active():
 		if exit_battle_btn and is_instance_valid(exit_battle_btn):
 			exit_battle_btn.visible = false
 		return
@@ -11599,6 +11621,10 @@ func _update_dead_exit_button_visibility() -> void:
 			desc_text.text = "☠️ Bạn đã tử trận. Đang quan sát người chơi khác chiến đấu..."
 
 func _on_exit_battle_clicked() -> void:
+	if not generals_data.has(my_seat) or bool(generals_data[my_seat].get("is_alive", true)) or _is_near_death_active():
+		if exit_battle_btn and is_instance_valid(exit_battle_btn):
+			exit_battle_btn.visible = false
+		return
 	if exit_battle_btn and is_instance_valid(exit_battle_btn):
 		exit_battle_btn.disabled = true
 		exit_battle_btn.text = "⏩ ĐANG TUA NHANH..."

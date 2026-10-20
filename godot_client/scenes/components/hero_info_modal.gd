@@ -137,7 +137,19 @@ func display_general(g: Dictionary, my_seat: int = 1) -> void:
 	var is_player = bool(g.get("isPlayer", false)) or (seat_num == my_seat)
 	var hero_name = str(g.get("name", "Vô Danh"))
 	var faction = str(g.get("faction", "Đại Việt"))
-	var hero_id = int(g.get("hero_id", 47))
+	var hero_id = int(g.get("hero_id", 0))
+	if hero_id <= 0:
+		var h_data = g.get("hero_data", {})
+		if h_data is Dictionary:
+			hero_id = int(h_data.get("id", 0))
+	if hero_id <= 0 and g.has("heroId"):
+		var raw_hid = str(g.get("heroId", ""))
+		if raw_hid.begins_with("HERO_"):
+			hero_id = int(raw_hid.trim_prefix("HERO_"))
+		elif raw_hid.is_valid_int():
+			hero_id = int(raw_hid)
+	if hero_id <= 0:
+		hero_id = 47
 	var current_hp = int(g.get("hp", 4))
 	var max_hp = int(g.get("max_hp", 4))
 	var hand_count = int(g.get("hand_count", 0))

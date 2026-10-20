@@ -9943,10 +9943,10 @@ export function tickGameState(state, connectedSeats = null) {
 
 export function fastForwardMatchForDeadPlayer(state, requesterSeat) {
   const requester = state?.players?.find((player) => player.seat === Number(requesterSeat));
-  if (!requester || isLivingPlayer(requester)) return { error: "Chỉ người đã tử trận mới được tua nhanh" };
+  if (!requester || requester.isAlive !== false || state.phase === "AWAIT_NEAR_DEATH") return { error: "Chỉ người đã tử trận mới được tua nhanh" };
   if (state.status === "FINISHED") return { success: true, changed: false };
   const isAiSlot = (player) => Boolean(player.isAI || player.isAiTakeover || player.isDisconnected);
-  const living = state.players.filter((player) => isLivingPlayer(player));
+  const living = state.players.filter((player) => player.isAlive !== false);
   if (living.length === 0 || !living.every(isAiSlot)) {
     return { error: "Chỉ tua nhanh khi những người còn sống đều là AI" };
   }

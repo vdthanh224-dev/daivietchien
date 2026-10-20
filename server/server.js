@@ -1172,7 +1172,12 @@ function sanitizeDraftMessageForClient(message, seat, modeId) {
   });
   const safe = { ...message, slots };
   if (Array.isArray(message.selectedHeroIds)) {
-    safe.selectedHeroIds = message.selectedHeroIds.slice();
+    if (!completed) {
+      const allowed = new Set(slots.map((s) => s.heroId).filter((id) => id > 0));
+      safe.selectedHeroIds = message.selectedHeroIds.filter((id) => allowed.has(id));
+    } else {
+      safe.selectedHeroIds = message.selectedHeroIds.slice();
+    }
   }
   if (Array.isArray(message.battlePlayers)) {
     safe.battlePlayers = message.battlePlayers.map(({ role, ...player }) => ({
@@ -2083,7 +2088,8 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           if (selectedHeroIds.includes(heroId)) {
             return socket.send(JSON.stringify({ type: "ERROR", error: "Tướng này đã được chọn" }));
           }
-          if (is2v2 && !getCandidateIdsForSlot(requestedSlot).includes(heroId)) {
+          const candidatePool = getCandidateIdsForSlot(requestedSlot);
+          if (is2v2 && candidatePool.length > 0 && !candidatePool.includes(heroId)) {
             return socket.send(JSON.stringify({ type: "ERROR", error: "Tướng này không nằm trong bể tướng của bạn" }));
           }
           const pickedSlot = requestedSlot;
