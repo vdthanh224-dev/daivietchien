@@ -208,6 +208,22 @@ func _build_ui() -> void:
 	)
 	add_child(chat)
 	_build_modal_layer()
+	
+	# 9. Disclaimer Watermark Banner (Thử nghiệm nội bộ / Phi thương mại)
+	var disclaimer_lbl = Label.new()
+	disclaimer_lbl.name = "DisclaimerNotice"
+	disclaimer_lbl.text = "⚖️ Game Thử nghiệm nội bộ • Phi thương mại"
+	disclaimer_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	disclaimer_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	disclaimer_lbl.set_anchors_preset(PRESET_BOTTOM_WIDE)
+	disclaimer_lbl.offset_top = -24
+	disclaimer_lbl.offset_bottom = -6
+	disclaimer_lbl.add_theme_font_size_override("font_size", 11)
+	disclaimer_lbl.add_theme_color_override("font_color", Color(0.85, 0.80, 0.70, 0.65))
+	disclaimer_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	disclaimer_lbl.add_theme_constant_override("shadow_offset_y", 1)
+	disclaimer_lbl.mouse_filter = MOUSE_FILTER_IGNORE
+	add_child(disclaimer_lbl)
 
 func _build_top_header() -> void:
 	var header_panel = Panel.new()
@@ -231,9 +247,9 @@ func _build_top_header() -> void:
 	header_hbox.add_theme_constant_override("separation", 16)
 	header_panel.add_child(header_hbox)
 
-	# 1. Game Logo ("ĐẠI VIỆT CHIẾN")
+	# 1. Game Logo ("ĐẠI VIỆT CHIẾN") + Disclaimer tag
 	var logo_panel = PanelContainer.new()
-	logo_panel.custom_minimum_size = Vector2(190, 46)
+	logo_panel.custom_minimum_size = Vector2(235, 46)
 	var lp_style = StyleBoxFlat.new()
 	lp_style.bg_color = Color(0.12, 0.07, 0.18, 0.85)
 	lp_style.border_width_left = 1
@@ -249,13 +265,27 @@ func _build_top_header() -> void:
 	lp_style.shadow_size = 10
 	logo_panel.add_theme_stylebox_override("panel", lp_style)
 
+	var logo_vbox = VBoxContainer.new()
+	logo_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	logo_vbox.add_theme_constant_override("separation", 1)
+
 	var logo_lbl = Label.new()
 	logo_lbl.text = "👑 ĐẠI VIỆT CHIẾN"
 	logo_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	logo_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	logo_lbl.add_theme_font_size_override("font_size", 15)
+	logo_lbl.add_theme_font_size_override("font_size", 14)
 	logo_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.45, 1.0))
-	logo_panel.add_child(logo_lbl)
+	logo_vbox.add_child(logo_lbl)
+
+	var logo_sub = Label.new()
+	logo_sub.text = "Thử nghiệm nội bộ • Phi thương mại"
+	logo_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	logo_sub.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	logo_sub.add_theme_font_size_override("font_size", 9)
+	logo_sub.add_theme_color_override("font_color", Color(0.90, 0.82, 0.68, 0.85))
+	logo_vbox.add_child(logo_sub)
+
+	logo_panel.add_child(logo_vbox)
 	header_hbox.add_child(logo_panel)
 
 	# 2. Profile Capsule Pill

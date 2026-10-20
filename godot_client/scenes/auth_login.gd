@@ -1142,6 +1142,7 @@ func _apply_royal_home_styling() -> void:
 
 	var notice_text = get_node_or_null("FooterDisclaimer/NoticeText") as Label
 	if notice_text:
-		notice_text.add_theme_color_override("font_color", Color(0.75, 0.70, 0.62, 0.8))
+		notice_text.text = "Chơi quá 180 phút một ngày sẽ ảnh hưởng xấu đến sức khỏe • Bản thử nghiệm nội bộ / Phi thương mại"
+		notice_text.add_theme_color_override("font_color", Color(0.85, 0.78, 0.62, 0.85))
 		notice_text.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 		_apply_node_font(notice_text, 10)
