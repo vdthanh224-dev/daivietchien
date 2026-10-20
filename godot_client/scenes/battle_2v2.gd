@@ -5570,8 +5570,18 @@ func _on_card_play_btn_clicked() -> void:
 			desc_text.text = "⚠️ Không tìm thấy lá bài cần bỏ."
 			return
 		var cc_target_seat := selected_target_seat
-		if is_network_mode:
-			NetworkClient.send_use_skill("Chuyên Chế", cc_target_seat, cost_card_id)
+		var tgt_g = generals_data.get(cc_target_seat, {})
+		var has_eq = not str(tgt_g.get("equipped_weapon", "")).is_empty() \
+			or not str(tgt_g.get("equipped_armor", "")).is_empty() \
+			or not str(tgt_g.get("equipped_def_horse", "")).is_empty() \
+			or not str(tgt_g.get("equipped_off_horse", "")).is_empty() \
+			or not str(tgt_g.get("equipped_treasure", "")).is_empty() \
+			or (tgt_g.get("equipment_cards", []) is Array and tgt_g.get("equipment_cards", []).size() > 0)
+		if not has_eq:
+			desc_text.text = "⚠️ %s không có trang bị nào để hủy." % tgt_g.get("name", "Người chơi")
+			return
+
+		var cost_node = selected_card_ui
 		is_targeting_chuyen_che = false
 		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
@@ -5582,6 +5592,13 @@ func _on_card_play_btn_clicked() -> void:
 		_refresh_local_skill_buttons(my_seat)
 		card_play_btn.disabled = true
 		card_play_btn.visible = false
+
+		_show_card_pick_modal(false, cc_target_seat, {
+			"effectType": "CHUYEN_CHE",
+			"costCardId": cost_card_id,
+			"costCardNode": cost_node,
+			"targetSeat": cc_target_seat
+		})
 		return
 
 	if is_targeting_hung_suc:
@@ -6605,6 +6622,14 @@ func _on_network_error_received(err_msg: String) -> void:
 	card_pick_submission_pending = false
 	card_pick_submitted_selection_id = ""
 	thuy_trieu_rut_give_sent = false
+
+	if ai_fast_forward_active:
+		ai_fast_forward_active = false
+		Engine.time_scale = 1.0
+		if exit_battle_btn and is_instance_valid(exit_battle_btn):
+			exit_battle_btn.disabled = false
+			exit_battle_btn.text = "🚪 THOÁT TRẬN (TUA NHANH)"
+		desc_text.text = "⚠️ " + err_msg
 
 	if err_msg.contains("Không phải lượt phản ứng") or err_msg.contains("Chưa tới lượt"):
 		_close_dodge_reaction_state()
@@ -8676,6 +8701,9 @@ func _close_rescue_modal() -> void:
 	_set_reaction_hand_focus(false)
 
 func _prompt_rescue_reaction(victim_seat: int) -> void:
+	if ai_fast_forward_active or not generals_data.has(my_seat) or not bool(generals_data[my_seat].get("is_alive", true)):
+		_on_rescue_passed()
+		return
 	if not generals_data.has(victim_seat):
 		return
 	var victim = generals_data[victim_seat]
@@ -10301,6 +10329,9 @@ func _format_damage_pass_text(damage_amount: int, action_label: String = "CHỊU
 	return "💥 %s (-%d MÁU)" % [action_label, max(1, damage_amount)]
 
 func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_element: String = "NORMAL", slash_suit_override: String = "") -> void:
+	if ai_fast_forward_active or not generals_data.has(my_seat) or not bool(generals_data[my_seat].get("is_alive", true)):
+		_on_dodge_passed()
+		return
 	var atk = generals_data[attacker_seat]
 	if slash_suit_override != "":
 		atk["last_slash_suit"] = slash_suit_override
@@ -10929,6 +10960,8 @@ func _on_dodge_passed() -> void:
 		_restore_turn_timer_to_attacker(dodge_attacker_seat, my_seat)
 
 func _prompt_custom_reaction_async(title_text: String, desc_text_msg: String, required_type: String, pass_text: String, confirm_text: String, timeout_sec: float = 40.0) -> bool:
+	if ai_fast_forward_active or not generals_data.has(my_seat) or not bool(generals_data[my_seat].get("is_alive", true)):
+		return false
 	if dodge_title_lbl and is_instance_valid(dodge_title_lbl):
 		dodge_title_lbl.text = title_text
 	dodge_desc_lbl.text = desc_text_msg
@@ -11632,24 +11665,53 @@ func _on_exit_battle_clicked() -> void:
 	fast_forward_started_at_msec = Time.get_ticks_msec()
 	desc_text.text = "⏩ Đang tăng tốc độ đánh của AI tối đa..."
 
+	# Đóng ngay lập tức các modal lựa chọn đang mở cho người chơi đã chết
+	_close_dodge_reaction_state()
+	_close_rescue_modal()
+	_close_song_cung_modal()
+	_hide_harvest_modal()
+	if card_pick_modal and is_instance_valid(card_pick_modal):
+		card_pick_modal.visible = false
+	if drum_reveal_modal and is_instance_valid(drum_reveal_modal):
+		drum_reveal_modal.visible = false
+
 	if NetworkClient and NetworkClient.is_connected_to_server and is_network_mode:
+		Engine.time_scale = 5.0
 		NetworkClient.send_fast_forward_match()
 	else:
+		Engine.time_scale = 10.0
 		_run_local_fast_forward_loop()
 
 func _run_local_fast_forward_loop() -> void:
 	if not is_inside_tree():
 		_check_victory_condition()
 		return
+	if is_player_turn or current_turn_seat == my_seat:
+		is_player_turn = false
+		_next_turn()
 	var safety_counter := 0
-	while not is_game_over and safety_counter < 100:
+	while not is_game_over and safety_counter < 3000:
 		safety_counter += 1
-		await get_tree().process_frame
 		_check_victory_condition()
 		if is_game_over:
 			break
-	if not is_game_over:
-		_check_victory_condition()
+		if is_player_turn or current_turn_seat == my_seat:
+			is_player_turn = false
+			_next_turn()
+		if current_waiting_seat == my_seat:
+			if is_waiting_dodge:
+				_on_dodge_passed()
+			elif is_waiting_rescue:
+				_on_rescue_passed()
+			elif is_waiting_song_cung:
+				_on_song_cung_passed()
+			else:
+				current_waiting_seat = 0
+				current_waiting_timer = 0.0
+		if ai_turn_watchdog_active and ai_turn_watchdog_elapsed > 2.0:
+			_recover_stuck_ai_turn(ai_turn_watchdog_seat)
+		await get_tree().process_frame
+	_check_victory_condition()
 
 func _check_victory_condition() -> void:
 	if is_network_mode:
@@ -11777,6 +11839,8 @@ func _show_authoritative_match_result(state: Dictionary) -> void:
 			"matchId": str(state.get("roomId", NetworkClient.room_id)), "isWinner": won,
 			"winningRole": outcome, "winnerLabel": {"KING":"VUA và Trung Thần", "REBELS":"Phản Tặc", "SPY":"Nội Gián"}.get(outcome, team_label)
 		}
+	Engine.time_scale = 1.0
+	ai_fast_forward_active = false
 	is_game_over = true
 	is_player_turn = false
 	card_play_btn.hide()
@@ -11804,6 +11868,8 @@ func _result_label(parent: Node, text: String, font_size: int, color: Color) -> 
 	return label
 
 func _show_victory_defeat_modal(is_win: bool) -> void:
+	Engine.time_scale = 1.0
+	ai_fast_forward_active = false
 	if not is_instance_valid(victory_defeat_modal) or match_result_recorded:
 		return
 	match_result_recorded = true
@@ -11873,7 +11939,7 @@ func _show_victory_defeat_modal(is_win: bool) -> void:
 	_result_label(content, "+%d EXP" % (20 if is_win else 12), 14, Color("#99dcff"))
 	var claim_button := Button.new()
 	claim_button.name = "ClaimRewardBtn"
-	claim_button.text = "NHẬN THƯỞNG VÀ VỀ TRANG CHỦ"
+	claim_button.text = "NHẬN THƯỞNG VỀ TRANG CHỦ"
 	claim_button.custom_minimum_size.y = 54
 	UIScaleManager.scale_node_font(claim_button, 15)
 	claim_button.pressed.connect(_on_return_home_clicked)
@@ -11888,13 +11954,18 @@ func _claim_match_reward() -> bool:
 		return false
 	return AuthManager.claim_match_reward(pending_match_result, battle_mode_id, match_entry_stake_recorded, match_entry_star_amount)
 
-
 func _on_return_home_clicked() -> void:
+	Engine.time_scale = 1.0
+	ai_fast_forward_active = false
 	_claim_match_reward()
 	if NetworkClient:
 		NetworkClient.clear_active_match()
 		NetworkClient.room_id = ""
 	get_tree().change_scene_to_file("res://scenes/home.tscn")
+
+func _exit_tree() -> void:
+	Engine.time_scale = 1.0
+	ai_fast_forward_active = false
 
 func _is_ai_controller() -> bool:
 	var lowest_human_seat = 99
@@ -12862,6 +12933,9 @@ func _execute_ai_turn(ai_seat: int) -> void:
 
 					if chosen_tgt_seat == my_seat:
 						while is_waiting_dodge and not is_game_over:
+							if ai_fast_forward_active:
+								_on_dodge_passed()
+								break
 							await get_tree().create_timer(0.3).timeout
 					else:
 						await _wait_for_ai_card_play()
@@ -13367,7 +13441,10 @@ func _handle_dai_hong_thuy_judgement(seat_num: int) -> void:
 		return
 	_add_log("🌊 [GIAI ĐOẠN PHÁN XÉT] %s đang mang [Đại Hồng Thủy]! Bắt đầu lật bài phán xét..." % g["name"])
 	_animate_showcase_card("Đại Hồng Thủy", "🌊 [Đại Hồng Thủy]: Phán xét bài Đen 1..6!")
-	await get_tree().create_timer(1.2).timeout
+	if not ai_fast_forward_active:
+		await get_tree().create_timer(1.2).timeout
+	else:
+		await get_tree().process_frame
 
 	var judge_card = _draw_card_from_pile()
 	var j_suit = judge_card.get("suit", "")
@@ -13388,7 +13465,10 @@ func _handle_dai_hong_thuy_judgement(seat_num: int) -> void:
 		AudioManager.play_voice("Đại Hồng Thủy")
 		AudioManager.play_skill()
 		_apply_damage_to_general(seat_num, 3, seat_num, "WATER", true)
-		await get_tree().create_timer(1.2).timeout
+		if not ai_fast_forward_active:
+			await get_tree().create_timer(1.2).timeout
+		else:
+			await get_tree().process_frame
 	else:
 		g["has_dai_hong_thuy"] = false
 		g["has_lightning"] = false
@@ -13409,7 +13489,10 @@ func _handle_dai_hong_thuy_judgement(seat_num: int) -> void:
 			_show_judgement_result(false, "Đại Hồng Thủy", judge_card)
 			_add_log("🌊 [Đại Hồng Thủy] Phán xét an toàn: Lật [Bài %s %s]. Không còn tướng nhận, lá bài bị loại bỏ!" % [rank_str, suit_name])
 		_trigger_local_giai_ach(g, "Đại Hồng Thủy")
-		await get_tree().create_timer(1.0).timeout
+		if not ai_fast_forward_active:
+			await get_tree().create_timer(1.0).timeout
+		else:
+			await get_tree().process_frame
 
 func _handle_supply_shortage_judgement(seat_num: int) -> bool:
 	var g = generals_data[seat_num]
@@ -13420,7 +13503,10 @@ func _handle_supply_shortage_judgement(seat_num: int) -> bool:
 		return false
 	_add_log("🌾 [PHÁN XÉT CẮT LƯƠNG] %s bị [Cắt Đường Lương]! Bắt đầu lật bài phán xét..." % g["name"])
 	_animate_showcase_card("Cắt Đường Lương", "🌾 Phán xét: Không phải bài Vàng -> Cấm rút bài!")
-	await get_tree().create_timer(1.2).timeout
+	if not ai_fast_forward_active:
+		await get_tree().create_timer(1.2).timeout
+	else:
+		await get_tree().process_frame
 
 	var judge_card = _draw_card_from_pile()
 	var j_suit = judge_card.get("suit", "")
@@ -13440,7 +13526,10 @@ func _handle_supply_shortage_judgement(seat_num: int) -> bool:
 		_add_log("🌾 [Cắt Đường Lương] Thoát hiểm: Lật [Bài %s %s] (bài Vàng) -> %s được rút bài!" % [rank_str, suit_name, g["name"]])
 		AudioManager.play_parry()
 		_trigger_local_giai_ach(g, "Cắt Đường Lương")
-		await get_tree().create_timer(1.0).timeout
+		if not ai_fast_forward_active:
+			await get_tree().create_timer(1.0).timeout
+		else:
+			await get_tree().process_frame
 		return false
 	else:
 		_show_judgement_result(true, "Cắt Đường Lương", judge_card)
@@ -13448,7 +13537,10 @@ func _handle_supply_shortage_judgement(seat_num: int) -> bool:
 		_add_log("🌾 [Cắt Đường Lương] Hiệu lực: Lật [Bài %s %s] (Không phải bài Vàng) -> %s bị tước quyền rút bài!" % [rank_str, suit_name, g["name"]])
 		AudioManager.play_voice("Cắt Đường Lương")
 		AudioManager.play_skill()
-		await get_tree().create_timer(1.0).timeout
+		if not ai_fast_forward_active:
+			await get_tree().create_timer(1.0).timeout
+		else:
+			await get_tree().process_frame
 		return true
 
 func _handle_acedia_judgement(seat_num: int) -> bool:
@@ -13460,7 +13552,10 @@ func _handle_acedia_judgement(seat_num: int) -> bool:
 		return false
 	_add_log("🕸️ [PHÁN XÉT TRẦM ẢO] %s bị [Trầm Ảo Sa Bẫy]! Bắt đầu lật bài phán xét..." % g["name"])
 	_animate_showcase_card("Trầm Ảo Sa Bẫy", "🕸️ Phán xét: Không phải bài Đỏ -> Cấm ra bài!")
-	await get_tree().create_timer(1.2).timeout
+	if not ai_fast_forward_active:
+		await get_tree().create_timer(1.2).timeout
+	else:
+		await get_tree().process_frame
 
 	var judge_card = _draw_card_from_pile()
 	var j_suit = judge_card.get("suit", "")
@@ -13480,7 +13575,10 @@ func _handle_acedia_judgement(seat_num: int) -> bool:
 		_add_log("🕸️ [Trầm Ảo Sa Bẫy] Thoát bẫy: Lật [Bài %s %s] (bài Đỏ) -> %s được ra bài!" % [rank_str, suit_name, g["name"]])
 		AudioManager.play_parry()
 		_trigger_local_giai_ach(g, "Trầm Ảo Sa Bẫy")
-		await get_tree().create_timer(1.0).timeout
+		if not ai_fast_forward_active:
+			await get_tree().create_timer(1.0).timeout
+		else:
+			await get_tree().process_frame
 		return false
 	else:
 		_show_judgement_result(true, "Trầm Ảo Sa Bẫy", judge_card)
@@ -13488,7 +13586,10 @@ func _handle_acedia_judgement(seat_num: int) -> bool:
 		_add_log("🕸️ [Trầm Ảo Sa Bẫy] Hiệu lực: Lật [Bài %s %s] (Không phải bài Đỏ) -> %s mất lượt ra bài!" % [rank_str, suit_name, g["name"]])
 		AudioManager.play_voice("Trầm Ảo Sa Bẫy")
 		AudioManager.play_skill()
-		await get_tree().create_timer(1.0).timeout
+		if not ai_fast_forward_active:
+			await get_tree().create_timer(1.0).timeout
+		else:
+			await get_tree().process_frame
 		return true
 
 func _next_turn() -> void:
@@ -14402,6 +14503,8 @@ func _is_seat_female(seat: int) -> bool:
 	return false
 
 func _play_card_voice(card_name: String, seat: int = 0) -> void:
+	if ai_fast_forward_active:
+		return
 	var target_seat = seat if seat > 0 else current_turn_seat
 	var is_fem = _is_seat_female(target_seat)
 	AudioManager.play_voice(card_name, is_fem)
@@ -14459,13 +14562,19 @@ func _execute_aoe_attack(caster_seat: int, aoe_name: String, required_card_name:
 				var skill_reason = "Khang Dũng" if hero_id == 13 else ("Thủy Trận" if hero_id == 22 else "Thủy Chiến")
 				_animate_showcase_card("Miễn Nhiễm", "%s miễn nhiễm Giặc Tới nhờ [%s]!" % [tgt["name"], skill_reason])
 				_add_log("🛡️ [Miễn Nhiễm] %s miễn nhiễm sát thương từ [Giặc Tới] nhờ kỹ năng [%s]!" % [tgt["name"], skill_reason])
-				await get_tree().create_timer(0.6).timeout
+				if not ai_fast_forward_active:
+					await get_tree().create_timer(0.6).timeout
+				else:
+					await get_tree().process_frame
 				continue
 
 		# Hỏi Diệu Kế riêng cho từng nạn nhân trước khi hỏi lá phản ứng AOE.
 		if await _maybe_local_nullify_delayed(tgt, aoe_name, "hủy tác động riêng lên %s" % tgt["name"]):
 			_add_log("🛡️ Diệu Kế Phá Mưu đã hủy tác động [%s] lên %s." % [aoe_name, tgt["name"]])
-			await get_tree().create_timer(0.4).timeout
+			if not ai_fast_forward_active:
+				await get_tree().create_timer(0.4).timeout
+			else:
+				await get_tree().process_frame
 			continue
 
 		# 2. Phản ứng: Người chơi thật (Luôn cho người chơi tự chọn)
@@ -14499,7 +14608,10 @@ func _execute_aoe_attack(caster_seat: int, aoe_name: String, required_card_name:
 			else:
 				_add_log("💥 Bạn không đánh lá [%s], chịu %d sát thương từ [%s]!" % [required_card_name, incoming_damage, aoe_name])
 				_apply_damage_to_general(target_seat, incoming_damage, caster_seat, "NORMAL")
-			await get_tree().create_timer(0.6).timeout
+			if not ai_fast_forward_active:
+				await get_tree().create_timer(0.6).timeout
+			else:
+				await get_tree().process_frame
 
 		# 3. Phản ứng: Bot AI
 		else:
@@ -14516,7 +14628,10 @@ func _execute_aoe_attack(caster_seat: int, aoe_name: String, required_card_name:
 					_show_judgement_result(true, "Khiên Mây Bện", judge_card)
 					_add_log("🛡️ [Khiên Mây Bện] của %s lật [Bài %s %s] (Bài Đỏ/Bài Trắng) -> Tự động Đỡ Mưa Tên thành công!" % [tgt["name"], rank_str, suit_name])
 					AudioManager.play_parry()
-					await get_tree().create_timer(0.8).timeout
+					if not ai_fast_forward_active:
+						await get_tree().create_timer(0.8).timeout
+					else:
+						await get_tree().process_frame
 					continue
 				else:
 					_animate_showcase_card("Khiên Mây Bện", "%s lật [Bài %s %s] (Bài Vàng/Bài Đen) -> Phán xét thất bại!" % [tgt["name"], rank_str, suit_name], judge_card)
@@ -14524,9 +14639,15 @@ func _execute_aoe_attack(caster_seat: int, aoe_name: String, required_card_name:
 					_play_card_voice("Khiên Mây Bện", target_seat)
 					_show_judgement_result(false, "Khiên Mây Bện", judge_card)
 					_add_log("🛡️ [Khiên Mây Bện] của %s lật [Bài %s %s] (Bài Vàng/Bài Đen) -> Phán xét thất bại!" % [tgt["name"], rank_str, suit_name])
-					await get_tree().create_timer(0.5).timeout
+					if not ai_fast_forward_active:
+						await get_tree().create_timer(0.5).timeout
+					else:
+						await get_tree().process_frame
 
-			await get_tree().create_timer(0.8).timeout
+			if not ai_fast_forward_active:
+				await get_tree().create_timer(0.8).timeout
+			else:
+				await get_tree().process_frame
 			var matched_idx = -1
 			for idx in range(tgt["hand_cards"].size()):
 				var c = tgt["hand_cards"][idx]
@@ -14552,7 +14673,10 @@ func _execute_aoe_attack(caster_seat: int, aoe_name: String, required_card_name:
 			else:
 				_add_log("💥 %s không có lá [%s], chịu %d sát thương từ [%s]!" % [tgt["name"], required_card_name, incoming_damage, aoe_name])
 				_apply_damage_to_general(target_seat, incoming_damage, caster_seat, "NORMAL")
-			await get_tree().create_timer(0.6).timeout
+			if not ai_fast_forward_active:
+				await get_tree().create_timer(0.6).timeout
+			else:
+				await get_tree().process_frame
 
 # ==========================================================
 # ⚔️ HUYẾT CHIẾN (DUEL): ĐỐI KHÁNG 1v1 LUÂN PHIÊN ĐÁNH TRẢM
@@ -14600,7 +14724,10 @@ func _execute_duel(caster_seat: int, target_seat: int) -> void:
 				40.0
 				)
 			else:
-				await get_tree().create_timer(0.9).timeout
+				if not ai_fast_forward_active:
+					await get_tree().create_timer(0.9).timeout
+				else:
+					await get_tree().process_frame
 				var s_idx = -1
 				for idx in range(cur_gen["hand_cards"].size()):
 					if "trảm" in cur_gen["hand_cards"][idx].get("name", "").to_lower():
@@ -14663,10 +14790,13 @@ func _execute_harvest(caster_seat: int) -> void:
 		var g = generals_data[s]
 		if await _maybe_local_nullify_delayed(g, "Mở Kho Cứu Tế", "hủy lượt bốc Kho Cứu Tế"):
 			_add_log("🛡️ Diệu Kế Phá Mưu đã hủy lượt bốc Kho Cứu Tế của %s." % g["name"])
-			await get_tree().create_timer(0.4).timeout
+			if not ai_fast_forward_active:
+				await get_tree().create_timer(0.4).timeout
+			else:
+				await get_tree().process_frame
 			continue
 		var picked_index = 0
-		if g["isPlayer"]:
+		if g["isPlayer"] and not ai_fast_forward_active and bool(g.get("is_alive", true)):
 			_show_harvest_modal(pool, true)
 			var picked_id = await harvest_card_chosen
 			for i in pool.size():
@@ -14674,21 +14804,25 @@ func _execute_harvest(caster_seat: int) -> void:
 					picked_index = i
 					break
 		var card = pool.pop_at(picked_index)
-		if g["isPlayer"]:
+		if g["isPlayer"] and not ai_fast_forward_active and bool(g.get("is_alive", true)):
 			_add_card_to_player_hand(card)
 			_add_log("🌾 Bạn đã chọn [%s] từ Kho Cứu Tế." % card.get("name", "Bài"))
 		else:
 			_animate_draw_to_seat(s)
 			g["hand_cards"].append(card)
 			g["hand_count"] = g["hand_cards"].size()
-			g["avatar_node"].update_hand_count(g["hand_count"])
+			if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
+				g["avatar_node"].update_hand_count(g["hand_count"])
 			_add_log("🌾 %s đã chọn 1 lá từ Kho Cứu Tế." % g["name"])
-		await get_tree().create_timer(0.4).timeout
+		if not ai_fast_forward_active:
+			await get_tree().create_timer(0.4).timeout
+		else:
+			await get_tree().process_frame
 	_hide_harvest_modal()
 	pool.clear()
 
 func _maybe_local_nullify_delayed(actor: Dictionary, root_name: String, intent: String) -> bool:
-	if actor.is_empty() or not actor.get("is_alive", false):
+	if ai_fast_forward_active or actor.is_empty() or not actor.get("is_alive", false):
 		return false
 	if actor.get("isPlayer", false):
 		for card_node in hand_container.get_children():
@@ -15251,7 +15385,7 @@ func _show_card_pick_modal(is_steal: bool, target_seat: int, selection_data: Dic
 		c.queue_free()
 
 	var effect_type = card_pick_effect_type
-	card_pick_cancel_btn.visible = (effect_type in ["UU_THIEP", "PHA_TONG"])
+	card_pick_cancel_btn.visible = (effect_type in ["UU_THIEP", "PHA_TONG", "CHUYEN_CHE"])
 	var card_pick_box := card_pick_modal.get_node_or_null("Dim/Box") as Control
 	var card_pick_dim := card_pick_modal.get_node_or_null("Dim") as Control
 	var is_dai_viet_color: bool = effect_type == "DAI_VIET_COLOR"
@@ -15294,6 +15428,11 @@ func _show_card_pick_modal(is_steal: bool, target_seat: int, selection_data: Dic
 		card_pick_title.text = "🌊 TRIỀU DÂNG: HỦY TRANG BỊ CỦA %s" % tgt["name"].to_upper()
 		card_pick_confirm_btn.text = "🌊 XÁC NHẬN HỦY"
 		card_pick_desc.text = "💡 Chọn 1 trang bị đang đeo của %s để hủy." % tgt["name"]
+	elif effect_type == "CHUYEN_CHE":
+		card_pick_title.text = "⚔️ CHUYÊN CHẾ: CHỌN TRANG BỊ CỦA %s" % tgt["name"].to_upper()
+		card_pick_confirm_btn.text = "⚔️ XÁC NHẬN HỦY TRANG BỊ"
+		card_pick_cancel_btn.text = "HỦY"
+		card_pick_desc.text = "💡 Chọn 1 trang bị đang đeo của %s để hủy (họ phải ra 1 Trảm hoặc tự mất 1 Máu):" % tgt["name"]
 	elif effect_type == "HOA_DAN":
 		card_pick_title.text = "🌾 HÓA DÂN: BỎ TRANG BỊ"
 		card_pick_confirm_btn.text = "🌾 BỎ VÀ HỒI 1 MÁU"
@@ -15340,7 +15479,7 @@ func _show_card_pick_modal(is_steal: bool, target_seat: int, selection_data: Dic
 	else:
 		card_pick_title.text = "🌾 VƯỜN KHÔNG NHÀ TRỐNG: PHÁ HỦY BÀI CỦA %s" % tgt["name"].to_upper()
 		card_pick_confirm_btn.text = "🌾 XÁC NHẬN PHÁ HỦY"
-	if effect_type not in ["DAI_VIET_COLOR", "THUONG_NGAU", "DOAN_DAO", "TAU_VI", "PHU_DE", "TRIEU_DANG", "HOA_DAN", "AN_DAN", "DAN_CAU_STEAL", "XUNG_VUONG_DISCARD", "AN_TICH_DEFENSE", "UU_THIEP", "CO_LAU", "PHA_TONG", "COT_KINH_DISCARD"]:
+	if effect_type not in ["DAI_VIET_COLOR", "THUONG_NGAU", "DOAN_DAO", "TAU_VI", "PHU_DE", "TRIEU_DANG", "HOA_DAN", "AN_DAN", "DAN_CAU_STEAL", "XUNG_VUONG_DISCARD", "AN_TICH_DEFENSE", "UU_THIEP", "CO_LAU", "PHA_TONG", "COT_KINH_DISCARD", "CHUYEN_CHE"]:
 		card_pick_desc.text = "💡 Hãy chọn 1 lá bài úp trên tay hoặc 1 trang bị đang mặc của %s:" % tgt["name"]
 
 	var has_options = false
@@ -15441,7 +15580,7 @@ func _show_card_pick_modal(is_steal: bool, target_seat: int, selection_data: Dic
 				var option_label = str(s_opt.get("label", "⏳ PHÁN XÉT"))
 				_add_visible_card_pick_option(option_label, item_name, "judgement", token, c_dict)
 	else:
-		if effect_type != "TRIEU_DANG":
+		if effect_type != "TRIEU_DANG" and effect_type != "CHUYEN_CHE":
 			var hand_count = tgt["hand_count"]
 			for i in range(hand_count):
 				has_options = true
@@ -15471,23 +15610,33 @@ func _show_card_pick_modal(is_steal: bool, target_seat: int, selection_data: Dic
 
 		if tgt["equipped_weapon"] != "":
 			has_options = true
-			_add_visible_card_pick_option("🗡️ VŨ KHÍ", tgt["equipped_weapon"], "weapon", "EQUIPMENT:%s" % tgt["equipped_weapon"])
+			var eq_info = _find_general_equipment_card(tgt, tgt["equipped_weapon"])
+			var eq_id = str(eq_info.get("id", tgt["equipped_weapon"]))
+			_add_visible_card_pick_option("🗡️ VŨ KHÍ", tgt["equipped_weapon"], "weapon", "EQUIPMENT:%s" % eq_id, eq_info)
 
 		if tgt["equipped_armor"] != "":
 			has_options = true
-			_add_visible_card_pick_option("🛡️ ÁO GIÁP", tgt["equipped_armor"], "armor", "EQUIPMENT:%s" % tgt["equipped_armor"])
+			var eq_info = _find_general_equipment_card(tgt, tgt["equipped_armor"])
+			var eq_id = str(eq_info.get("id", tgt["equipped_armor"]))
+			_add_visible_card_pick_option("🛡️ ÁO GIÁP", tgt["equipped_armor"], "armor", "EQUIPMENT:%s" % eq_id, eq_info)
 
 		if tgt["equipped_def_horse"] != "":
 			has_options = true
-			_add_visible_card_pick_option("🐘 NGỰA THỦ", tgt["equipped_def_horse"], "def_horse", "EQUIPMENT:%s" % tgt["equipped_def_horse"])
+			var eq_info = _find_general_equipment_card(tgt, tgt["equipped_def_horse"])
+			var eq_id = str(eq_info.get("id", tgt["equipped_def_horse"]))
+			_add_visible_card_pick_option("🐘 NGỰA THỦ", tgt["equipped_def_horse"], "def_horse", "EQUIPMENT:%s" % eq_id, eq_info)
 
 		if tgt["equipped_off_horse"] != "":
 			has_options = true
-			_add_visible_card_pick_option("🐎 NGỰA CÔNG", tgt["equipped_off_horse"], "off_horse", "EQUIPMENT:%s" % tgt["equipped_off_horse"])
+			var eq_info = _find_general_equipment_card(tgt, tgt["equipped_off_horse"])
+			var eq_id = str(eq_info.get("id", tgt["equipped_off_horse"]))
+			_add_visible_card_pick_option("🐎 NGỰA CÔNG", tgt["equipped_off_horse"], "off_horse", "EQUIPMENT:%s" % eq_id, eq_info)
 
 		if tgt.get("equipped_treasure", "") != "":
 			has_options = true
-			_add_visible_card_pick_option("🥁 BẢO VẬT", tgt["equipped_treasure"], "treasure", "EQUIPMENT:%s" % tgt["equipped_treasure"])
+			var eq_info = _find_general_equipment_card(tgt, tgt["equipped_treasure"])
+			var eq_id = str(eq_info.get("id", tgt["equipped_treasure"]))
+			_add_visible_card_pick_option("🥁 BẢO VẬT", tgt["equipped_treasure"], "treasure", "EQUIPMENT:%s" % eq_id, eq_info)
 
 		var local_judgements = [
 			["has_dai_hong_thuy", "Đại Hồng Thủy", "dai_hong_thuy"],
@@ -15495,7 +15644,7 @@ func _show_card_pick_modal(is_steal: bool, target_seat: int, selection_data: Dic
 			["has_tram_ao", "Trầm Ảo Sa Bẫy", "tram_ao"],
 			["has_bai_coc", "Bãi Cọc Bạch Đằng", "bai_coc"]
 		]
-		if effect_type != "TRIEU_DANG":
+		if effect_type != "TRIEU_DANG" and effect_type != "CHUYEN_CHE":
 			for judgement in local_judgements:
 				if tgt.get(judgement[0], false):
 					has_options = true
@@ -15514,6 +15663,13 @@ func _show_card_pick_modal(is_steal: bool, target_seat: int, selection_data: Dic
 	card_pick_status_lbl.text = "👉 Đang chọn: Chưa chọn lá nào"
 	card_pick_confirm_btn.disabled = true
 	card_pick_modal.visible = true
+
+func _find_general_equipment_card(general: Dictionary, item_name: String) -> Dictionary:
+	if general.has("equipment_cards") and general["equipment_cards"] is Array:
+		for eq in general["equipment_cards"]:
+			if eq is Dictionary and (str(eq.get("name", "")) == item_name or str(eq.get("cardName", "")) == item_name):
+				return eq
+	return {}
 
 func _get_equipment_slot_title(card_info: Dictionary, item_name: String) -> String:
 	var sub_type = int(card_info.get("subType", -1))
@@ -15644,6 +15800,39 @@ func _on_card_pick_confirmed() -> void:
 			cost_id,
 			cost_node
 		)
+		return
+
+	if effect_type == "CHUYEN_CHE":
+		var cost_card_id = str(card_pick_current_selection.get("costCardId", ""))
+		var cost_card_node = card_pick_current_selection.get("costCardNode", null)
+		var target_seat = card_pick_target_seat
+		var item_name = opt.get("item_name", "")
+		if item_name.is_empty():
+			var c_dict = opt.get("card", {})
+			if c_dict is Dictionary:
+				item_name = c_dict.get("name", "")
+		if item_name.is_empty():
+			item_name = str(opt.get("token", "")).replace("EQUIPMENT:", "")
+
+		var target_equip_id = ""
+		var c_info = opt.get("card", {})
+		if c_info is Dictionary and not str(c_info.get("id", "")).is_empty() and str(c_info.get("id")) != "target_card":
+			target_equip_id = str(c_info.get("id"))
+		if target_equip_id.is_empty():
+			target_equip_id = str(opt.get("token", "")).replace("EQUIPMENT:", "")
+		if target_equip_id.is_empty():
+			target_equip_id = item_name
+
+		card_pick_effect_type = ""
+		card_pick_target_seat = -1
+		selected_card_pick_option.clear()
+		card_pick_current_selection.clear()
+		card_pick_modal.visible = false
+
+		if is_network_mode and NetworkClient and NetworkClient.is_connected_to_server:
+			NetworkClient.send_use_skill("Chuyên Chế", target_seat, cost_card_id, target_equip_id)
+		else:
+			_execute_local_chuyen_che(target_seat, cost_card_id, cost_card_node, item_name, opt)
 		return
 
 	var tgt = generals_data[card_pick_target_seat]
@@ -16284,6 +16473,9 @@ func _show_drum_reveal_modal(target_seat: int, cards: Array, reveal_source: Stri
 # 🏹 SONG CUNG MƯỜNG NHẠ: PHẢN ỨNG BỎ 2 LÁ ĐỂ TRẢM XUYÊN QUA ĐỠ
 # ==========================================================
 func _prompt_song_cung_modal(target_seat: int, timeout_sec: float = 40.0, damage_amount: int = 1, damage_element: String = "NORMAL") -> void:
+	if ai_fast_forward_active or not generals_data.has(my_seat) or not bool(generals_data[my_seat].get("is_alive", true)):
+		_on_song_cung_passed()
+		return
 	is_waiting_song_cung = true
 	is_waiting_dodge = false
 	song_cung_target_seat = target_seat
@@ -17013,6 +17205,75 @@ func _execute_local_nhiep_chinh_y_lan(target_seat: int, card_ui_node: Control, c
 	_animate_showcase_card("Nhiếp Chính", "Ỷ Lan tặng [%s] cho %s!" % [card_info.get("name", "Bài"), target.get("name", "người chơi")], card_info)
 	_add_log("👑 [NHIẾP CHÍNH] %s tặng [%s] cho %s." % [my_g.get("name", "Ỷ Lan"), card_info.get("name", "Bài"), target.get("name", "người chơi")])
 	AudioManager.play_skill()
+
+func _execute_local_chuyen_che(target_seat: int, cost_card_id: String, cost_card_node: Control, item_name: String, opt: Dictionary) -> void:
+	if not generals_data.has(target_seat) or not generals_data.has(my_seat):
+		return
+	if cost_card_node != null and is_instance_valid(cost_card_node):
+		_discard_player_card(cost_card_node)
+	elif not cost_card_id.is_empty():
+		for child in hand_container.get_children():
+			var c_dict = _get_card_info_from_ui(child)
+			if str(c_dict.get("id", "")) == cost_card_id or str(c_dict.get("name", "")) == cost_card_id:
+				_discard_player_card(child)
+				break
+
+	var target = generals_data[target_seat]
+	var removed = false
+	for slot in ["equipped_weapon", "equipped_armor", "equipped_def_horse", "equipped_off_horse", "equipped_treasure"]:
+		if str(target.get(slot, "")) == item_name:
+			target[slot] = ""
+			removed = true
+			break
+	if not removed:
+		var eq_cards = target.get("equipment_cards", []) as Array
+		for i in range(eq_cards.size()):
+			var eq = eq_cards[i]
+			if str(eq.get("name", "")) == item_name or str(eq.get("id", "")) == str(opt.get("token", "")).replace("EQUIPMENT:", ""):
+				eq_cards.remove_at(i)
+				target["equipment_cards"] = eq_cards
+				break
+	if target.has("avatar_node") and is_instance_valid(target["avatar_node"]):
+		target["avatar_node"].update_equipments(
+			target.get("equipped_weapon", ""),
+			target.get("equipped_armor", ""),
+			target.get("equipped_def_horse", ""),
+			target.get("equipped_off_horse", ""),
+			target.get("equipped_treasure", "")
+		)
+
+	var my_g = generals_data[my_seat]
+	_animate_showcase_card("Chuyên Chế", "%s hủy [%s] của %s!" % [my_g.get("name", "Trần Thủ Độ"), item_name, target.get("name", "mục tiêu")], opt.get("card", {}))
+	_add_log("⚔️ [CHUYÊN CHẾ] %s bỏ 1 lá hủy [%s] của %s! Mục tiêu phải ra Trảm hoặc mất 1 Máu." % [my_g.get("name", "Trần Thủ Độ"), item_name, target.get("name", "mục tiêu")])
+	AudioManager.play_skill()
+
+	if target.get("isAI", false):
+		var slash_idx = -1
+		var hand_cards = target.get("hand_cards", []) as Array
+		for idx in range(hand_cards.size()):
+			var c = hand_cards[idx]
+			if "Trảm" in str(c.get("name", "")):
+				slash_idx = idx
+				break
+		if slash_idx < 0 and (target.get("hero_id", -1) == 47 or _hero_has_skill(target, "tien_thoai")):
+			for idx in range(hand_cards.size()):
+				var c = hand_cards[idx]
+				if "Đỡ" in str(c.get("name", "")):
+					slash_idx = idx
+					break
+		if slash_idx >= 0:
+			var sc = hand_cards[slash_idx]
+			hand_cards.remove_at(slash_idx)
+			target["hand_cards"] = hand_cards
+			target["hand_count"] = max(0, int(target.get("hand_count", 1)) - 1)
+			if target.has("avatar_node") and is_instance_valid(target["avatar_node"]):
+				target["avatar_node"].update_hand_count(target["hand_count"])
+			_animate_showcase_card("Trảm", "%s ra [%s] để hóa giải Chuyên Chế!" % [target.get("name", "Mục tiêu"), sc.get("name", "Trảm")], sc)
+			_add_log("⚔️ %s ra 1 lá [%s] để hóa giải [Chuyên Chế]!" % [target.get("name", "Mục tiêu"), sc.get("name", "Trảm")])
+			AudioManager.play_slash()
+		else:
+			_add_log("🩸 %s không có Trảm, nhận 1 sát thương từ [Chuyên Chế]!" % target.get("name", "Mục tiêu"))
+			_apply_damage_to_general(target_seat, 1, my_seat, "NORMAL")
 
 func _execute_local_doi_do(chosen_seats: Array) -> void:
 	var g = generals_data.get(my_seat, {})

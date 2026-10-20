@@ -686,7 +686,7 @@ func send_play_card_for_seat(seat_num: int, card_id: String, target_seat: int = 
 		payload["phaTongCardId"] = pha_tong_card_id
 	send_json(payload)
 
-func send_use_skill(skill_id: String, target_seat: int = 0, card_id: String = "") -> void:
+func send_use_skill(skill_id: String, target_seat: int = 0, card_id: String = "", extra_data = null) -> void:
 	var payload = {
 		"action": "USE_SKILL",
 		"roomId": room_id,
@@ -696,6 +696,15 @@ func send_use_skill(skill_id: String, target_seat: int = 0, card_id: String = ""
 	}
 	if not card_id.is_empty():
 		payload["cardId"] = card_id
+	if extra_data != null:
+		if extra_data is Dictionary:
+			for k in extra_data:
+				payload[k] = extra_data[k]
+			payload["extraData"] = extra_data
+		elif extra_data is String and not extra_data.is_empty():
+			payload["targetEquipId"] = extra_data
+			payload["targetCardId"] = extra_data
+			payload["extraData"] = extra_data
 	send_json(payload)
 
 func send_toggle_skill(skill_id: String) -> void:

@@ -831,6 +831,18 @@ function createTestState(heroIds = ["HERO_41", "HERO_42", "HERO_43", "HERO_44"])
   const respRes = handleRespondAction(state, 2, true, "P2_SLASH");
   assert.equal(respRes.success, true);
   assert.equal(state.phase, "PLAY");
+
+  // Specific equipment destruction test: P2 has weapon and horse, P1 targets horse specifically
+  p1.hand = [{ id: "COST_2", name: "Đỡ", suit: "Heart", rank: 3, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE }];
+  p2.equipments = [
+    { id: "P2_WEAPON", name: "Thanh Long Đao", category: CARD_CATEGORIES.EQUIPMENT, subType: CARD_SUBTYPES.WEAPON },
+    { id: "P2_HORSE", name: "Xích Thố", category: CARD_CATEGORIES.EQUIPMENT, subType: CARD_SUBTYPES.OFFENSIVE_HORSE }
+  ];
+  p2.hand = [];
+  const useRes2 = handleUseSkill(state, 1, "Chuyên Chế", 2, "COST_2", { targetEquipId: "EQUIPMENT:P2_HORSE" });
+  assert.equal(useRes2.success, true);
+  assert.equal(p2.equipments.length, 1);
+  assert.equal(p2.equipments[0].id, "P2_WEAPON"); // Horse was destroyed, Weapon remains!
   console.log("✅ Hero 49: Trần Thủ Độ (Chuyên Chế & Đoạt Quyền) OK");
 }
 

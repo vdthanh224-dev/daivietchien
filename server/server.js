@@ -1040,7 +1040,7 @@ function applyActionToState(state, seat, payload) {
   if (!hasSeat(state, seat)) return { error: "Ghế không thuộc phòng đấu" };
 
   if (payload.action === "FAST_FORWARD_MATCH") {
-    return fastForwardMatchForDeadPlayer(state, seat);
+    return fastForwardMatchForDeadPlayer(state, seat, payload.connectedSeats);
   }
   if (payload.action === "USE_SKILL") {
     return handleUseSkill(state, seat, payload.skillId, payload.targetSeat, payload.cardId, payload);
@@ -2304,6 +2304,11 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
         }
 
         // D. XỬ LÝ TRÊN STATE TRONG BỘ NHỚ RAM
+        const connectedSeats = room.sockets
+          ? Array.from(room.sockets.entries())
+              .filter(([s, ws]) => ws && ws.readyState === WebSocket.OPEN)
+              .map(([s]) => Number(s))
+          : null;
         const outcome = mutateSharedState(roomId, boundSeat, {
           action,
           cardId,
@@ -2316,6 +2321,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           accepted,
           cardIds,
           expectedVersion,
+          connectedSeats,
         });
         if (outcome.conflict) {
           return socket.send(JSON.stringify({

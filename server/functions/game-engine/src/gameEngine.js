@@ -9121,13 +9121,24 @@ function checkGameOver(state) {
 function shouldFastForwardAiBattle(state) {
   if (!state || state.status === "FINISHED") return false;
   if (state.fastForwardAiRequested === true) return true;
-  const allInitialPlayersAI = state.players.length > 0 && state.players.every((player) => player.isAI === true);
+  const allInitialPlayersAI = state.players.length > 0 && state.players.every((player) => isAiPlayerSlot(player));
   return allInitialPlayersAI;
+}
+
+export function isAiPlayerSlot(player) {
+  if (!player) return false;
+  if (player.isAI === true || player.isAiTakeover === true || player.isDisconnected === true) return true;
+  const uid = String(player.userId || "").toLowerCase().trim();
+  if (uid.startsWith("bot_") || uid.startsWith("ai_") || uid === "empty" || uid === "") return true;
+  const name = String(player.userName || "").toLowerCase().trim();
+  if (name.startsWith("ai ") || name.includes("(máy)") || name.includes("(bot)")) return true;
+  return false;
 }
 
 function fastForwardAiBattle(state) {
   let changed = false;
-  for (let step = 0; step < 128 && state.status !== "FINISHED"; step++) {
+  let consecutiveStalls = 0;
+  for (let step = 0; step < 2000 && state.status !== "FINISHED"; step++) {
     const beforeVersion = state.version || 0;
     if (state.phase === "AWAIT_JUDGEMENT") {
       applyPendingJudgement(state);
@@ -9150,9 +9161,32 @@ function fastForwardAiBattle(state) {
         if (!result || result.error) handleEndTurn(state, current.seat);
       }
     } else {
-      break;
+      if (state.turnSeat > 0) {
+        advanceTurn(state);
+      } else {
+        break;
+      }
     }
-    changed = changed || (state.version || 0) !== beforeVersion || state.status === "FINISHED";
+    checkGameOver(state);
+    const stepChanged = (state.version || 0) !== beforeVersion || state.status === "FINISHED";
+    changed = changed || stepChanged;
+    if (!stepChanged) {
+      consecutiveStalls++;
+      if (consecutiveStalls >= 3) {
+        if (state.waitingTargetSeat > 0) {
+          const waiting = state.players.find((player) => player.seat === state.waitingTargetSeat);
+          executeFallbackReactionForSeat(state, state.waitingTargetSeat, waiting);
+        } else {
+          advanceTurn(state);
+        }
+      }
+      if (consecutiveStalls >= 8) {
+        checkGameOver(state);
+        break;
+      }
+    } else {
+      consecutiveStalls = 0;
+    }
     state.timerStartAt = Date.now();
   }
   return { changed, important: changed };
@@ -9941,11 +9975,11 @@ export function tickGameState(state, connectedSeats = null) {
   return { changed, important };
 }
 
-export function fastForwardMatchForDeadPlayer(state, requesterSeat) {
+export function fastForwardMatchForDeadPlayer(state, requesterSeat, connectedSeats = null) {
   const requester = state?.players?.find((player) => player.seat === Number(requesterSeat));
   if (!requester || requester.isAlive !== false || state.phase === "AWAIT_NEAR_DEATH") return { error: "Chỉ người đã tử trận mới được tua nhanh" };
   if (state.status === "FINISHED") return { success: true, changed: false };
-  const isAiSlot = (player) => Boolean(player.isAI || player.isAiTakeover || player.isDisconnected);
+  const isAiSlot = (player) => isAiPlayerSlot(player) || (Array.isArray(connectedSeats) && !connectedSeats.includes(player.seat));
   const living = state.players.filter((player) => player.isAlive !== false);
   if (living.length === 0 || !living.every(isAiSlot)) {
     return { error: "Chỉ tua nhanh khi những người còn sống đều là AI" };
@@ -10581,9 +10615,23 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
     const costCard = player.hand.splice(cardIdx, 1)[0];
     discardCard(state, costCard);
 
-    const targetEquipId = (extraData && typeof extraData === "object" ? extraData.targetEquipId : extraData);
-    const equipIdx = targetEquipId ? target.equipments.findIndex((e) => e.id === targetEquipId) : 0;
-    const destroyedEquip = target.equipments.splice(equipIdx >= 0 ? equipIdx : 0, 1)[0];
+    const rawEquipId = (extraData && typeof extraData === "object"
+      ? (extraData.targetEquipId || extraData.targetCardId || extraData.target_equip_id || extraData.extraData?.targetEquipId)
+      : extraData);
+    let equipIdx = -1;
+    if (rawEquipId) {
+      const cleanEquip = String(rawEquipId).replace(/^EQUIPMENT:/, "").trim();
+      equipIdx = target.equipments.findIndex((e) =>
+        e.id === cleanEquip ||
+        e.name === cleanEquip ||
+        String(e.id) === cleanEquip ||
+        e.name === rawEquipId ||
+        ("EQUIPMENT:" + e.name) === rawEquipId ||
+        ("EQUIPMENT:" + e.id) === rawEquipId
+      );
+    }
+    if (equipIdx < 0) equipIdx = 0;
+    const destroyedEquip = target.equipments.splice(equipIdx, 1)[0];
     discardCard(state, destroyedEquip);
 
     state.phase = "AWAIT_CHUYEN_CHE_RESPOND";
