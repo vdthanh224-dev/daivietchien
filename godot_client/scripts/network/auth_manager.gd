@@ -4,6 +4,10 @@ signal login_succeeded(user_data: Dictionary)
 signal login_failed(error_message: String)
 signal profile_updated()
 signal profile_loaded()
+signal password_recovery_sent(message: String)
+signal password_recovery_failed(error_message: String)
+signal password_reset_succeeded(message: String)
+signal password_reset_failed(error_message: String)
 
 const ENDPOINT = "https://sgp.cloud.appwrite.io/v1"
 const PROJECT_ID = "6a885457002da3f3d47e"
@@ -18,6 +22,7 @@ var session_cookie: String = ""
 var fallback_cookies: String = ""
 var is_logged_in: bool = false
 var is_deleting_session: bool = false
+var last_recovery_user_id: String = ""
 
 # Player Profile & Progression (Synced with Appwrite /account/prefs)
 var current_level: int = 1
@@ -80,7 +85,43 @@ const MILITARY_TIERS = [
 	{"tier": 12, "name": "Đại Nguyên Soái","badge": "🔥", "min": 8200, "max": 999999, "desc": "Bậc Thống Soái tối cao, thống lĩnh toàn bộ quân lực bảo vệ xã tắc vĩnh cửu."}
 ]
 
+# Profile Save Debouncing & Caching
+var _profile_save_timer: Timer = null
+var _profile_save_pending: bool = false
+var _profile_save_callbacks: Array[Callable] = []
+
+var _last_leaderboard_sync_time: float = 0.0
+const MIN_LEADERBOARD_SYNC_INTERVAL_SEC: float = 30.0
+
+var _cached_leaderboard_players: Array = []
+var _last_leaderboard_fetch_time: float = 0.0
+const LEADERBOARD_CACHE_TTL_SEC: float = 120.0
+
+func _init_profile_save_timer() -> void:
+	if _profile_save_timer == null:
+		_profile_save_timer = Timer.new()
+		_profile_save_timer.name = "ProfileSaveTimer"
+		_profile_save_timer.one_shot = true
+		_profile_save_timer.wait_time = 3.5
+		_profile_save_timer.timeout.connect(_on_profile_save_timer_timeout)
+		add_child(_profile_save_timer)
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_PAUSED:
+		flush_profile_save()
+
+func flush_profile_save() -> void:
+	if _profile_save_pending:
+		if is_instance_valid(_profile_save_timer) and not _profile_save_timer.is_stopped():
+			_profile_save_timer.stop()
+		_execute_save_profile_to_appwrite()
+
+func _on_profile_save_timer_timeout() -> void:
+	if _profile_save_pending:
+		_execute_save_profile_to_appwrite()
+
 func _ready() -> void:
+	_init_profile_save_timer()
 	load_saved_session()
 	if is_logged_in:
 		fetch_account_info()
@@ -158,6 +199,7 @@ func add_exp(amount: int) -> Dictionary:
 			"exp_added": amount,
 			"show_modal": true
 		}
+		sync_leaderboard_entry()
 
 	save_session()
 	save_profile_to_appwrite()
@@ -183,6 +225,7 @@ func add_general(hero_id: String) -> void:
 		current_generals.append(hero_id)
 		save_session()
 		save_profile_to_appwrite()
+		sync_leaderboard_entry()
 		profile_updated.emit()
 
 func add_silver(amount: int) -> void:
@@ -779,7 +822,7 @@ func fetch_profile_from_appwrite(on_completed: Callable = Callable()) -> void:
 
 	http.request(url, headers, HTTPClient.METHOD_GET)
 
-func save_profile_to_appwrite(on_completed: Callable = Callable()) -> void:
+func save_profile_to_appwrite(on_completed: Callable = Callable(), immediate: bool = false) -> void:
 	if disable_session_save:
 		if on_completed.is_valid(): on_completed.call()
 		return
@@ -787,6 +830,30 @@ func save_profile_to_appwrite(on_completed: Callable = Callable()) -> void:
 
 	if session_secret == "" and session_cookie == "":
 		if on_completed.is_valid(): on_completed.call()
+		return
+
+	if on_completed.is_valid():
+		_profile_save_callbacks.append(on_completed)
+
+	if immediate:
+		if is_instance_valid(_profile_save_timer) and not _profile_save_timer.is_stopped():
+			_profile_save_timer.stop()
+		_execute_save_profile_to_appwrite()
+	else:
+		_profile_save_pending = true
+		if is_instance_valid(_profile_save_timer):
+			_profile_save_timer.start(3.5)
+		else:
+			_execute_save_profile_to_appwrite()
+
+func _execute_save_profile_to_appwrite() -> void:
+	_profile_save_pending = false
+	var callbacks = _profile_save_callbacks.duplicate()
+	_profile_save_callbacks.clear()
+
+	if disable_session_save or (session_secret == "" and session_cookie == ""):
+		for cb in callbacks:
+			if cb.is_valid(): cb.call()
 		return
 
 	var http = HTTPRequest.new()
@@ -834,11 +901,11 @@ func save_profile_to_appwrite(on_completed: Callable = Callable()) -> void:
 		http.queue_free()
 		if response_code == 200:
 			print("[AuthManager] Đã lưu thông tin Profile lên Appwrite thành công!")
-			sync_leaderboard_entry()
 		else:
 			print("[AuthManager] Lưu Profile Appwrite kết quả mã: ", response_code)
-		if on_completed.is_valid():
-			on_completed.call()
+		for cb in callbacks:
+			if cb.is_valid():
+				cb.call()
 	)
 
 	http.request(url, headers, HTTPClient.METHOD_PATCH, body)
@@ -889,10 +956,17 @@ func get_leaderboard_player_data() -> Dictionary:
 		p_data["qua"] = admin_gift_reward
 	return p_data
 
-func sync_leaderboard_entry(on_completed: Callable = Callable()) -> void:
+func sync_leaderboard_entry(on_completed: Callable = Callable(), force: bool = false) -> void:
 	if disable_session_save:
 		if on_completed.is_valid(): on_completed.call()
 		return
+
+	var now = Time.get_unix_time_from_system()
+	if not force and (now - _last_leaderboard_sync_time < MIN_LEADERBOARD_SYNC_INTERVAL_SEC):
+		if on_completed.is_valid(): on_completed.call()
+		return
+
+	_last_leaderboard_sync_time = now
 
 	var http = HTTPRequest.new()
 	add_child(http)
@@ -948,7 +1022,13 @@ func sync_leaderboard_entry(on_completed: Callable = Callable()) -> void:
 	})
 	http.request(patch_url, headers, HTTPClient.METHOD_PATCH, patch_body)
 
-func fetch_leaderboard_players(on_done: Callable) -> void:
+func fetch_leaderboard_players(on_done: Callable, force: bool = false) -> void:
+	var now = Time.get_unix_time_from_system()
+	if not force and not _cached_leaderboard_players.is_empty() and (now - _last_leaderboard_fetch_time < LEADERBOARD_CACHE_TTL_SEC):
+		if on_done.is_valid():
+			on_done.call(_cached_leaderboard_players)
+		return
+
 	var http = HTTPRequest.new()
 	add_child(http)
 
@@ -969,8 +1049,11 @@ func fetch_leaderboard_players(on_done: Callable) -> void:
 						var parsed = JSON.parse_string(str(doc["userName"]))
 						if parsed is Dictionary:
 							players.append(parsed)
+			if not players.is_empty():
+				_cached_leaderboard_players = players
+				_last_leaderboard_fetch_time = Time.get_unix_time_from_system()
 		if on_done.is_valid():
-			on_done.call(players)
+			on_done.call(players if not players.is_empty() else _cached_leaderboard_players)
 	)
 
 	http.request(url, headers, HTTPClient.METHOD_GET)
@@ -1518,6 +1601,142 @@ func _parse_error_msg(body: PackedByteArray, response_code: int = 0) -> String:
 		return "Máy chủ từ chối kết nối (Mã 403 - Invalid Origin). Vui lòng thêm tên miền này vào Appwrite Console > Platforms."
 	return "Không thể kết nối máy chủ xác thực hoặc thông tin không chính xác."
 
+func send_password_recovery(email: String) -> void:
+	email = email.strip_edges()
+	if email == "" or not ("@" in email) or not ("." in email):
+		password_recovery_failed.emit("Vui lòng nhập địa chỉ Email hợp lệ.")
+		return
+
+	var http = HTTPRequest.new()
+	add_child(http)
+
+	var url = ENDPOINT + "/account/recovery"
+	var body = JSON.stringify({
+		"email": email,
+		"url": "http://localhost"
+	})
+	var headers = get_auth_headers(false)
+
+	http.request_completed.connect(func(result, response_code, resp_headers, resp_body):
+		http.queue_free()
+		if response_code == 200 or response_code == 201:
+			var json = JSON.new()
+			if json.parse(resp_body.get_string_from_utf8()) == OK and json.get_data() is Dictionary:
+				var data = json.get_data()
+				last_recovery_user_id = str(data.get("userId", ""))
+			password_recovery_sent.emit("Đã gửi liên kết và mã khôi phục tới " + email + ". Vui lòng kiểm tra hộp thư đến (hoặc Thư rác/Spam)!")
+		else:
+			var err_msg = _parse_error_msg(resp_body, response_code)
+			password_recovery_failed.emit("Gửi yêu cầu thất bại: " + err_msg)
+	)
+
+	var err = http.request(url, headers, HTTPClient.METHOD_POST, body)
+	if err != OK:
+		http.queue_free()
+		password_recovery_failed.emit("Lỗi kết nối khi gửi yêu cầu khôi phục: " + str(err))
+
+func complete_password_reset(user_id: String, secret: String, new_password: String) -> void:
+	user_id = user_id.strip_edges()
+	secret = secret.strip_edges()
+	new_password = new_password.strip_edges()
+
+	if user_id == "":
+		user_id = last_recovery_user_id
+
+	if user_id == "":
+		password_reset_failed.emit("Thiếu định danh tài khoản (userId). Vui lòng dán toàn bộ link nhận được từ Email.")
+		return
+	if secret == "":
+		password_reset_failed.emit("Vui lòng nhập mã khôi phục (secret token) nhận từ Email.")
+		return
+	if new_password.length() < 8:
+		password_reset_failed.emit("Mật thư mới phải có tối thiểu 8 ký tự.")
+		return
+
+	var http = HTTPRequest.new()
+	add_child(http)
+
+	var url = ENDPOINT + "/account/recovery"
+	var body = JSON.stringify({
+		"userId": user_id,
+		"secret": secret,
+		"password": new_password,
+		"passwordAgain": new_password
+	})
+	var headers = get_auth_headers(false)
+
+	http.request_completed.connect(func(result, response_code, resp_headers, resp_body):
+		http.queue_free()
+		if response_code == 200 or response_code == 201:
+			password_reset_succeeded.emit("Đặt lại mật khẩu thành công! Bạn có thể dùng mật thư mới để đăng nhập.")
+		else:
+			var err_msg = _parse_error_msg(resp_body, response_code)
+			password_reset_failed.emit("Đổi mật khẩu thất bại: " + err_msg)
+	)
+
+	var err = http.request(url, headers, HTTPClient.METHOD_PUT, body)
+	if err != OK:
+		http.queue_free()
+		password_reset_failed.emit("Lỗi gửi yêu cầu đặt lại mật khẩu: " + str(err))
+
+func get_remember_creds_path() -> String:
+	var inst = 1
+	if Engine.get_main_loop() and Engine.get_main_loop().has_method("get_root"):
+		var root = Engine.get_main_loop().root
+		if root and root.has_node("NetworkClient"):
+			var net = root.get_node("NetworkClient")
+			if "auto_instance_index" in net:
+				inst = net.auto_instance_index
+	if inst == 1:
+		var all_args = OS.get_cmdline_args() + OS.get_cmdline_user_args()
+		for arg in all_args:
+			if arg.begins_with("--seat=") or arg.begins_with("--tester="):
+				var val = arg.split("=")[1].to_int()
+				if val >= 1 and val <= 8:
+					inst = val
+					break
+	if inst > 1:
+		return "user://auth_remember_%d.json" % inst
+	return "user://auth_remember.json"
+
+func save_remembered_credentials(email: String, password_text: String, remember: bool) -> void:
+	var path = get_remember_creds_path()
+	if not remember:
+		if FileAccess.file_exists(path):
+			DirAccess.remove_absolute(path)
+		return
+	var file = FileAccess.open(path, FileAccess.WRITE)
+	if file:
+		var data = {
+			"remember": true,
+			"email": email,
+			"secret_token": Marshalls.utf8_to_base64(password_text)
+		}
+		file.store_string(JSON.stringify(data, "\t"))
+		file.close()
+
+func load_remembered_credentials() -> Dictionary:
+	var path = get_remember_creds_path()
+	if FileAccess.file_exists(path):
+		var file = FileAccess.open(path, FileAccess.READ)
+		if file:
+			var txt = file.get_as_text()
+			file.close()
+			var json = JSON.new()
+			if json.parse(txt) == OK and json.get_data() is Dictionary:
+				var d = json.get_data()
+				var raw_pass = ""
+				if d.has("secret_token"):
+					raw_pass = Marshalls.base64_to_utf8(str(d.get("secret_token", "")))
+				elif d.has("password"):
+					raw_pass = str(d.get("password", ""))
+				return {
+					"remember": bool(d.get("remember", false)),
+					"email": str(d.get("email", "")),
+					"password": raw_pass
+				}
+	return {"remember": false, "email": "", "password": ""}
+
 func get_save_path() -> String:
 	var inst = 1
 	if Engine.get_main_loop() and Engine.get_main_loop().has_method("get_root"):
@@ -1563,6 +1782,8 @@ func claim_match_reward(result: Dictionary, mode_id: String, stake_recorded: boo
 			DailyQuestSystem.record_progress("win", 1)
 	# add_exp saves the complete updated profile and the claim marker together.
 	add_exp(20 if is_win else 12)
+	save_profile_to_appwrite(Callable(), true)
+	sync_leaderboard_entry(Callable(), true)
 	return true
 
 func save_session() -> void:

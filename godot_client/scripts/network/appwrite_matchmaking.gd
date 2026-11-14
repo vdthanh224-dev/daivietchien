@@ -434,12 +434,9 @@ func update_room_state(room: Dictionary) -> bool:
 func send_host_heartbeat(room_id: String) -> void:
 	if room_id.is_empty():
 		return
-	var room = await poll_room_state(room_id)
-	if not room.is_empty():
-		room["updateTimestamp"] = get_now_ms()
-		var doc_id = get_deterministic_doc_id("r_", room_id)
-		var patch_url = "%s/databases/%s/collections/%s/documents/%s" % [ENDPOINT, DATABASE_ID, COLLECTION_ID, doc_id]
-		_send_http_request(patch_url, HTTPClient.METHOD_PATCH, JSON.stringify({"data": {"timestamp": room["updateTimestamp"]}, "permissions": PUBLIC_DOC_PERMISSIONS}))
+	var doc_id = get_deterministic_doc_id("r_", room_id)
+	var patch_url = "%s/databases/%s/collections/%s/documents/%s" % [ENDPOINT, DATABASE_ID, COLLECTION_ID, doc_id]
+	_send_http_request(patch_url, HTTPClient.METHOD_PATCH, JSON.stringify({"data": {"timestamp": get_now_ms()}, "permissions": PUBLIC_DOC_PERMISSIONS}))
 
 # --- 7. Leave Room Slot (Guest cancel) ---
 func leave_room_slot(room_id: String, my_user_id: String) -> bool:

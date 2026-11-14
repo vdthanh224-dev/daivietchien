@@ -11788,7 +11788,7 @@ func _apply_match_entry_stake() -> void:
 		AuthManager.current_2v2_entry_stake_amount = match_entry_star_amount
 	match_entry_stake_recorded = true
 	if AuthManager.has_method("save_profile_to_appwrite"):
-		AuthManager.save_profile_to_appwrite()
+		AuthManager.save_profile_to_appwrite(Callable(), true)
 
 
 func _show_authoritative_match_result(state: Dictionary) -> void:

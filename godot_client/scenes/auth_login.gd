@@ -44,6 +44,9 @@ const COLOR_SHADOW_DEEP = Color(0.0, 0.0, 0.0, 0.75)
 @onready var email_input: LineEdit = $CenterAuthCard/VBox/Form/EmailGroup/Box/HBox/EmailInput
 @onready var pass_input: LineEdit = $CenterAuthCard/VBox/Form/PassGroup/Box/HBox/PassInput
 @onready var toggle_pass_btn: Button = $CenterAuthCard/VBox/Form/PassGroup/Box/HBox/TogglePassBtn
+@onready var options_hbox: HBoxContainer = $CenterAuthCard/VBox/Form/OptionsHBox
+@onready var remember_check: CheckBox = $CenterAuthCard/VBox/Form/OptionsHBox/RememberCheck
+@onready var forgot_pass_btn: Button = $CenterAuthCard/VBox/Form/OptionsHBox/ForgotPassBtn
 @onready var status_lbl: Label = $CenterAuthCard/VBox/StatusLabel
 @onready var submit_btn: Button = $CenterAuthCard/VBox/SubmitBtn
 @onready var guest_hbox: HBoxContainer = $CenterAuthCard/VBox/GuestHBox
@@ -58,6 +61,24 @@ const COLOR_SHADOW_DEEP = Color(0.0, 0.0, 0.0, 0.75)
 @onready var dev_tester_drawer: PanelContainer = $ModalsLayer/DevTesterDrawer
 @onready var dev_grid: GridContainer = $ModalsLayer/DevTesterDrawer/VBox/Grid
 @onready var btn_tutorial_direct: Button = $ModalsLayer/DevTesterDrawer/VBox/BtnTutorialDirect
+
+# Forgot Password Modal
+@onready var forgot_pass_modal: PanelContainer = $ModalsLayer/ForgotPassModal
+@onready var close_forgot_btn: Button = $ModalsLayer/ForgotPassModal/VBox/Header/CloseForgotBtn
+@onready var request_view: VBoxContainer = $ModalsLayer/ForgotPassModal/VBox/RequestView
+@onready var forgot_email_input: LineEdit = $ModalsLayer/ForgotPassModal/VBox/RequestView/EmailBox/HBox/ForgotEmailInput
+@onready var forgot_status_lbl: Label = $ModalsLayer/ForgotPassModal/VBox/RequestView/Status
+@onready var forgot_cancel_btn: Button = $ModalsLayer/ForgotPassModal/VBox/RequestView/Actions/ForgotCancelBtn
+@onready var send_recovery_btn: Button = $ModalsLayer/ForgotPassModal/VBox/RequestView/Actions/SendRecoveryBtn
+@onready var switch_to_reset_btn: Button = $ModalsLayer/ForgotPassModal/VBox/RequestView/SwitchToResetBtn
+
+@onready var reset_view: VBoxContainer = $ModalsLayer/ForgotPassModal/VBox/ResetView
+@onready var token_input: LineEdit = $ModalsLayer/ForgotPassModal/VBox/ResetView/TokenBox/HBox/TokenInput
+@onready var new_pass_input: LineEdit = $ModalsLayer/ForgotPassModal/VBox/ResetView/NewPassBox/HBox/NewPassInput
+@onready var confirm_pass_input: LineEdit = $ModalsLayer/ForgotPassModal/VBox/ResetView/ConfirmPassBox/HBox/ConfirmPassInput
+@onready var reset_status_lbl: Label = $ModalsLayer/ForgotPassModal/VBox/ResetView/ResetStatus
+@onready var back_to_request_btn: Button = $ModalsLayer/ForgotPassModal/VBox/ResetView/ResetActions/BackToRequestBtn
+@onready var confirm_reset_btn: Button = $ModalsLayer/ForgotPassModal/VBox/ResetView/ResetActions/ConfirmResetBtn
 
 var is_register_mode: bool = false
 var is_password_visible: bool = false
@@ -86,6 +107,27 @@ func _ready() -> void:
 	user_account_btn.pressed.connect(func():
 		email_input.grab_focus()
 	)
+
+	# Kết nối Quên mật khẩu & Ghi nhớ mật khẩu
+	if is_instance_valid(forgot_pass_btn):
+		forgot_pass_btn.pressed.connect(_open_forgot_modal)
+	if is_instance_valid(close_forgot_btn):
+		close_forgot_btn.pressed.connect(_hide_all_modals)
+	if is_instance_valid(forgot_cancel_btn):
+		forgot_cancel_btn.pressed.connect(_hide_all_modals)
+	if is_instance_valid(send_recovery_btn):
+		send_recovery_btn.pressed.connect(_on_send_recovery_pressed)
+	if is_instance_valid(switch_to_reset_btn):
+		switch_to_reset_btn.pressed.connect(_switch_to_reset_view)
+	if is_instance_valid(back_to_request_btn):
+		back_to_request_btn.pressed.connect(_switch_to_request_view)
+	if is_instance_valid(confirm_reset_btn):
+		confirm_reset_btn.pressed.connect(_on_confirm_reset_pressed)
+	if is_instance_valid(remember_check):
+		remember_check.toggled.connect(func(pressed: bool):
+			if not pressed:
+				AuthManager.save_remembered_credentials("", "", false)
+		)
 
 	# 3. Kết nối nút đóng Modal
 	close_notice_btn.pressed.connect(_hide_all_modals)
@@ -122,18 +164,32 @@ func _ready() -> void:
 	# 6. Lắng nghe AuthManager & NetworkClient Ping
 	AuthManager.login_succeeded.connect(_on_login_succeeded)
 	AuthManager.login_failed.connect(_on_login_failed)
+	AuthManager.password_recovery_sent.connect(_on_recovery_sent)
+	AuthManager.password_recovery_failed.connect(_on_recovery_failed)
+	AuthManager.password_reset_succeeded.connect(_on_reset_succeeded)
+	AuthManager.password_reset_failed.connect(_on_reset_failed)
 	if NetworkClient:
 		NetworkClient.ping_updated.connect(_update_ping_display)
 		_update_ping_display(NetworkClient.current_ping)
 
-	# 7. Khởi tạo tài khoản & Dev instance
+	# 7. Khởi tạo tài khoản & Dev instance & Ghi nhớ mật khẩu
+	var remembered = AuthManager.load_remembered_credentials()
 	if is_dev and NetworkClient and NetworkClient.auto_instance_index >= 1 and NetworkClient.auto_instance_index <= 9:
 		active_tester_index = NetworkClient.auto_instance_index
 		dev_tester_btn.text = "🛠️ TESTER: Tướng %d ▾" % active_tester_index
 		user_account_btn.text = "👤 Tester %d ▾" % active_tester_index
 		email_input.text = "vdthanh22%d@gmail.com" % active_tester_index
 		pass_input.text = "matkhau123"
+		if is_instance_valid(remember_check):
+			remember_check.button_pressed = true
 		_set_status("🎯 Ghế %d: Đã chọn sẵn Tester %d. Nhấn xác nhận để vào game!" % [active_tester_index, active_tester_index], Color("#FFD700"))
+	elif remembered.get("remember", false):
+		if is_instance_valid(remember_check):
+			remember_check.button_pressed = true
+		email_input.text = str(remembered.get("email", ""))
+		pass_input.text = str(remembered.get("password", ""))
+		user_account_btn.text = "👤 %s ▾" % (AuthManager.current_user_name if AuthManager.is_logged_in else "Chiến Tướng")
+		_set_status("✨ Đã ghi nhớ tài khoản. Nhấn xác nhận để vào trận!", Color("#10B981"))
 	elif AuthManager.is_logged_in:
 		user_account_btn.text = "👤 %s ▾" % AuthManager.current_user_name
 		email_input.text = AuthManager.current_user_email
@@ -178,7 +234,13 @@ func _ready() -> void:
 		var img_notice = tex_notice.get_image() if tex_notice else null
 		if img_notice: img_notice.save_png("res://auth_screenshot_notice.png")
 
-		print("[Screenshot] Đã lưu auth_screenshot.png, auth_screenshot_focus.png, auth_screenshot_notice.png!")
+		_open_forgot_modal()
+		await get_tree().create_timer(0.4).timeout
+		var tex_forgot = get_viewport().get_texture()
+		var img_forgot = tex_forgot.get_image() if tex_forgot else null
+		if img_forgot: img_forgot.save_png("res://auth_screenshot_forgot.png")
+
+		print("[Screenshot] Đã lưu auth_screenshot.png, auth_screenshot_focus.png, auth_screenshot_notice.png, auth_screenshot_forgot.png!")
 		get_tree().quit()
 
 # --- ANIMATION & LIVING MOTION ---
@@ -209,6 +271,20 @@ func _setup_hover_effects() -> void:
 	_setup_micro_hover(user_account_btn)
 	_setup_micro_hover(notice_confirm_btn)
 	_setup_micro_hover(submit_btn)
+	if is_instance_valid(forgot_pass_btn):
+		_setup_micro_hover(forgot_pass_btn)
+	if is_instance_valid(close_forgot_btn):
+		_setup_micro_hover(close_forgot_btn)
+	if is_instance_valid(forgot_cancel_btn):
+		_setup_micro_hover(forgot_cancel_btn)
+	if is_instance_valid(send_recovery_btn):
+		_setup_micro_hover(send_recovery_btn)
+	if is_instance_valid(switch_to_reset_btn):
+		_setup_micro_hover(switch_to_reset_btn)
+	if is_instance_valid(back_to_request_btn):
+		_setup_micro_hover(back_to_request_btn)
+	if is_instance_valid(confirm_reset_btn):
+		_setup_micro_hover(confirm_reset_btn)
 
 func _setup_micro_hover(btn: Button) -> void:
 	if not btn:
@@ -231,6 +307,8 @@ func _hide_all_modals() -> void:
 	dim_backdrop.visible = false
 	notice_modal.visible = false
 	dev_tester_drawer.visible = false
+	if is_instance_valid(forgot_pass_modal):
+		forgot_pass_modal.visible = false
 
 func _show_modal(m: Control) -> void:
 	_hide_all_modals()
@@ -250,6 +328,115 @@ func _show_modal(m: Control) -> void:
 
 func _open_notice_modal() -> void:
 	_show_modal(notice_modal)
+
+func _open_forgot_modal() -> void:
+	if not is_instance_valid(forgot_pass_modal):
+		return
+	var current_em = email_input.text.strip_edges()
+	if current_em != "" and not current_em.begins_with("vdthanh22"):
+		forgot_email_input.text = current_em
+	forgot_status_lbl.text = ""
+	reset_status_lbl.text = ""
+	request_view.visible = true
+	reset_view.visible = false
+	_show_modal(forgot_pass_modal)
+	forgot_email_input.grab_focus()
+
+func _on_send_recovery_pressed() -> void:
+	var em = forgot_email_input.text.strip_edges()
+	if em == "" or not ("@" in em) or not ("." in em):
+		_set_forgot_status("⚠️ Vui lòng nhập địa chỉ Email hợp lệ!", Color("#F59E0B"))
+		forgot_email_input.grab_focus()
+		return
+	_set_forgot_status("⏳ Đang gửi yêu cầu khôi phục mật khẩu...", COLOR_GOLD_ACCENT)
+	send_recovery_btn.disabled = true
+	AuthManager.send_password_recovery(em)
+
+func _on_recovery_sent(msg: String) -> void:
+	send_recovery_btn.disabled = false
+	_set_forgot_status(msg, Color("#10B981"))
+	await get_tree().create_timer(1.2).timeout
+	if is_instance_valid(forgot_pass_modal) and forgot_pass_modal.visible and request_view.visible:
+		_switch_to_reset_view()
+
+func _on_recovery_failed(err_msg: String) -> void:
+	send_recovery_btn.disabled = false
+	_set_forgot_status(err_msg, Color("#EF4444"))
+
+func _switch_to_reset_view() -> void:
+	request_view.visible = false
+	reset_view.visible = true
+	reset_status_lbl.text = ""
+	token_input.grab_focus()
+
+func _switch_to_request_view() -> void:
+	reset_view.visible = false
+	request_view.visible = true
+	forgot_status_lbl.text = ""
+	forgot_email_input.grab_focus()
+
+func _set_forgot_status(msg: String, col: Color) -> void:
+	forgot_status_lbl.text = msg
+	forgot_status_lbl.add_theme_color_override("font_color", col)
+
+func _set_reset_status(msg: String, col: Color) -> void:
+	reset_status_lbl.text = msg
+	reset_status_lbl.add_theme_color_override("font_color", col)
+
+func _on_confirm_reset_pressed() -> void:
+	var raw_token = token_input.text.strip_edges()
+	var new_pass = new_pass_input.text
+	var conf_pass = confirm_pass_input.text
+
+	if raw_token == "":
+		_set_reset_status("⚠️ Vui lòng dán mã xác thực (secret) hoặc link nhận từ Email!", Color("#F59E0B"))
+		token_input.grab_focus()
+		return
+
+	# Tự động bóc tách userId và secret nếu người dùng dán toàn bộ URL
+	var user_id = ""
+	var secret = raw_token
+	if "secret=" in raw_token or "userId=" in raw_token:
+		var q_parts = raw_token.split("?")
+		var query_str = q_parts[1] if q_parts.size() > 1 else raw_token
+		var params = query_str.split("&")
+		for p in params:
+			var kv = p.split("=")
+			if kv.size() == 2:
+				if kv[0] == "userId":
+					user_id = kv[1]
+				elif kv[0] == "secret":
+					secret = kv[1]
+
+	if new_pass.length() < 8:
+		_set_reset_status("⚠️ Mật thư mới phải có tối thiểu 8 ký tự!", Color("#F59E0B"))
+		new_pass_input.grab_focus()
+		return
+
+	if new_pass != conf_pass:
+		_set_reset_status("⚠️ Hai lần nhập mật khẩu không trùng khớp!", Color("#F59E0B"))
+		confirm_pass_input.grab_focus()
+		return
+
+	_set_reset_status("⏳ Đang cập nhật mật thư mới lên hệ thống...", COLOR_GOLD_ACCENT)
+	confirm_reset_btn.disabled = true
+	AuthManager.complete_password_reset(user_id, secret, new_pass)
+
+func _on_reset_succeeded(msg: String) -> void:
+	confirm_reset_btn.disabled = false
+	_set_reset_status(msg, Color("#10B981"))
+	pass_input.text = new_pass_input.text
+	if forgot_email_input.text.strip_edges() != "":
+		email_input.text = forgot_email_input.text.strip_edges()
+	if is_instance_valid(remember_check) and remember_check.button_pressed:
+		AuthManager.save_remembered_credentials(email_input.text.strip_edges(), pass_input.text, true)
+	await get_tree().create_timer(1.5).timeout
+	_hide_all_modals()
+	_set_status("✨ Mật thư đã được cập nhật thành công! Nhấn xác nhận để vào trận.", Color("#10B981"))
+
+func _on_reset_failed(err_msg: String) -> void:
+	confirm_reset_btn.disabled = false
+	_set_reset_status(err_msg, Color("#EF4444"))
 
 func _toggle_dev_drawer() -> void:
 	dev_tester_drawer.visible = not dev_tester_drawer.visible
@@ -286,6 +473,8 @@ func set_register_mode(register: bool) -> void:
 
 		name_group.visible = true
 		name_group.modulate.a = 0.0
+		if is_instance_valid(forgot_pass_btn):
+			forgot_pass_btn.visible = false
 		var tw = create_tween()
 		tw.tween_property(name_group, "modulate:a", 1.0, 0.2).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 		name_input.grab_focus()
@@ -293,6 +482,8 @@ func set_register_mode(register: bool) -> void:
 		submit_btn.text = "⚔️ XÁC NHẬN VÀO TRẬN"
 		tab_login_btn.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 		tab_register_btn.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+		if is_instance_valid(forgot_pass_btn):
+			forgot_pass_btn.visible = true
 
 		var tw = create_tween()
 		tw.tween_property(name_group, "modulate:a", 0.0, 0.15).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
@@ -420,6 +611,11 @@ func _on_quick_login(num: int) -> void:
 func _on_login_succeeded(user_data: Dictionary) -> void:
 	submit_btn.disabled = false
 	quick_guest_btn.disabled = false
+	if is_instance_valid(remember_check):
+		if remember_check.button_pressed:
+			AuthManager.save_remembered_credentials(email_input.text.strip_edges(), pass_input.text, true)
+		else:
+			AuthManager.save_remembered_credentials("", "", false)
 	# Đợi prefs Appwrite đồng bộ xong trước khi quyết định có hiện tập huấn hay không.
 	if AuthManager and AuthManager.has_signal("profile_loaded"):
 		await AuthManager.profile_loaded
@@ -522,6 +718,19 @@ func _setup_mobile_keyboard_handling() -> void:
 	email_input.text_submitted.connect(func(_new_text): pass_input.grab_focus())
 	pass_input.text_submitted.connect(func(_new_text): _on_submit_pressed())
 
+	if is_instance_valid(forgot_email_input):
+		forgot_email_input.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_EMAIL_ADDRESS
+		forgot_email_input.text_submitted.connect(func(_new_text): _on_send_recovery_pressed())
+	if is_instance_valid(token_input):
+		token_input.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_DEFAULT
+		token_input.text_submitted.connect(func(_new_text): new_pass_input.grab_focus())
+	if is_instance_valid(new_pass_input):
+		new_pass_input.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_PASSWORD
+		new_pass_input.text_submitted.connect(func(_new_text): confirm_pass_input.grab_focus())
+	if is_instance_valid(confirm_pass_input):
+		confirm_pass_input.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_PASSWORD
+		confirm_pass_input.text_submitted.connect(func(_new_text): _on_confirm_reset_pressed())
+
 	# Lắng nghe sự kiện lấy nét để dịch chuyển khung giao diện lên cao, không bị bàn phím che
 	name_input.focus_entered.connect(_on_input_focus_entered)
 	email_input.focus_entered.connect(_on_input_focus_entered)
@@ -539,7 +748,11 @@ func _get_virtual_keyboard_height() -> int:
 func _has_any_input_focus() -> bool:
 	return (is_instance_valid(name_input) and name_input.has_focus()) or \
 		   (is_instance_valid(email_input) and email_input.has_focus()) or \
-		   (is_instance_valid(pass_input) and pass_input.has_focus())
+		   (is_instance_valid(pass_input) and pass_input.has_focus()) or \
+		   (is_instance_valid(forgot_email_input) and forgot_email_input.has_focus()) or \
+		   (is_instance_valid(token_input) and token_input.has_focus()) or \
+		   (is_instance_valid(new_pass_input) and new_pass_input.has_focus()) or \
+		   (is_instance_valid(confirm_pass_input) and confirm_pass_input.has_focus())
 
 func _on_input_focus_entered() -> void:
 	if UIScaleManager.is_mobile_mode() or _get_virtual_keyboard_height() > 0 or UIScaleManager.is_mobile_device():
@@ -1060,6 +1273,31 @@ func _apply_royal_home_styling() -> void:
 		_apply_node_font(toggle_pass_btn, 11)
 		toggle_pass_btn.custom_minimum_size = Vector2(50, 30)
 
+	if is_instance_valid(remember_check):
+		var empty_check = StyleBoxEmpty.new()
+		remember_check.add_theme_stylebox_override("normal", empty_check)
+		remember_check.add_theme_stylebox_override("pressed", empty_check)
+		remember_check.add_theme_stylebox_override("hover", empty_check)
+		remember_check.add_theme_stylebox_override("hover_pressed", empty_check)
+		remember_check.add_theme_stylebox_override("focus", empty_check)
+		remember_check.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		_apply_node_font(remember_check, 12)
+		remember_check.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
+		remember_check.add_theme_color_override("font_pressed_color", COLOR_GOLD_ACCENT)
+		remember_check.add_theme_color_override("font_hover_color", Color(1.0, 0.95, 0.75, 1.0))
+		remember_check.add_theme_color_override("font_hover_pressed_color", Color(1.0, 1.0, 0.85, 1.0))
+
+	if is_instance_valid(forgot_pass_btn):
+		var empty_forgot = StyleBoxEmpty.new()
+		forgot_pass_btn.add_theme_stylebox_override("normal", empty_forgot)
+		forgot_pass_btn.add_theme_stylebox_override("pressed", empty_forgot)
+		forgot_pass_btn.add_theme_stylebox_override("hover", empty_forgot)
+		forgot_pass_btn.add_theme_stylebox_override("focus", empty_forgot)
+		forgot_pass_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		_apply_node_font(forgot_pass_btn, 12)
+		forgot_pass_btn.add_theme_color_override("font_color", COLOR_GOLD_PRIMARY)
+		forgot_pass_btn.add_theme_color_override("font_hover_color", COLOR_GOLD_ACCENT)
+
 	# 9. Submit & Quick Guest Buttons
 	if submit_btn:
 		_style_bronze_drum_cta(submit_btn)
@@ -1071,7 +1309,7 @@ func _apply_royal_home_styling() -> void:
 		_apply_node_font(quick_guest_btn, 12)
 		quick_guest_btn.add_theme_color_override("font_color", Color(1.0, 0.90, 0.60, 1.0))
 
-	# 10. Modals Styling (Notice Modal & Dev Tester Drawer)
+	# 10. Modals Styling (Notice Modal & Dev Tester Drawer & Forgot Pass Modal)
 	if notice_modal:
 		var nms = StyleBoxFlat.new()
 		nms.bg_color = Color(0.08, 0.06, 0.11, 0.98)
@@ -1099,6 +1337,53 @@ func _apply_royal_home_styling() -> void:
 	if notice_confirm_btn:
 		_style_bronze_drum_cta(notice_confirm_btn)
 		notice_confirm_btn.custom_minimum_size = Vector2(0, 42)
+
+	if is_instance_valid(forgot_pass_modal):
+		var fms = StyleBoxFlat.new()
+		fms.bg_color = Color(0.08, 0.06, 0.11, 0.98)
+		fms.border_width_left = 2
+		fms.border_width_top = 2
+		fms.border_width_right = 2
+		fms.border_width_bottom = 2
+		fms.border_color = COLOR_GOLD_PRIMARY
+		fms.corner_radius_top_left = 14
+		fms.corner_radius_top_right = 14
+		fms.corner_radius_bottom_right = 14
+		fms.corner_radius_bottom_left = 14
+		fms.shadow_color = Color(0, 0, 0, 0.92)
+		fms.shadow_size = 36
+		fms.shadow_offset = Vector2(0, 12)
+		fms.content_margin_left = 22
+		fms.content_margin_right = 22
+		fms.content_margin_top = 20
+		fms.content_margin_bottom = 20
+		forgot_pass_modal.add_theme_stylebox_override("panel", fms)
+
+	if is_instance_valid(close_forgot_btn):
+		_style_cancel_red_button(close_forgot_btn)
+	if is_instance_valid(forgot_cancel_btn):
+		_style_white_gold_button(forgot_cancel_btn, 8, 4, Vector2(0, 2))
+	if is_instance_valid(send_recovery_btn):
+		_style_bronze_drum_cta(send_recovery_btn)
+	if is_instance_valid(switch_to_reset_btn):
+		var empty_switch = StyleBoxEmpty.new()
+		switch_to_reset_btn.add_theme_stylebox_override("normal", empty_switch)
+		switch_to_reset_btn.add_theme_stylebox_override("pressed", empty_switch)
+		switch_to_reset_btn.add_theme_stylebox_override("hover", empty_switch)
+		switch_to_reset_btn.add_theme_stylebox_override("focus", empty_switch)
+		switch_to_reset_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		_apply_node_font(switch_to_reset_btn, 11)
+		switch_to_reset_btn.add_theme_color_override("font_color", COLOR_GOLD_PRIMARY)
+		switch_to_reset_btn.add_theme_color_override("font_hover_color", COLOR_GOLD_ACCENT)
+	if is_instance_valid(back_to_request_btn):
+		_style_white_gold_button(back_to_request_btn, 8, 4, Vector2(0, 2))
+	if is_instance_valid(confirm_reset_btn):
+		_style_bronze_drum_cta(confirm_reset_btn)
+
+	_setup_form_input_styling(get_node_or_null("ModalsLayer/ForgotPassModal/VBox/RequestView/EmailBox"), forgot_email_input)
+	_setup_form_input_styling(get_node_or_null("ModalsLayer/ForgotPassModal/VBox/ResetView/TokenBox"), token_input)
+	_setup_form_input_styling(get_node_or_null("ModalsLayer/ForgotPassModal/VBox/ResetView/NewPassBox"), new_pass_input)
+	_setup_form_input_styling(get_node_or_null("ModalsLayer/ForgotPassModal/VBox/ResetView/ConfirmPassBox"), confirm_pass_input)
 
 	if dev_tester_drawer:
 		var dds = StyleBoxFlat.new()

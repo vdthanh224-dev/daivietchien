@@ -1341,10 +1341,7 @@ func _build_15day_event_content() -> Control:
 	# Initial render
 	_populate_15day_top10(top10_list, my_status_lbl_left, my_status_lbl_right)
 
-	# Tự động đẩy kết quả mới nhất của mình lên Appwrite và tải Top 10 mới nhất
-	if AuthManager and AuthManager.is_logged_in:
-		AuthManager.sync_leaderboard_entry()
-
+	# Tự động tải Top 10 mới nhất
 	if AuthManager and AuthManager.has_method("fetch_leaderboard_players"):
 		AuthManager.fetch_leaderboard_players(func(fetched_players: Array):
 			if not fetched_players.is_empty():
@@ -5960,18 +5957,14 @@ func _build_leaderboard_content() -> Control:
 	)
 
 	refresh_btn.pressed.connect(func():
-		_fetch_and_render_leaderboard(table_rows_container, bottom_pin_container, server_status_lbl, refresh_btn)
+		_fetch_and_render_leaderboard(table_rows_container, bottom_pin_container, server_status_lbl, refresh_btn, true)
 	)
-
-	# Tự động đẩy thông tin mới nhất của người chơi hiện tại lên Appwrite
-	if AuthManager and AuthManager.is_logged_in:
-		AuthManager.sync_leaderboard_entry()
 
 	# Render danh sách tạm
 	_render_leaderboard_rows(table_rows_container, bottom_pin_container)
 
 	# Tự động gửi HTTP GET trực tiếp tới Appwrite Singapore ngay khi mở bảng
-	_fetch_and_render_leaderboard(table_rows_container, bottom_pin_container, server_status_lbl, refresh_btn)
+	_fetch_and_render_leaderboard(table_rows_container, bottom_pin_container, server_status_lbl, refresh_btn, false)
 
 	return container
 
@@ -6011,7 +6004,7 @@ func _style_leaderboard_tab_button(btn: Button, is_active: bool) -> void:
 	btn.add_theme_stylebox_override("hover", sb)
 	btn.add_theme_stylebox_override("pressed", sb)
 
-func _fetch_and_render_leaderboard(table_rows_container: VBoxContainer, bottom_pin_container: PanelContainer, server_status_lbl: Label = null, refresh_btn: Button = null) -> void:
+func _fetch_and_render_leaderboard(table_rows_container: VBoxContainer, bottom_pin_container: PanelContainer, server_status_lbl: Label = null, refresh_btn: Button = null, force: bool = false) -> void:
 	if not is_instance_valid(table_rows_container):
 		return
 	_leaderboard_is_loading = true
@@ -6037,7 +6030,7 @@ func _fetch_and_render_leaderboard(table_rows_container: VBoxContainer, bottom_p
 				server_status_lbl.text = "🟢 %d tướng • %s" % [count_real, Time.get_time_string_from_system()]
 				server_status_lbl.add_theme_color_override("font_color", Color(0.35, 0.85, 0.45))
 			_render_leaderboard_rows(table_rows_container, bottom_pin_container)
-		)
+		, force)
 	else:
 		_leaderboard_is_loading = false
 		if is_instance_valid(refresh_btn):
@@ -10809,7 +10802,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 			continue
 
 		if poll_timer <= 0.0 or is_fast_test:
-			poll_timer = 3.0 # Đặt lại chu kỳ 3s để giảm lượt đọc Appwrite
+			poll_timer = 4.5 # Đặt lại chu kỳ 4.5s để giảm lượt đọc Appwrite
 
 			# Keep consolidating rooms while they are waiting. Every client moves
 			# toward a room with more real players; ties use roomId for stability.
@@ -10843,7 +10836,7 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 
 			if mm_is_host:
 				if heartbeat_timer <= 0.0:
-					heartbeat_timer = 4.0
+					heartbeat_timer = 6.0
 					AppwriteMatchmaking.send_host_heartbeat(mm_active_room_id)
 
 				var polled = await AppwriteMatchmaking.poll_room_state(mm_active_room_id)

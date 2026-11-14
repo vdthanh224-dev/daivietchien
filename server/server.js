@@ -48,7 +48,7 @@ const APPWRITE_MATCHMAKING_PROJECT = "6a885457002da3f3d47e";
 const APPWRITE_MATCHMAKING_DATABASE = "game";
 const APPWRITE_MATCHMAKING_COLLECTION = "matchmaking_queue";
 const APPWRITE_MATCHMAKING_MAX_AGE_MS = 180000;
-const APPWRITE_MATCHMAKING_POLL_MS = 3000;
+const APPWRITE_MATCHMAKING_POLL_MS = 5000;
 const lobbyChatStore = createLobbyChatStore({
   request: appwriteMatchmakingRequest,
   documentsPath: `/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents`,
@@ -286,12 +286,22 @@ function mergeInMemoryMatchRooms(sourceRoomId, targetRoomId) {
   if (target.draft && !target.draft.isCompleted) broadcastRoom(target, draftMessage(targetRoomId, target.draft));
 }
 
+let lastExpiredRoomsCleanup = 0;
+
 async function sweepAppwriteMatchmaking() {
   if (matchmakingSweepRunning) return;
   matchmakingSweepRunning = true;
   try {
     const limit = encodeURIComponent(JSON.stringify({ method: "limit", values: [100] }));
-    const matchmakingStatuses = ["ROOM_WAITING", "ROOM_MERGED", "ROOM_STARTED", "ROOM_FINISHED"];
+    const now = Date.now();
+    // ROOM_WAITING is the only status needed for live matching.
+    // Clean up expired documents for other statuses once every 60s to save Appwrite queries.
+    const shouldCleanupExpired = now - lastExpiredRoomsCleanup > 60000;
+    const matchmakingStatuses = shouldCleanupExpired
+      ? ["ROOM_WAITING", "ROOM_MERGED", "ROOM_STARTED", "ROOM_FINISHED"]
+      : ["ROOM_WAITING"];
+    if (shouldCleanupExpired) lastExpiredRoomsCleanup = now;
+
     const documents = [];
     for (const status of matchmakingStatuses) {
       const query = encodeURIComponent(JSON.stringify({ method: "equal", attribute: "userId", values: [status] }));
@@ -301,7 +311,6 @@ async function sweepAppwriteMatchmaking() {
       if (Array.isArray(body?.documents)) documents.push(...body.documents);
     }
     const body = { documents: [...new Map(documents.map((document) => [String(document?.$id || ""), document])).values()] };
-    const now = Date.now();
     const roomsWaiting = [];
     for (const document of Array.isArray(body?.documents) ? body.documents : []) {
       const room = decodeMatchmakingRoom(document);
@@ -1001,11 +1010,7 @@ setInterval(async () => {
   }
 }, 9 * 60 * 1000);
 
-// Start after boot so an Appwrite outage cannot delay the WebSocket server.
-setInterval(() => {
-  if (activeMatchmakingSockets.size > 0) sweepAppwriteMatchmaking();
-}, APPWRITE_MATCHMAKING_POLL_MS);
-setInterval(() => { syncSocialProfilesFromAppwrite(); }, 60000);
+// Sync initial social profiles after boot without a 24/7 background polling loop.
 syncSocialProfilesFromAppwrite();
 
 function ensureLocalRoom(roomId, players = null, forceReinit = false, modeId = "2v2") {
@@ -1811,11 +1816,11 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
         const requestSeat = normalizeSeat(payload.seat);
 
         if (action === "MATCHMAKING_START") {
-          activeMatchmakingSockets.add(socket);
+          registerMatchmakingSocket(socket);
           return socket.send(JSON.stringify({ type: "MATCHMAKING_ACK", active: true }));
         }
         if (action === "MATCHMAKING_STOP") {
-          activeMatchmakingSockets.delete(socket);
+          unregisterMatchmakingSocket(socket);
           return socket.send(JSON.stringify({ type: "MATCHMAKING_ACK", active: false }));
         }
 
@@ -1867,7 +1872,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
               socket.send(JSON.stringify({ type: "FRIEND_SEARCH_RESULT", results: [], query: rawQuery }));
               return;
             }
-            if (socialProfiles.size <= 1 || Date.now() - lastSocialAppwriteSync > 60000) {
+            if (socialProfiles.size <= 1 || Date.now() - lastSocialAppwriteSync > 15 * 60 * 1000) {
               await syncSocialProfilesFromAppwrite();
             }
             const tokens = queryNorm.split(/\s+/).filter(Boolean);
@@ -1931,7 +1936,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           if (action === "FRIEND_REQUEST") {
             const targetId = socialUserId(payload.targetUserId);
             if (!targetId || targetId === socialId) return sendSocialError(socket, "Người chơi không hợp lệ");
-            if (!socialProfiles.has(targetId)) {
+            if (!socialProfiles.has(targetId) && Date.now() - lastSocialAppwriteSync > 15 * 60 * 1000) {
               await syncSocialProfilesFromAppwrite();
             }
             if (!socialProfiles.has(targetId)) return sendSocialError(socket, "Không tìm thấy người chơi này");
@@ -2358,7 +2363,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
     };
 
     socket.onclose = () => {
-      activeMatchmakingSockets.delete(socket);
+      unregisterMatchmakingSocket(socket);
       lobbyChatSockets.delete(socket);
       if (socket.socialUserId) {
         const social = socialProfiles.get(socket.socialUserId);

@@ -487,6 +487,28 @@ theme_override_colors/font_color = Color(1, 0.85, 0.35, 1)
 text = "HIỆN"
 flat = true
 
+[node name="OptionsHBox" type="HBoxContainer" parent="CenterAuthCard/VBox/Form"]
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="RememberCheck" type="CheckBox" parent="CenterAuthCard/VBox/Form/OptionsHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.85, 0.78, 0.65, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.88, 0.38, 1)
+theme_override_colors/font_hover_color = Color(1, 0.95, 0.75, 1)
+theme_override_font_sizes/font_size = 11
+text = "Ghi nhớ mật khẩu"
+
+[node name="ForgotPassBtn" type="Button" parent="CenterAuthCard/VBox/Form/OptionsHBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.75, 0.26, 1)
+theme_override_colors/font_hover_color = Color(1, 0.88, 0.38, 1)
+theme_override_font_sizes/font_size = 11
+text = "Quên mật khẩu?"
+flat = true
+
 [node name="StatusLabel" type="Label" parent="CenterAuthCard/VBox"]
 custom_minimum_size = Vector2(0, 18)
 layout_mode = 2
@@ -646,6 +668,249 @@ theme_override_colors/font_color = Color(1, 0.95, 0.85, 1)
 theme_override_font_sizes/font_size = 13
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_gold_normal")
 text = "ĐÃ HIỂU CHIẾU CHỈ"
+
+[node name="ForgotPassModal" type="PanelContainer" parent="ModalsLayer"]
+visible = false
+custom_minimum_size = Vector2(480, 340)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -240.0
+offset_top = -170.0
+offset_right = 240.0
+offset_bottom = 170.0
+grow_horizontal = 2
+grow_vertical = 2
+pivot_offset = Vector2(240, 170)
+theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
+
+[node name="VBox" type="VBoxContainer" parent="ModalsLayer/ForgotPassModal"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Header" type="HBoxContainer" parent="ModalsLayer/ForgotPassModal/VBox"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="ModalsLayer/ForgotPassModal/VBox/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.88, 0.38, 1)
+theme_override_font_sizes/font_size = 15
+text = "🗝️ KHÔI PHỤC MẬT KHẨU"
+
+[node name="CloseForgotBtn" type="Button" parent="ModalsLayer/ForgotPassModal/VBox/Header"]
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.35, 1)
+theme_override_font_sizes/font_size = 18
+text = "✕"
+flat = true
+
+[node name="Divider" type="TextureRect" parent="ModalsLayer/ForgotPassModal/VBox"]
+custom_minimum_size = Vector2(0, 6)
+layout_mode = 2
+texture = ExtResource("6_divider")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="RequestView" type="VBoxContainer" parent="ModalsLayer/ForgotPassModal/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Desc" type="Label" parent="ModalsLayer/ForgotPassModal/VBox/RequestView"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.88, 0.78, 1)
+theme_override_font_sizes/font_size = 11
+text = "Nhập địa chỉ Email đã đăng ký để nhận liên kết và mã đặt lại mật khẩu mới:"
+autowrap_mode = 2
+
+[node name="EmailBox" type="PanelContainer" parent="ModalsLayer/ForgotPassModal/VBox/RequestView"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_input_box")
+
+[node name="HBox" type="HBoxContainer" parent="ModalsLayer/ForgotPassModal/VBox/RequestView/EmailBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Icon" type="TextureRect" parent="ModalsLayer/ForgotPassModal/VBox/RequestView/EmailBox/HBox"]
+custom_minimum_size = Vector2(18, 18)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("9_icon_mail")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ForgotEmailInput" type="LineEdit" parent="ModalsLayer/ForgotPassModal/VBox/RequestView/EmailBox/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.98, 0.92, 1)
+placeholder_text = "Nhập email của bạn..."
+flat = true
+
+[node name="Status" type="Label" parent="ModalsLayer/ForgotPassModal/VBox/RequestView"]
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.35, 1)
+theme_override_font_sizes/font_size = 11
+autowrap_mode = 2
+
+[node name="Actions" type="HBoxContainer" parent="ModalsLayer/ForgotPassModal/VBox/RequestView"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ForgotCancelBtn" type="Button" parent="ModalsLayer/ForgotPassModal/VBox/RequestView/Actions"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.92, 0.85, 0.7, 1)
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_dark_normal")
+text = "HỦY"
+
+[node name="SendRecoveryBtn" type="Button" parent="ModalsLayer/ForgotPassModal/VBox/RequestView/Actions"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.3
+theme_override_colors/font_color = Color(1, 0.95, 0.85, 1)
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_gold_normal")
+text = "GỬI LIÊN KẾT KHÔI PHỤC"
+
+[node name="SwitchToResetBtn" type="Button" parent="ModalsLayer/ForgotPassModal/VBox/RequestView"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.75, 0.26, 1)
+theme_override_colors/font_hover_color = Color(1, 0.88, 0.38, 1)
+theme_override_font_sizes/font_size = 11
+text = "🔑 Đã nhận được mã từ Email? Nhấn vào đây để đặt mật khẩu mới ➔"
+flat = true
+
+[node name="ResetView" type="VBoxContainer" parent="ModalsLayer/ForgotPassModal/VBox"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Desc" type="Label" parent="ModalsLayer/ForgotPassModal/VBox/ResetView"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.88, 0.78, 1)
+theme_override_font_sizes/font_size = 11
+text = "Dán mã xác thực (secret) hoặc link trong Email, rồi nhập mật khẩu mới:"
+autowrap_mode = 2
+
+[node name="TokenBox" type="PanelContainer" parent="ModalsLayer/ForgotPassModal/VBox/ResetView"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_input_box")
+
+[node name="HBox" type="HBoxContainer" parent="ModalsLayer/ForgotPassModal/VBox/ResetView/TokenBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Icon" type="TextureRect" parent="ModalsLayer/ForgotPassModal/VBox/ResetView/TokenBox/HBox"]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("10_icon_lock")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="TokenInput" type="LineEdit" parent="ModalsLayer/ForgotPassModal/VBox/ResetView/TokenBox/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.98, 0.92, 1)
+placeholder_text = "Dán mã xác thực hoặc toàn bộ link từ email..."
+flat = true
+
+[node name="NewPassBox" type="PanelContainer" parent="ModalsLayer/ForgotPassModal/VBox/ResetView"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_input_box")
+
+[node name="HBox" type="HBoxContainer" parent="ModalsLayer/ForgotPassModal/VBox/ResetView/NewPassBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Icon" type="TextureRect" parent="ModalsLayer/ForgotPassModal/VBox/ResetView/NewPassBox/HBox"]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("10_icon_lock")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="NewPassInput" type="LineEdit" parent="ModalsLayer/ForgotPassModal/VBox/ResetView/NewPassBox/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.98, 0.92, 1)
+placeholder_text = "Mật thư mới (tối thiểu 8 ký tự)..."
+flat = true
+secret = true
+
+[node name="ConfirmPassBox" type="PanelContainer" parent="ModalsLayer/ForgotPassModal/VBox/ResetView"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_input_box")
+
+[node name="HBox" type="HBoxContainer" parent="ModalsLayer/ForgotPassModal/VBox/ResetView/ConfirmPassBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Icon" type="TextureRect" parent="ModalsLayer/ForgotPassModal/VBox/ResetView/ConfirmPassBox/HBox"]
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("10_icon_lock")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ConfirmPassInput" type="LineEdit" parent="ModalsLayer/ForgotPassModal/VBox/ResetView/ConfirmPassBox/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.98, 0.92, 1)
+placeholder_text = "Nhập lại mật thư mới..."
+flat = true
+secret = true
+
+[node name="ResetStatus" type="Label" parent="ModalsLayer/ForgotPassModal/VBox/ResetView"]
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.35, 1)
+theme_override_font_sizes/font_size = 11
+autowrap_mode = 2
+
+[node name="ResetActions" type="HBoxContainer" parent="ModalsLayer/ForgotPassModal/VBox/ResetView"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="BackToRequestBtn" type="Button" parent="ModalsLayer/ForgotPassModal/VBox/ResetView/ResetActions"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.92, 0.85, 0.7, 1)
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_dark_normal")
+text = "QUAY LẠI"
+
+[node name="ConfirmResetBtn" type="Button" parent="ModalsLayer/ForgotPassModal/VBox/ResetView/ResetActions"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.3
+theme_override_colors/font_color = Color(1, 0.95, 0.85, 1)
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("StyleBoxFlat_btn_gold_normal")
+text = "XÁC NHẬN ĐỔI MẬT KHẨU"
+
+[node name="FooterHelp" type="Label" parent="ModalsLayer/ForgotPassModal/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.65, 0.55, 0.8)
+theme_override_font_sizes/font_size = 10
+text = "🎧 CSKH hỗ trợ: vdthanh1998@gmail.com | Hotline: 0961 705 592"
+horizontal_alignment = 1
 
 [node name="DevTesterDrawer" type="PanelContainer" parent="ModalsLayer"]
 visible = false
