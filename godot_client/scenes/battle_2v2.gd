@@ -3273,6 +3273,45 @@ func _clear_treasure_targeting() -> void:
 	card_play_btn.visible = false
 	_set_treasure_skill_selected(false)
 
+func _clear_all_skill_targeting() -> void:
+	if is_targeting_ho_phu_skill or is_targeting_drum_skill:
+		_clear_treasure_targeting()
+	is_targeting_trieu_dang = false
+	is_targeting_bat_na = false
+	is_targeting_van_sach = false
+	is_targeting_hung_suc = false
+	is_targeting_van_an = false
+	is_targeting_cai_cach = false
+	is_targeting_thien_cam = false
+	is_targeting_co_bien = false
+	is_targeting_phu_tran = false
+	is_targeting_dinh_quoc = false
+	is_targeting_trao_bao = false
+	is_targeting_nhiep_chinh_y_lan = false
+	is_targeting_dinh_trieu = false
+	is_targeting_chuyen_che = false
+	is_targeting_binh_san = false
+	is_targeting_tay_phu = false
+	is_targeting_dan_cau = false
+	is_targeting_thuy_chien = false
+	is_targeting_nghich_y = false
+	selected_nghich_y_card_id = ""
+	is_targeting_chinh_thong = false
+	is_targeting_khoan_hoa = false
+	is_targeting_tau_vi = false
+	is_using_trac_lac = false
+	hung_suc_submission_pending = false
+	_clear_all_equipped_previews()
+	selected_two_card_skill_nodes.clear()
+	_clear_lien_chau_selection()
+	if selected_target_seat > 0 and generals_data.has(selected_target_seat):
+		var tgt_av = generals_data[selected_target_seat].get("avatar_node")
+		if is_instance_valid(tgt_av):
+			tgt_av.set_target_highlight(false)
+	selected_target_seat = -1
+	if generals_data.has(my_seat):
+		_refresh_local_skill_buttons(my_seat)
+
 func _deal_initial_hands() -> void:
 	for s_num in range(1, battle_seat_count + 1):
 		var g = generals_data[s_num]
@@ -3667,6 +3706,36 @@ func _refresh_hung_suc_equipped_weapon_previews() -> void:
 	_relayout_hand_cards()
 
 func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> void:
+	# Giai đoạn bỏ bài thừa: Chọn / Bỏ chọn nhiều lá cùng một lúc (Multi-select)
+	if is_discard_phase:
+		if card_node.has_meta("hung_suc_equipped_preview") or card_node.has_meta("trao_bao_equipped_preview") or card_node.has_meta("tau_vi_equipped_preview") or card_node.has_meta("song_cung_equipped_preview") or card_node.has_meta("tran_thu_equipped_preview"):
+			return
+		if selected_discard_nodes.has(card_node):
+			selected_discard_nodes.erase(card_node)
+			if card_node.has_method("set_selected"):
+				card_node.set_selected(false)
+			AudioManager.play_card_select()
+		else:
+			if selected_discard_nodes.size() < cards_to_discard_count:
+				selected_discard_nodes.append(card_node)
+				if card_node.has_method("set_selected"):
+					card_node.set_selected(true)
+				AudioManager.play_card_select()
+			else:
+				if card_node.has_method("set_selected"):
+					card_node.set_selected(false)
+				desc_text.text = "⚠️ Bạn đã chọn đủ %d lá! Hãy bấm nút [BỎ BÀI] để xác nhận, hoặc nhấp lại lá bài đã chọn để đổi." % cards_to_discard_count
+				AudioManager.play_skill()
+
+		var chosen_count = selected_discard_nodes.size()
+		card_play_btn.visible = true
+		card_play_btn.text = "🗑️ BỎ BÀI (%d/%d)" % [chosen_count, cards_to_discard_count]
+		card_play_btn.disabled = (chosen_count == 0)
+		if chosen_count == cards_to_discard_count:
+			desc_text.text = "💡 Đã chọn đủ %d lá! Bấm nút [BỎ BÀI (%d/%d)] để xác nhận và kết thúc lượt." % [chosen_count, chosen_count, cards_to_discard_count]
+		else:
+			desc_text.text = "⚠️ Hãy nhấp chọn thêm %d lá nữa (%d/%d) để bỏ bài thừa." % [cards_to_discard_count - chosen_count, chosen_count, cards_to_discard_count]
+		return
 	if generals_data.has(my_seat) and bool(generals_data[my_seat].get("che_no_active", false)) and _get_card_color(str(c_info.get("suit", ""))) != "BLACK" and not is_discard_phase:
 		desc_text.text = "⚠️ [CHẾ NỎ] Đang kích hoạt: Các lá không phải màu Đen bị tối. Tắt Chế Nỏ để sử dụng lá này."
 		return
@@ -3939,34 +4008,6 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 		_update_action_btn()
 		return
 
-	# Giai đoạn bỏ bài thừa: Chọn / Bỏ chọn nhiều lá cùng một lúc (Multi-select)
-	if is_discard_phase:
-		if selected_discard_nodes.has(card_node):
-			selected_discard_nodes.erase(card_node)
-			if card_node.has_method("set_selected"):
-				card_node.set_selected(false)
-			AudioManager.play_card_select()
-		else:
-			if selected_discard_nodes.size() < cards_to_discard_count:
-				selected_discard_nodes.append(card_node)
-				if card_node.has_method("set_selected"):
-					card_node.set_selected(true)
-				AudioManager.play_card_select()
-			else:
-				if card_node.has_method("set_selected"):
-					card_node.set_selected(false)
-				desc_text.text = "⚠️ Bạn đã chọn đủ %d lá! Hãy bấm nút [BỎ BÀI] để xác nhận, hoặc nhấp lại lá bài đã chọn để đổi." % cards_to_discard_count
-				AudioManager.play_skill()
-
-		var chosen_count = selected_discard_nodes.size()
-		card_play_btn.visible = true
-		card_play_btn.text = "🗑️ BỎ BÀI (%d/%d)" % [chosen_count, cards_to_discard_count]
-		card_play_btn.disabled = (chosen_count == 0)
-		if chosen_count == cards_to_discard_count:
-			desc_text.text = "💡 Đã chọn đủ %d lá! Bấm nút [BỎ BÀI (%d/%d)] để xác nhận và kết thúc lượt." % [chosen_count, chosen_count, cards_to_discard_count]
-		else:
-			desc_text.text = "⚠️ Hãy nhấp chọn thêm %d lá nữa (%d/%d) để bỏ bài thừa." % [cards_to_discard_count - chosen_count, chosen_count, cards_to_discard_count]
-		return
 
 	if selected_card_ui == card_node:
 		# Deselect
@@ -4620,6 +4661,12 @@ func _apply_action_buttons_layout(is_van_sach: bool = false) -> void:
 		hich_recast_btn.size.x = 120.0
 
 func _update_action_btn() -> void:
+	if is_discard_phase:
+		var chosen_count = selected_discard_nodes.size()
+		card_play_btn.visible = true
+		card_play_btn.text = "🗑️ BỎ BÀI (%d/%d)" % [chosen_count, cards_to_discard_count]
+		card_play_btn.disabled = (chosen_count == 0)
+		return
 	var in_van_sach := (current_server_phase == "AWAIT_VAN_SACH" and current_waiting_seat == my_seat)
 	_apply_action_buttons_layout(in_van_sach)
 	hich_recast_btn.visible = in_van_sach
@@ -5183,6 +5230,56 @@ func _resolve_local_hich_tuong_si(target_seat: int) -> void:
 			_add_log("📣 %s không có bài để nhận [SỤC SÔI]." % target.get("name", "Mục tiêu"))
 
 func _on_card_play_btn_clicked() -> void:
+	if is_discard_phase:
+		if selected_discard_nodes.is_empty():
+			desc_text.text = "⚠️ Hãy chọn ít nhất 1 lá bài để bỏ."
+			return
+
+		pending_discard_card_ids.clear()
+		var discarded_names: Array = []
+		var discarded_cards_info: Array = []
+		for c_node in selected_discard_nodes:
+			if is_instance_valid(c_node):
+				var info_d = _get_card_info_from_ui(c_node)
+				var c_name_d = info_d.get("name", "Bài")
+				var c_id_d = info_d.get("id", c_name_d)
+				if c_id_d.is_empty(): c_id_d = c_name_d
+				pending_discard_card_ids.append(c_id_d)
+				discarded_names.append(c_name_d)
+				discarded_cards_info.append(info_d)
+				_discard_player_card(c_node)
+
+		var discarded_count = pending_discard_card_ids.size()
+		selected_discard_nodes.clear()
+		cards_to_discard_count = max(0, cards_to_discard_count - discarded_count)
+		is_discard_phase = cards_to_discard_count > 0
+		card_play_btn.visible = is_discard_phase
+		card_play_btn.disabled = is_discard_phase
+		if is_discard_phase:
+			card_play_btn.text = "🗑️ BỎ BÀI (0/%d)" % cards_to_discard_count
+		_add_log("🗑️ Bạn đã bỏ %d lá bài thừa: [%s]." % [pending_discard_card_ids.size(), ", ".join(discarded_names)])
+		for info_d in discarded_cards_info:
+			var c_name_d = str(info_d.get("name", "Bài"))
+			_animate_showcase_card(c_name_d, "Bạn đã bỏ lá [%s]" % c_name_d, info_d, 2.5)
+		AudioManager.play_card_draw()
+
+		if is_network_mode:
+			_broadcast_player_battle_action("DISCARD_CARDS", "")
+			pending_discard_card_ids.clear()
+			# Máy chủ quyết định đã đủ bài hay chưa. Giữ nguyên pha cho tới bản đồng bộ kế tiếp,
+			# tránh giao diện chuyển sang lượt sau trước khi số bài bỏ được xác nhận.
+			is_discard_phase = true
+			discard_submission_pending = true
+			card_play_btn.visible = true
+			card_play_btn.disabled = true
+			card_play_btn.text = "🗑️ ĐANG XÁC NHẬN..."
+			desc_text.text = "🗑️ Đang chờ máy chủ xác nhận số bài đã bỏ..."
+		elif not is_discard_phase:
+			_finish_player_end_turn()
+		else:
+			desc_text.text = "🗑️ Đã bỏ %d lá. Bạn còn phải bỏ %d lá, hãy tiếp tục chọn bài." % [discarded_count, cards_to_discard_count]
+		return
+
 	if is_targeting_nhiep_chinh_y_lan:
 		if selected_card_ui == null or not is_instance_valid(selected_card_ui) or selected_target_seat <= 0 or selected_target_seat == my_seat:
 			desc_text.text = "⚠️ [NHIẾP CHÍNH] của Ỷ Lan cần chọn 1 lá bài trên tay và 1 người nhận."
@@ -5779,56 +5876,6 @@ func _on_card_play_btn_clicked() -> void:
 			NetworkClient.send_use_skill("Triều Dâng", trieu_target_seat)
 		else:
 			_show_card_pick_modal(false, trieu_target_seat, {"effectType": "TRIEU_DANG"})
-		return
-
-	if is_discard_phase:
-		if selected_discard_nodes.is_empty():
-			desc_text.text = "⚠️ Hãy chọn ít nhất 1 lá bài để bỏ."
-			return
-
-		pending_discard_card_ids.clear()
-		var discarded_names: Array = []
-		var discarded_cards_info: Array = []
-		for c_node in selected_discard_nodes:
-			if is_instance_valid(c_node):
-				var info_d = _get_card_info_from_ui(c_node)
-				var c_name_d = info_d.get("name", "Bài")
-				var c_id_d = info_d.get("id", c_name_d)
-				if c_id_d.is_empty(): c_id_d = c_name_d
-				pending_discard_card_ids.append(c_id_d)
-				discarded_names.append(c_name_d)
-				discarded_cards_info.append(info_d)
-				_discard_player_card(c_node)
-
-		var discarded_count = pending_discard_card_ids.size()
-		selected_discard_nodes.clear()
-		cards_to_discard_count = max(0, cards_to_discard_count - discarded_count)
-		is_discard_phase = cards_to_discard_count > 0
-		card_play_btn.visible = is_discard_phase
-		card_play_btn.disabled = is_discard_phase
-		if is_discard_phase:
-			card_play_btn.text = "🗑️ BỎ BÀI (0/%d)" % cards_to_discard_count
-		_add_log("🗑️ Bạn đã bỏ %d lá bài thừa: [%s]." % [pending_discard_card_ids.size(), ", ".join(discarded_names)])
-		for info_d in discarded_cards_info:
-			var c_name_d = str(info_d.get("name", "Bài"))
-			_animate_showcase_card(c_name_d, "Bạn đã bỏ lá [%s]" % c_name_d, info_d, 2.5)
-		AudioManager.play_card_draw()
-
-		if is_network_mode:
-			_broadcast_player_battle_action("DISCARD_CARDS", "")
-			pending_discard_card_ids.clear()
-			# Máy chủ quyết định đã đủ bài hay chưa. Giữ nguyên pha cho tới bản đồng bộ kế tiếp,
-			# tránh giao diện chuyển sang lượt sau trước khi số bài bỏ được xác nhận.
-			is_discard_phase = true
-			discard_submission_pending = true
-			card_play_btn.visible = true
-			card_play_btn.disabled = true
-			card_play_btn.text = "🗑️ ĐANG XÁC NHẬN..."
-			desc_text.text = "🗑️ Đang chờ máy chủ xác nhận số bài đã bỏ..."
-		elif not is_discard_phase:
-			_finish_player_end_turn()
-		else:
-			desc_text.text = "🗑️ Đã bỏ %d lá. Bạn còn phải bỏ %d lá, hãy tiếp tục chọn bài." % [discarded_count, cards_to_discard_count]
 		return
 
 	if is_targeting_drum_skill:
@@ -7193,6 +7240,7 @@ func _has_equipped_weapon_name(general: Dictionary, weapon_name: String) -> bool
 	return weapon_name in str(general.get("equipped_weapon", ""))
 
 func _enter_discard_phase(excess: int) -> void:
+	_clear_all_skill_targeting()
 	is_player_turn = true
 	is_discard_phase = true
 	discard_submission_pending = false
@@ -8712,6 +8760,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			desc_text.text = "💮 Đang chờ %s suy nghĩ có cứu %s hay không. Cần 1 Bánh Chưng; người cận tử có thể tự dùng 1 Hủ Rượu." % [wait_name, victim_name]
 
 	elif server_phase == "DISCARD":
+		_clear_all_skill_targeting()
 		if is_waiting_dodge:
 			dodge_modal.visible = false
 			is_waiting_dodge = false
@@ -13255,16 +13304,7 @@ func _on_end_turn_btn_clicked() -> void:
 		return
 
 	# 2. Nếu có bài thừa so với máu: chuyển sang pha bỏ bài bắt buộc
-	if is_targeting_trao_bao:
-		is_targeting_trao_bao = false
-		_clear_trao_bao_equipped_previews()
-		_refresh_local_skill_buttons(my_seat)
-	if is_targeting_dinh_trieu:
-		is_targeting_dinh_trieu = false
-		_refresh_local_skill_buttons(my_seat)
-	if is_targeting_chuyen_che:
-		is_targeting_chuyen_che = false
-		_refresh_local_skill_buttons(my_seat)
+	_clear_all_skill_targeting()
 	if excess > 0:
 		_enter_discard_phase(excess)
 		if is_network_mode:
@@ -13281,13 +13321,7 @@ func _on_end_turn_btn_clicked() -> void:
 	_finish_player_end_turn()
 
 func _on_player_turn_timeout() -> void:
-	if is_targeting_trao_bao:
-		is_targeting_trao_bao = false
-		_clear_trao_bao_equipped_previews()
-	if is_targeting_dinh_trieu:
-		is_targeting_dinh_trieu = false
-	if is_targeting_chuyen_che:
-		is_targeting_chuyen_che = false
+	_clear_all_skill_targeting()
 	var p_gen = generals_data[my_seat]
 	var hand_limit = _get_general_hand_limit(p_gen)
 	var auto_discard_ids: Array = []
@@ -13321,27 +13355,7 @@ func _finish_player_end_turn(send_network_end_turn: bool = true) -> void:
 		local_player["suc_soi_turns_remaining"] = max(0, int(local_player.get("suc_soi_turns_remaining", 0)) - 1)
 	is_player_turn = false
 	is_discard_phase = false
-	if is_targeting_ho_phu_skill or is_targeting_drum_skill:
-		_clear_treasure_targeting()
-	is_targeting_trieu_dang = false
-	is_targeting_bat_na = false
-	is_targeting_van_sach = false
-	is_targeting_hung_suc = false
-	is_targeting_van_an = false
-	is_targeting_cai_cach = false
-	is_targeting_thien_cam = false
-	is_targeting_co_bien = false
-	is_targeting_phu_tran = false
-	is_targeting_dinh_quoc = false
-	is_targeting_trao_bao = false
-	is_targeting_dinh_trieu = false
-	is_targeting_chuyen_che = false
-	is_using_trac_lac = false
-	hung_suc_submission_pending = false
-	_clear_hung_suc_equipped_weapon_previews()
-	_clear_trao_bao_equipped_previews()
-	selected_two_card_skill_nodes.clear()
-	_refresh_local_skill_buttons(my_seat)
+	_clear_all_skill_targeting()
 	slashes_used_this_turn = 0
 	local_van_an_uses = 0
 	is_wine_buff_active = false
