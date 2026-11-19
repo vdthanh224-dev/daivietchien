@@ -239,8 +239,6 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 			continue
 		var doc_time = int(doc.get("timestamp", 0))
 		if now - doc_time > 180000:
-			if doc.get("$id", "") != "":
-				_delete_document_async(doc.get("$id", ""))
 			continue
 		var room = decode_room_string(str(doc.get("userName", "")), doc_time, int(doc.get("rankPoints", 0)))
 		if room.is_empty() or room.get("status") != "WAITING":
@@ -322,7 +320,7 @@ func _acquire_room_lock(room_id: String, user_id: String) -> bool:
 	var lock_id = _match_lock_doc_id(room_id)
 	var now = get_now_ms()
 	var payload = {"documentId": lock_id, "data": {"userId": "MATCH_LOCK", "userName": user_id, "rankPoints": 0, "timestamp": now}, "permissions": PUBLIC_DOC_PERMISSIONS}
-	for attempt in range(8):
+	for attempt in range(3):
 		var res = await _send_http_request(docs_url, HTTPClient.METHOD_POST, JSON.stringify(payload))
 		print("[AppwriteMatchmaking] LOCK room=%s code=%d attempt=%d" % [room_id, int(res["code"]), attempt + 1])
 		if res["code"] == 201 or res["code"] == 200:

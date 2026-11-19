@@ -22,7 +22,7 @@ const sandbox = {
   setInterval() {}, setTimeout() {}, clearInterval() {}, clearTimeout() {},
   fetch: chatDb.request,
   Deno: {
-    env: { get() {} },
+    env: { get(k) { if (k === "APPWRITE_CHAT_ENABLED") return "true"; } },
     serve(_options, callback) { handler = callback; },
     upgradeWebSocket(request) { return { socket: request.socket, response: {} }; },
   },

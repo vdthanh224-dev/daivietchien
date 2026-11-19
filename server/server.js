@@ -49,6 +49,8 @@ const APPWRITE_MATCHMAKING_DATABASE = "game";
 const APPWRITE_MATCHMAKING_COLLECTION = "matchmaking_queue";
 const APPWRITE_MATCHMAKING_MAX_AGE_MS = 180000;
 const APPWRITE_MATCHMAKING_POLL_MS = 5000;
+const APPWRITE_CHAT_ENABLED = (typeof Deno !== "undefined" && Deno.env?.get("APPWRITE_CHAT_ENABLED") === "true")
+  || (typeof process !== "undefined" && process.env?.APPWRITE_CHAT_ENABLED === "true");
 const lobbyChatStore = createLobbyChatStore({
   request: appwriteMatchmakingRequest,
   documentsPath: `/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents`,
@@ -555,9 +557,10 @@ let socialAppwriteSyncRunning = false;
 async function syncSocialProfilesFromAppwrite() {
   if (socialAppwriteSyncRunning) return;
   socialAppwriteSyncRunning = true;
+  lastSocialAppwriteSync = Date.now();
   try {
     let offset = 0;
-    const limit = 100;
+    const limit = 50;
     while (true) {
       const q_equal = encodeURIComponent(JSON.stringify({ method: "equal", attribute: "userId", values: ["LEADERBOARD_PLAYER"] }));
       const q_limit = encodeURIComponent(JSON.stringify({ method: "limit", values: [limit] }));
@@ -714,12 +717,14 @@ async function flushLobbyChatMessages() {
 
 function queueLobbyChatMessage(message) {
   cacheLobbyChatMessage(message);
+  if (!APPWRITE_CHAT_ENABLED) return;
   pendingLobbyChatMessages.push({ ...message });
   if (pendingLobbyChatMessages.length >= LOBBY_CHAT_FLUSH_BATCH_SIZE) void flushLobbyChatMessages();
   else scheduleLobbyChatFlush();
 }
 
 async function getLobbyChatHistory() {
+  if (!APPWRITE_CHAT_ENABLED) return copyLobbyChatHistory();
   if (lobbyChatHistoryLoaded) return copyLobbyChatHistory();
   if (Date.now() < lobbyChatHistoryRetryAt) return copyLobbyChatHistory();
   if (!lobbyChatHistoryLoadPromise) {
@@ -1872,7 +1877,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
               socket.send(JSON.stringify({ type: "FRIEND_SEARCH_RESULT", results: [], query: rawQuery }));
               return;
             }
-            if (socialProfiles.size <= 1 || Date.now() - lastSocialAppwriteSync > 15 * 60 * 1000) {
+            if (Date.now() - lastSocialAppwriteSync > 15 * 60 * 1000) {
               await syncSocialProfilesFromAppwrite();
             }
             const tokens = queryNorm.split(/\s+/).filter(Boolean);

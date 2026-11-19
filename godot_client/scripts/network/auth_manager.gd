@@ -1033,7 +1033,7 @@ func fetch_leaderboard_players(on_done: Callable, force: bool = false) -> void:
 	add_child(http)
 
 	var q_equal = "{\"method\":\"equal\",\"attribute\":\"userId\",\"values\":[\"LEADERBOARD_PLAYER\"]}".uri_encode()
-	var q_limit = "{\"method\":\"limit\",\"values\":[100]}".uri_encode()
+	var q_limit = "{\"method\":\"limit\",\"values\":[30]}".uri_encode()
 	var url = "%s/databases/game/collections/matchmaking_queue/documents?queries[0]=%s&queries[1]=%s" % [ENDPOINT, q_equal, q_limit]
 	var headers = get_auth_headers(false)
 
