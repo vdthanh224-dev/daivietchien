@@ -144,7 +144,7 @@ export const SKILLS = {
   HICH_NGHIA: { id: 'HICH_NGHIA', name: 'Hịch Nghĩa', type: 'TRIGGERED', description: 'Mỗi khi có người mất máu, bạn tự mất 1 máu và rút 3 lá. Khi máu của bạn về 0, bạn có thể chọn hồi lên đến 4 máu và mất kỹ năng này, đổi lại, giới hạn trữ bài của bạn vĩnh viễn là 4.' },
   UAT_KHI: { id: 'UAT_KHI', name: 'Uất Khí', type: 'TRIGGERED', description: 'Khi bạn tử trận, chọn tối đa 2 người, mỗi người trong họ được hồi 1 máu và rút 2 lá bài.' },
   TRIEU_DANG: { id: 'TRIEU_DANG', name: 'Triều Dâng', type: 'ACTIVE', description: 'Một lần mỗi lượt, chỉ định hủy 1 lá trang bị của 1 người khác.' },
-  LAP_LANG: { id: 'LAP_LANG', name: 'Lập Làng', type: 'TRIGGERED', description: 'Cuối lượt của mình, nếu bạn không gây sát thương, bạn rút 2 lá bài.' },
+  LAP_LANG: { id: 'LAP_LANG', name: 'Lập Làng', type: 'TRIGGERED', description: 'Cuối lượt, nếu bạn không gây sát thương, bạn rút 2 lá bài, nếu bạn gây sát thương, rút số lượng lá bài bằng số sát thương đã gây trong lượt.' },
   DUNG_NU: { id: 'DUNG_NU', name: 'Dũng Nữ', type: 'PASSIVE', description: 'Đòn Trảm của bạn khiến mục tiêu phải đánh ra 2 lá Đỡ mới có thể triệt tiêu nếu mục tiêu có lượng Máu hiện tại nhiều hơn bạn.' },
   THU_MUC: { id: 'THU_MUC', name: 'Thủ Mục', type: 'OPTIONAL', description: 'Trước khi nhận sát thương từ lá Trảm, bạn có thể bỏ 1 lá bài Đỏ hoặc bài Trắng trên tay để khiến đòn Trảm đó bị giảm đi 1 điểm sát thương.' },
   TRINH_LIET: { id: 'TRINH_LIET', name: 'Trinh Liệt', type: 'TRIGGERED', description: 'Mỗi khi chịu sát thương từ đòn Trảm, bạn được rút 1 lá bài trong vùng chơi của nguồn gây sát thương.' },

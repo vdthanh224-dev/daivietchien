@@ -409,6 +409,7 @@ export function hydrateGameState(rawState, roomId = "") {
     ? { ...state.pendingHanLam, card: hydrateCard(state.pendingHanLam.card) }
     : null;
   state.turnDamageDealt = !!state.turnDamageDealt;
+  state.turnDamageDealtAmount = Math.max(0, Number(state.turnDamageDealtAmount) || 0);
   state.isWineBuffActive = !!state.isWineBuffActive;
   state.actionSeq = Math.max(1, Number(state.actionSeq) || Number(state.lastAction?.seq) || 1);
   state.actionHistory = Array.isArray(state.actionHistory) ? state.actionHistory : [];
@@ -647,6 +648,7 @@ export function initGame(roomId, playersInput, modeId = "2v2") {
     khuyenNongPending: null,
     slashesUsedThisTurn: 0,
     turnDamageDealt: false,
+    turnDamageDealtAmount: 0,
     isWineBuffActive: false,
     activeCard: null,
     targetCardSelection: null,
@@ -1396,15 +1398,20 @@ function startNextUatKhiPrompt(state) {
 }
 
 function triggerLapLang(state, player) {
-  if (!player || !heroHasSkill(player, "LAP_LANG") || state.turnDamageDealt || player.usedSkills?.LapLang) return false;
+  if (!player || !heroHasSkill(player, "LAP_LANG") || player.usedSkills?.LapLang) return false;
   if (!player.usedSkills) player.usedSkills = {};
   player.usedSkills.LapLang = true;
-  drawCards(state, player.seat, 2);
+  const damageDealt = Math.max(0, Number(state.turnDamageDealtAmount) || (state.turnDamageDealt ? 1 : 0));
+  const drawCount = damageDealt > 0 ? damageDealt : 2;
+  drawCards(state, player.seat, drawCount);
   recordAction(state, {
     type: "LAP_LANG_DRAW",
     casterSeat: player.seat,
+    drawCount,
     skillActivations: [{ name: "Lập Làng", seat: player.seat }],
-    description: `🏘️ <b>${player.generalName}</b> không gây sát thương trong lượt, sau khi bỏ bài kích hoạt [Lập Làng] rút 2 lá bài.`
+    description: damageDealt > 0
+      ? `🌾 <b>${player.generalName}</b> đã gây ${damageDealt} sát thương trong lượt, sau khi bỏ bài kích hoạt [Lập Làng] rút ${drawCount} lá bài.`
+      : `🏘️ <b>${player.generalName}</b> không gây sát thương trong lượt, sau khi bỏ bài kích hoạt [Lập Làng] rút 2 lá bài.`
   });
   return true;
 }
@@ -7948,7 +7955,7 @@ export function applyHichNghiaRevive(state, target) {
 
 function startHichNghiaRevivePrompt(state, target, context = {}) {
   if (!heroHasSkill(target, "HICH_NGHIA")) return false;
-  if (target.isAI) {
+  if (target.isAI || target.isAiTakeover || target.isDisconnected) {
     applyHichNghiaRevive(state, target);
     return false;
   }
@@ -7985,7 +7992,7 @@ export function triggerHichNghiaHpLoss(state, damagedSeat, options = {}) {
     });
 
     if (player.hp <= 0) {
-      if (player.isAI) {
+      if (player.isAI || player.isAiTakeover || player.isDisconnected) {
         applyHichNghiaRevive(state, player);
       } else {
         if (state.phase !== "AWAIT_HICH_NGHIA_REVIVE") {
@@ -8136,6 +8143,7 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
   if (finalDamage > 0) target.damageReceivedThisTurn = true;
   if (finalDamage > 0 && !options.skipTurnDamageCredit && attackerSeat === state.turnSeat && attackerSeat !== targetSeat) {
     state.turnDamageDealt = true;
+    state.turnDamageDealtAmount = (Number(state.turnDamageDealtAmount) || 0) + finalDamage;
   }
   if (finalDamage > 0 && options.singleTargetScrollCasterSeat) {
     triggerDeNghiep(state, options.singleTargetScrollCasterSeat, targetSeat);
@@ -8237,7 +8245,7 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
   if (target.hp <= 0) {
     const nearDeathContext = { attackerSeat, finalDamage, armorEffect, armorChargesRemaining, armorExpired };
     if (heroHasSkill(target, "HICH_NGHIA")) {
-      if (target.isAI) {
+      if (target.isAI || target.isAiTakeover || target.isDisconnected) {
         applyHichNghiaRevive(state, target);
         return { finalDamage, enteredNearDeath: false, armorEffect, armorChargesRemaining, armorExpired };
       }
@@ -9125,6 +9133,7 @@ function advanceTurn(state) {
   state.turnTimer = 40;
   state.slashesUsedThisTurn = 0;
   state.turnDamageDealt = false;
+  state.turnDamageDealtAmount = 0;
   state.isWineBuffActive = false;
   for (const player of state.players) {
     player.thuPhucCountThisTurn = 0;

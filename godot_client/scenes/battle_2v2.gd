@@ -408,6 +408,7 @@ var is_targeting_khoan_hoa: bool = false
 var hung_suc_submission_pending: bool = false
 var huynh_truong_pending: bool = false
 var local_turn_dealt_damage: bool = false
+var local_turn_damage_dealt_amount: int = 0
 var lap_lang_triggered_this_turn: bool = false
 var is_targeting_drum_skill: bool = false
 var is_targeting_ho_phu_skill: bool = false
@@ -9803,7 +9804,8 @@ func _on_network_action_received(delta: Dictionary) -> void:
 		if caster_seat == my_seat:
 			_update_action_btn()
 	elif act_type == "LAP_LANG_DRAW":
-		_animate_showcase_card("Lập Làng", str(delta.get("description", "Lập Làng rút 2 lá bài.")))
+		_animate_showcase_card("Lập Làng", str(delta.get("description", "Lập Làng rút bài.")))
+		AudioManager.play_voice("lập làng")
 		AudioManager.play_skill()
 	elif act_type == "MUU_DINH_PROMPT":
 		_animate_showcase_card("Mưu Định", str(delta.get("description", "Đang xem 2 lá đầu xấp bài...")))
@@ -11440,6 +11442,7 @@ func _apply_damage_to_general(target_seat: int, amount: int, attacker_seat: int 
 		_trigger_damage_effects(target_seat, amount, damage_element, is_major_damage)
 		if attacker_seat == current_turn_seat and attacker_seat != target_seat:
 			local_turn_dealt_damage = true
+			local_turn_damage_dealt_amount += amount
 		_trigger_hich_nghia_on_hp_loss(target_seat)
 	tgt["avatar_node"].update_hp(tgt["hp"], tgt["max_hp"])
 
@@ -12206,6 +12209,7 @@ func _start_turn(seat_num: int) -> void:
 
 	current_turn_seat = seat_num
 	local_turn_dealt_damage = false
+	local_turn_damage_dealt_amount = 0
 	lap_lang_triggered_this_turn = false
 	g["used_trieu_dang_this_turn"] = false
 	slashes_used_this_turn = 0
@@ -13172,17 +13176,24 @@ func _execute_ai_turn(ai_seat: int) -> void:
 		await _wait_for_ai_card_play()
 
 	# Lập Làng được xử lý sau khi AI đã bỏ đủ bài thừa.
-	if _hero_has_skill(ai_gen, "lap_lang") and not local_turn_dealt_damage and not lap_lang_triggered_this_turn:
+	if _hero_has_skill(ai_gen, "lap_lang") and not lap_lang_triggered_this_turn:
 		lap_lang_triggered_this_turn = true
-		for _draw_index in range(2):
+		var draw_count = local_turn_damage_dealt_amount if local_turn_damage_dealt_amount > 0 else 2
+		for _draw_index in range(draw_count):
 			var drawn_c = _draw_card_from_pile()
 			if drawn_c is Dictionary and not drawn_c.is_empty():
 				ai_gen["hand_cards"].append(drawn_c)
 		ai_gen["hand_count"] = ai_gen["hand_cards"].size()
 		if ai_gen.has("avatar_node") and is_instance_valid(ai_gen["avatar_node"]):
 			ai_gen["avatar_node"].update_hand_count(ai_gen["hand_count"])
-		_animate_showcase_card("Lập Làng", "🏘️ %s đã bỏ bài xong và không gây sát thương, rút 2 lá bài." % ai_gen["name"])
-		_add_log("🏘️ [LẬP LÀNG] %s đã bỏ bài xong và không gây sát thương, rút 2 lá bài." % ai_gen["name"])
+		AudioManager.play_voice("lập làng")
+		AudioManager.play_skill()
+		if local_turn_damage_dealt_amount > 0:
+			_animate_showcase_card("Lập Làng", "🌾 %s đã gây %d sát thương trong lượt, kích hoạt [Lập Làng] rút %d lá bài." % [ai_gen["name"], local_turn_damage_dealt_amount, draw_count])
+			_add_log("🌾 [LẬP LÀNG] %s đã gây %d sát thương trong lượt, kích hoạt [Lập Làng] rút %d lá bài." % [ai_gen["name"], local_turn_damage_dealt_amount, draw_count])
+		else:
+			_animate_showcase_card("Lập Làng", "🏘️ %s không gây sát thương trong lượt, kích hoạt [Lập Làng] rút 2 lá bài." % ai_gen["name"])
+			_add_log("🏘️ [LẬP LÀNG] %s không gây sát thương trong lượt, kích hoạt [Lập Làng] rút 2 lá bài." % ai_gen["name"])
 		await _wait_for_ai_card_play()
 
 	# End AI turn. A watchdog recovery may have already advanced the match.
@@ -13362,13 +13373,6 @@ func _on_end_turn_btn_clicked() -> void:
 			_broadcast_player_battle_action("END_TURN", "", 0)
 		return
 
-	if not is_network_mode and _hero_has_skill(p_gen, "lap_lang") and not local_turn_dealt_damage and not lap_lang_triggered_this_turn:
-		lap_lang_triggered_this_turn = true
-		for _draw_index in range(2):
-			_add_card_to_player_hand(_draw_card_from_pile())
-		_animate_showcase_card("Lập Làng", "🏘️ Đã bỏ bài xong, không gây sát thương trong lượt nên rút 2 lá bài.")
-		_add_log("🏘️ [LẬP LÀNG] Bạn đã bỏ bài xong và không gây sát thương, rút 2 lá bài.")
-
 	_finish_player_end_turn()
 
 func _on_player_turn_timeout() -> void:
@@ -13404,6 +13408,19 @@ func _finish_player_end_turn(send_network_end_turn: bool = true) -> void:
 	if not is_network_mode and generals_data.has(my_seat):
 		var local_player = generals_data[my_seat]
 		local_player["suc_soi_turns_remaining"] = max(0, int(local_player.get("suc_soi_turns_remaining", 0)) - 1)
+		if _hero_has_skill(local_player, "lap_lang") and not lap_lang_triggered_this_turn:
+			lap_lang_triggered_this_turn = true
+			var draw_count = local_turn_damage_dealt_amount if local_turn_damage_dealt_amount > 0 else 2
+			for _draw_index in range(draw_count):
+				_add_card_to_player_hand(_draw_card_from_pile())
+			AudioManager.play_voice("lập làng")
+			AudioManager.play_skill()
+			if local_turn_damage_dealt_amount > 0:
+				_animate_showcase_card("Lập Làng", "🌾 Đã gây %d sát thương trong lượt, kích hoạt [Lập Làng] rút %d lá bài." % [local_turn_damage_dealt_amount, draw_count])
+				_add_log("🌾 [LẬP LÀNG] Bạn đã gây %d sát thương trong lượt, kích hoạt [Lập Làng] rút %d lá bài." % [local_turn_damage_dealt_amount, draw_count])
+			else:
+				_animate_showcase_card("Lập Làng", "🏘️ Không gây sát thương trong lượt, kích hoạt [Lập Làng] rút 2 lá bài.")
+				_add_log("🏘️ [LẬP LÀNG] Bạn không gây sát thương trong lượt, kích hoạt [Lập Làng] rút 2 lá bài.")
 	is_player_turn = false
 	is_discard_phase = false
 	_clear_all_skill_targeting()
