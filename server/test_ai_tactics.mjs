@@ -198,6 +198,7 @@ for (const [targetSeat, subType, expectedUse] of [[3, S.ACEDIA, true], [2, S.EX_
 {
   const state = board(2, 'dynasty_8');
   state.players[1].heroId = 'HERO_3';
+  state.players[1].hichNghiaLost = true;
   state.players[1].isAI = true;
   state.players[1].hp = 1;
   state.turnSeat = 3;

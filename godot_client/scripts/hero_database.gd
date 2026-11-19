@@ -1187,7 +1187,7 @@ func _init_all_heroes() -> void:
 	all_heroes.clear()
 	_add_hero(1, "Cao Lỗ", "Hồng Bàng", 4, "Chế Nỏ", "Bạn có thể dùng bất kỳ lá bài Đen như lá trang bị Nỏ Thần Kim Quy. Khi sử dụng Nỏ Thần Kim Quy, bốc 1 lá bài.", "res://assets/ui/cao_lo.png", "cao_lo")
 	_add_hero(2, "Đào Hãn", "Hồng Bàng", 4, "Xạ Thuẫn", "Bạn mặc định tăng 2 tầm Ngựa công.", "res://assets/ui/dao_han.png", "dao_han")
-	_add_hero(3, "Thi Sách", "Hồng Bàng", 4, "Hịch Nghĩa", "Khi bạn rơi vào trạng thái Cận Tử, bạn lập tức rút 3 lá bài.", "res://assets/ui/thi_sach.png", "thi_sach")
+	_add_hero(3, "Thi Sách", "Hồng Bàng", 4, "Hịch Nghĩa", "Mỗi khi có người mất máu, bạn tự mất 1 máu và rút 3 lá. Khi máu của bạn về 0, bạn có thể chọn hồi lên đến 4 máu và mất kỹ năng này, đổi lại, giới hạn trữ bài của bạn vĩnh viễn là 4.", "res://assets/ui/thi_sach.png", "thi_sach", 2)
 	_add_hero(4, "Lê Chân", "Hồng Bàng", 3, "Triều Dâng", "Một lần mỗi lượt, chỉ định hủy 1 lá trang bị của 1 người khác.", "res://assets/ui/le_chan.png", "le_chan")
 	_add_hero(5, "Thánh Thiên", "Hồng Bàng", 4, "Dũng Nữ", "Đòn Trảm của bạn khiến mục tiêu phải đánh ra 2 lá Đỡ mới có thể triệt tiêu nếu mục tiêu có lượng Máu hiện tại nhiều hơn bạn.", "res://assets/ui/thanh_thien.png", "thanh_thien")
 	_add_hero(6, "Vũ Thị Thục", "Hồng Bàng", 3, "Trinh Liệt", "Mỗi khi chịu sát thương từ đòn Trảm, bạn được rút 1 lá bài trong vùng chơi của nguồn gây sát thương.", "res://assets/ui/bat_nan.png", "bat_nan")
@@ -1286,7 +1286,7 @@ func _init_all_heroes() -> void:
 	_add_hero(99, "Lê Khôi", "Đông A", 4, "Khai Biên", "Mỗi khi bạn tiêu diệt thành công một người chơi khác, bạn lập tức được hồi 1 Máu và rút thêm 2 lá bài từ xấp bài rút.", "res://assets/ui/le_khoi.png", "le_khoi")
 	_add_hero(100, "Nguyễn Nhữ Lãm", "Đông A", 4, "Trấn Ải", "Bạn hoàn toàn miễn nhiễm với các lá Cẩm Nang Trì Hoãn.", "res://assets/ui/nguyen_nhu_lam.png", "nguyen_nhu_lam")
 
-func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: String, skill_desc: String, avatar_path: String, slug: String) -> void:
+func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: String, skill_desc: String, avatar_path: String, slug: String, starting_hp: int = -1) -> void:
 	var skills: Array = [{"id": skill_name.to_lower().replace(" ", "_"), "name": skill_name, "desc": skill_desc}]
 	if id == 1:
 		skills = [
@@ -1299,7 +1299,7 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 		]
 	elif id == 3:
 		skills = [
-			{"id": "hich_nghia", "name": "Hịch Nghĩa", "desc": "Khi bạn rơi vào trạng thái Cận Tử, bạn lập tức rút 3 lá bài."},
+			{"id": "hich_nghia", "name": "Hịch Nghĩa", "desc": "Mỗi khi có người mất máu, bạn tự mất 1 máu và rút 3 lá. Khi máu của bạn về 0, bạn có thể chọn hồi lên đến 4 máu và mất kỹ năng này, đổi lại, giới hạn trữ bài của bạn vĩnh viễn là 4."},
 			{"id": "uat_khi", "name": "Uất Khí", "desc": "Khi bạn tử trận, chọn tối đa 2 người, mỗi người trong họ được hồi 1 máu và rút 2 lá bài."}
 		]
 	elif id == 4:
@@ -1594,6 +1594,7 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 		"name": name,
 		"faction": faction,
 		"maxHp": hp,
+		"starting_hp": starting_hp if starting_hp > 0 else hp,
 		"skills": skills,
 		"avatarPath": avatar_path,
 		"slug": slug

@@ -599,7 +599,11 @@ export function initGame(roomId, playersInput, modeId = "2v2") {
       heroId,
       generalName: hero?.name || p.generalName || `Tướng Ghế ${index + 1}`,
       maxHp,
-      hp: maxHp,
+      hp: (Number.isFinite(Number(p.hp)) && Number(p.hp) > 0)
+        ? Number(p.hp)
+        : (Number.isFinite(Number(hero?.startingHp)) && Number(hero?.startingHp) > 0
+          ? Number(hero.startingHp)
+          : maxHp),
       role,
       teamId: resolveRoleTeamId(modeRules, role, p.seat || index + 1) || resolvePlayerTeamId(modeRules, p, p.seat || index + 1),
       isAlly: modeRules.victory === "DYNASTY_ROLES" ? (role === "KING" || role === "LOYALIST") : resolvePlayerIsAlly(modeRules, p, p.seat || index + 1),
@@ -995,6 +999,9 @@ function getKhoanGianValue(player) {
 }
 
 export function getHandLimit(player) {
+  if (player?.permanentHandLimit !== undefined && player?.permanentHandLimit !== null && Number.isFinite(Number(player.permanentHandLimit))) {
+    return Number(player.permanentHandLimit);
+  }
   let limit = Math.max(0, Number(player?.hp) || 0);
   if (heroHasSkill(player, "XUNG_DE") && player.hp === player.maxHp) limit += 2;
   if (heroHasSkill(player, "TUNG_NGHIA") && hasHorseOrArmor(player)) limit += 1;
@@ -6254,6 +6261,38 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     return { success: true, state };
   }
 
+
+  if (state.phase === "AWAIT_HICH_NGHIA_REVIVE") {
+    const pending = state.pendingHichNghiaRevive;
+    const target = state.players.find((player) => player.seat === pending?.targetSeat);
+    if (!pending || !target || target.seat !== respondentSeat || !heroHasSkill(target, "HICH_NGHIA")) {
+      return { error: "Hịch Nghĩa không còn hiệu lực" };
+    }
+    state.pendingHichNghiaRevive = null;
+    if (accepted) {
+      applyHichNghiaRevive(state, target);
+      return resolveNearDeathResume(state);
+    }
+    if (startTrungKienPrompt(state, target, pending)
+        || startTrungTietPrompt(state, target, pending)
+        || startNearDeathRescue(state, target, pending.attackerSeat, pending.finalDamage, pending.armorEffect, pending.armorChargesRemaining, pending.armorExpired)) {
+      return { success: true, state };
+    }
+    target.hp = 0;
+    state.deathKillerSeat = pending.attackerSeat;
+    const deathSummary = finalizePlayerDeath(state, target);
+    recordAction(state, { type: "PLAYER_DIED", casterSeat: pending.attackerSeat, targetSeat: target.seat, description: `☠️ Không ai cứu viện! <b>${target.generalName}</b> đã tử trận!${deathSummary}` });
+    triggerTranTien(state, pending.attackerSeat, target.seat);
+    triggerVanThang(state, pending.attackerSeat, target.seat);
+    checkGameOver(state);
+    if (state.status !== "FINISHED") {
+      const uatKhiRes = triggerUatKhiDeath(state, target.seat);
+      if (uatKhiRes) return uatKhiRes;
+      return resolveNearDeathResume(state);
+    }
+    return { success: true, state };
+  }
+
   if (state.phase === "AWAIT_TRUNG_KIEN") {
     const pending = state.pendingNearDeath;
     const target = state.players.find((player) => player.seat === pending?.targetSeat);
@@ -6263,6 +6302,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     state.trungKienQueue.shift();
     if (accepted) {
       respondent.hp -= 1;
+      triggerHichNghiaHpLoss(state, respondent.seat);
       const beforeHp = target.hp;
       target.hp = 1;
       if (target.hp > beforeHp) triggerBaoLam(state, target.seat); triggerKhuyenNong(state, target.seat);
@@ -6331,6 +6371,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     state.trungTietQueue.shift();
     if (accepted) {
       respondent.hp -= 1;
+      triggerHichNghiaHpLoss(state, respondent.seat);
       drawCards(state, respondent.seat, 3);
       state.trungTietHelpers = state.trungTietHelpers || [];
       state.trungTietHelpers.push({ helperSeat: respondent.seat, victimSeat: target.seat });
@@ -6464,6 +6505,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     turnStart.truQuanResolved = true;
     if (accepted) {
       respondent.hp -= 1;
+      triggerHichNghiaHpLoss(state, respondent.seat);
       turnStart.drawCount = (Number(turnStart.drawCount) || 2) + 2;
       recordAction(state, {
         type: "TRU_QUAN_TRIGGERED",
@@ -7523,10 +7565,10 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     let aoeDamageResult = { finalDamage: 0, armorEffect: "", armorChargesRemaining: -1, armorExpired: false };
     if (!satisfied) {
       aoeDamageResult = applyDamageToPlayer(state, respondentSeat, 1, "đòn diện rộng");
-      if (["AWAIT_NEAR_DEATH", "AWAIT_TRUNG_KIEN"].includes(state.phase)) {
+      if (["AWAIT_NEAR_DEATH", "AWAIT_TRUNG_KIEN", "AWAIT_HICH_NGHIA_REVIVE"].includes(state.phase)) {
         return { success: true, state };
       }
-      if (state.phase !== "PLAY" && !["AWAIT_NEAR_DEATH", "AWAIT_TRUNG_KIEN"].includes(state.phase)) {
+      if (state.phase !== "PLAY" && !["AWAIT_NEAR_DEATH", "AWAIT_TRUNG_KIEN", "AWAIT_HICH_NGHIA_REVIVE"].includes(state.phase)) {
         state.pendingAfterUatKhi = {
           type: "AOE",
           activeCard: state.activeCard ? { ...state.activeCard } : null
@@ -7884,6 +7926,80 @@ function startTrungTietPrompt(state, target, context) {
   });
   return true;
 }
+export function applyHichNghiaRevive(state, target) {
+  if (!target) return;
+  target.hp = Math.min(target.maxHp || 4, 4);
+  target.hichNghiaLost = true;
+  target.hichNghiaRevived = true;
+  target.lostSkills = Array.isArray(target.lostSkills) ? target.lostSkills : [];
+  if (!target.lostSkills.includes("HICH_NGHIA")) target.lostSkills.push("HICH_NGHIA");
+  target.skills = (target.skills || []).filter((s) => s !== "HICH_NGHIA");
+  target.permanentHandLimit = 4;
+  target.usedSkills = target.usedSkills || {};
+  target.usedSkills.HichNghiaLost = true;
+  recordAction(state, {
+    type: "HICH_NGHIA_REVIVE",
+    casterSeat: target.seat,
+    targetSeat: target.seat,
+    skillActivations: [{ name: "Hịch Nghĩa", seat: target.seat }],
+    description: `✨ <b>${target.generalName}</b> kích hoạt <color=#FFD700><b>[Hịch Nghĩa]</b></color>: Máu về 0, hồi phục lên 4 Máu (${target.hp}/${target.maxHp}) và mất kỹ năng này! Giới hạn trữ bài vĩnh viễn là 4.`
+  });
+}
+
+function startHichNghiaRevivePrompt(state, target, context = {}) {
+  if (!heroHasSkill(target, "HICH_NGHIA")) return false;
+  if (target.isAI) {
+    applyHichNghiaRevive(state, target);
+    return false;
+  }
+  state.pendingHichNghiaRevive = { ...context, targetSeat: target.seat };
+  state.phase = "AWAIT_HICH_NGHIA_REVIVE";
+  state.waitingTargetSeat = target.seat;
+  state.waitingReactionType = "HICH_NGHIA_REVIVE";
+  state.waitingTimer = 40;
+  state.timerStartAt = Date.now();
+  recordAction(state, {
+    type: "HICH_NGHIA_PROMPT",
+    casterSeat: target.seat,
+    targetSeat: target.seat,
+    skillActivations: [{ name: "Hịch Nghĩa", seat: target.seat }],
+    description: `✨ <b>${target.generalName}</b> có thể chọn kích hoạt <color=#FFD700><b>[Hịch Nghĩa]</b></color>: Máu về 0, hồi lên 4 Máu và mất kỹ năng này (giới hạn trữ bài vĩnh viễn là 4).`
+  });
+  return true;
+}
+
+export function triggerHichNghiaHpLoss(state, damagedSeat, options = {}) {
+  if (options?.isHichNghiaSelfDamage) return;
+  const livingPlayers = (state.players || []).filter(
+    (p) => isLivingPlayer(p) && heroHasSkill(p, "HICH_NGHIA") && p.hp > 0
+  );
+  for (const player of livingPlayers) {
+    player.hp -= 1;
+    drawCards(state, player.seat, 3, true);
+    recordAction(state, {
+      type: "HICH_NGHIA_TRIGGERED",
+      casterSeat: player.seat,
+      damagedSeat,
+      skillActivations: [{ name: "Hịch Nghĩa", seat: player.seat }],
+      description: `🩸 <b>${player.generalName}</b> kích hoạt <color=#FFD700><b>[Hịch Nghĩa]</b></color>: Có người mất máu, tự mất 1 Máu (${player.hp}/${player.maxHp}) và rút 3 lá bài!`
+    });
+
+    if (player.hp <= 0) {
+      if (player.isAI) {
+        applyHichNghiaRevive(state, player);
+      } else {
+        if (state.phase !== "AWAIT_HICH_NGHIA_REVIVE") {
+          startHichNghiaRevivePrompt(state, player, {
+            attackerSeat: damagedSeat,
+            finalDamage: 1,
+            options: { isHichNghiaSelfDamage: true }
+          });
+        }
+      }
+    }
+  }
+}
+
 
 /**
  * Áp dụng sát thương lên người chơi và kích hoạt pha Hấp Hối (Near Death) nếu HP <= 0
@@ -8093,6 +8209,10 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
     });
   }
 
+  if (finalDamage > 0) {
+    triggerHichNghiaHpLoss(state, targetSeat, options);
+  }
+
   // XỬ LÝ LAN TRUYỀN SÁT THƯƠNG XÍCH LIÊN HOÀN (HỎA / THỦY)
   const isElemental = (damageElement === "FIRE" || damageElement === "WATER");
   const wasTargetChained = Boolean(target.isChained);
@@ -8115,20 +8235,20 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
   }
 
   if (target.hp <= 0) {
+    const nearDeathContext = { attackerSeat, finalDamage, armorEffect, armorChargesRemaining, armorExpired };
     if (heroHasSkill(target, "HICH_NGHIA")) {
-      drawCards(state, target.seat, 3, true);
-      recordAction(state, {
-        type: "USE_SKILL",
-        casterSeat: target.seat,
-        skillActivations: [{ name: "Hịch Nghĩa", seat: target.seat }],
-        description: `✨ <b>${target.generalName}</b> kích hoạt <color=#FFD700><b>[Hịch Nghĩa]</b></color>: Rơi vào trạng thái Cận Tử, lập tức rút 3 lá bài!`
-      });
+      if (target.isAI) {
+        applyHichNghiaRevive(state, target);
+        return { finalDamage, enteredNearDeath: false, armorEffect, armorChargesRemaining, armorExpired };
+      }
+      if (startHichNghiaRevivePrompt(state, target, nearDeathContext)) {
+        return { finalDamage, enteredNearDeath: true, armorEffect, armorChargesRemaining, armorExpired };
+      }
     }
 
     // Máu có thể âm khi sát thương lớn hơn máu hiện tại
     // target.hp = 0; // KHÔNG SET VỀ 0 NẾU ÂM! Để dành cho Bánh Chưng cộng dồn
 
-    const nearDeathContext = { attackerSeat, finalDamage, armorEffect, armorChargesRemaining, armorExpired };
     if (startTrungKienPrompt(state, target, nearDeathContext)
         || startTrungTietPrompt(state, target, nearDeathContext)
         || startNearDeathRescue(state, target, attackerSeat, finalDamage, armorEffect, armorChargesRemaining, armorExpired)) {
@@ -8189,7 +8309,7 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
 
   if (state.pendingChainSpread) {
     const chainResult = continueChainSpread(state);
-    if (["AWAIT_NEAR_DEATH", "AWAIT_UAT_KHI", "AWAIT_TRUNG_KIEN"].includes(state.phase)) return chainResult;
+    if (["AWAIT_NEAR_DEATH", "AWAIT_UAT_KHI", "AWAIT_TRUNG_KIEN", "AWAIT_HICH_NGHIA_REVIVE"].includes(state.phase)) return chainResult;
   }
   return { finalDamage, enteredNearDeath: false, armorEffect, armorChargesRemaining, armorExpired };
 }
@@ -9468,6 +9588,10 @@ export function handleAIReaction(state, aiSeat) {
       ? handleRespondAction(state, aiSeat, true, discard.id, "DRAW", null, 0, { choice: "DRAW" }) : handleRespondAction(state, aiSeat, false, null);
   }
 
+  if (state.phase === "AWAIT_HICH_NGHIA_REVIVE" && state.waitingTargetSeat === aiSeat) {
+    return handleRespondAction(state, aiSeat, true, null);
+  }
+
   if (state.phase === "AWAIT_TRUNG_KIEN" && state.waitingTargetSeat === aiSeat) {
     const victimSeat = Number(state.pendingNearDeath?.targetSeat) || 0;
     const victim = state.players.find((p) => p.seat === victimSeat);
@@ -9851,6 +9975,8 @@ export function executeFallbackReactionForSeat(state, waitingSeat, waitingPlayer
     return handleUseSkill(state, waitingSeat, "Huynh Trưởng", 0);
   } else if (state.phase === "AWAIT_THU_MUC") {
     return handleRespondAction(state, waitingSeat, false, null);
+  } else if (state.phase === "AWAIT_HICH_NGHIA_REVIVE") {
+    return handleRespondAction(state, waitingSeat, true, null);
   } else if (["AWAIT_AN_TICH", "AWAIT_OAI_NHUOC", "AWAIT_CHUYEN_CHE_RESPOND", "AWAIT_BON_PHAN", "AWAIT_NAM_QUOC_SON_HA",
     "AWAIT_DAN_CAU", "AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_CAN_GIAN", "AWAIT_THANG_MOC", "AWAIT_TRUNG_KIEN",
     "AWAIT_CHINH_THONG_TARGET", "AWAIT_CHINH_THONG_GIVE", "AWAIT_KHOAN_HOA", "AWAIT_NGHIA_TU",

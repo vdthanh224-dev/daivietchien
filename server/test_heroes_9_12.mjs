@@ -122,6 +122,8 @@ function game(heroIds = ["HERO_9", "HERO_1", "HERO_2", "HERO_3"]) {
 
 {
   const state = game(["HERO_9", "HERO_3", "HERO_2", "HERO_4"]);
+  state.players[1].hp = 4;
+  state.players[1].hichNghiaLost = true;
   state.players[0].hand = [basic("fire-one-damage", CARD_SUBTYPES.ATTACK_FIRE, "Heart")];
   handlePlayCard(state, 1, "fire-one-damage", 2);
   handleRespondAction(state, 2, false, null);

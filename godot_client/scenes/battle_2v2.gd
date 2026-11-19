@@ -34,6 +34,9 @@ const HERO_SKILL_ACTIONS := {
 	"XUNG_DE_TRIGGERED": {"name": "Xưng Đế"},
 	"TUNG_NGHIA_DRAW": {"name": "Tùng Nghĩa"},
 	"TRUNG_KIEN_TRIGGERED": {"name": "Trung Kiên"},
+	"HICH_NGHIA_TRIGGERED": {"name": "Hịch Nghĩa"},
+	"HICH_NGHIA_REVIVE": {"name": "Hịch Nghĩa"},
+	"HICH_NGHIA_PROMPT": {"name": "Hịch Nghĩa"},
 	"VAN_SACH_PROMPT": {"name": "Văn Sách"},
 	"VAN_SACH_TRIGGERED": {"name": "Văn Sách"},
 	"VAN_SACH_DECLINED": {"name": "Văn Sách"},
@@ -2466,7 +2469,10 @@ func _init_generals_from_draft() -> void:
 		var is_ally: bool = (is_drag == my_team_is_dragon) if not is_dynasty else (role_code in ["KING", "LOYALIST"] and local_dynasty_role in ["KING", "LOYALIST"])
 
 		var avatar_node = seat_to_avatar[s_num]
-		avatar_node.setup_general(slug, h_name, h_faction, h_hp, h_hp, role_str, s_num, slot_user_name, is_p, is_ally)
+		var start_hp = int(hero_info.get("starting_hp", h_hp))
+		if start_hp <= 0:
+			start_hp = h_hp
+		avatar_node.setup_general(slug, h_name, h_faction, start_hp, h_hp, role_str, s_num, slot_user_name, is_p, is_ally)
 		if is_dynasty:
 			var can_guess_role := (not is_p and role_code.is_empty())
 			avatar_node.set_role_guess_enabled(can_guess_role, "?")
@@ -2503,7 +2509,7 @@ func _init_generals_from_draft() -> void:
 			"player_name": slot_user_name,
 			"hero_id": int(hero_info.get("id", s_num)),
 			"faction": h_faction,
-			"hp": h_hp,
+			"hp": start_hp,
 			"max_hp": h_hp,
 			"hand_count": 0,
 			"an_tich_count": 0,
@@ -2550,6 +2556,10 @@ func _hero_has_skill(g: Dictionary, skill_id: String) -> bool:
 		if h is Dictionary and not h.is_empty():
 			hero_id = int(h.get("id", 0))
 	var s_id = skill_id.to_lower().strip_edges()
+	if s_id == "hich_nghia" and g.get("hich_nghia_lost", false):
+		return false
+	if g.has("lost_skills") and g["lost_skills"] is Array and s_id in g["lost_skills"]:
+		return false
 	# These two heroes share a legacy skill name in old snapshots. Their numeric
 	# IDs are authoritative so a stale hero_data/skills array can never leak
 	# Dương Vân Nga's Trao Bào button onto Ỷ Lan.
@@ -5586,7 +5596,7 @@ func _on_card_play_btn_clicked() -> void:
 		NetworkClient.send_respond_action(true, str(_get_card_info_from_ui(selected_card_ui).get("id", "")))
 		card_play_btn.disabled = true
 		return
-	if current_server_phase in ["AWAIT_AN_DAN", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_TRUNG_KIEN", "AWAIT_TRU_QUAN", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE"] and current_waiting_seat == my_seat:
+	if current_server_phase in ["AWAIT_AN_DAN", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_TRUNG_KIEN", "AWAIT_TRU_QUAN", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_HICH_NGHIA_REVIVE"] and current_waiting_seat == my_seat:
 		NetworkClient.send_respond_action(true, "")
 		card_play_btn.disabled = true
 		return
@@ -7464,6 +7474,10 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		g["is_wine_buff_active"] = bool(p.get("isWineBuffActive", g.get("is_wine_buff_active", false)))
 		g["wine_used_this_turn"] = bool(p.get("wineUsedThisTurn", g.get("wine_used_this_turn", false)))
 		g["used_skills_keys"] = p.get("usedSkillsKeys", []) if p.get("usedSkillsKeys", []) is Array else []
+		if p.has("permanentHandLimit") and p["permanentHandLimit"] != null:
+			g["permanent_hand_limit"] = int(p["permanentHandLimit"])
+		if bool(p.get("hichNghiaLost", false)):
+			g["hich_nghia_lost"] = true
 		g["an_tich_count"] = int(p.get("anTichCount", 1 if bool(p.get("hasAnTich", false)) else 0))
 		g["an_tich_cards"] = p.get("anTichCards", []) if p.get("anTichCards", []) is Array else []
 		if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
@@ -7968,7 +7982,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		elif server_waiting_seat != my_seat:
 			turn_indicator.text = "🐘 ĐANG CHỜ MỤC TIÊU CHỌN OAI NHƯỢC (%ds)..." % server_waiting_timer
 
-	elif server_phase in ["AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_TRUNG_KIEN", "AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP"]:
+	elif server_phase in ["AWAIT_AN_DAN", "AWAIT_AN_DAN_DUEL", "AWAIT_DA_TRACH_DISCARD", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_VAN_SACH", "AWAIT_TRUNG_KIEN", "AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_HICH_NGHIA_REVIVE"]:
 		is_player_turn = false
 		if server_waiting_seat == my_seat:
 			card_play_btn.visible = true
@@ -8082,6 +8096,11 @@ func _apply_network_game_state(state: Dictionary) -> void:
 					card_play_btn.text = "👑 CHỌN NGƯỜI ĐANG MẤT MÁU"
 					card_play_btn.disabled = true
 				desc_text.text = "Bạn đã thắng đấu điểm! Hãy nhấp chọn 1 người đang bị mất máu để hồi 1 Máu."
+			elif server_phase == "AWAIT_HICH_NGHIA_REVIVE":
+				card_play_btn.text = "✨ HỒI 4 MÁU"
+				end_turn_btn.text = "TỪ CHỐI"
+				turn_indicator.text = "✨ HỊCH NGHĨA: HỒI 4 MÁU? (%ds)" % server_waiting_timer
+				desc_text.text = "Máu của bạn về 0. Bạn có thể chọn hồi lên đến 4 máu và mất kỹ năng này (giới hạn trữ bài vĩnh viễn là 4)."
 			else:
 				card_play_btn.text = "🛡️ PHÁT ĐỘNG TRUNG KIÊN"
 				turn_indicator.text = "🛡️ TRUNG KIÊN: CỨU NGƯỜI SẮP TỬ TRẬN (%ds)" % server_waiting_timer
@@ -8096,6 +8115,9 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			elif server_phase == "AWAIT_NHIEP_CHINH":
 				turn_indicator.text = "👑 ĐANG CHỜ %s PHÁT ĐỘNG NHIẾP CHÍNH (%ds)..." % [wait_name, server_waiting_timer]
 				desc_text.text = "👑 %s đang quyết định đấu điểm [Nhiếp Chính]..." % wait_name
+			elif server_phase == "AWAIT_HICH_NGHIA_REVIVE":
+				turn_indicator.text = "✨ ĐANG CHỜ %s QUYẾT ĐỊNH HỊCH NGHĨA (%ds)..." % [wait_name.to_upper(), server_waiting_timer]
+				desc_text.text = "✨ %s đang chọn hồi 4 Máu bằng [Hịch Nghĩa]..." % wait_name
 			elif server_phase == "AWAIT_NHIEP_CHINH_DUEL_OPPONENT":
 				turn_indicator.text = "👑 ĐANG CHỜ %s RA LÁ ĐẤU ĐIỂM (%ds)..." % [wait_name, server_waiting_timer]
 				desc_text.text = "👑 %s đang chọn 1 lá trên tay để đấu điểm..." % wait_name
@@ -11354,6 +11376,36 @@ func _play_armor_effect(target_seat: int, armor_name: String, success: bool = tr
 		else:
 			_animate_showcase_card("Khiên Mây Bện", "🛡️ [Khiên Mây Bện] của %s lật ĐEN -> Phán xét thất bại!" % tgt["name"])
 
+func _trigger_hich_nghia_on_hp_loss(damaged_seat: int) -> void:
+	for s_num in generals_data.keys():
+		var g = generals_data[s_num]
+		if not g.get("is_alive", false):
+			continue
+		if not _hero_has_skill(g, "hich_nghia"):
+			continue
+		if int(g.get("hp", 0)) <= 0:
+			continue
+		g["hp"] = max(0, int(g["hp"]) - 1)
+		g["avatar_node"].update_hp(g["hp"], g["max_hp"])
+		for _i in range(3):
+			var hich_card = _draw_card_from_pile()
+			if s_num == my_seat:
+				_add_card_to_player_hand(hich_card)
+			else:
+				g["hand_cards"].append(hich_card)
+				g["hand_count"] = g["hand_cards"].size()
+				_animate_draw_to_seat(s_num)
+		if s_num != my_seat:
+			g["avatar_node"].update_hand_count(g["hand_count"])
+		_add_log("🩸 [HỊCH NGHĨA] %s kích hoạt: Có người mất máu, tự mất 1 Máu và rút 3 lá bài!" % g["name"])
+
+		if int(g["hp"]) <= 0:
+			g["hp"] = 4
+			g["avatar_node"].update_hp(4, g["max_hp"])
+			g["hich_nghia_lost"] = true
+			g["permanent_hand_limit"] = 4
+			_add_log("✨ [HỊCH NGHĨA] %s máu về 0, kích hoạt hồi phục lên 4 Máu và mất kỹ năng này! Giới hạn trữ bài vĩnh viễn là 4." % g["name"])
+
 func _apply_damage_to_general(target_seat: int, amount: int, attacker_seat: int = -1, damage_element: String = "NORMAL", is_major_damage: bool = false) -> void:
 	if not generals_data.has(target_seat):
 		return
@@ -11388,6 +11440,7 @@ func _apply_damage_to_general(target_seat: int, amount: int, attacker_seat: int 
 		_trigger_damage_effects(target_seat, amount, damage_element, is_major_damage)
 		if attacker_seat == current_turn_seat and attacker_seat != target_seat:
 			local_turn_dealt_damage = true
+		_trigger_hich_nghia_on_hp_loss(target_seat)
 	tgt["avatar_node"].update_hp(tgt["hp"], tgt["max_hp"])
 
 	_add_log("💥 %s nhận %d sát thương! Còn (%d/%d) Máu." % [tgt["name"], amount, tgt["hp"], tgt["max_hp"]])
@@ -11414,18 +11467,14 @@ func _apply_damage_to_general(target_seat: int, amount: int, attacker_seat: int 
 				_apply_damage_to_general(other_seat, amount, attacker_seat, damage_element)
 
 	if tgt["hp"] <= 0:
-		if amount > 0 and _hero_has_skill(tgt, "hich_nghia"):
-			for _draw_index in range(3):
-				var hich_card = _draw_card_from_pile()
-				if target_seat == my_seat:
-					_add_card_to_player_hand(hich_card)
-				else:
-					tgt["hand_cards"].append(hich_card)
-					tgt["hand_count"] = tgt["hand_cards"].size()
-					_animate_draw_to_seat(target_seat)
-			if target_seat != my_seat:
-				tgt["avatar_node"].update_hand_count(tgt["hand_count"])
-			_add_log("✨ [HỊCH NGHĨA] %s rơi vào Cận Tử, rút 3 lá bài!" % tgt["name"])
+		if _hero_has_skill(tgt, "hich_nghia"):
+			tgt["hp"] = 4
+			tgt["avatar_node"].update_hp(4, tgt["max_hp"])
+			tgt["hich_nghia_lost"] = true
+			tgt["permanent_hand_limit"] = 4
+			_add_log("✨ [HỊCH NGHĨA] %s máu về 0, kích hoạt hồi phục lên 4 Máu và mất kỹ năng này! Giới hạn trữ bài vĩnh viễn là 4." % tgt["name"])
+			_check_victory_condition()
+			return
 		near_death_attacker_seat = attacker_seat
 		_prompt_near_death_check(target_seat)
 	else:
@@ -13204,6 +13253,8 @@ func _recover_stuck_ai_turn(ai_seat: int) -> void:
 		_next_turn()
 
 func _get_general_hand_limit(general: Dictionary) -> int:
+	if general.has("permanent_hand_limit") and general["permanent_hand_limit"] != null and int(general["permanent_hand_limit"]) >= 0:
+		return int(general["permanent_hand_limit"])
 	var limit = int(general.get("hp", 0))
 	if general.get("thai_binh_buff", 0) > 0:
 		limit += int(general.get("thai_binh_buff", 0))
@@ -13266,7 +13317,7 @@ func _on_end_turn_btn_clicked() -> void:
 	if current_server_phase == "AWAIT_THU_PHAP_DISCARD" and current_waiting_seat == my_seat:
 		desc_text.text = "⚠️ [Thủ Pháp]: Bạn bắt buộc phải chọn 1 lá bài trên tay để bỏ."
 		return
-	if current_server_phase in ["AWAIT_AN_DAN", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_TRUNG_KIEN", "AWAIT_VAN_SACH", "AWAIT_CAN_GIAN", "AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_MUU_DINH_CHOICE"] and current_waiting_seat == my_seat:
+	if current_server_phase in ["AWAIT_AN_DAN", "AWAIT_HOA_DAN", "AWAIT_DUNG_NUOC", "AWAIT_HAN_LAM", "AWAIT_TRUNG_KIEN", "AWAIT_VAN_SACH", "AWAIT_CAN_GIAN", "AWAIT_TRU_QUAN", "AWAIT_COT_KINH_TARGET", "AWAIT_TRUNG_TIET", "AWAIT_CAN_VE", "AWAIT_THU_PHUC", "AWAIT_PHO_TA", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NHIEP_CHINH", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_MUU_DINH_CHOICE", "AWAIT_HICH_NGHIA_REVIVE"] and current_waiting_seat == my_seat:
 		_close_muu_dinh_modal()
 		NetworkClient.send_respond_action(false, "")
 		end_turn_btn.disabled = true

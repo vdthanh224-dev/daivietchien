@@ -9,7 +9,7 @@ export const FACTIONS = {
 export const HEROES = {
   HERO_1: { id: 'HERO_1', name: 'Cao Lỗ', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['CHE_NO'] },
   HERO_2: { id: 'HERO_2', name: 'Đào Hãn', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['XA_THUAN', 'PHU_TRAN'] },
-  HERO_3: { id: 'HERO_3', name: 'Thi Sách', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['HICH_NGHIA', 'UAT_KHI'] },
+  HERO_3: { id: 'HERO_3', name: 'Thi Sách', faction: FACTIONS.DAI_VIET, maxHp: 4, startingHp: 2, skills: ['HICH_NGHIA', 'UAT_KHI'] },
   HERO_4: { id: 'HERO_4', name: 'Lê Chân', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['TRIEU_DANG', 'LAP_LANG'] },
   HERO_5: { id: 'HERO_5', name: 'Thánh Thiên', faction: FACTIONS.DAI_VIET, maxHp: 4, skills: ['DUNG_NU', 'THU_MUC'] },
   HERO_6: { id: 'HERO_6', name: 'Vũ Thị Thục', faction: FACTIONS.DAI_VIET, maxHp: 3, skills: ['TRINH_LIET', 'BAT_NA'] },
@@ -141,7 +141,7 @@ export const SKILLS = {
   LIEN_CHAU: { id: 'LIEN_CHAU', name: 'Liên Châu', type: 'OPTIONAL', description: 'Bạn đánh ra lá Trảm khi đang đeo Nỏ Thần Kim Quy, bạn có thể bỏ thêm 1 lá bài trên tay để chọn thêm 1 mục tiêu khác trong Tầm đánh.' },
   XA_THUAN: { id: 'XA_THUAN', name: 'Xạ Thuẫn', type: 'PASSIVE', description: 'Bạn mặc định tăng 2 tầm Ngựa công.' },
   PHU_TRAN: { id: 'PHU_TRAN', name: 'Phù Trấn', type: 'ACTIVE', description: 'Khi bạn sử dụng Trảm mà không đeo vũ khí, bạn được rút 3 lá bài. Bạn có thể đổi vũ khí lấy lá mới.' },
-  HICH_NGHIA: { id: 'HICH_NGHIA', name: 'Hịch Nghĩa', type: 'TRIGGERED', description: 'Khi bạn rơi vào trạng thái Cận Tử, bạn lập tức rút 3 lá bài.' },
+  HICH_NGHIA: { id: 'HICH_NGHIA', name: 'Hịch Nghĩa', type: 'TRIGGERED', description: 'Mỗi khi có người mất máu, bạn tự mất 1 máu và rút 3 lá. Khi máu của bạn về 0, bạn có thể chọn hồi lên đến 4 máu và mất kỹ năng này, đổi lại, giới hạn trữ bài của bạn vĩnh viễn là 4.' },
   UAT_KHI: { id: 'UAT_KHI', name: 'Uất Khí', type: 'TRIGGERED', description: 'Khi bạn tử trận, chọn tối đa 2 người, mỗi người trong họ được hồi 1 máu và rút 2 lá bài.' },
   TRIEU_DANG: { id: 'TRIEU_DANG', name: 'Triều Dâng', type: 'ACTIVE', description: 'Một lần mỗi lượt, chỉ định hủy 1 lá trang bị của 1 người khác.' },
   LAP_LANG: { id: 'LAP_LANG', name: 'Lập Làng', type: 'TRIGGERED', description: 'Cuối lượt của mình, nếu bạn không gây sát thương, bạn rút 2 lá bài.' },
@@ -556,6 +556,8 @@ export function getSkillById(skillId) {
 }
 
 export function heroHasSkill(player, skillId) {
+  if (Array.isArray(player?.lostSkills) && player.lostSkills.includes(skillId)) return false;
+  if (player?.hichNghiaLost && skillId === "HICH_NGHIA") return false;
   if (Array.isArray(player?.skills) && player.skills.includes(skillId)) return true;
   return !!getHeroById(normalizeHeroId(player?.heroId, player?.generalName))?.skills?.includes(skillId);
 }

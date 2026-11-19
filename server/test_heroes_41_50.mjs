@@ -394,6 +394,7 @@ function createTestState(heroIds = ["HERO_41", "HERO_42", "HERO_43", "HERO_44"])
   // Thang Mộc: at end of P3's turn, P2 is asked if they want to activate Thang Mộc
   state.turnSeat = 3;
   state.phase = "PLAY";
+  state.players[2].hand = [];
   p2.isAI = false;
   p2.hand = [];
   const endRes = handleEndTurn(state, 3);

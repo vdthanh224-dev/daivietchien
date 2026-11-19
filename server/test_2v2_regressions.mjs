@@ -203,6 +203,9 @@ assert.equal(HERO_MAX_HP[7], 4);
 
   // Thi Sách takes lethal damage
   applyDamageToPlayer(state, 2, 1, "Kiểm thử tử trận");
+  if (state.phase === "AWAIT_HICH_NGHIA_REVIVE") {
+    handleRespondAction(state, 2, false, null);
+  }
   assert.equal(state.phase, "AWAIT_NEAR_DEATH");
   while (state.phase === "AWAIT_NEAR_DEATH") {
     handleRespondAction(state, state.waitingTargetSeat, false, null);
@@ -226,6 +229,7 @@ assert.equal(HERO_MAX_HP[7], 4);
   // Test: Uất Khí sequential 2-step selection (pick 1 target while another ally exists -> prompt again -> pick 2nd target)
   const state = freshState();
   state.players[1].heroId = 3; // Thi Sách (Seat 2)
+  state.players[1].hichNghiaLost = true;
   state.players[1].hp = 1;
   state.players[0].hp = 2; // Enemy Seat 1
   state.players[3].hp = 2; // Ally Seat 4
@@ -257,6 +261,7 @@ assert.equal(HERO_MAX_HP[7], 4);
   // Test: Uất Khí supports choosing multiple targets at once ("4,1")
   const state = freshState();
   state.players[1].heroId = 3; // Thi Sách (Seat 2)
+  state.players[1].hichNghiaLost = true;
   state.players[1].hp = 1;
   state.players[0].hp = 2; // Enemy Seat 1
   state.players[3].hp = 1; // Ally Seat 4
@@ -1433,6 +1438,7 @@ for (const [subType, name] of [
   // Test: Uất Khí AI reaction and timeout decline
   const state = freshState();
   state.players[1].heroId = 3; // Thi Sách (Seat 2)
+  state.players[1].hichNghiaLost = true;
   state.players[1].isAI = true;
   state.players[1].hp = 1;
   state.players[3].hp = 2; // Ally Seat 4
@@ -1459,6 +1465,7 @@ for (const [subType, name] of [
   // Test timeout decline
   const state2 = freshState();
   state2.players[1].heroId = 3; // Thi Sách
+  state2.players[1].hichNghiaLost = true;
   state2.players[1].hp = 1;
   applyDamageToPlayer(state2, 2, 1, "Sát thương chí mạng");
   while (state2.phase === "AWAIT_NEAR_DEATH") {

@@ -79,6 +79,7 @@ function restoreLegacyPrompt(state) {
   handlePlayCard(state, 1, "slash-2", 2);
   handleRespondAction(state, 2, false, null);
   restoreLegacyPrompt(state);
+  state.players[1].hand = [];
 
   assert.equal(state.phase, "AWAIT_UAT_KHI");
   assert.equal(state.waitingTargetSeat, 2);
@@ -108,6 +109,7 @@ function restoreLegacyPrompt(state) {
   handlePlayCard(state, 1, "slash-3", 2);
   handleRespondAction(state, 2, false, null);
   restoreLegacyPrompt(state);
+  state.players[1].hand = [];
 
   assert.equal(state.phase, "AWAIT_UAT_KHI");
 
