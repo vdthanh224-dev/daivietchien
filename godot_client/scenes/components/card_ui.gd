@@ -34,12 +34,12 @@ func _ready() -> void:
 	if card_data:
 		update_card(card_data)
 
-func setup_card_data(id: String, p_name: String, rank_val: Variant, suit_str: String, cat: int, desc: String, sub_type_val: int = -1) -> void:
+func setup_card_data(id: String, p_name: String, rank_val: Variant, suit_str: String, cat: int, desc: String, sub_type_val: int = -1, allow_override: bool = false) -> void:
 	# The card ID is authoritative. Network payloads can contain stale names or
 	# categories after a card was migrated; resolve known IDs through the local
 	# canonical catalog before rendering or inferring anything from the name.
 	var canonical_id := CardDatabaseScript.canonical_id(id) if CardDatabaseScript else id
-	if (canonical_id.begins_with("D80_") or canonical_id.begins_with("D150_")) and CardDatabaseScript:
+	if not allow_override and (canonical_id.begins_with("D80_") or canonical_id.begins_with("D150_")) and CardDatabaseScript:
 		var canonical = CardDatabaseScript.get_card(canonical_id)
 		if canonical != null and str(canonical.id) == canonical_id:
 			p_name = canonical.card_name
@@ -70,6 +70,7 @@ func setup_card_data(id: String, p_name: String, rank_val: Variant, suit_str: St
 		if cat == 0:
 			res.category = _infer_category_from_name(p_name)
 	res.description = desc
+	res.set_meta("custom_override", allow_override)
 	update_card(res)
 
 static func _infer_sub_type_from_name(p_name: String) -> int:
@@ -121,7 +122,7 @@ func update_card(data: Resource) -> void:
 	card_data = data
 	card_name = data.card_name
 	# Keep the hover tooltip aligned with the canonical local card description.
-	if not str(data.id).is_empty():
+	if not str(data.id).is_empty() and not (data.has_meta("custom_override") and bool(data.get_meta("custom_override"))):
 		var database_card = CardDatabaseScript.get_card(str(data.id))
 		if database_card != null and not str(database_card.description).is_empty():
 			data.description = database_card.description

@@ -3,25 +3,27 @@ import { CARD_CATEGORIES, CARD_SUBTYPES } from './functions/game-engine/src/deck
 import {
   initGame,
   handlePlayCard,
+  handleToggleSkill,
   handleUseSkill,
-  handleEndTurn,
-  handleAIStep
+  handleEndTurn
 } from './functions/game-engine/src/gameEngine.js';
 import {
   getHeroById,
-  heroHasSkill
+  heroHasSkill,
+  SKILLS
 } from './functions/game-engine/src/heroes.js';
 
-console.log("=== Testing Cao Lỗ: Cơ Biến Skill ===");
+console.log("=== Testing Cao Lỗ: Chế Nỏ Skill & Mechanics ===");
 
 // 1. Check Hero definition and skills
 const caoLo = getHeroById("HERO_1");
 assert.equal(caoLo.name, "Cao Lỗ");
-assert.deepEqual(caoLo.skills, ["CHE_NO", "CO_BIEN"]);
+assert.deepEqual(caoLo.skills, ["CHE_NO"], "Cao Lỗ chỉ có skill 1 Chế Nỏ, skill 2 Cơ Biến đã được loại bỏ");
 assert.equal(caoLo.maxHp, 4);
+assert.match(SKILLS.CHE_NO.description, /Khi sử dụng Nỏ Thần Kim Quy, bốc 1 lá bài/, "Mô tả Chế Nỏ có hiệu ứng bốc 1 lá bài");
 
 function createTestState() {
-  return initGame("TEST_CAO_LO_CO_BIEN", [
+  return initGame("TEST_CAO_LO_CHE_NO", [
     { id: "u1", name: "Cao Lỗ", heroId: "HERO_1", seat: 1, isAI: false },
     { id: "u2", name: "Đào Hãn", heroId: "HERO_2", seat: 2, isAI: true },
     { id: "u3", name: "Thi Sách", heroId: "HERO_3", seat: 3, isAI: true },
@@ -29,113 +31,103 @@ function createTestState() {
   ]);
 }
 
-// 2. Mechanics: Exchange Black card from hand
+// 2. Chế Nỏ toggling: Black cards (Spade & Club) convert to Nỏ Thần Kim Quy; Red cards remain
 {
   const state = createTestState();
   const p1 = state.players[0];
-  assert.equal(heroHasSkill(p1, "CO_BIEN"), true);
   assert.equal(heroHasSkill(p1, "CHE_NO"), true);
-  assert.equal(heroHasSkill(p1, "LIEN_CHAU"), false);
+  assert.equal(heroHasSkill(p1, "CO_BIEN"), false, "Không còn Cơ Biến");
 
   state.phase = "PLAY";
   state.turnSeat = 1;
   p1.hand = [
     { id: "CARD_SPADE", name: "Trảm Đen", suit: "Spade", rank: 7, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
-    { id: "CARD_HEART", name: "Bánh Chưng", suit: "Heart", rank: 9, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH },
-    { id: "CARD_CLUB", name: "Đỡ Đen", suit: "Club", rank: 3, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE }
+    { id: "CARD_CLUB", name: "Đỡ Chuồn", suit: "Club", rank: 3, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE },
+    { id: "CARD_HEART", name: "Bánh Chưng", suit: "Heart", rank: 9, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH }
+  ];
+
+  // Bật Chế Nỏ
+  const toggleOn = handleToggleSkill(state, 1, "Chế Nỏ");
+  assert.equal(toggleOn.success, true);
+  assert.equal(p1.activeSkills["Chế Nỏ"], true);
+
+  // Cả Spade và Club đều biến thành Nỏ Thần Kim Quy (Trang bị / Vũ khí)
+  assert.equal(p1.hand[0].name, "Nỏ Thần Kim Quy");
+  assert.equal(p1.hand[0].category, CARD_CATEGORIES.EQUIPMENT);
+  assert.equal(p1.hand[0].subType, CARD_SUBTYPES.WEAPON);
+
+  assert.equal(p1.hand[1].name, "Nỏ Thần Kim Quy");
+  assert.equal(p1.hand[1].category, CARD_CATEGORIES.EQUIPMENT);
+  assert.equal(p1.hand[1].subType, CARD_SUBTYPES.WEAPON);
+
+  // Lá Đỏ giữ nguyên
+  assert.equal(p1.hand[2].name, "Bánh Chưng");
+  assert.equal(p1.hand[2].category, CARD_CATEGORIES.BASIC);
+
+  // Tắt Chế Nỏ -> Phục hồi các lá bài cũ
+  const toggleOff = handleToggleSkill(state, 1, "Chế Nỏ");
+  assert.equal(toggleOff.success, true);
+  assert.equal(p1.activeSkills["Chế Nỏ"], false);
+  assert.equal(p1.hand[0].name, "Trảm Đen");
+  assert.equal(p1.hand[1].name, "Đỡ Chuồn");
+  assert.equal(p1.hand[2].name, "Bánh Chưng");
+  console.log("✅ Chế Nỏ: Chuyển đổi bài Đen (Spade/Club) và hoàn tác thành công");
+}
+
+// 3. Sử dụng Nỏ Thần Kim Quy bốc 1 lá bài
+{
+  const state = createTestState();
+  const p1 = state.players[0];
+  state.phase = "PLAY";
+  state.turnSeat = 1;
+
+  p1.hand = [
+    { id: "BLACK_CARD_1", name: "Trảm Thường", suit: "Spade", rank: 8, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
+    { id: "RED_CARD_1", name: "Bánh Chưng", suit: "Heart", rank: 5, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH }
   ];
   state._deck = [
-    { id: "DRAWN_1", name: "Cẩm Nang 1", suit: "Diamond", rank: 5, category: CARD_CATEGORIES.INSTANT_SCROLL, subType: CARD_SUBTYPES.DISMANTLE },
-    { id: "DRAWN_2", name: "Cẩm Nang 2", suit: "Heart", rank: 6, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH }
+    { id: "DECK_CARD_1", name: "Lá Bài Rút", suit: "Diamond", rank: 9, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE }
   ];
   state._discard = [];
 
-  // A. Red card cannot be exchanged
-  const redRes = handleUseSkill(state, 1, "Cơ Biến", 0, "CARD_HEART");
-  assert.ok(redRes.error);
-  assert.match(redRes.error, /Cơ Biến cần chọn 1 lá bài Đen/);
+  // Bật Chế Nỏ
+  handleToggleSkill(state, 1, "Chế Nỏ");
+  assert.equal(p1.hand[0].name, "Nỏ Thần Kim Quy");
 
-  // B. Black card (Spade) exchanged successfully
-  const spadeRes = handleUseSkill(state, 1, "Cơ Biến", 0, "CARD_SPADE");
-  assert.equal(spadeRes.success, true);
-  assert.equal(p1.hand.some(c => c.id === "CARD_SPADE"), false);
-  assert.equal(p1.hand.some(c => c.id === "DRAWN_2"), true);
-  assert.equal(state._discard.some(c => c.id === "CARD_SPADE"), true);
-  assert.equal(state.lastAction.type, "CO_BIEN_TRIGGERED");
+  // Đánh (trang bị) Nỏ Thần Kim Quy
+  const playRes = handlePlayCard(state, 1, "BLACK_CARD_1");
+  assert.equal(playRes.success, true);
 
-  // C. Second Black card (Club) can also be exchanged in same turn (unlimited active recast)
-  const clubRes = handleUseSkill(state, 1, "Cơ Biến", 0, "CARD_CLUB");
-  assert.equal(clubRes.success, true);
-  assert.equal(p1.hand.some(c => c.id === "CARD_CLUB"), false);
-  assert.equal(p1.hand.some(c => c.id === "DRAWN_1"), true);
-  assert.equal(state._discard.some(c => c.id === "CARD_CLUB"), true);
-  console.log("✅ Cao Lỗ: Cơ Biến đổi bài Đen trên tay thành công");
+  // Kiểm tra: Nỏ Thần Kim Quy đã vào trang bị
+  assert.equal(p1.equipments.length, 1);
+  assert.equal(p1.equipments[0].name, "Nỏ Thần Kim Quy");
+
+  // Kiểm tra hiệu ứng: Cao Lỗ bốc 1 lá bài từ deck
+  assert.equal(p1.hand.some(c => c.id === "DECK_CARD_1"), true, "Cao Lỗ đã bốc 1 lá bài mới khi dùng Nỏ Thần Kim Quy");
+  assert.equal(p1.hand.length, 2, "1 lá bỏ đi trang bị, 1 lá rút mới, 1 lá cũ -> còn 2 lá");
+  assert.equal(state.lastAction.type, "EQUIP");
+  console.log("✅ Chế Nỏ: Khi sử dụng Nỏ Thần Kim Quy, bốc 1 lá bài thành công");
 }
 
-// 3. Mechanics: Exchange Black card from Equipment
+// 4. Sử dụng Nỏ Thần Kim Quy thật (không qua Chế Nỏ) cũng kích hoạt bốc 1 lá bài
 {
   const state = createTestState();
   const p1 = state.players[0];
   state.phase = "PLAY";
   state.turnSeat = 1;
+
   p1.hand = [
-    { id: "HAND_RED", name: "Bánh Chưng", suit: "Heart", rank: 9, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH }
-  ];
-  p1.equipments = [
-    { id: "BLACK_ARMOR", name: "Giáp Hắc Thiết", suit: "Spade", rank: 2, category: CARD_CATEGORIES.EQUIPMENT, subType: CARD_SUBTYPES.ARMOR }
+    { id: "D80_VK_CQ_NoThan", name: "Nỏ Thần Kim Quy", suit: "Club", rank: 8, category: CARD_CATEGORIES.EQUIPMENT, subType: CARD_SUBTYPES.WEAPON }
   ];
   state._deck = [
-    { id: "DRAWN_EQ", name: "Trảm Rút", suit: "Club", rank: 10, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }
+    { id: "DECK_CARD_2", name: "Lá Bài Rút 2", suit: "Heart", rank: 2, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH }
   ];
 
-  const eqRes = handleUseSkill(state, 1, "Cơ Biến", 0, "BLACK_ARMOR");
-  assert.equal(eqRes.success, true);
-  assert.equal(p1.equipments.length, 0);
-  assert.equal(p1.hand.some(c => c.id === "DRAWN_EQ"), true);
-  assert.equal(state._discard.some(c => c.id === "BLACK_ARMOR"), true);
-  console.log("✅ Cao Lỗ: Cơ Biến đổi trang bị Đen thành công");
+  const playRes = handlePlayCard(state, 1, "D80_VK_CQ_NoThan");
+  assert.equal(playRes.success, true);
+  assert.equal(p1.equipments.some(e => e.name === "Nỏ Thần Kim Quy"), true);
+  assert.equal(p1.hand.some(c => c.id === "DECK_CARD_2"), true, "Kể cả lá Nỏ Thần thật cũng kích hoạt bốc 1 lá");
+  console.log("✅ Chế Nỏ: Trang bị Nỏ Thần Kim Quy gốc cũng bốc 1 lá bài");
 }
 
-// 4. Phase and Turn constraints
-{
-  const state = createTestState();
-  state.phase = "AWAIT_SLASH_DEFENSE";
-  state.turnSeat = 1;
-  const p1 = state.players[0];
-  p1.hand = [{ id: "C1", name: "T", suit: "Spade", rank: 1, category: 0, subType: 0 }];
-  const wrongPhaseRes = handleUseSkill(state, 1, "Cơ Biến", 0, "C1");
-  assert.ok(wrongPhaseRes.error);
-  assert.match(wrongPhaseRes.error, /Giai đoạn Ra bài/);
-
-  state.phase = "PLAY";
-  state.turnSeat = 2; // Not Cao Lỗ's turn
-  const wrongTurnRes = handleUseSkill(state, 1, "Cơ Biến", 0, "C1");
-  assert.ok(wrongTurnRes.error);
-  console.log("✅ Cao Lỗ: Ràng buộc phase và turn hoạt động chính xác");
-}
-
-// 5. AI Cao Lỗ uses Cơ Biến in handleAIStep
-{
-  const state = createTestState();
-  const p1 = state.players[0];
-  p1.isAI = true;
-  state.phase = "PLAY";
-  state.turnSeat = 1;
-  state.slashesUsedThisTurn = 1; // Already slashed, so extra slash or non-essential black card will be cycled
-  p1.hand = [
-    { id: "AI_BLACK_DODGE", name: "Đỡ", suit: "Spade", rank: 2, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE },
-    { id: "AI_SPENT_SLASH", name: "Trảm", suit: "Spade", rank: 4, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }
-  ];
-  state._deck = [
-    { id: "AI_NEW_CARD", name: "Lá Mới", suit: "Heart", rank: 9, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH }
-  ];
-
-  const aiStep = handleAIStep(state, 1);
-  assert.equal(aiStep.success, true);
-  assert.equal(state.lastAction.type, "CO_BIEN_TRIGGERED");
-  assert.equal(p1.hand.some(c => c.id === "AI_NEW_CARD"), true);
-  assert.equal(p1.hand.some(c => c.id === "AI_BLACK_DODGE"), true, "AI giữ lá Đỡ cuối cùng khi đổi bài");
-  console.log("✅ AI Cao Lỗ: Tự động dùng Cơ Biến chu chuyển bài Đen thành công");
-}
-
-console.log("🎉 ALL CAO LỖ CƠ BIẾN TESTS PASSED!");
+console.log("🎉 ALL CAO LỖ TESTS PASSED!");

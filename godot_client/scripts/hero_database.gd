@@ -1185,7 +1185,7 @@ func get_avatar_texture(avatar_path: String, hero_id: int = 0) -> Texture2D:
 func _init_all_heroes() -> void:
 	hero_dict.clear()
 	all_heroes.clear()
-	_add_hero(1, "Cao Lỗ", "Hồng Bàng", 4, "Chế Nỏ", "Bạn có thể dùng bất kỳ lá bài Đen như lá trang bị Nỏ Thần Kim Quy.", "res://assets/ui/cao_lo.png", "cao_lo")
+	_add_hero(1, "Cao Lỗ", "Hồng Bàng", 4, "Chế Nỏ", "Bạn có thể dùng bất kỳ lá bài Đen như lá trang bị Nỏ Thần Kim Quy. Khi sử dụng Nỏ Thần Kim Quy, bốc 1 lá bài.", "res://assets/ui/cao_lo.png", "cao_lo")
 	_add_hero(2, "Đào Hãn", "Hồng Bàng", 4, "Xạ Thuẫn", "Bạn mặc định tăng 2 tầm Ngựa công.", "res://assets/ui/dao_han.png", "dao_han")
 	_add_hero(3, "Thi Sách", "Hồng Bàng", 4, "Hịch Nghĩa", "Khi bạn rơi vào trạng thái Cận Tử, bạn lập tức rút 3 lá bài.", "res://assets/ui/thi_sach.png", "thi_sach")
 	_add_hero(4, "Lê Chân", "Hồng Bàng", 3, "Triều Dâng", "Một lần mỗi lượt, chỉ định hủy 1 lá trang bị của 1 người khác.", "res://assets/ui/le_chan.png", "le_chan")
@@ -1290,8 +1290,7 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 	var skills: Array = [{"id": skill_name.to_lower().replace(" ", "_"), "name": skill_name, "desc": skill_desc}]
 	if id == 1:
 		skills = [
-			{"id": "che_no", "name": "Chế Nỏ", "desc": "Bạn có thể dùng bất kỳ lá bài Đen như lá trang bị Nỏ Thần Kim Quy."},
-			{"id": "co_bien", "name": "Cơ Biến", "desc": "Bạn có thể đổi lá Đen thành lá khác."}
+			{"id": "che_no", "name": "Chế Nỏ", "desc": "Bạn có thể dùng bất kỳ lá bài Đen như lá trang bị Nỏ Thần Kim Quy. Khi sử dụng Nỏ Thần Kim Quy, bốc 1 lá bài."}
 		]
 	elif id == 2:
 		skills = [

@@ -919,7 +919,7 @@ export function drawCards(state, seat, count = 2, allowDying = false) {
     }
     const card = state._deck.pop();
     if (card) {
-      if (p.activeSkills && p.activeSkills["Chế Nỏ"] && cardColor(card.suit) === "BLACK") {
+      if (p.activeSkills && p.activeSkills["Chế Nỏ"] && isBlackCardSuit(card.suit)) {
           card.orig_name = card.name;
           card.orig_subType = card.subType;
           card.orig_category = card.category;
@@ -2139,7 +2139,7 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
   let card = null;
   if (cardIndex >= 0) {
       card = caster.hand[cardIndex];
-      if (caster.activeSkills && caster.activeSkills["Chế Nỏ"] && cardColor(card.suit) === "BLACK") {
+      if (caster.activeSkills && caster.activeSkills["Chế Nỏ"] && isBlackCardSuit(card.suit)) {
           card = { ...card, name: "Nỏ Thần Kim Quy", subType: CARD_SUBTYPES.WEAPON, category: CARD_CATEGORIES.EQUIPMENT, range: 1, distMod: 0, desc: "Tầm 1. Không giới hạn số Trảm trong lượt" };
       }
       if (heroHasSkill(caster, "SON_CHIEN") && (card.subType === CARD_SUBTYPES.OFFENSIVE_HORSE || card.subType === CARD_SUBTYPES.DEFENSIVE_HORSE) && targetSeat && targetSeat !== casterSeat) {
@@ -2493,6 +2493,16 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
     }
     if (card.subType === CARD_SUBTYPES.ARMOR && card.name && card.name.includes("Áo Bào")) {
       caster.aoBaoCharges = 2;
+    }
+    const isNoThanKimQuy = card.name === "Nỏ Thần Kim Quy" || card.id?.includes("NoThan") || card.id?.includes("NO_THAN");
+    if (heroHasSkill(caster, "CHE_NO") && isNoThanKimQuy) {
+      drawCards(state, casterSeat, 1);
+      recordAction(state, {
+        type: "CHE_NO_DRAW",
+        casterSeat,
+        skillActivations: [{ name: "Chế Nỏ", seat: casterSeat }],
+        description: `🎯 <b>${caster.generalName}</b> sử dụng [Nỏ Thần Kim Quy], bốc 1 lá bài!`
+      });
     }
     recordAction(state, {
       type: "EQUIP",
@@ -9008,6 +9018,20 @@ function advanceTurn(state) {
     previousPlayer.extraSlashLimit = 0;
     previousPlayer.usedSkills = {};
     if (previousPlayer.sucSoiTurnsRemaining > 0) previousPlayer.sucSoiTurnsRemaining--;
+    if (previousPlayer.activeSkills && previousPlayer.activeSkills["Chế Nỏ"]) {
+      delete previousPlayer.activeSkills["Chế Nỏ"];
+      if (previousPlayer.hand) {
+        previousPlayer.hand.forEach(c => {
+          if (c.orig_name) {
+            c.name = c.orig_name;
+            c.subType = c.orig_subType;
+            c.category = c.orig_category;
+            c.desc = c.orig_desc;
+            delete c.orig_name; delete c.orig_subType; delete c.orig_category; delete c.orig_desc;
+          }
+        });
+      }
+    }
   }
   for (const player of state.players) {
     player.playPhaseDamageDealt = 0;
@@ -11500,7 +11524,7 @@ export function handleToggleSkill(state, seat, skillId) {
     if (isActive) {
       if (player.hand) {
         player.hand.forEach(c => {
-          if (cardColor(c.suit) === "BLACK" && c.subType !== CARD_SUBTYPES.WEAPON) {
+          if (isBlackCardSuit(c.suit) && c.name !== "Nỏ Thần Kim Quy") {
             c.originalCardId = c.id;
             c.orig_name = c.name;
             c.orig_subType = c.subType;

@@ -2654,7 +2654,7 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 	if seat == my_seat and _hero_has_skill(g, "thien_cam") and int(g.get("hp", 0)) <= 1 and current_server_phase == "PLAY" and current_turn_seat == my_seat and has_delayed_scroll:
 		buttons.append({"id": "thien_cam", "text": "🌙 THIÊN CẢM", "description": "Bỏ 1 Cẩm Nang Trì Hoãn trên tay để rút 2 lá mới.", "selected": is_targeting_thien_cam})
 	if seat == my_seat and _hero_has_skill(g, "che_no"):
-		buttons.append({"id": "che_no", "text": "🎯 CHẾ NỎ", "description": "Bật: mọi lá bài Đen trên tay trở thành Nỏ Thần Kim Quy. Bấm lại để hủy.", "selected": bool(g.get("che_no_active", false))})
+		buttons.append({"id": "che_no", "text": "🎯 CHẾ NỎ", "description": "Bật: mọi lá bài Đen trên tay trở thành Nỏ Thần Kim Quy. Khi sử dụng Nỏ Thần Kim Quy, bốc 1 lá bài.", "selected": bool(g.get("che_no_active", false))})
 	if seat == my_seat and _hero_has_skill(g, "co_bien") and current_server_phase == "PLAY" and current_turn_seat == my_seat:
 		buttons.append({"id": "co_bien", "text": "🔄 CƠ BIẾN", "description": "Đổi 1 lá bài Đen trên tay hoặc đang mang lấy 1 lá mới.", "selected": is_targeting_co_bien})
 	if seat == my_seat and _hero_has_skill(g, "trieu_dang"):
@@ -2754,14 +2754,24 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 
 func _set_local_che_no_hand(active: bool) -> void:
 	for card_ui in hand_container.get_children():
+		if not (card_ui is Control) or card_ui == exit_battle_btn:
+			continue
 		var info = _get_card_info_from_ui(card_ui)
-		if active and _get_card_color(str(info.get("suit", ""))) == "BLACK" and not card_ui.has_meta("che_no_original"):
-			card_ui.set_meta("che_no_original", info.duplicate())
-			card_ui.setup_card_data(str(info.get("id", "")), "Nỏ Thần Kim Quy", info.get("rank", 0), str(info.get("suit", "Spade")), 1, "Tầm 1. Không giới hạn số Trảm trong lượt", 6)
-		elif not active and card_ui.has_meta("che_no_original"):
-			var original = card_ui.get_meta("che_no_original") as Dictionary
-			card_ui.setup_card_data(str(original.get("id", "")), str(original.get("name", "Bài")), original.get("rank", 0), str(original.get("suit", "Spade")), int(original.get("cat", 0)), str(original.get("desc", "")), int(original.get("subType", -1)))
-			card_ui.remove_meta("che_no_original")
+		var is_black = _is_black_card(info)
+		if active:
+			if is_black:
+				if not card_ui.has_meta("che_no_original"):
+					card_ui.set_meta("che_no_original", info.duplicate())
+				card_ui.setup_card_data(str(info.get("id", "")), "Nỏ Thần Kim Quy", info.get("rank", 0), str(info.get("suit", "Spade")), 1, "Tầm 1. Không giới hạn số Trảm trong lượt", 6, true)
+				card_ui.modulate = Color.WHITE
+			else:
+				card_ui.modulate = Color(0.38, 0.4, 0.46, 0.72)
+		else:
+			card_ui.modulate = Color.WHITE
+			if card_ui.has_meta("che_no_original"):
+				var original = card_ui.get_meta("che_no_original") as Dictionary
+				card_ui.remove_meta("che_no_original")
+				card_ui.setup_card_data(str(original.get("id", "")), str(original.get("name", "Bài")), original.get("rank", 0), str(original.get("suit", "Spade")), int(original.get("cat", 0)), str(original.get("desc", "")), int(original.get("subType", -1)), true)
 
 func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 	if not generals_data.has(s_num):
@@ -2869,7 +2879,7 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 		if is_network_mode and NetworkClient and NetworkClient.is_connected_to_server:
 			NetworkClient.send_toggle_skill("Chế Nỏ")
 		var state_text = "bật" if g["che_no_active"] else "tắt"
-		desc_text.text = "🎯 [CHẾ NỎ] đã %s: lá bài Đen trên tay %s Nỏ Thần Kim Quy." % [state_text, "trở thành" if g["che_no_active"] else "trở lại"]
+		desc_text.text = "🎯 [CHẾ NỎ] đã %s: lá bài Đen trên tay %s Nỏ Thần Kim Quy. Sử dụng để bốc 1 lá bài." % [state_text, "trở thành" if g["che_no_active"] else "trở lại"]
 		return
 	if s_num == my_seat and (skill_key == "trieu_dang" or (skill_key.is_empty() and _hero_has_skill(g, "trieu_dang"))):
 		if not is_player_turn:
@@ -3626,6 +3636,9 @@ func _refresh_hung_suc_equipped_weapon_previews() -> void:
 	_relayout_hand_cards()
 
 func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> void:
+	if generals_data.has(my_seat) and bool(generals_data[my_seat].get("che_no_active", false)) and not _is_black_card(c_info) and not is_discard_phase:
+		desc_text.text = "⚠️ [CHẾ NỎ] Đang kích hoạt: Các lá không phải màu Đen bị tối. Tắt Chế Nỏ để sử dụng lá này."
+		return
 	if is_waiting_song_cung:
 		_handle_song_cung_card_selection(card_node)
 		return
@@ -6356,6 +6369,11 @@ func _on_card_play_btn_clicked() -> void:
 		_broadcast_player_battle_action("PLAY_CARD", c_id, my_seat)
 		_animate_showcase_card(c_name, "Bạn trang bị [%s]!" % c_name, c_info)
 		_add_log("🗡️ Bạn đã trang bị Vũ Khí: [%s]!" % c_name)
+		if not is_network_mode and _hero_has_skill(p_gen, "che_no") and c_name == "Nỏ Thần Kim Quy":
+			var drawn_card = _draw_card_from_pile()
+			_add_card_to_player_hand(drawn_card)
+			_animate_draw_to_seat(my_seat)
+			_add_log("🎯 [CHẾ NỎ] Cao Lỗ sử dụng [Nỏ Thần Kim Quy], bốc 1 lá bài!")
 
 	elif c_name in ["Giáp Đồng Sơn Vi", "Khiên Mây Bện", "Áo Bào Hoàng Tộc", "Giáp Tây Sơn"]:
 		p_gen = generals_data[my_seat]
