@@ -1295,7 +1295,7 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 	elif id == 2:
 		skills = [
 			{"id": "xa_thuan", "name": "Xạ Thuẫn", "desc": "Bạn mặc định tăng 2 tầm Ngựa công."},
-			{"id": "phu_tran", "name": "Phù Trấn", "desc": "Khi bạn sử dụng Trảm mà không đeo vũ khí, bạn được rút 1 lá bài."}
+			{"id": "phu_tran", "name": "Phù Trấn", "desc": "Khi bạn sử dụng Trảm mà không đeo vũ khí, bạn được rút 3 lá bài. Bạn có thể đổi vũ khí lấy lá mới."}
 		]
 	elif id == 3:
 		skills = [

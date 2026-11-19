@@ -214,6 +214,13 @@ export function buildAiTurnPlans(state, ai, rules) {
       if (forced) skill('Dẫn Cầu', forced, `${spare[0].id}|${enemy.seat}`, 66 + targetScore(enemy) / 40);
     }
   }
+  if (heroHasSkill(ai, 'PHU_TRAN') && (used.phuTranCount || 0) < 2) {
+    const isWp = (c) => c && (c.subType === 6 || (c.category === 1 && c.subType === 6));
+    const eqWp = (ai.equipments || []).find(isWp);
+    const handWp = hand.find(isWp);
+    const cost = eqWp || handWp;
+    if (cost) skill('Phù Trấn', null, cost, 65);
+  }
   if (heroHasSkill(ai, 'CO_BIEN') && (used.coBienCount || 0) < 2) {
     const cost = spare.find((c) => c.suit === 'Spade' && (!offensiveSlash || !canSlashWith(c)));
     if (cost) skill('Cơ Biến', null, cost, 32);

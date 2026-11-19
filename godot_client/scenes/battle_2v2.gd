@@ -389,6 +389,7 @@ var is_targeting_nghich_y: bool = false
 var selected_nghich_y_card_id: String = ""
 var is_targeting_thien_cam: bool = false
 var is_targeting_co_bien: bool = false
+var is_targeting_phu_tran: bool = false
 var dan_cau_forced_target_seat: int = -1
 var is_targeting_cai_cach: bool = false
 var is_targeting_binh_san: bool = false
@@ -2653,6 +2654,8 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 		buttons.append({"id": "an_tich", "text": "🌫️ ẨN TÍCH (%d)" % int(g.get("an_tich_count", 0)), "description": "Chọn 1 lá Ẩn để dùng như Đỡ cho đòn Trảm."})
 	if seat == my_seat and _hero_has_skill(g, "thien_cam") and int(g.get("hp", 0)) <= 1 and current_server_phase == "PLAY" and current_turn_seat == my_seat and has_delayed_scroll:
 		buttons.append({"id": "thien_cam", "text": "🌙 THIÊN CẢM", "description": "Bỏ 1 Cẩm Nang Trì Hoãn trên tay để rút 2 lá mới.", "selected": is_targeting_thien_cam})
+	if seat == my_seat and _hero_has_skill(g, "phu_tran") and current_server_phase == "PLAY" and current_turn_seat == my_seat:
+		buttons.append({"id": "phu_tran", "text": "🏹 PHÙ TRẤN", "description": "Đổi 1 lá Vũ Khí trên tay hoặc đang mang lấy 1 lá mới.", "selected": is_targeting_phu_tran})
 	if seat == my_seat and _hero_has_skill(g, "che_no"):
 		buttons.append({"id": "che_no", "text": "🎯 CHẾ NỎ", "description": "Bật: mọi lá bài Đen trên tay trở thành Nỏ Thần Kim Quy. Khi sử dụng Nỏ Thần Kim Quy, bốc 1 lá bài.", "selected": bool(g.get("che_no_active", false))})
 	if seat == my_seat and _hero_has_skill(g, "co_bien") and current_server_phase == "PLAY" and current_turn_seat == my_seat:
@@ -2732,6 +2735,7 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 		buttons.append({"id": "treasure_ho_phu", "text": "🐯 HỔ PHÙ"})
 	avatar.set_skill_buttons(buttons)
 	if avatar.has_method("set_skill_button_selected"):
+		avatar.set_skill_button_selected("phu_tran", is_targeting_phu_tran)
 		avatar.set_skill_button_selected("che_no", bool(g.get("che_no_active", false)))
 		avatar.set_skill_button_selected("co_bien", is_targeting_co_bien)
 		avatar.set_skill_button_selected("trieu_dang", is_targeting_trieu_dang)
@@ -2821,6 +2825,22 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 			turn_indicator.text = "🌙 THIÊN CẢM: CHỌN CẨM NANG TRÌ HOÃN"
 		else:
 			desc_text.text = "🌙 Đã hủy chọn [THIÊN CẢM]."
+		_refresh_local_skill_buttons(s_num)
+		_update_action_btn()
+		return
+	if s_num == my_seat and skill_key == "phu_tran":
+		if current_server_phase != "PLAY" or current_turn_seat != my_seat:
+			desc_text.text = "⚠️ [PHÙ TRẤN] chỉ dùng trong lượt của bạn."
+			return
+		is_targeting_phu_tran = not is_targeting_phu_tran
+		selected_card_ui = null
+		if is_targeting_phu_tran:
+			_refresh_hung_suc_equipped_weapon_previews()
+			desc_text.text = "🏹 [PHÙ TRẤN] Chọn 1 lá Vũ Khí trên tay hoặc đang mang để đổi thành lá mới."
+			turn_indicator.text = "🏹 PHÙ TRẤN: CHỌN 1 VŨ KHÍ"
+		else:
+			_clear_hung_suc_equipped_weapon_previews()
+			desc_text.text = "🏹 Đã hủy chọn [PHÙ TRẤN]."
 		_refresh_local_skill_buttons(s_num)
 		_update_action_btn()
 		return
@@ -3585,8 +3605,19 @@ func _record_local_equipment_card(card_info: Dictionary) -> void:
 	equipment_cards.append(new_card)
 	g["equipment_cards"] = equipment_cards
 
+func _is_weapon_card_item(c_info: Dictionary, node: Control = null) -> bool:
+	if node != null and node.has_meta("hung_suc_equipped_preview"):
+		return true
+	if int(c_info.get("subType", -1)) == 6:
+		return true
+	var c_name = str(c_info.get("name", ""))
+	if c_name in ["Kiếm Thuận Thiên", "Song Cung Mường Nhạ", "Nỏ Thần Kim Quy", "Trường Đao Nam Sơn", "Thương Ngâu Lãng Bạc", "Súng Thần Công Hồ Triều", "Hỏa Mai Tây Sơn", "Liêm Đao Đống Đa", "Đoản Đao Lam Sơn"]:
+		return true
+	var n = c_name.to_lower()
+	return "kiếm thuận thiên" in n or "song cung" in n or "nỏ thần" in n or "trường đao" in n or "thương ngâu" in n or "súng thần công" in n or "hỏa mai" in n or "liêm đao" in n or "đoản đao" in n
+
 func _refresh_hung_suc_equipped_weapon_previews() -> void:
-	if not (is_targeting_hung_suc or is_targeting_cai_cach or is_targeting_binh_san or is_targeting_co_bien) or not generals_data.has(my_seat):
+	if not (is_targeting_hung_suc or is_targeting_cai_cach or is_targeting_binh_san or is_targeting_co_bien or is_targeting_phu_tran) or not generals_data.has(my_seat):
 		_clear_hung_suc_equipped_weapon_previews()
 		return
 	var desired_weapons: Dictionary = {}
@@ -3751,6 +3782,23 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 			selected_card_ui.set_selected(false)
 		selected_card_ui = card_node
 		card_node.set_selected(true)
+		_update_action_btn()
+		return
+	if is_targeting_phu_tran:
+		if not _is_weapon_card_item(c_info, card_node):
+			desc_text.text = "⚠️ [PHÙ TRẤN] chỉ chọn lá Vũ Khí."
+			return
+		if selected_card_ui == card_node:
+			selected_card_ui.set_selected(false)
+			selected_card_ui = null
+			desc_text.text = "🏹 [PHÙ TRẤN] Chọn 1 lá Vũ Khí trên tay hoặc đang mang để đổi thành lá mới."
+			_update_action_btn()
+			return
+		if selected_card_ui and is_instance_valid(selected_card_ui):
+			selected_card_ui.set_selected(false)
+		selected_card_ui = card_node
+		card_node.set_selected(true)
+		AudioManager.play_card_select()
 		_update_action_btn()
 		return
 	if is_targeting_co_bien:
@@ -4690,6 +4738,13 @@ func _update_action_btn() -> void:
 		card_play_btn.disabled = not thien_cam_ready
 		card_play_btn.text = "🌙 ĐỔI TRÌ HOÃN LẤY 2 LÁ" if thien_cam_ready else "🌙 THIÊN CẢM: CHỌN 1 CẨM NANG TRÌ HOÃN"
 		return
+	if is_targeting_phu_tran:
+		var pt_info := _get_card_info_from_ui(selected_card_ui) if selected_card_ui and is_instance_valid(selected_card_ui) else {}
+		var is_weapon_card := not pt_info.is_empty() and _is_weapon_card_item(pt_info, selected_card_ui)
+		card_play_btn.visible = true
+		card_play_btn.disabled = not is_weapon_card
+		card_play_btn.text = "🏹 ĐỔI VŨ KHÍ" if is_weapon_card else "🏹 PHÙ TRẤN: CHỌN 1 VŨ KHÍ"
+		return
 	if is_targeting_co_bien:
 		var co_bien_info := _get_card_info_from_ui(selected_card_ui) if selected_card_ui and is_instance_valid(selected_card_ui) else {}
 		var is_black_card := not co_bien_info.is_empty() and _is_black_card(co_bien_info)
@@ -5203,6 +5258,44 @@ func _on_card_play_btn_clicked() -> void:
 		NetworkClient.send_use_skill("Thiên Cảm", 0, str(thien_card.get("id", "")))
 		is_targeting_thien_cam = false
 		selected_card_ui.set_selected(false)
+		selected_card_ui = null
+		card_play_btn.disabled = true
+		_refresh_local_skill_buttons(my_seat)
+		return
+	if is_targeting_phu_tran:
+		if selected_card_ui == null or not is_instance_valid(selected_card_ui):
+			desc_text.text = "⚠️ [PHÙ TRẤN] hãy chọn 1 lá Vũ Khí."
+			return
+		var pt_card = _get_card_info_from_ui(selected_card_ui)
+		if not _is_weapon_card_item(pt_card, selected_card_ui):
+			desc_text.text = "⚠️ [PHÙ TRẤN] chỉ chọn lá Vũ Khí."
+			return
+		var card_id_to_send := str(pt_card.get("id", ""))
+		if is_network_mode:
+			NetworkClient.send_use_skill("Phù Trấn", 0, card_id_to_send)
+		else:
+			if selected_card_ui.has_meta("hung_suc_equipped_preview"):
+				var p_gen = generals_data[my_seat]
+				p_gen["equipped_weapon"] = ""
+				if p_gen.has("avatar_node") and is_instance_valid(p_gen["avatar_node"]):
+					p_gen["avatar_node"].set_equipment("weapon", "", "")
+				var eq_cards = p_gen.get("equipment_cards", [])
+				for i in range(eq_cards.size() - 1, -1, -1):
+					if str(eq_cards[i].get("id", "")) == card_id_to_send or int(eq_cards[i].get("subType", -1)) == 6:
+						eq_cards.remove_at(i)
+						break
+			else:
+				_discard_player_card(selected_card_ui)
+			_add_card_to_player_hand(_draw_card_from_pile())
+			_add_log("🏹 [PHÙ TRẤN] Đào Hãn đổi vũ khí [%s] lấy 1 lá mới." % str(pt_card.get("name", "Vũ Khí")))
+		if selected_card_ui.has_meta("hung_suc_equipped_preview"):
+			_clear_hung_suc_equipped_weapon_previews()
+		else:
+			if is_network_mode:
+				_discard_player_card(selected_card_ui)
+		is_targeting_phu_tran = false
+		if is_instance_valid(selected_card_ui):
+			selected_card_ui.set_selected(false)
 		selected_card_ui = null
 		card_play_btn.disabled = true
 		_refresh_local_skill_buttons(my_seat)
@@ -5862,8 +5955,9 @@ func _on_card_play_btn_clicked() -> void:
 			_discard_player_card(lien_chau_cost_card)
 		_clear_lien_chau_selection()
 		if not is_network_mode and _hero_has_skill(p_gen, "phu_tran") and str(p_gen.get("equipped_weapon", "")).is_empty():
-			_add_card_to_player_hand(_draw_card_from_pile())
-			_add_log("🏹 [PHÙ TRẤN] %s không đeo vũ khí, rút 1 lá khi dùng Trảm." % p_gen["name"])
+			for _d in range(3):
+				_add_card_to_player_hand(_draw_card_from_pile())
+			_add_log("🏹 [PHÙ TRẤN] %s không đeo vũ khí, rút 3 lá khi dùng Trảm." % p_gen["name"])
 
 		var can_pha_tong: bool = _hero_has_skill(p_gen, "pha_tong") or int(p_gen.get("hero_id", 0)) == 35 or "Lê Hoàn" in str(p_gen.get("name", ""))
 		var slash_rank = int(c_info.get("rank", 0))
@@ -13237,6 +13331,7 @@ func _finish_player_end_turn(send_network_end_turn: bool = true) -> void:
 	is_targeting_cai_cach = false
 	is_targeting_thien_cam = false
 	is_targeting_co_bien = false
+	is_targeting_phu_tran = false
 	is_targeting_dinh_quoc = false
 	is_targeting_trao_bao = false
 	is_targeting_dinh_trieu = false

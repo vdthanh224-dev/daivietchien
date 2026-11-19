@@ -1701,14 +1701,14 @@ function startSlashResolution(state, slashCard, casterSeat, targetSeat, options 
   caster.usedSkills.TramUsedThisTurn = true;
 
   if (heroHasSkill(caster, "PHU_TRAN") && !getEquippedWeapon(caster)) {
-    drawCards(state, casterSeat, 1);
+    drawCards(state, casterSeat, 3);
     recordAction(state, {
       type: "PHU_TRAN_DRAW",
       casterSeat,
       cardId: slashCard.id,
       cardName: slashCard.name,
       skillActivations: [{ name: "Phù Trấn", seat: casterSeat }],
-      description: `🏹 ${caster.generalName} kích hoạt [Phù Trấn], rút 1 lá vì dùng Trảm khi không đeo vũ khí.`
+      description: `🏹 ${caster.generalName} kích hoạt [Phù Trấn], rút 3 lá vì dùng Trảm khi không đeo vũ khí.`
     });
   }
 
@@ -10494,6 +10494,69 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
       cardName: exchanged.name,
       skillActivations: [{ name: "Cơ Biến", seat }],
       description: `🔄 <b>${player.generalName}</b> kích hoạt [Cơ Biến], đổi lá Đen [${exchanged.name}] lấy 1 lá mới!`
+    });
+    refreshLastDelta(state);
+    return { success: true, state };
+  }
+
+  if (norm.includes("phù trấn") || norm.includes("phu tran") || norm === "phu_tran") {
+    if (!heroHasSkill(player, "PHU_TRAN")) return { error: "Chỉ tướng có Phù Trấn mới có thể dùng kỹ năng này" };
+    if (state.phase !== "PLAY" || state.turnSeat !== seat) return { error: "Phù Trấn chỉ dùng trong Giai đoạn Ra bài của bạn" };
+
+    const isWeaponCard = (c) => {
+      if (!c) return false;
+      if (c.subType === CARD_SUBTYPES.WEAPON || c.subType === 6) return true;
+      const name = String(c.name || "").toLowerCase();
+      return name.includes("thuận thiên") || name.includes("song cung") || name.includes("nỏ thần")
+        || name.includes("trường đao") || name.includes("thương ngâu") || name.includes("súng thần công")
+        || name.includes("hỏa mai") || name.includes("liêm đao") || name.includes("đoản đao");
+    };
+
+    let handIndex = (player.hand || []).findIndex(
+      (card) => (card.id === cardId || String(card.id) === String(cardId) || card.name === cardId) && isWeaponCard(card)
+    );
+    let equipIndex = -1;
+    if (handIndex < 0) {
+      equipIndex = (player.equipments || []).findIndex(
+        (card) => (card.id === cardId || String(card.id) === String(cardId) || card.name === cardId) && isWeaponCard(card)
+      );
+    }
+    if (handIndex < 0 && equipIndex < 0) {
+      if (!cardId) {
+        handIndex = (player.hand || []).findIndex(isWeaponCard);
+        if (handIndex < 0) {
+          equipIndex = (player.equipments || []).findIndex(isWeaponCard);
+        }
+      }
+    }
+    if (handIndex < 0 && equipIndex < 0) {
+      return { error: "Phù Trấn cần chọn 1 lá Vũ Khí trên tay hoặc đang trang bị để đổi" };
+    }
+
+    const exchanged = handIndex >= 0
+      ? player.hand.splice(handIndex, 1)[0]
+      : player.equipments.splice(equipIndex, 1)[0];
+
+    if (exchanged.orig_name) {
+      exchanged.name = exchanged.orig_name;
+      exchanged.subType = exchanged.orig_subType;
+      exchanged.category = exchanged.orig_category;
+      exchanged.desc = exchanged.orig_desc;
+      delete exchanged.orig_name;
+      delete exchanged.orig_subType;
+      delete exchanged.orig_category;
+      delete exchanged.orig_desc;
+    }
+
+    discardCard(state, exchanged);
+    drawCards(state, seat, 1);
+    recordAction(state, {
+      type: "PHU_TRAN_EXCHANGE",
+      casterSeat: seat,
+      cardId: exchanged.id,
+      cardName: exchanged.name,
+      skillActivations: [{ name: "Phù Trấn", seat }],
+      description: `🏹 <b>${player.generalName}</b> kích hoạt [Phù Trấn], đổi vũ khí [${exchanged.name}] lấy 1 lá mới!`
     });
     refreshLastDelta(state);
     return { success: true, state };
