@@ -41,7 +41,18 @@ const SKILL_VOICE_KEYS := {
 	"an dân": "an_dan",
 	"ẩn tích": "an_tich",
 	"lực địch": "luc_dich",
-	"hùng sức": "hung_suc"
+	"hùng sức": "hung_suc",
+	"trao bào": "trao_bao",
+	"nhiếp chính": "nhiep_chinh",
+	"thiên cảm": "thien_cam",
+	"cải cách": "cai_cach",
+	"bình sạn": "binh_san",
+	"tây phu": "tay_phu",
+	"dẫn cầu": "dan_cau",
+	"thủy chiến": "thuy_chien",
+	"định quốc": "dinh_quoc",
+	"định triều": "dinh_trieu",
+	"chuyên chế": "chuyen_che"
 }
 
 const FEMALE_SKILL_VOICE_KEYS := {
@@ -52,7 +63,14 @@ const FEMALE_SKILL_VOICE_KEYS := {
 	"chiến tượng": true, "chien_tuong": true,
 	"bát nạ": true, "bat_na": true,
 	"trao bào": true, "trao_bao": true,
-	"nhiếp chính": true, "nhiep_chinh": true
+	"nhiếp chính": true, "nhiep_chinh": true,
+	"thiên cảm": true, "thien_cam": true,
+	"oai nhược": true, "oai_nhuoc": true,
+	"dựng nước": true, "dung_nuoc": true,
+	"xưng đế": true, "xung_de": true,
+	"khởi binh": true, "khoi_binh": true,
+	"huynh trưởng": true, "huynh_truong": true,
+	"thủ mục": true, "thu_muc": true
 }
 
 func _ready() -> void:
@@ -197,13 +215,8 @@ func play_voice(card_or_skill_name: String, is_female: bool = false) -> void:
 	if chosen_stream != null:
 		var p = AudioStreamPlayer.new()
 		p.stream = chosen_stream
-		if effective_female and voice_cache.get(female_key, null) == null:
-			# Female voice pitch shift (+4.2 semitones up for natural female voice tone)
-			p.pitch_scale = 1.28
-			p.volume_db = 2.8
-		else:
-			p.pitch_scale = 1.0
-			p.volume_db = 2.0
+		p.pitch_scale = 1.0
+		p.volume_db = 2.0
 		add_child(p)
 		p.play()
 		p.finished.connect(p.queue_free)
