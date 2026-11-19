@@ -1407,7 +1407,9 @@ func delete_current_session(on_completed: Callable = Callable()) -> void:
 func register_email(email: String, password: String, name: String) -> void:
 	email = email.strip_edges()
 	name = name.strip_edges()
-	if name == "": name = "Đại Tướng Quân"
+	if name == "":
+		login_failed.emit("Vui lòng đặt danh xưng (tên) trước khi đăng ký.")
+		return
 
 	if email == "" or password.length() < 8:
 		login_failed.emit("Email hợp lệ và Mật thư tối thiểu 8 ký tự.")
@@ -1448,23 +1450,7 @@ func register_email(email: String, password: String, name: String) -> void:
 	)
 
 func login_anonymous() -> void:
-	delete_current_session(func():
-		var http = HTTPRequest.new()
-		add_child(http)
-
-		var url = ENDPOINT + "/account/sessions/anonymous"
-		var headers = get_auth_headers(false)
-
-		http.request_completed.connect(func(result, response_code, resp_headers, resp_body):
-			http.queue_free()
-			_handle_login_response(result, response_code, resp_headers, resp_body, "khach@daiviet.vn")
-		)
-
-		var err = http.request(url, headers, HTTPClient.METHOD_POST, "{}")
-		if err != OK:
-			http.queue_free()
-			login_failed.emit("Lỗi tạo phiên chơi khách: " + str(err))
-	)
+	login_failed.emit("Chế độ chơi khách đã ngừng hỗ trợ. Vui lòng đăng nhập hoặc tạo tài khoản mới.")
 
 func quick_login(num: int) -> void:
 	var email = "vdthanh22%d@gmail.com" % num
@@ -1924,7 +1910,10 @@ func load_saved_session() -> void:
 							onboarding_completed = true
 					if not onboarding_completed and (current_level > 1 or current_exp > 0 or current_generals.size() > 1):
 						onboarding_completed = true
-					if session_secret != "" or session_cookie != "" or fallback_cookies != "":
+					if current_user_email == "khach@daiviet.vn" or current_user_email == "":
+						reset_to_defaults()
+						is_logged_in = false
+					elif session_secret != "" or session_cookie != "" or fallback_cookies != "":
 						is_logged_in = true
 					var saved_rc = data.get("redeemedCodes", [])
 					if saved_rc is Array:

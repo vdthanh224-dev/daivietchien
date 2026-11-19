@@ -49,8 +49,6 @@ const COLOR_SHADOW_DEEP = Color(0.0, 0.0, 0.0, 0.75)
 @onready var forgot_pass_btn: Button = $CenterAuthCard/VBox/Form/OptionsHBox/ForgotPassBtn
 @onready var status_lbl: Label = $CenterAuthCard/VBox/StatusLabel
 @onready var submit_btn: Button = $CenterAuthCard/VBox/SubmitBtn
-@onready var guest_hbox: HBoxContainer = $CenterAuthCard/VBox/GuestHBox
-@onready var quick_guest_btn: Button = $CenterAuthCard/VBox/GuestHBox/QuickGuestBtn
 
 # Modals Layer
 @onready var modals_layer: Control = $ModalsLayer
@@ -98,7 +96,6 @@ func _ready() -> void:
 
 	# 3. Kết nối nút thao tác chính
 	submit_btn.pressed.connect(_on_submit_pressed)
-	quick_guest_btn.pressed.connect(_on_guest_pressed)
 	toggle_pass_btn.pressed.connect(_on_toggle_password)
 	tab_login_btn.pressed.connect(func(): set_register_mode(false))
 	tab_register_btn.pressed.connect(func(): set_register_mode(true))
@@ -264,7 +261,6 @@ func _setup_crest_motion() -> void:
 	tw.tween_property(crest_icon, "scale", Vector2(1.0, 1.0), 2.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _setup_hover_effects() -> void:
-	_setup_micro_hover(quick_guest_btn)
 	_setup_micro_hover(notice_btn)
 	_setup_micro_hover(support_btn)
 	_setup_micro_hover(dev_tester_btn)
@@ -572,26 +568,40 @@ func _on_submit_pressed() -> void:
 			_set_status("⚠️ Vui lòng nhập danh xưng chiến tướng!", Color("#F59E0B"))
 			name_input.grab_focus()
 			return
+		if n.length() < 2:
+			_set_status("⚠️ Danh xưng phải có tối thiểu 2 ký tự!", Color("#F59E0B"))
+			name_input.grab_focus()
+			return
+		if email.is_empty():
+			_set_status("⚠️ Vui lòng nhập địa chỉ email!", Color("#F59E0B"))
+			email_input.grab_focus()
+			return
+		if not ("@" in email and "." in email):
+			_set_status("⚠️ Định dạng email không hợp lệ!", Color("#F59E0B"))
+			email_input.grab_focus()
+			return
+		if password.length() < 8:
+			_set_status("⚠️ Mật thư phải có tối thiểu 8 ký tự!", Color("#F59E0B"))
+			pass_input.grab_focus()
+			return
 		_set_status("⏳ Đang lập danh xưng chiến tướng...", Color("#FFD700"))
 		submit_btn.disabled = true
-		quick_guest_btn.disabled = true
 		AuthManager.register_email(email, password, n)
 	else:
+		if email.is_empty():
+			_set_status("⚠️ Vui lòng nhập email đăng nhập!", Color("#F59E0B"))
+			email_input.grab_focus()
+			return
+		if password.is_empty():
+			_set_status("⚠️ Vui lòng nhập mật thư!", Color("#F59E0B"))
+			pass_input.grab_focus()
+			return
 		_set_status("⏳ Đang xác thực thông tin chiến tướng...", Color("#FFD700"))
 		submit_btn.disabled = true
-		quick_guest_btn.disabled = true
 		AuthManager.login_email(email, password)
 
 	if AudioManager:
 		AudioManager.play_sfx("sfx_parry", -2.0)
-
-func _on_guest_pressed() -> void:
-	_set_status("⏳ Đang khởi tạo phiên chơi khách...", Color("#FFD700"))
-	submit_btn.disabled = true
-	quick_guest_btn.disabled = true
-	AuthManager.login_anonymous()
-	if AudioManager:
-		AudioManager.play_sfx("sfx_card_select", -2.0)
 
 func _on_quick_login(num: int) -> void:
 	active_tester_index = num
@@ -601,7 +611,6 @@ func _on_quick_login(num: int) -> void:
 	dim_backdrop.visible = false
 	_set_status("⚡ Đang đăng nhập Tester %d..." % num, Color("#FFD700"))
 	submit_btn.disabled = true
-	quick_guest_btn.disabled = true
 	email_input.text = "vdthanh22%d@gmail.com" % num
 	pass_input.text = "matkhau123"
 	AuthManager.quick_login(num)
@@ -610,7 +619,6 @@ func _on_quick_login(num: int) -> void:
 
 func _on_login_succeeded(user_data: Dictionary) -> void:
 	submit_btn.disabled = false
-	quick_guest_btn.disabled = false
 	if is_instance_valid(remember_check):
 		if remember_check.button_pressed:
 			AuthManager.save_remembered_credentials(email_input.text.strip_edges(), pass_input.text, true)
@@ -633,7 +641,6 @@ func _on_login_succeeded(user_data: Dictionary) -> void:
 
 func _execute_entry_transition() -> void:
 	submit_btn.disabled = true
-	quick_guest_btn.disabled = true
 	var tw = create_tween().set_parallel(true)
 	tw.tween_property(background_img, "scale", Vector2(1.08, 1.08), 0.5).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tw.tween_property(center_auth_card, "modulate:a", 0.0, 0.45).set_trans(Tween.TRANS_CUBIC)
@@ -658,7 +665,6 @@ func _show_onboarding_modal() -> void:
 func _on_login_failed(err_msg: String) -> void:
 	_set_status("❌ " + err_msg, Color("#EF4444"))
 	submit_btn.disabled = false
-	quick_guest_btn.disabled = false
 	if AudioManager:
 		AudioManager.play_sfx("sfx_damage", -4.0)
 
@@ -781,8 +787,6 @@ func _apply_keyboard_focus_shift(enable: bool) -> void:
 		# 1. Ẩn biểu tượng trống đồng to và nút Chơi khách để thu gọn chiều dọc
 		if is_instance_valid(drum_header):
 			drum_header.visible = false
-		if is_instance_valid(guest_hbox):
-			guest_hbox.visible = false
 
 		# 2. Làm mờ tiêu đề game trên cùng để card trượt lên không bị đè chữ
 		if is_instance_valid(title_brand_center):
@@ -800,8 +804,6 @@ func _apply_keyboard_focus_shift(enable: bool) -> void:
 		# Phục hồi hiển thị đầy đủ khi ẩn bàn phím
 		if is_instance_valid(drum_header):
 			drum_header.visible = true
-		if is_instance_valid(guest_hbox):
-			guest_hbox.visible = true
 
 		if is_instance_valid(title_brand_center):
 			card_tween.tween_property(title_brand_center, "modulate:a", 1.0, 0.22).set_trans(Tween.TRANS_CUBIC)
@@ -1303,11 +1305,7 @@ func _apply_royal_home_styling() -> void:
 		_style_bronze_drum_cta(submit_btn)
 		submit_btn.custom_minimum_size = Vector2(0, 46)
 
-	if quick_guest_btn:
-		_style_white_gold_button(quick_guest_btn, 10, 6, Vector2(0, 3))
-		quick_guest_btn.custom_minimum_size = Vector2(0, 38)
-		_apply_node_font(quick_guest_btn, 12)
-		quick_guest_btn.add_theme_color_override("font_color", Color(1.0, 0.90, 0.60, 1.0))
+
 
 	# 10. Modals Styling (Notice Modal & Dev Tester Drawer & Forgot Pass Modal)
 	if notice_modal:

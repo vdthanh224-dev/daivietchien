@@ -526,19 +526,6 @@ theme_override_font_sizes/font_size = 14
 theme_override_styles/normal = SubResource("StyleBoxFlat_btn_gold_normal")
 text = "⚔️ XÁC NHẬN VÀO TRẬN"
 
-[node name="GuestHBox" type="HBoxContainer" parent="CenterAuthCard/VBox"]
-layout_mode = 2
-theme_override_constants/separation = 8
-alignment = 1
-
-[node name="QuickGuestBtn" type="Button" parent="CenterAuthCard/VBox/GuestHBox"]
-custom_minimum_size = Vector2(0, 36)
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.92, 0.85, 0.7, 1)
-theme_override_font_sizes/font_size = 12
-theme_override_styles/normal = SubResource("StyleBoxFlat_btn_dark_normal")
-text = "⚡ Chơi Ngay (Khách)"
 
 [node name="FooterDisclaimer" type="HBoxContainer" parent="."]
 layout_mode = 1
