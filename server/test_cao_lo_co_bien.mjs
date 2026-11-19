@@ -13,7 +13,7 @@ import {
   SKILLS
 } from './functions/game-engine/src/heroes.js';
 
-console.log("=== Testing Cao Lỗ: Chế Nỏ Skill & Mechanics ===");
+console.log("=== Testing Cao Lỗ: Chế Nỏ Skill & Mechanics (4 Colors: Đỏ, Trắng, Vàng, Đen) ===");
 
 // 1. Check Hero definition and skills
 const caoLo = getHeroById("HERO_1");
@@ -31,7 +31,7 @@ function createTestState() {
   ]);
 }
 
-// 2. Chế Nỏ toggling: Black cards (Spade & Club) convert to Nỏ Thần Kim Quy; Red cards remain
+// 2. Chế Nỏ toggling: CHỈ lá bài ĐEN (Black) biến thành Nỏ Thần Kim Quy; Vàng (Club), Đỏ (Heart), Trắng (Diamond) giữ nguyên
 {
   const state = createTestState();
   const p1 = state.players[0];
@@ -41,9 +41,10 @@ function createTestState() {
   state.phase = "PLAY";
   state.turnSeat = 1;
   p1.hand = [
-    { id: "CARD_SPADE", name: "Trảm Đen", suit: "Spade", rank: 7, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
-    { id: "CARD_CLUB", name: "Đỡ Chuồn", suit: "Club", rank: 3, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE },
-    { id: "CARD_HEART", name: "Bánh Chưng", suit: "Heart", rank: 9, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH }
+    { id: "CARD_BLACK", name: "Trảm Đen", suit: "Spade", rank: 7, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
+    { id: "CARD_YELLOW", name: "Đỡ Vàng", suit: "Club", rank: 3, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE },
+    { id: "CARD_RED", name: "Bánh Chưng Đỏ", suit: "Heart", rank: 9, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH },
+    { id: "CARD_WHITE", name: "Trảm Trắng", suit: "Diamond", rank: 5, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }
   ];
 
   // Bật Chế Nỏ
@@ -51,27 +52,32 @@ function createTestState() {
   assert.equal(toggleOn.success, true);
   assert.equal(p1.activeSkills["Chế Nỏ"], true);
 
-  // Cả Spade và Club đều biến thành Nỏ Thần Kim Quy (Trang bị / Vũ khí)
+  // CHỈ lá ĐEN biến thành Nỏ Thần Kim Quy (Trang bị / Vũ khí)
   assert.equal(p1.hand[0].name, "Nỏ Thần Kim Quy");
   assert.equal(p1.hand[0].category, CARD_CATEGORIES.EQUIPMENT);
   assert.equal(p1.hand[0].subType, CARD_SUBTYPES.WEAPON);
 
-  assert.equal(p1.hand[1].name, "Nỏ Thần Kim Quy");
-  assert.equal(p1.hand[1].category, CARD_CATEGORIES.EQUIPMENT);
-  assert.equal(p1.hand[1].subType, CARD_SUBTYPES.WEAPON);
+  // Lá VÀNG (Club) KHÔNG ĐƯỢC biến đổi, giữ nguyên là Đỡ Vàng
+  assert.equal(p1.hand[1].name, "Đỡ Vàng");
+  assert.equal(p1.hand[1].category, CARD_CATEGORIES.BASIC);
 
-  // Lá Đỏ giữ nguyên
-  assert.equal(p1.hand[2].name, "Bánh Chưng");
+  // Lá ĐỎ (Heart) giữ nguyên
+  assert.equal(p1.hand[2].name, "Bánh Chưng Đỏ");
   assert.equal(p1.hand[2].category, CARD_CATEGORIES.BASIC);
 
-  // Tắt Chế Nỏ -> Phục hồi các lá bài cũ
+  // Lá TRẮNG (Diamond) giữ nguyên
+  assert.equal(p1.hand[3].name, "Trảm Trắng");
+  assert.equal(p1.hand[3].category, CARD_CATEGORIES.BASIC);
+
+  // Tắt Chế Nỏ -> Phục hồi lá Đen cũ
   const toggleOff = handleToggleSkill(state, 1, "Chế Nỏ");
   assert.equal(toggleOff.success, true);
   assert.equal(p1.activeSkills["Chế Nỏ"], false);
   assert.equal(p1.hand[0].name, "Trảm Đen");
-  assert.equal(p1.hand[1].name, "Đỡ Chuồn");
-  assert.equal(p1.hand[2].name, "Bánh Chưng");
-  console.log("✅ Chế Nỏ: Chuyển đổi bài Đen (Spade/Club) và hoàn tác thành công");
+  assert.equal(p1.hand[1].name, "Đỡ Vàng");
+  assert.equal(p1.hand[2].name, "Bánh Chưng Đỏ");
+  assert.equal(p1.hand[3].name, "Trảm Trắng");
+  console.log("✅ Chế Nỏ: Chỉ chuyển đổi duy nhất màu Đen (Đỏ, Trắng, Vàng giữ nguyên) và hoàn tác thành công");
 }
 
 // 3. Sử dụng Nỏ Thần Kim Quy bốc 1 lá bài
@@ -82,8 +88,8 @@ function createTestState() {
   state.turnSeat = 1;
 
   p1.hand = [
-    { id: "BLACK_CARD_1", name: "Trảm Thường", suit: "Spade", rank: 8, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
-    { id: "RED_CARD_1", name: "Bánh Chưng", suit: "Heart", rank: 5, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH }
+    { id: "BLACK_CARD_1", name: "Trảm Đen", suit: "Spade", rank: 8, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL },
+    { id: "RED_CARD_1", name: "Bánh Chưng Đỏ", suit: "Heart", rank: 5, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH }
   ];
   state._deck = [
     { id: "DECK_CARD_1", name: "Lá Bài Rút", suit: "Diamond", rank: 9, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE }
@@ -117,7 +123,7 @@ function createTestState() {
   state.turnSeat = 1;
 
   p1.hand = [
-    { id: "D80_VK_CQ_NoThan", name: "Nỏ Thần Kim Quy", suit: "Club", rank: 8, category: CARD_CATEGORIES.EQUIPMENT, subType: CARD_SUBTYPES.WEAPON }
+    { id: "D80_VK_CQ_NoThan", name: "Nỏ Thần Kim Quy", suit: "Spade", rank: 8, category: CARD_CATEGORIES.EQUIPMENT, subType: CARD_SUBTYPES.WEAPON }
   ];
   state._deck = [
     { id: "DECK_CARD_2", name: "Lá Bài Rút 2", suit: "Heart", rank: 2, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.PEACH }

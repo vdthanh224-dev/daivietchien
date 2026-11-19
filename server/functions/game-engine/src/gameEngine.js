@@ -919,7 +919,7 @@ export function drawCards(state, seat, count = 2, allowDying = false) {
     }
     const card = state._deck.pop();
     if (card) {
-      if (p.activeSkills && p.activeSkills["Chế Nỏ"] && isBlackCardSuit(card.suit)) {
+      if (p.activeSkills && p.activeSkills["Chế Nỏ"] && cardColor(card.suit) === "BLACK") {
           card.orig_name = card.name;
           card.orig_subType = card.subType;
           card.orig_category = card.category;
@@ -2139,7 +2139,7 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
   let card = null;
   if (cardIndex >= 0) {
       card = caster.hand[cardIndex];
-      if (caster.activeSkills && caster.activeSkills["Chế Nỏ"] && isBlackCardSuit(card.suit)) {
+      if (caster.activeSkills && caster.activeSkills["Chế Nỏ"] && cardColor(card.suit) === "BLACK") {
           card = { ...card, name: "Nỏ Thần Kim Quy", subType: CARD_SUBTYPES.WEAPON, category: CARD_CATEGORIES.EQUIPMENT, range: 1, distMod: 0, desc: "Tầm 1. Không giới hạn số Trảm trong lượt" };
       }
       if (heroHasSkill(caster, "SON_CHIEN") && (card.subType === CARD_SUBTYPES.OFFENSIVE_HORSE || card.subType === CARD_SUBTYPES.DEFENSIVE_HORSE) && targetSeat && targetSeat !== casterSeat) {
@@ -11524,7 +11524,7 @@ export function handleToggleSkill(state, seat, skillId) {
     if (isActive) {
       if (player.hand) {
         player.hand.forEach(c => {
-          if (isBlackCardSuit(c.suit) && c.name !== "Nỏ Thần Kim Quy") {
+          if (cardColor(c.suit) === "BLACK" && c.name !== "Nỏ Thần Kim Quy") {
             c.originalCardId = c.id;
             c.orig_name = c.name;
             c.orig_subType = c.subType;

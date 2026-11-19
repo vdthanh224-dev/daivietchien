@@ -2757,7 +2757,7 @@ func _set_local_che_no_hand(active: bool) -> void:
 		if not (card_ui is Control) or card_ui == exit_battle_btn:
 			continue
 		var info = _get_card_info_from_ui(card_ui)
-		var is_black = _is_black_card(info)
+		var is_black = _get_card_color(str(info.get("suit", ""))) == "BLACK"
 		if active:
 			if is_black:
 				if not card_ui.has_meta("che_no_original"):
@@ -3636,7 +3636,7 @@ func _refresh_hung_suc_equipped_weapon_previews() -> void:
 	_relayout_hand_cards()
 
 func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> void:
-	if generals_data.has(my_seat) and bool(generals_data[my_seat].get("che_no_active", false)) and not _is_black_card(c_info) and not is_discard_phase:
+	if generals_data.has(my_seat) and bool(generals_data[my_seat].get("che_no_active", false)) and _get_card_color(str(c_info.get("suit", ""))) != "BLACK" and not is_discard_phase:
 		desc_text.text = "⚠️ [CHẾ NỎ] Đang kích hoạt: Các lá không phải màu Đen bị tối. Tắt Chế Nỏ để sử dụng lá này."
 		return
 	if is_waiting_song_cung:
