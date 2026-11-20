@@ -4748,6 +4748,37 @@ function resolveNearDeathResume(state) {
     if (state.pendingAfterNearDeath) {
         const pending = state.pendingAfterNearDeath;
         state.pendingAfterNearDeath = null;
+        if (pending.type === "TARGET_NEAR_DEATH") {
+          const victim = state.players.find((player) => player.seat === pending.targetSeat);
+          if (victim && victim.hp <= 0 && victim.isAlive !== false) {
+            if (startTrungKienPrompt(state, victim, pending)
+                || startTrungTietPrompt(state, victim, pending)
+                || startNearDeathRescue(state, victim, pending.attackerSeat, pending.finalDamage, pending.armorEffect, pending.armorChargesRemaining, pending.armorExpired)) {
+              refreshLastDelta(state);
+              return { success: true, state };
+            }
+            victim.hp = 0;
+            state.deathKillerSeat = pending.attackerSeat;
+            const deathSummary = finalizePlayerDeath(state, victim);
+            recordAction(state, {
+              type: "PLAYER_DIED",
+              casterSeat: pending.attackerSeat,
+              targetSeat: victim.seat,
+              description: `☠️ Không ai cứu viện! <b>${victim.generalName}</b> đã tử trận!${deathSummary}`
+            });
+            triggerTranTien(state, pending.attackerSeat, victim.seat);
+            triggerVanThang(state, pending.attackerSeat, victim.seat);
+            clearTrungTietVictim(state, victim.seat);
+            checkGameOver(state);
+            if (state.status !== "FINISHED") {
+              const uatKhiRes = triggerUatKhiDeath(state, victim.seat);
+              if (uatKhiRes) return uatKhiRes;
+              return resolveNearDeathResume(state);
+            }
+            refreshLastDelta(state);
+            return { success: true, state };
+          }
+        }
         const target = state.players.find((player) => player.seat === pending.targetSeat);
         if (pending.type === "THUONG_NGAU" && target && target.hp > 0) {
             const weapon = state.players
@@ -6289,6 +6320,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     if (startTrungKienPrompt(state, target, pending)
         || startTrungTietPrompt(state, target, pending)
         || startNearDeathRescue(state, target, pending.attackerSeat, pending.finalDamage, pending.armorEffect, pending.armorChargesRemaining, pending.armorExpired)) {
+      refreshLastDelta(state);
       return { success: true, state };
     }
     target.hp = 0;
@@ -8227,6 +8259,21 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
     triggerHichNghiaHpLoss(state, targetSeat, options);
   }
 
+  if (["AWAIT_HICH_NGHIA_REVIVE", "AWAIT_NEAR_DEATH", "AWAIT_TRUNG_KIEN", "AWAIT_TRUNG_TIET"].includes(state.phase)) {
+    if (target.hp <= 0 && target.seat !== state.waitingTargetSeat) {
+      state.pendingAfterNearDeath = {
+        type: "TARGET_NEAR_DEATH",
+        targetSeat,
+        attackerSeat,
+        finalDamage,
+        armorEffect,
+        armorChargesRemaining,
+        armorExpired
+      };
+    }
+    return { finalDamage, enteredNearDeath: true, armorEffect, armorChargesRemaining, armorExpired };
+  }
+
   // XỬ LÝ LAN TRUYỀN SÁT THƯƠNG XÍCH LIÊN HOÀN (HỎA / THỦY)
   const isElemental = (damageElement === "FIRE" || damageElement === "WATER");
   const wasTargetChained = Boolean(target.isChained);
@@ -9405,7 +9452,7 @@ export function handleAIReaction(state, aiSeat) {
   if (state.status === "FINISHED") return { error: "Trận đấu đã kết thúc" };
   aiSeat = Number(aiSeat);
   const ai = state.players.find(x => x.seat === aiSeat);
-  if (!ai || (ai.hp <= 0 && !["AWAIT_NEAR_DEATH", "AWAIT_UAT_KHI_TARGET"].includes(state.phase))) return { error: "Người chơi không hợp lệ" };
+  if (!ai || (ai.hp <= 0 && !["AWAIT_NEAR_DEATH", "AWAIT_UAT_KHI_TARGET", "AWAIT_HICH_NGHIA_REVIVE"].includes(state.phase))) return { error: "Người chơi không hợp lệ" };
 
   const friends = state.players.filter((p) => isLivingPlayer(p) && areTeammatesInState(state, aiSeat, p.seat));
   const allies = friends.filter((p) => p.seat !== aiSeat).sort((a, b) => (a.hp * 2 + a.hand.length) - (b.hp * 2 + b.hand.length));
@@ -10072,7 +10119,7 @@ export function tickGameState(state, connectedSeats = null) {
     );
     const isAISlot = waitingPlayer && (waitingPlayer.isAI === true || isDisconnectedOrAway);
     const canAIReact = isAISlot
-      && (waitingPlayer.hp > 0 || ["AWAIT_NEAR_DEATH", "AWAIT_UAT_KHI_TARGET"].includes(state.phase));
+      && (waitingPlayer.hp > 0 || ["AWAIT_NEAR_DEATH", "AWAIT_UAT_KHI_TARGET", "AWAIT_HICH_NGHIA_REVIVE"].includes(state.phase));
     if (canAIReact && elapsedMs >= AI_THINK_DELAY_MS && elapsed < 40) {
       const res = handleAIReaction(state, waitingSeat);
       const reaction = res && !res.error ? res : executeFallbackReactionForSeat(state, waitingSeat, waitingPlayer);

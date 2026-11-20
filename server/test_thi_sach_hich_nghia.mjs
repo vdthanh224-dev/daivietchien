@@ -127,7 +127,7 @@ console.log("Starting Thi Sách Hịch Nghĩa & Starting HP Tests...");
   console.log("✓ TEST 4 PASSED: Permanent hand limit persists at 1 HP and skill no longer triggers");
 }
 
-// TEST 5: Human Thi Sách prompt on lethal damage / 0 HP
+// TEST 5: Human Thi Sách prompt on direct lethal damage
 {
   const state = initGame("test-human-prompt", [
     { seat: 1, heroId: "HERO_3", isAI: false }, // Thi Sách (Human)
@@ -154,6 +154,113 @@ console.log("Starting Thi Sách Hịch Nghĩa & Starting HP Tests...");
   assert.equal(heroHasSkill(thiSach, "HICH_NGHIA"), false, "Skill is removed");
   assert.equal(state.phase, "PLAY", "Game returns to PLAY after revive");
   console.log("✓ TEST 5 PASSED: Human Thi Sách prompt acceptance revives to 4 HP and sets limit to 4");
+}
+
+// TEST 6: External damage causes Human Thi Sách to drop to 0 HP via Hịch Nghĩa self-damage -> Phase remains AWAIT_HICH_NGHIA_REVIVE
+{
+  const state = initGame("test-external-hich-nghia-0hp", [
+    { seat: 1, heroId: "HERO_1", isAI: true }, // Cao Lỗ
+    { seat: 2, heroId: "HERO_3", isAI: false }, // Thi Sách (Human, starts 2 HP)
+    { seat: 3, heroId: "HERO_2", isAI: true },
+    { seat: 4, heroId: "HERO_4", isAI: true },
+  ]);
+
+  const thiSach = state.players[1];
+  const caoLo = state.players[0];
+  thiSach.hp = 1; // set to 1 HP
+
+  // Cao Lỗ takes 1 damage -> Thi Sách triggers Hịch Nghĩa, drops to 0 HP
+  const res = applyDamageToPlayer(state, caoLo.seat, 1, "đòn Trảm");
+  assert.equal(thiSach.hp, 0, "Thi Sách must reach 0 HP");
+  assert.equal(state.phase, "AWAIT_HICH_NGHIA_REVIVE", "State phase must remain AWAIT_HICH_NGHIA_REVIVE (not overwritten to PLAY)");
+  assert.equal(state.waitingTargetSeat, 2, "Waiting target must be Thi Sách (seat 2)");
+  assert.equal(state.waitingReactionType, "HICH_NGHIA_REVIVE");
+  assert.equal(res.enteredNearDeath, true, "enteredNearDeath must be true");
+  console.log("✓ TEST 6 PASSED: External damage preserves AWAIT_HICH_NGHIA_REVIVE prompt for human Thi Sách");
+}
+
+// TEST 7: Thi Sách declines Hịch Nghĩa revive -> Transitions to AWAIT_NEAR_DEATH (Rescue phase) & can be saved with Peach
+{
+  const state = initGame("test-decline-rescue", [
+    { seat: 1, heroId: "HERO_1", isAI: false }, // Teammate/Ally
+    { seat: 2, heroId: "HERO_3", isAI: false }, // Thi Sách (Human)
+    { seat: 3, heroId: "HERO_2", isAI: false },
+    { seat: 4, heroId: "HERO_4", isAI: false },
+  ]);
+
+  const thiSach = state.players[1];
+  thiSach.hp = 1;
+
+  // Thi Sách takes 1 damage -> 0 HP
+  applyDamageToPlayer(state, thiSach.seat, 1, "đòn Trảm");
+  assert.equal(state.phase, "AWAIT_HICH_NGHIA_REVIVE");
+
+  // Thi Sách declines revive (e.g. wants to save revive or be rescued by teammate)
+  const declineRes = handleRespondAction(state, 2, false, null);
+  assert.equal(declineRes.success, true);
+  assert.equal(state.phase, "AWAIT_NEAR_DEATH", "Declining revive must enter Near Death rescue phase, NOT instant death");
+  assert.equal(state.waitingReactionType, "PEACH");
+  assert.equal(state.nearDeathVictimSeat, 2, "Near death victim must be Thi Sách");
+
+  // Give waiting player a Bánh Chưng to rescue
+  const waitingPlayer = state.players.find(p => p.seat === state.waitingTargetSeat);
+  const peach = { id: "peach_test", name: "Bánh Chưng", subType: CARD_SUBTYPES.PEACH, category: 0 };
+  waitingPlayer.hand.push(peach);
+
+  // Rescue Thi Sách
+  const rescueRes = handleRespondAction(state, waitingPlayer.seat, true, peach.id);
+  assert.equal(rescueRes.success, true);
+  assert.equal(thiSach.hp, 1, "Thi Sách must recover to 1 HP upon rescue");
+  assert.equal(state.phase, "PLAY", "Game phase returns to PLAY after rescue");
+  console.log("✓ TEST 7 PASSED: Declining revive enters Near Death rescue phase and Thi Sách can be saved with Peach");
+}
+
+// TEST 8: Thi Sách declines revive and NO ONE rescues -> Dies properly with PLAYER_DIED
+{
+  const state = initGame("test-decline-no-rescue", [
+    { seat: 1, heroId: "HERO_1", isAI: false },
+    { seat: 2, heroId: "HERO_3", isAI: false }, // Thi Sách
+    { seat: 3, heroId: "HERO_2", isAI: false },
+    { seat: 4, heroId: "HERO_4", isAI: false },
+  ]);
+
+  const thiSach = state.players[1];
+  thiSach.hp = 1;
+  applyDamageToPlayer(state, thiSach.seat, 1, "đòn Trảm");
+  handleRespondAction(state, 2, false, null); // Decline revive
+  assert.equal(state.phase, "AWAIT_NEAR_DEATH");
+
+  // All askers pass rescue
+  while (state.phase === "AWAIT_NEAR_DEATH") {
+    handleRespondAction(state, state.waitingTargetSeat, false, null);
+  }
+
+  assert.equal(thiSach.hp, 0);
+  assert.equal(thiSach.isAlive, false, "Thi Sách must die only after everyone passes rescue");
+  const deathAction = state.actionHistory.find(a => a.type === "PLAYER_DIED" && a.targetSeat === 2);
+  assert.ok(deathAction, "Must record PLAYER_DIED action for Thi Sách");
+  console.log("✓ TEST 8 PASSED: Thi Sách dies properly only when all players pass rescue");
+}
+
+// TEST 9: Lethal damage after Hịch Nghĩa is already lost -> Enters AWAIT_NEAR_DEATH directly without revive prompt
+{
+  const state = initGame("test-lethal-after-lost-skill", [
+    { seat: 1, heroId: "HERO_1", isAI: true },
+    { seat: 2, heroId: "HERO_3", isAI: false }, // Thi Sách
+    { seat: 3, heroId: "HERO_2", isAI: true },
+    { seat: 4, heroId: "HERO_4", isAI: true },
+  ]);
+
+  const thiSach = state.players[1];
+  thiSach.hp = 1;
+  thiSach.hichNghiaLost = true;
+  thiSach.skills = thiSach.skills.filter(s => s !== "HICH_NGHIA");
+  thiSach.lostSkills = ["HICH_NGHIA"];
+
+  applyDamageToPlayer(state, thiSach.seat, 1, "đòn Trảm");
+  assert.equal(state.phase, "AWAIT_NEAR_DEATH", "Must enter AWAIT_NEAR_DEATH directly when Hịch Nghĩa was already lost");
+  assert.equal(state.nearDeathVictimSeat, 2);
+  console.log("✓ TEST 9 PASSED: Dropping to 0 HP after Hịch Nghĩa is lost directly enters Near Death rescue");
 }
 
 console.log("\nALL THI SÁCH HỊCH NGHĨA TESTS PASSED 100%!");

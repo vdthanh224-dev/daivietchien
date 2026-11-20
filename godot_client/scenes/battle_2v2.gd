@@ -7727,7 +7727,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 	if server_phase != "AWAIT_NAM_QUOC_SON_HA" and not selected_nam_quoc_targets.is_empty():
 		_clear_nam_quoc_son_ha_selection()
 	var keep_reaction_hand_selection = server_waiting_seat == my_seat and (is_waiting_dodge or is_waiting_thuy_trieu_rut_give or is_waiting_song_cung or server_phase in ["AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_THU_PHAP_DISCARD", "AWAIT_NGHICH_Y", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_THAN_CHINH_LE_HOAN"])
-	if server_phase not in ["PLAY", "DISCARD", "AWAIT_HUYNH_TRUONG", "AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_THU_PHAP_DISCARD", "AWAIT_NGHICH_Y", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NAM_QUOC_SON_HA"] or (server_phase == "DISCARD" and server_waiting_seat != my_seat):
+	if server_phase not in ["PLAY", "DISCARD", "AWAIT_HUYNH_TRUONG", "AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_THU_PHAP_DISCARD", "AWAIT_NGHICH_Y", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NAM_QUOC_SON_HA", "AWAIT_HICH_NGHIA_REVIVE"] or (server_phase == "DISCARD" and server_waiting_seat != my_seat):
 		card_play_btn.visible = false
 		if not keep_reaction_hand_selection:
 			_clear_normal_hand_selection()
@@ -7735,7 +7735,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			_set_reaction_hand_focus(false)
 			if dodge_card_selector_scroll and is_instance_valid(dodge_card_selector_scroll):
 				dodge_card_selector_scroll.visible = false
-	if server_phase not in ["PLAY", "DISCARD", "AWAIT_HUYNH_TRUONG", "AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_THU_PHAP_DISCARD", "AWAIT_NGHICH_Y", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NAM_QUOC_SON_HA"]:
+	if server_phase not in ["PLAY", "DISCARD", "AWAIT_HUYNH_TRUONG", "AWAIT_DA_TRACH_DISCARD", "AWAIT_VAN_SACH", "AWAIT_THU_PHAP_DISCARD", "AWAIT_NGHICH_Y", "AWAIT_XUNG_VUONG_TARGET", "AWAIT_NHIEP_CHINH", "AWAIT_NHIEP_CHINH_DUEL_OPPONENT", "AWAIT_NHIEP_CHINH_HEAL", "AWAIT_TRAO_BAO_EQUIP", "AWAIT_THAN_CHINH_LE_HOAN", "AWAIT_NAM_QUOC_SON_HA", "AWAIT_HICH_NGHIA_REVIVE"]:
 		is_player_turn = false
 		is_discard_phase = false
 		card_play_btn.visible = false
@@ -8105,7 +8105,11 @@ func _apply_network_game_state(state: Dictionary) -> void:
 					card_play_btn.disabled = true
 				desc_text.text = "Bạn đã thắng đấu điểm! Hãy nhấp chọn 1 người đang bị mất máu để hồi 1 Máu."
 			elif server_phase == "AWAIT_HICH_NGHIA_REVIVE":
+				card_play_btn.visible = true
+				card_play_btn.disabled = false
 				card_play_btn.text = "✨ HỒI 4 MÁU"
+				end_turn_btn.visible = true
+				end_turn_btn.disabled = false
 				end_turn_btn.text = "TỪ CHỐI"
 				turn_indicator.text = "✨ HỊCH NGHĨA: HỒI 4 MÁU? (%ds)" % server_waiting_timer
 				desc_text.text = "Máu của bạn về 0. Bạn có thể chọn hồi lên đến 4 máu và mất kỹ năng này (giới hạn trữ bài vĩnh viễn là 4)."
@@ -11545,7 +11549,7 @@ func _advance_near_death_rescue() -> void:
 	if not asker.get("is_alive", false) and asker_seat != victim_seat:
 		_advance_near_death_rescue()
 		return
-	if asker_seat != victim_seat and _is_dynasty_battle() and not _ai_is_enemy_seat(asker_seat, victim_seat):
+	if asker_seat != victim_seat and _is_dynasty_battle() and _ai_is_enemy_seat(asker_seat, victim_seat):
 		_advance_near_death_rescue()
 		return
 	if asker_seat != victim_seat and not _is_dynasty_battle() and asker.get("isDragon", false) != victim.get("isDragon", false):
