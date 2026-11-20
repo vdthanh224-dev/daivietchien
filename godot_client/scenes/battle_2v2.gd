@@ -9600,6 +9600,15 @@ func _prompt_reaction_modal(title_text: String, desc_text_msg: String, required_
 			selected_card_ui.set_selected(false)
 		selected_card_ui = null
 
+	# Dọn dẹp card showcase giữa bàn để không che khuất modal và các nút phản ứng
+	for entry in showcase_entries:
+		var node = entry.get("node")
+		if node and is_instance_valid(node):
+			node.queue_free()
+	showcase_entries.clear()
+	if showcase_center and is_instance_valid(showcase_center):
+		showcase_center.visible = false
+
 	if requires_card:
 		_set_reaction_hand_focus(true, required_type, dodge_attacker_seat if is_slash_attack else 0, allow_dodge_as_slash, is_slash_attack)
 		# Phản ứng dùng bài luôn chờ người chơi tự chọn lá trên tay.
@@ -10854,6 +10863,15 @@ func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_e
 		if selected_card_ui.has_method("set_selected"):
 			selected_card_ui.set_selected(false)
 		selected_card_ui = null
+
+	# Dọn dẹp card showcase giữa bàn để không che khuất modal và các nút phản ứng
+	for entry in showcase_entries:
+		var node = entry.get("node")
+		if node and is_instance_valid(node):
+			node.queue_free()
+	showcase_entries.clear()
+	if showcase_center and is_instance_valid(showcase_center):
+		showcase_center.visible = false
 
 	if dodge_title_lbl and is_instance_valid(dodge_title_lbl):
 		dodge_title_lbl.text = "⚔️ BỊ TẤN CÔNG BỞI [TRẢM]!"
@@ -14124,13 +14142,27 @@ func _next_turn() -> void:
 		next_seat = (current_turn_seat % battle_seat_count) + 1
 	_start_turn(next_seat)
 
+func _update_showcase_layout() -> void:
+	if not showcase_center or not is_instance_valid(showcase_center):
+		return
+	showcase_center.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	showcase_center.offset_left = 220.0
+	showcase_center.offset_right = -220.0
+	if battle_seat_count == 8:
+		showcase_center.offset_top = 312.0
+		showcase_center.offset_bottom = 428.0
+	else:
+		showcase_center.offset_top = 274.0
+		showcase_center.offset_bottom = 426.0
+
 func _ensure_showcase_layer() -> void:
 	if showcase_center and is_instance_valid(showcase_center):
+		_update_showcase_layout()
 		return
 	showcase_center = CenterContainer.new()
 	showcase_center.name = "ShowcaseCenter"
-	showcase_center.set_anchors_preset(PRESET_FULL_RECT)
-	showcase_center.mouse_filter = MOUSE_FILTER_IGNORE
+	_update_showcase_layout()
+	showcase_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	showcase_center.z_as_relative = false
 	showcase_center.z_index = 280
 	add_child(showcase_center)
@@ -14138,7 +14170,7 @@ func _ensure_showcase_layer() -> void:
 	showcase_row.name = "ShowcaseRow"
 	showcase_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	showcase_row.add_theme_constant_override("separation", 14)
-	showcase_row.mouse_filter = MOUSE_FILTER_IGNORE
+	showcase_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	showcase_center.add_child(showcase_row)
 	center_showcase.visible = false
 
@@ -14203,14 +14235,25 @@ func _animate_showcase_card(c_name: String, banner_text: String, card_info: Dict
 	if ai_fast_forward_active:
 		return
 	_ensure_showcase_layer()
+
+	# Giới hạn tối đa 2 lá bài cùng lúc giữa bàn để không tràn sang hai bên che khuất các tướng
+	while showcase_entries.size() >= 2:
+		var old = showcase_entries.pop_front()
+		var old_node = old.get("node")
+		if old_node and is_instance_valid(old_node):
+			old_node.queue_free()
+
 	var info = _get_showcase_card_info(c_name, card_info)
 	var entry = VBoxContainer.new()
-	entry.custom_minimum_size = Vector2(138, 210)
+	entry.custom_minimum_size = Vector2(138, 204)
 	entry.alignment = BoxContainer.ALIGNMENT_CENTER
-	entry.mouse_filter = MOUSE_FILTER_IGNORE
-	entry.pivot_offset = Vector2(69, 105)
+	entry.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	entry.pivot_offset = Vector2(69, 102)
 	entry.modulate.a = 0.0
-	entry.scale = Vector2(0.72, 0.72)
+
+	var target_s: float = 0.56 if battle_seat_count == 8 else 0.65
+	var target_scale = Vector2(target_s, target_s)
+	entry.scale = target_scale * 0.70
 
 	var card_ui = CardUIScene.instantiate()
 	_make_card_display_only(card_ui)
@@ -14225,18 +14268,39 @@ func _animate_showcase_card(c_name: String, banner_text: String, card_info: Dict
 		int(info.get("subType", -1))
 	)
 
+	var banner_panel = PanelContainer.new()
+	banner_panel.custom_minimum_size = Vector2(138, 26)
+	banner_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var banner_style = StyleBoxFlat.new()
+	banner_style.bg_color = Color(0.05, 0.07, 0.12, 0.94)
+	banner_style.border_width_left = 1
+	banner_style.border_width_top = 1
+	banner_style.border_width_right = 1
+	banner_style.border_width_bottom = 1
+	banner_style.border_color = Color(0.90, 0.78, 0.35, 0.85)
+	banner_style.corner_radius_top_left = 6
+	banner_style.corner_radius_top_right = 6
+	banner_style.corner_radius_bottom_right = 6
+	banner_style.corner_radius_bottom_left = 6
+	banner_style.content_margin_left = 6
+	banner_style.content_margin_right = 6
+	banner_style.content_margin_top = 2
+	banner_style.content_margin_bottom = 2
+	banner_panel.add_theme_stylebox_override("panel", banner_style)
+
 	var banner = Label.new()
-	banner.custom_minimum_size = Vector2(138, 34)
 	banner.text = banner_text
 	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	banner.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	banner.add_theme_font_size_override("font_size", 10)
-	banner.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5, 1.0))
-	banner.mouse_filter = MOUSE_FILTER_IGNORE
-	entry.add_child(banner)
+	banner.add_theme_color_override("font_color", Color(1.0, 0.92, 0.65, 1.0))
+	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner_panel.add_child(banner)
+	entry.add_child(banner_panel)
+
 	showcase_row.add_child(entry)
-	var display_duration = duration_override if duration_override > 0.0 else (4.0 if "Phán xét" in banner_text or "Lật [" in banner_text else (5.0 if _is_aoe_showcase(c_name, banner_text) else 2.5))
+	var display_duration = duration_override if duration_override > 0.0 else (3.0 if "Phán xét" in banner_text or "Lật [" in banner_text else (3.0 if _is_aoe_showcase(c_name, banner_text) else 2.0))
 	showcase_entries.append({
 		"node": entry,
 		"expires_at": Time.get_ticks_msec() / 1000.0 + display_duration
@@ -14244,7 +14308,7 @@ func _animate_showcase_card(c_name: String, banner_text: String, card_info: Dict
 	showcase_center.visible = true
 	var tw = create_tween().set_parallel(true)
 	tw.tween_property(entry, "modulate:a", 1.0, 0.16)
-	tw.tween_property(entry, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(entry, "scale", target_scale, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _animate_nhiep_chinh_duel(data: Dictionary) -> void:
 	if ai_fast_forward_active:
@@ -14275,11 +14339,14 @@ func _animate_nhiep_chinh_duel(data: Dictionary) -> void:
 
 	var duel_wrapper = PanelContainer.new()
 	duel_wrapper.name = "NhiepChinhDuelWrapper"
-	duel_wrapper.custom_minimum_size = Vector2(430, 275)
+	duel_wrapper.custom_minimum_size = Vector2(410, 255)
 	duel_wrapper.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	duel_wrapper.pivot_offset = Vector2(215, 137.5)
+	duel_wrapper.pivot_offset = Vector2(205, 127.5)
 	duel_wrapper.modulate.a = 0.0
-	duel_wrapper.scale = Vector2(0.75, 0.75)
+
+	var duel_scale: float = 0.52 if battle_seat_count == 8 else 0.58
+	var target_duel_scale = Vector2(duel_scale, duel_scale)
+	duel_wrapper.scale = target_duel_scale * 0.75
 
 	var wrapper_style = StyleBoxFlat.new()
 	wrapper_style.bg_color = Color(0.03, 0.045, 0.08, 0.94)
@@ -14292,10 +14359,10 @@ func _animate_nhiep_chinh_duel(data: Dictionary) -> void:
 	wrapper_style.corner_radius_top_right = 12
 	wrapper_style.corner_radius_bottom_right = 12
 	wrapper_style.corner_radius_bottom_left = 12
-	wrapper_style.content_margin_left = 16
-	wrapper_style.content_margin_right = 16
-	wrapper_style.content_margin_top = 10
-	wrapper_style.content_margin_bottom = 10
+	wrapper_style.content_margin_left = 12
+	wrapper_style.content_margin_right = 12
+	wrapper_style.content_margin_top = 6
+	wrapper_style.content_margin_bottom = 6
 	wrapper_style.shadow_color = Color(0, 0, 0, 0.7)
 	wrapper_style.shadow_size = 12
 	duel_wrapper.add_theme_stylebox_override("panel", wrapper_style)
@@ -14376,18 +14443,18 @@ func _animate_nhiep_chinh_duel(data: Dictionary) -> void:
 
 	var tw = create_tween().set_parallel(true)
 	tw.tween_property(duel_wrapper, "modulate:a", 1.0, 0.2)
-	tw.tween_property(duel_wrapper, "scale", Vector2.ONE, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(duel_wrapper, "scale", target_duel_scale, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _build_duel_card_column(general_name: String, card_data: Dictionary, is_winner: bool, is_dvn: bool) -> VBoxContainer:
 	var col = VBoxContainer.new()
-	col.custom_minimum_size = Vector2(138, 235)
+	col.custom_minimum_size = Vector2(130, 220)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.add_theme_constant_override("separation", 6)
+	col.add_theme_constant_override("separation", 4)
 
 	# 1. Tên tướng đã xuất bài đó
 	var name_panel = PanelContainer.new()
-	name_panel.custom_minimum_size = Vector2(136, 26)
+	name_panel.custom_minimum_size = Vector2(128, 22)
 	name_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var name_style = StyleBoxFlat.new()
 	name_style.bg_color = Color(0.06, 0.09, 0.16, 0.96)
@@ -14410,7 +14477,7 @@ func _build_duel_card_column(general_name: String, card_data: Dictionary, is_win
 	name_lbl.text = ("👑 " if is_dvn else "⚔️ ") + general_name
 	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	name_lbl.add_theme_font_size_override("font_size", 11)
+	name_lbl.add_theme_font_size_override("font_size", 10)
 	name_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.60, 1.0) if is_dvn else Color(0.85, 0.95, 1.0, 1.0))
 	name_lbl.clip_text = true
 	name_panel.add_child(name_lbl)
@@ -14435,7 +14502,7 @@ func _build_duel_card_column(general_name: String, card_data: Dictionary, is_win
 
 	# 3. 1 chữ Thắng và 1 chữ Thua (Result Badge)
 	var result_panel = PanelContainer.new()
-	result_panel.custom_minimum_size = Vector2(136, 30)
+	result_panel.custom_minimum_size = Vector2(128, 26)
 	result_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var res_style = StyleBoxFlat.new()
 	if is_winner:
@@ -14468,7 +14535,7 @@ func _build_duel_card_column(general_name: String, card_data: Dictionary, is_win
 	res_lbl.text = "👑 THẮNG" if is_winner else "❌ THUA"
 	res_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	res_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	res_lbl.add_theme_font_size_override("font_size", 13)
+	res_lbl.add_theme_font_size_override("font_size", 12)
 	res_lbl.add_theme_color_override("font_color", Color(0.45, 1.0, 0.65, 1.0) if is_winner else Color(1.0, 0.60, 0.60, 1.0))
 	result_panel.add_child(res_lbl)
 	col.add_child(result_panel)
@@ -14491,7 +14558,9 @@ func _animate_tien_thoai_morph(caster_seat: int, from_name: String, to_name: Str
 	entry.mouse_filter = MOUSE_FILTER_IGNORE
 	entry.pivot_offset = Vector2(75, 122)
 	entry.modulate.a = 0.0
-	entry.scale = Vector2(0.68, 0.68)
+	var target_s: float = 0.52 if battle_seat_count == 8 else 0.60
+	var target_scale = Vector2(target_s, target_s)
+	entry.scale = target_scale * 0.70
 
 	# Skill Tag Header
 	var skill_tag = Label.new()
@@ -14595,7 +14664,7 @@ func _animate_tien_thoai_morph(caster_seat: int, from_name: String, to_name: Str
 	# Phase 1: Appear entry
 	var tw = create_tween().set_parallel(true)
 	tw.tween_property(entry, "modulate:a", 1.0, 0.18)
-	tw.tween_property(entry, "scale", Vector2.ONE, 0.24).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(entry, "scale", target_scale, 0.24).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 	# Phase 2: Glow aura pulse & begin horizontal flip
 	var tw_morph = create_tween()
