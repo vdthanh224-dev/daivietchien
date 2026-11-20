@@ -88,6 +88,7 @@ var defeated_label: Label = null
 var is_defeated: bool = false
 var distance_label: Label = null
 var bottom_info_container: VBoxContainer = null
+var bottom_info_panel: PanelContainer = null
 var player_name_label: Label = null
 var player_name: String = ""
 var is_self_player: bool = false
@@ -377,32 +378,57 @@ func _update_defeated_role_label() -> void:
 	defeated_label.text = "☠\nTỬ TRẬN" if revealed_role_display.is_empty() or revealed_role_display == "?" else "☠\nTỬ TRẬN\n%s" % revealed_role_display
 
 func _build_distance_label() -> void:
-	if is_instance_valid(bottom_info_container):
+	if is_instance_valid(bottom_info_panel):
 		return
+
+	bottom_info_panel = PanelContainer.new()
+	bottom_info_panel.name = "BottomInfoPanel"
+	bottom_info_panel.anchor_left = 0.5
+	bottom_info_panel.anchor_right = 0.5
+	bottom_info_panel.anchor_top = 1.0
+	bottom_info_panel.anchor_bottom = 1.0
+	bottom_info_panel.offset_left = -82.0
+	bottom_info_panel.offset_right = 82.0
+	bottom_info_panel.offset_top = 4.0
+	bottom_info_panel.offset_bottom = 36.0
+	bottom_info_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bottom_info_panel.z_index = 30
+
+	var plaque_style := StyleBoxFlat.new()
+	plaque_style.bg_color = Color(0.04, 0.06, 0.11, 0.90)
+	plaque_style.border_width_left = 1
+	plaque_style.border_width_top = 1
+	plaque_style.border_width_right = 1
+	plaque_style.border_width_bottom = 1
+	plaque_style.border_color = Color(0.85, 0.70, 0.28, 0.80)
+	plaque_style.corner_radius_top_left = 6
+	plaque_style.corner_radius_top_right = 6
+	plaque_style.corner_radius_bottom_right = 6
+	plaque_style.corner_radius_bottom_left = 6
+	plaque_style.content_margin_left = 6
+	plaque_style.content_margin_right = 6
+	plaque_style.content_margin_top = 2
+	plaque_style.content_margin_bottom = 2
+	plaque_style.shadow_color = Color(0, 0, 0, 0.55)
+	plaque_style.shadow_size = 4
+	plaque_style.shadow_offset = Vector2(0, 1)
+	bottom_info_panel.add_theme_stylebox_override("panel", plaque_style)
+	add_child(bottom_info_panel)
 
 	bottom_info_container = VBoxContainer.new()
 	bottom_info_container.name = "BottomInfoContainer"
-	bottom_info_container.anchor_left = 0.5
-	bottom_info_container.anchor_right = 0.5
-	bottom_info_container.anchor_top = 1.0
-	bottom_info_container.anchor_bottom = 1.0
-	bottom_info_container.offset_left = -90
-	bottom_info_container.offset_right = 90
-	bottom_info_container.offset_top = 3
-	bottom_info_container.offset_bottom = 48
-	bottom_info_container.alignment = BoxContainer.ALIGNMENT_BEGIN
+	bottom_info_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	bottom_info_container.add_theme_constant_override("separation", 1)
 	bottom_info_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bottom_info_container.z_index = 30
-	add_child(bottom_info_container)
+	bottom_info_panel.add_child(bottom_info_container)
 
 	distance_label = Label.new()
 	distance_label.name = "DistanceLabel"
 	distance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	distance_label.add_theme_font_size_override("font_size", 11)
+	distance_label.add_theme_font_size_override("font_size", 10)
 	distance_label.add_theme_color_override("font_color", Color(0.92, 0.84, 0.55, 1.0))
 	distance_label.add_theme_color_override("font_outline_color", Color(0.03, 0.04, 0.08, 1.0))
-	distance_label.add_theme_constant_override("outline_size", 3)
+	distance_label.add_theme_constant_override("outline_size", 2)
 	distance_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	distance_label.visible = false
 	bottom_info_container.add_child(distance_label)
@@ -412,14 +438,22 @@ func _build_distance_label() -> void:
 	player_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	player_name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	player_name_label.clip_text = true
-	player_name_label.custom_minimum_size = Vector2(180, 0)
+	player_name_label.custom_minimum_size = Vector2(150, 0)
 	player_name_label.add_theme_font_size_override("font_size", 11)
 	player_name_label.add_theme_color_override("font_color", Color(0.95, 0.92, 0.85, 1.0))
 	player_name_label.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.06, 1.0))
-	player_name_label.add_theme_constant_override("outline_size", 3)
+	player_name_label.add_theme_constant_override("outline_size", 2)
 	player_name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	player_name_label.visible = false
 	bottom_info_container.add_child(player_name_label)
+	_update_bottom_info_visibility()
+
+func _update_bottom_info_visibility() -> void:
+	if not is_instance_valid(bottom_info_panel):
+		return
+	var has_content := (distance_label and distance_label.visible and not distance_label.text.is_empty()) \
+		or (player_name_label and player_name_label.visible and not player_name_label.text.is_empty())
+	bottom_info_panel.visible = has_content
 
 func set_distance_label(distance: int) -> void:
 	if displayed_distance == distance:
@@ -427,7 +461,8 @@ func set_distance_label(distance: int) -> void:
 	displayed_distance = distance
 	if distance_label:
 		distance_label.visible = distance > 0
-		distance_label.text = "Khoảng cách: %d" % distance if distance > 0 else ""
+		distance_label.text = "🎯 Khoảng cách: %d" % distance if distance > 0 else ""
+	_update_bottom_info_visibility()
 
 func set_player_name(p_name: String, is_self: bool = false, is_ally: bool = false) -> void:
 	player_name = p_name.strip_edges()
@@ -438,6 +473,7 @@ func set_player_name(p_name: String, is_self: bool = false, is_ally: bool = fals
 	if player_name.is_empty():
 		player_name_label.visible = false
 		player_name_label.text = ""
+		_update_bottom_info_visibility()
 		return
 
 	player_name_label.visible = true
@@ -453,6 +489,7 @@ func set_player_name(p_name: String, is_self: bool = false, is_ally: bool = fals
 	else:
 		player_name_label.text = player_name
 		player_name_label.add_theme_color_override("font_color", Color(0.95, 0.88, 0.85, 1.0))
+	_update_bottom_info_visibility()
 
 func _build_depth_rim() -> void:
 	var light_rim = Panel.new()
@@ -992,6 +1029,26 @@ func set_delayed_trick(trick_type: String, active: bool) -> void:
 
 	_update_delayed_tricks_position()
 
+func _style_equip_slot(slot: PanelContainer, border_col: Color, bg_col: Color) -> void:
+	if not is_instance_valid(slot):
+		return
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg_col
+	style.border_width_left = 1
+	style.border_width_top = 1
+	style.border_width_right = 1
+	style.border_width_bottom = 1
+	style.border_color = border_col
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_right = 4
+	style.corner_radius_bottom_left = 4
+	style.content_margin_left = 4
+	style.content_margin_right = 4
+	style.content_margin_top = 1
+	style.content_margin_bottom = 1
+	slot.add_theme_stylebox_override("panel", style)
+
 func _init_equipment_slots() -> void:
 	var equip_container = weapon_slot.get_parent() if is_instance_valid(weapon_slot) else null
 	if equip_container:
@@ -1000,34 +1057,41 @@ func _init_equipment_slots() -> void:
 		equip_container.move_child(armor_slot, 1)
 		equip_container.move_child(defensive_mount_slot.get_parent(), 2)
 		equip_container.move_child(treasure_slot, 3)
+
+	_style_equip_slot(weapon_slot, Color(0.95, 0.40, 0.30, 0.85), Color(0.18, 0.05, 0.05, 0.78))
+	_style_equip_slot(armor_slot, Color(0.35, 0.72, 0.95, 0.85), Color(0.04, 0.12, 0.22, 0.78))
+	_style_equip_slot(defensive_mount_slot, Color(0.30, 0.85, 0.50, 0.85), Color(0.04, 0.18, 0.10, 0.78))
+	_style_equip_slot(offensive_mount_slot, Color(0.95, 0.75, 0.25, 0.85), Color(0.20, 0.15, 0.04, 0.78))
+	_style_equip_slot(treasure_slot, Color(0.95, 0.85, 0.35, 0.90), Color(0.20, 0.16, 0.04, 0.78))
+
 	if is_instance_valid(weapon_slot):
-		weapon_slot.visible = true
+		weapon_slot.visible = (equipped_items.get("weapon", "") != "")
 		if is_instance_valid(weapon_label):
-			weapon_label.add_theme_font_size_override("font_size", 12)
+			weapon_label.add_theme_font_size_override("font_size", 11)
 			weapon_label.text = ""
 			weapon_label.modulate.a = 1.0
 	if is_instance_valid(armor_slot):
-		armor_slot.visible = true
+		armor_slot.visible = (equipped_items.get("armor", "") != "")
 		if is_instance_valid(armor_label):
-			armor_label.add_theme_font_size_override("font_size", 12)
+			armor_label.add_theme_font_size_override("font_size", 11)
 			armor_label.text = ""
 			armor_label.modulate.a = 1.0
 	if is_instance_valid(defensive_mount_slot):
-		defensive_mount_slot.visible = true
+		defensive_mount_slot.visible = defensive_mount_equipped
 		if is_instance_valid(defensive_mount_label):
-			defensive_mount_label.add_theme_font_size_override("font_size", 12)
+			defensive_mount_label.add_theme_font_size_override("font_size", 11)
 			defensive_mount_label.text = ""
 			defensive_mount_label.modulate.a = 1.0
 	if is_instance_valid(offensive_mount_slot):
-		offensive_mount_slot.visible = true
+		offensive_mount_slot.visible = offensive_mount_equipped
 		if is_instance_valid(offensive_mount_label):
-			offensive_mount_label.add_theme_font_size_override("font_size", 12)
+			offensive_mount_label.add_theme_font_size_override("font_size", 11)
 			offensive_mount_label.text = ""
 			offensive_mount_label.modulate.a = 1.0
 	if is_instance_valid(treasure_slot):
-		treasure_slot.visible = true
+		treasure_slot.visible = (equipped_items.get("treasure", "") != "")
 		if is_instance_valid(treasure_label):
-			treasure_label.add_theme_font_size_override("font_size", 12)
+			treasure_label.add_theme_font_size_override("font_size", 11)
 			treasure_label.text = ""
 			treasure_label.modulate.a = 1.0
 	_refresh_mount_slots_visibility()
@@ -1247,7 +1311,7 @@ func set_equipment(slot_type: String, item_name: String, suit_rank: String = "")
 		"weapon", "vu_khi":
 			key = "weapon"
 			if is_instance_valid(weapon_slot):
-				weapon_slot.visible = true
+				weapon_slot.visible = (item_name != "")
 				if is_instance_valid(weapon_label):
 					if item_name != "":
 						weapon_label.text = _format_equip_str("🗡️", suit_rank, item_name)
@@ -1258,7 +1322,7 @@ func set_equipment(slot_type: String, item_name: String, suit_rank: String = "")
 		"armor", "giap":
 			key = "armor"
 			if is_instance_valid(armor_slot):
-				armor_slot.visible = true
+				armor_slot.visible = (item_name != "")
 				if is_instance_valid(armor_label):
 					if item_name != "":
 						armor_label.text = _format_equip_str("🛡️", suit_rank, item_name)
@@ -1277,7 +1341,7 @@ func set_equipment(slot_type: String, item_name: String, suit_rank: String = "")
 		"treasure", "bao_vat":
 			key = "treasure"
 			if is_instance_valid(treasure_slot):
-				treasure_slot.visible = true
+				treasure_slot.visible = (item_name != "")
 				if is_instance_valid(treasure_label):
 					if item_name != "":
 						treasure_label.text = _format_equip_str("👑", suit_rank, item_name)
@@ -1780,6 +1844,13 @@ func setup_general(p_id: String, p_name: String, p_faction: String = "Trần", p
 	_refresh_mount_labels()
 	if is_instance_valid(name_label):
 		name_label.text = p_name
+		# Cân đối kích cỡ chữ để tên dài (như "Lý Thường Kiệt", "Trần Quốc Tuấn") không bị cắt thành dấu ba chấm
+		if p_name.length() > 11:
+			name_label.add_theme_font_size_override("font_size", 10)
+		elif p_name.length() > 7:
+			name_label.add_theme_font_size_override("font_size", 11)
+		else:
+			name_label.add_theme_font_size_override("font_size", 12)
 		# Trong Vương Triều, dấu ? nằm sát mép trái của avatar. Căn phải tên
 		# để ký hiệu không che mất phần đầu tên tướng.
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT if p_role in ["?", "VUA", "Trung Thần", "Phản Tặc", "Nội Gián"] else HORIZONTAL_ALIGNMENT_LEFT

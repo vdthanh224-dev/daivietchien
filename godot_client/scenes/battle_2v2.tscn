@@ -20,16 +20,19 @@ corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_desc_bar"]
-bg_color = Color(0.07, 0.1, 0.17, 0.95)
+bg_color = Color(0.04, 0.065, 0.12, 0.96)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.831373, 0.686275, 0.215686, 0.8)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
+border_color = Color(0.90, 0.75, 0.30, 0.88)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+shadow_color = Color(0, 0, 0, 0.55)
+shadow_size = 5
+shadow_offset = Vector2(0, 2)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_turn_bar"]
 bg_color = Color(0.09, 0.12, 0.19, 0.95)
@@ -356,8 +359,8 @@ horizontal_scroll_mode = 0
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
-theme_override_colors/font_color = Color(0.92, 0.95, 1, 1)
-theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(1, 0.94, 0.8, 1)
+theme_override_font_sizes/font_size = 12
 text = "💡 Chạm chọn một lá bài trên tay để xem mô tả & sử dụng..."
 vertical_alignment = 1
 autowrap_mode = 3
@@ -452,8 +455,8 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 230.0
-offset_bottom = -225.0
+offset_top = 302.0
+offset_bottom = -218.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -464,27 +467,27 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 230.0
-offset_bottom = -225.0
+offset_top = 302.0
+offset_bottom = -218.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
 [node name="Box" type="PanelContainer" parent="DodgeModal/Dim"]
-custom_minimum_size = Vector2(500, 240)
+custom_minimum_size = Vector2(480, 180)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
 
 [node name="Margin" type="MarginContainer" parent="DodgeModal/Dim/Box"]
 layout_mode = 2
 theme_override_constants/margin_left = 20
-theme_override_constants/margin_top = 14
+theme_override_constants/margin_top = 10
 theme_override_constants/margin_right = 20
-theme_override_constants/margin_bottom = 14
+theme_override_constants/margin_bottom = 10
 
 [node name="VBox" type="VBoxContainer" parent="DodgeModal/Dim/Box/Margin"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 5
 
 [node name="Title" type="Label" parent="DodgeModal/Dim/Box/Margin/VBox"]
 layout_mode = 2
@@ -530,18 +533,18 @@ horizontal_alignment = 1
 
 [node name="HBox" type="HBoxContainer" parent="DodgeModal/Dim/Box/Margin/VBox"]
 layout_mode = 2
-theme_override_constants/separation = 16
+theme_override_constants/separation = 10
 alignment = 1
 
 [node name="DodgeBtn" type="Button" parent="DodgeModal/Dim/Box/Margin/VBox/HBox"]
-custom_minimum_size = Vector2(210, 38)
+custom_minimum_size = Vector2(170, 36)
 layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 12
 text = "🛡️ DÙNG [ĐỠ]"
 
 [node name="PassBtn" type="Button" parent="DodgeModal/Dim/Box/Margin/VBox/HBox"]
-custom_minimum_size = Vector2(160, 38)
+custom_minimum_size = Vector2(140, 36)
 layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 12
@@ -564,8 +567,8 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 230.0
-offset_bottom = -225.0
+offset_top = 302.0
+offset_bottom = -218.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -576,27 +579,27 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 230.0
-offset_bottom = -225.0
+offset_top = 302.0
+offset_bottom = -218.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
 [node name="Box" type="PanelContainer" parent="RescueModal/Dim"]
-custom_minimum_size = Vector2(460, 220)
+custom_minimum_size = Vector2(460, 180)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
 
 [node name="Margin" type="MarginContainer" parent="RescueModal/Dim/Box"]
 layout_mode = 2
 theme_override_constants/margin_left = 20
-theme_override_constants/margin_top = 16
+theme_override_constants/margin_top = 12
 theme_override_constants/margin_right = 20
-theme_override_constants/margin_bottom = 16
+theme_override_constants/margin_bottom = 12
 
 [node name="VBox" type="VBoxContainer" parent="RescueModal/Dim/Box/Margin"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 8
 
 [node name="Title" type="Label" parent="RescueModal/Dim/Box/Margin/VBox"]
 layout_mode = 2
@@ -727,8 +730,8 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 230.0
-offset_bottom = -225.0
+offset_top = 285.0
+offset_bottom = -160.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -739,27 +742,27 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 230.0
-offset_bottom = -225.0
+offset_top = 285.0
+offset_bottom = -160.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
 [node name="Box" type="PanelContainer" parent="IronChainModal/Dim"]
-custom_minimum_size = Vector2(680, 270)
+custom_minimum_size = Vector2(680, 255)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
 
 [node name="Margin" type="MarginContainer" parent="IronChainModal/Dim/Box"]
 layout_mode = 2
 theme_override_constants/margin_left = 18
-theme_override_constants/margin_top = 12
+theme_override_constants/margin_top = 10
 theme_override_constants/margin_right = 18
-theme_override_constants/margin_bottom = 12
+theme_override_constants/margin_bottom = 10
 
 [node name="VBox" type="VBoxContainer" parent="IronChainModal/Dim/Box/Margin"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
 [node name="Title" type="Label" parent="IronChainModal/Dim/Box/Margin/VBox"]
 layout_mode = 2
@@ -830,7 +833,7 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 250.0
+offset_top = 280.0
 offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 2
@@ -842,23 +845,23 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 250.0
+offset_top = 280.0
 offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
 [node name="Box" type="PanelContainer" parent="CardPickModal/Dim"]
-custom_minimum_size = Vector2(680, 455)
+custom_minimum_size = Vector2(680, 430)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_modal")
 
 [node name="Margin" type="MarginContainer" parent="CardPickModal/Dim/Box"]
 layout_mode = 2
 theme_override_constants/margin_left = 18
-theme_override_constants/margin_top = 12
+theme_override_constants/margin_top = 10
 theme_override_constants/margin_right = 18
-theme_override_constants/margin_bottom = 12
+theme_override_constants/margin_bottom = 10
 
 [node name="VBox" type="VBoxContainer" parent="CardPickModal/Dim/Box/Margin"]
 layout_mode = 2

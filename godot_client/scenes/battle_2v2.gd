@@ -319,6 +319,11 @@ func _build_battle_seat_avatar_map(seat_count: int) -> Dictionary:
 		Vector2(22.0, 105.0),
 		Vector2(22.0, seats_root.size.y - 295.0),
 	]
+	var four_player_positions: Array[Vector2] = [
+		Vector2(935.0, 40.0),
+		Vector2(555.0, 26.0),
+		Vector2(175.0, 40.0)
+	]
 	# Place seats from the local player toward the right, then continue around
 	# the table counter-clockwise; after the last seat, wrap back to seat 1.
 	var other_seat_order: Array[int] = []
@@ -363,6 +368,9 @@ func _build_battle_seat_avatar_map(seat_count: int) -> Dictionary:
 				holder.anchor_bottom = 1.0
 			holder.position = eight_player_positions[other_index]
 			holder.size = Vector2(157, 214)
+		elif seat_count == 4 and other_index < four_player_positions.size():
+			holder.position = four_player_positions[other_index]
+			holder.size = Vector2(170, 230)
 		else:
 			holder.position = center + Vector2(cos(angle) * radius.x, sin(angle) * radius.y) - Vector2(85, 115)
 			holder.size = Vector2(170, 230)
@@ -1105,24 +1113,52 @@ func _ready() -> void:
 	var dodge_btn_hbox = dodge_confirm_btn.get_parent()
 	if dodge_btn_hbox:
 		dodge_khien_may_btn = Button.new()
-		dodge_khien_may_btn.custom_minimum_size = Vector2(210, 38)
+		dodge_khien_may_btn.custom_minimum_size = Vector2(170, 36)
 		dodge_khien_may_btn.focus_mode = Control.FOCUS_NONE
 		dodge_khien_may_btn.text = "🎲 LẬT KHIÊN MÂY (ĐỎ = ĐỠ)"
 		dodge_khien_may_btn.add_theme_font_size_override("font_size", 11)
 
 		var km_style = StyleBoxFlat.new()
-		km_style.bg_color = Color(0.12, 0.22, 0.35, 0.95)
+		km_style.bg_color = Color(0.10, 0.22, 0.35, 0.96)
 		km_style.border_width_left = 2
 		km_style.border_width_top = 2
 		km_style.border_width_right = 2
 		km_style.border_width_bottom = 2
-		km_style.border_color = Color(0.35, 0.75, 1.0, 0.9)
+		km_style.border_color = Color(0.35, 0.75, 1.0, 0.95)
 		km_style.corner_radius_top_left = 6
 		km_style.corner_radius_top_right = 6
 		km_style.corner_radius_bottom_right = 6
 		km_style.corner_radius_bottom_left = 6
 		dodge_khien_may_btn.add_theme_stylebox_override("normal", km_style)
-		dodge_khien_may_btn.add_theme_color_override("font_color", Color(0.65, 0.9, 1.0, 1.0))
+		dodge_khien_may_btn.add_theme_color_override("font_color", Color(0.75, 0.92, 1.0, 1.0))
+
+		var dodge_style := StyleBoxFlat.new()
+		dodge_style.bg_color = Color(0.08, 0.26, 0.16, 0.96)
+		dodge_style.border_width_left = 2
+		dodge_style.border_width_top = 2
+		dodge_style.border_width_right = 2
+		dodge_style.border_width_bottom = 2
+		dodge_style.border_color = Color(0.35, 0.88, 0.50, 0.95)
+		dodge_style.corner_radius_top_left = 6
+		dodge_style.corner_radius_top_right = 6
+		dodge_style.corner_radius_bottom_right = 6
+		dodge_style.corner_radius_bottom_left = 6
+		dodge_confirm_btn.add_theme_stylebox_override("normal", dodge_style)
+		dodge_confirm_btn.add_theme_color_override("font_color", Color(0.85, 1.0, 0.90, 1.0))
+
+		var pass_style := StyleBoxFlat.new()
+		pass_style.bg_color = Color(0.26, 0.08, 0.08, 0.96)
+		pass_style.border_width_left = 2
+		pass_style.border_width_top = 2
+		pass_style.border_width_right = 2
+		pass_style.border_width_bottom = 2
+		pass_style.border_color = Color(0.92, 0.35, 0.30, 0.95)
+		pass_style.corner_radius_top_left = 6
+		pass_style.corner_radius_top_right = 6
+		pass_style.corner_radius_bottom_right = 6
+		pass_style.corner_radius_bottom_left = 6
+		dodge_pass_btn.add_theme_stylebox_override("normal", pass_style)
+		dodge_pass_btn.add_theme_color_override("font_color", Color(1.0, 0.88, 0.85, 1.0))
 
 		dodge_btn_hbox.add_child(dodge_khien_may_btn)
 		dodge_btn_hbox.move_child(dodge_khien_may_btn, 0)
@@ -1141,6 +1177,7 @@ func _ready() -> void:
 	card_pick_confirm_btn.pressed.connect(_on_card_pick_confirmed)
 	card_pick_cancel_btn.pressed.connect(_hide_card_pick_modal)
 	_setup_lien_chau_prompt()
+	_setup_action_button_styles()
 
 	dodge_modal.visible = false
 	if dodge_card_selector_scroll and is_instance_valid(dodge_card_selector_scroll):
@@ -2167,6 +2204,15 @@ func _process(delta: float) -> void:
 	if hand_layout_refresh_timer <= 0.0:
 		hand_layout_refresh_timer = 0.1
 		_relayout_hand_cards()
+
+	var card_desc_bar := get_node_or_null("TableTop/CardDescBar") as Control
+	if is_instance_valid(card_desc_bar):
+		var modal_active: bool = (dodge_modal != null and dodge_modal.visible) \
+			or (rescue_modal != null and rescue_modal.visible) \
+			or (iron_chain_modal != null and iron_chain_modal.visible) \
+			or (card_pick_modal != null and card_pick_modal.visible) \
+			or (victory_defeat_modal != null and victory_defeat_modal.visible)
+		card_desc_bar.visible = not modal_active
 
 	if is_game_over:
 		return
@@ -4656,29 +4702,151 @@ func _get_van_sach_last_scroll_name() -> String:
 						return card_name
 	return ""
 
+func _setup_action_button_styles() -> void:
+	if not is_instance_valid(card_play_btn) or not is_instance_valid(end_turn_btn) or not is_instance_valid(hich_recast_btn):
+		return
+
+	# 1. Nút Xuất bài / Tấn công / Ra đòn (Crimson Vermilion & Gold)
+	var play_normal := StyleBoxFlat.new()
+	play_normal.bg_color = Color(0.68, 0.16, 0.14, 0.98)
+	play_normal.border_width_left = 2
+	play_normal.border_width_top = 2
+	play_normal.border_width_right = 2
+	play_normal.border_width_bottom = 2
+	play_normal.border_color = Color(1.0, 0.86, 0.38, 1.0)
+	play_normal.corner_radius_top_left = 8
+	play_normal.corner_radius_top_right = 8
+	play_normal.corner_radius_bottom_right = 8
+	play_normal.corner_radius_bottom_left = 8
+	play_normal.shadow_color = Color(0.7, 0.15, 0.1, 0.45)
+	play_normal.shadow_size = 6
+	play_normal.shadow_offset = Vector2(0, 2)
+	card_play_btn.add_theme_stylebox_override("normal", play_normal)
+
+	var play_hover := play_normal.duplicate() as StyleBoxFlat
+	play_hover.bg_color = Color(0.80, 0.22, 0.18, 1.0)
+	play_hover.border_color = Color(1.0, 0.94, 0.60, 1.0)
+	play_hover.shadow_size = 9
+	card_play_btn.add_theme_stylebox_override("hover", play_hover)
+
+	var play_pressed := play_normal.duplicate() as StyleBoxFlat
+	play_pressed.bg_color = Color(0.50, 0.10, 0.08, 1.0)
+	play_pressed.border_color = Color(0.85, 0.68, 0.25, 1.0)
+	card_play_btn.add_theme_stylebox_override("pressed", play_pressed)
+
+	var play_disabled := play_normal.duplicate() as StyleBoxFlat
+	play_disabled.bg_color = Color(0.18, 0.16, 0.16, 0.75)
+	play_disabled.border_color = Color(0.42, 0.42, 0.42, 0.55)
+	play_disabled.shadow_size = 0
+	card_play_btn.add_theme_stylebox_override("disabled", play_disabled)
+
+	card_play_btn.add_theme_color_override("font_color", Color(1.0, 0.96, 0.88, 1.0))
+	card_play_btn.add_theme_color_override("font_hover_color", Color.WHITE)
+	card_play_btn.add_theme_color_override("font_disabled_color", Color(0.65, 0.65, 0.65, 0.75))
+
+	# 2. Nút Kết thúc lượt (Obsidian Bronze & Royal Gold)
+	var end_normal := StyleBoxFlat.new()
+	end_normal.bg_color = Color(0.08, 0.12, 0.19, 0.96)
+	end_normal.border_width_left = 2
+	end_normal.border_width_top = 2
+	end_normal.border_width_right = 2
+	end_normal.border_width_bottom = 2
+	end_normal.border_color = Color(0.88, 0.72, 0.28, 0.95)
+	end_normal.corner_radius_top_left = 8
+	end_normal.corner_radius_top_right = 8
+	end_normal.corner_radius_bottom_right = 8
+	end_normal.corner_radius_bottom_left = 8
+	end_normal.shadow_color = Color(0, 0, 0, 0.55)
+	end_normal.shadow_size = 5
+	end_normal.shadow_offset = Vector2(0, 2)
+	end_turn_btn.add_theme_stylebox_override("normal", end_normal)
+
+	var end_hover := end_normal.duplicate() as StyleBoxFlat
+	end_hover.bg_color = Color(0.14, 0.20, 0.30, 1.0)
+	end_hover.border_color = Color(1.0, 0.88, 0.45, 1.0)
+	end_hover.shadow_size = 8
+	end_turn_btn.add_theme_stylebox_override("hover", end_hover)
+
+	var end_pressed := end_normal.duplicate() as StyleBoxFlat
+	end_pressed.bg_color = Color(0.05, 0.08, 0.12, 1.0)
+	end_turn_btn.add_theme_stylebox_override("pressed", end_pressed)
+
+	end_turn_btn.add_theme_color_override("font_color", Color(1.0, 0.90, 0.55, 1.0))
+	end_turn_btn.add_theme_color_override("font_hover_color", Color.WHITE)
+
+	# 3. Nút Đổi Hịch / Tái Thi Triển (Teal Azure & Gold)
+	var recast_normal := StyleBoxFlat.new()
+	recast_normal.bg_color = Color(0.10, 0.18, 0.26, 0.96)
+	recast_normal.border_width_left = 2
+	recast_normal.border_width_top = 2
+	recast_normal.border_width_right = 2
+	recast_normal.border_width_bottom = 2
+	recast_normal.border_color = Color(0.38, 0.76, 0.98, 0.95)
+	recast_normal.corner_radius_top_left = 8
+	recast_normal.corner_radius_top_right = 8
+	recast_normal.corner_radius_bottom_right = 8
+	recast_normal.corner_radius_bottom_left = 8
+	recast_normal.shadow_color = Color(0, 0, 0, 0.55)
+	recast_normal.shadow_size = 5
+	recast_normal.shadow_offset = Vector2(0, 2)
+	hich_recast_btn.add_theme_stylebox_override("normal", recast_normal)
+
+	var recast_hover := recast_normal.duplicate() as StyleBoxFlat
+	recast_hover.bg_color = Color(0.16, 0.28, 0.40, 1.0)
+	recast_hover.border_color = Color(0.60, 0.90, 1.0, 1.0)
+	hich_recast_btn.add_theme_stylebox_override("hover", recast_hover)
+	hich_recast_btn.add_theme_color_override("font_color", Color(0.85, 0.95, 1.0, 1.0))
+
 func _apply_action_buttons_layout(is_van_sach: bool = false) -> void:
 	if not is_instance_valid(card_play_btn) or not is_instance_valid(end_turn_btn) or not is_instance_valid(hich_recast_btn):
 		return
 	if is_van_sach:
 		card_play_btn.custom_minimum_size.x = 220.0
-		card_play_btn.position.x = 515.0
 		card_play_btn.size.x = 220.0
 		hich_recast_btn.custom_minimum_size.x = 230.0
-		hich_recast_btn.position.x = 745.0
 		hich_recast_btn.size.x = 230.0
 		end_turn_btn.custom_minimum_size.x = 110.0
-		end_turn_btn.position.x = 985.0
 		end_turn_btn.size.x = 110.0
+		var total_w: float = 220.0 + 10.0 + 230.0 + 10.0 + 110.0
+		var start_x: float = 640.0 - total_w * 0.5
+		card_play_btn.position.x = start_x
+		hich_recast_btn.position.x = start_x + 220.0 + 10.0
+		end_turn_btn.position.x = start_x + 220.0 + 10.0 + 230.0 + 10.0
 	else:
-		card_play_btn.custom_minimum_size.x = 240.0
-		card_play_btn.position.x = 525.0
-		card_play_btn.size.x = 240.0
-		end_turn_btn.custom_minimum_size.x = 145.0
-		end_turn_btn.position.x = 780.0
-		end_turn_btn.size.x = 145.0
-		hich_recast_btn.custom_minimum_size.x = 120.0
-		hich_recast_btn.position.x = 930.0
-		hich_recast_btn.size.x = 120.0
+		var play_vis := card_play_btn.visible
+		var recast_vis := hich_recast_btn.visible
+		if play_vis:
+			card_play_btn.custom_minimum_size.x = 240.0
+			card_play_btn.size.x = 240.0
+			end_turn_btn.custom_minimum_size.x = 145.0
+			end_turn_btn.size.x = 145.0
+			if recast_vis:
+				hich_recast_btn.custom_minimum_size.x = 120.0
+				hich_recast_btn.size.x = 120.0
+				var total_w := 240.0 + 12.0 + 120.0 + 12.0 + 145.0
+				var start_x := 640.0 - total_w * 0.5
+				card_play_btn.position.x = start_x
+				hich_recast_btn.position.x = start_x + 240.0 + 12.0
+				end_turn_btn.position.x = start_x + 240.0 + 12.0 + 120.0 + 12.0
+			else:
+				var total_w := 240.0 + 16.0 + 145.0
+				var start_x := 640.0 - total_w * 0.5
+				card_play_btn.position.x = start_x
+				end_turn_btn.position.x = start_x + 240.0 + 16.0
+		else:
+			if recast_vis:
+				hich_recast_btn.custom_minimum_size.x = 130.0
+				hich_recast_btn.size.x = 130.0
+				end_turn_btn.custom_minimum_size.x = 150.0
+				end_turn_btn.size.x = 150.0
+				var total_w := 130.0 + 14.0 + 150.0
+				var start_x := 640.0 - total_w * 0.5
+				hich_recast_btn.position.x = start_x
+				end_turn_btn.position.x = start_x + 130.0 + 14.0
+			else:
+				end_turn_btn.custom_minimum_size.x = 160.0
+				end_turn_btn.size.x = 160.0
+				end_turn_btn.position.x = 640.0 - 80.0
 
 func _update_action_btn() -> void:
 	if is_discard_phase:
@@ -4988,6 +5156,7 @@ func _update_action_btn() -> void:
 
 	if not is_player_turn or selected_card_ui == null or is_waiting_dodge or is_waiting_rescue or (is_network_mode and current_server_phase != "PLAY"):
 		card_play_btn.visible = false
+		_apply_action_buttons_layout(false)
 		return
 
 	var c_info = _get_card_info_from_ui(selected_card_ui)
@@ -5201,6 +5370,7 @@ func _update_action_btn() -> void:
 	else:
 		card_play_btn.text = "DÙNG [%s]" % c_name
 		card_play_btn.visible = true
+	_apply_action_buttons_layout(false)
 
 func _reset_player_turn_timer() -> void:
 	if is_player_turn:
@@ -10850,10 +11020,11 @@ func _select_dodge_card(card_ui: Control) -> void:
 				break
 		dodge_confirm_btn.disabled = true
 		dodge_confirm_btn.modulate = Color(0.55, 0.58, 0.64, 0.78)
+		var req_lbl = _get_reaction_required_label(current_reaction_required_type)
 		if has_valid_card:
 			dodge_confirm_btn.text = "%s [CHỌN BÀI]" % current_reaction_confirm_prefix if not current_reaction_confirm_prefix.is_empty() else dodge_confirm_btn.text
 		else:
-			dodge_confirm_btn.text = "❌ KHÔNG CÓ BÀI PHÙ HỢP"
+			dodge_confirm_btn.text = "❌ KHÔNG CÓ %s" % req_lbl.to_upper()
 		if is_waiting_thuy_trieu_rut_give:
 			dodge_pass_btn.visible = false
 		elif not current_reaction_pass_text.is_empty():
@@ -10864,7 +11035,6 @@ func _select_dodge_card(card_ui: Control) -> void:
 			dodge_pass_btn.visible = true
 		if not is_waiting_thuy_trieu_rut_give:
 			dodge_pass_btn.disabled = false
-		var req_lbl = _get_reaction_required_label(current_reaction_required_type)
 		if dodge_selected_lbl:
 			dodge_selected_lbl.text = "👉 Hãy chạm chọn 1 lá [%s] sáng trên tay bạn để đưa đi." % req_lbl if is_waiting_thuy_trieu_rut_give else "👉 Hãy chạm chọn 1 lá [%s] sáng trên tay bạn (hoặc bấm %s)." % [req_lbl, dodge_pass_btn.text]
 		desc_text.text = "👉 Hãy chọn lá [%s] bạn muốn dùng trên tay." % req_lbl if has_valid_card else "💥 Bạn không có sẵn lá [%s] phù hợp trên tay!" % req_lbl
@@ -14176,9 +14346,10 @@ func _setup_history_ui() -> void:
 	history_button.name = "HistoryButton"
 	history_button.text = "📜  NHẬT KÝ ĐẤU"
 	history_button.tooltip_text = "Mở nhật ký diễn biến trận đấu"
-	history_button.custom_minimum_size = Vector2(190, 40)
+	history_button.custom_minimum_size = Vector2(146, 32)
+	history_button.size = Vector2(146, 32)
 	history_button.set_anchors_preset(PRESET_TOP_LEFT)
-	history_button.position = Vector2(18, 18)
+	history_button.position = Vector2(14, 14)
 	history_button.z_index = 40
 	var button_style = StyleBoxFlat.new()
 	button_style.bg_color = Color(0.055, 0.09, 0.15, 0.97)

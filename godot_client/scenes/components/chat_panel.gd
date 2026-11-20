@@ -89,8 +89,8 @@ func _build_ui() -> void:
 	_style_button(toggle_button)
 	add_child(toggle_button)
 	if channel == "battle":
-		toggle_button.position = Vector2(222, 18)
-		toggle_button.size = Vector2(160, 40)
+		toggle_button.position = Vector2(14, 52)
+		toggle_button.size = Vector2(146, 32)
 	else:
 		toggle_button.set_anchors_and_offsets_preset(PRESET_BOTTOM_LEFT)
 		toggle_button.offset_left = 24
