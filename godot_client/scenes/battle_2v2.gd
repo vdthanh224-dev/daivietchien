@@ -20,6 +20,8 @@ const HERO_SKILL_ACTIONS := {
 	"TRINH_LIET_STEAL": {"name": "Trinh Liệt"},
 	"BAT_NA_TRIGGERED": {"name": "Bát Nạ"},
 	"TRAN_TIEN_DRAW": {"name": "Trận Tiền"},
+	"TRAN_TIEN_HEAL": {"name": "Trận Tiền"},
+	"TIEN_PHONG_DRAW": {"name": "Tiên Phong"},
 	"KHOI_BINH_PROMPT": {"name": "Khởi Binh"},
 	"KHOI_BINH_DRAW": {"name": "Khởi Binh"},
 	"KHOI_BINH_DECLINED": {"name": "Khởi Binh"},
@@ -5027,7 +5029,14 @@ func _update_action_btn() -> void:
 		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 			var tgt = generals_data[selected_target_seat]
 			if tgt["is_alive"]:
-				card_play_btn.text = "⚔️ %s → %s" % [c_name.to_upper(), tgt["name"]]
+				var tien_phong_suffix = ""
+				if _hero_has_skill(p_gen, "tien_phong") and int(p_gen.get("turns_taken", 0)) <= 1:
+					var hand_slashes = _count_hand_slashes()
+					if hand_slashes >= 3:
+						tien_phong_suffix = " (RÚT 1 LÁ)"
+					else:
+						tien_phong_suffix = " (KHÔNG THỂ NÉ)"
+				card_play_btn.text = "⚔️ %s%s → %s" % [c_name.to_upper(), tien_phong_suffix, tgt["name"]]
 				card_play_btn.visible = true
 				return
 		card_play_btn.text = "⚔️ CHỌN MỤC TIÊU..."
@@ -7601,6 +7610,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 		# Dương Vân Nga's data.
 		_refresh_local_skill_buttons(seat)
 
+		g["turns_taken"] = int(p.get("turnsTaken", 0))
 		var is_chained = bool(p.get("isChained", false))
 		if is_chained != g.get("is_chained", false):
 			g["is_chained"] = is_chained
@@ -8652,6 +8662,25 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			else:
 				turn_indicator.text = "🗡️ %s ĐANG CHỌN BÀI MỤC TIÊU (%ds)..." % [wait_name, server_waiting_timer]
 				desc_text.text = "🗡️ Đang chờ %s chọn lá bài để cướp hoặc phá..." % wait_name
+
+	elif server_phase == "AWAIT_TRAN_TIEN":
+		if server_waiting_seat == my_seat and not dodge_modal.visible:
+			_prompt_reaction_modal(
+				"⚔️ TRẬN TIỀN (NÀNG NỘI)",
+				"Bạn vừa hạ gục một đối thủ!
+Hãy chọn rút 2 lá bài hoặc hồi 1 Máu:",
+				"NONE",
+				"📜 RÚT 2 LÁ BÀI",
+				"❤️ HỒI 1 MÁU"
+			)
+			custom_reaction_callback = func(choose_heal: bool, _card_info: Dictionary):
+				if NetworkClient and NetworkClient.is_connected_to_server:
+					NetworkClient.send_respond_action(choose_heal, "HEAL_1" if choose_heal else "DRAW_2")
+			turn_indicator.text = "⚔️ TRẬN TIỀN: CHỌN RÚT 2 LÁ HOẶC HỒI 1 MÁU (%ds)!" % server_waiting_timer
+		else:
+			var wait_gen = generals_data.get(server_waiting_seat, {})
+			var wait_name = wait_gen.get("name", "Ghế %d" % server_waiting_seat) if wait_gen is Dictionary else "Ghế %d" % server_waiting_seat
+			turn_indicator.text = "⚔️ ĐANG CHỜ %s CHỌN TRẬN TIỀN (%ds)..." % [wait_name, server_waiting_timer]
 
 	elif server_phase == "AWAIT_DOAN_DAO_CHOICE":
 		if server_waiting_seat == my_seat and not dodge_modal.visible:
@@ -17983,8 +18012,21 @@ func _execute_local_muu_dinh_confirm(chosen_card: Dictionary, remaining_card: Di
 	AudioManager.play_skill()
 	_update_action_btn()
 
+func _count_hand_slashes() -> int:
+	var count = 0
+	if is_instance_valid(hand_container):
+		for child in hand_container.get_children():
+			var info = _get_card_info_from_ui(child)
+			var c_name = str(info.get("name", ""))
+			var c_sub = int(info.get("sub", -1))
+			if "Trảm" in c_name or c_sub in [0, 1, 2]:
+				count += 1
+	return count
+
 func _get_max_slashes_allowed(g: Dictionary) -> int:
 	if _has_no_than(g) or int(g.get("suc_soi_turns_remaining", 0)) > 0:
+		return 999
+	if _hero_has_skill(g, "tien_phong") and int(g.get("turns_taken", 0)) <= 1:
 		return 999
 	var extra = int(g.get("extra_slash_limit", 0))
 	if bool(g.get("than_chinh_slash_bonus", false)):

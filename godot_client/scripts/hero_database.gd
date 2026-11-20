@@ -1191,7 +1191,7 @@ func _init_all_heroes() -> void:
 	_add_hero(4, "Lê Chân", "Hồng Bàng", 3, "Triều Dâng", "Một lần mỗi lượt, chỉ định hủy 1 lá trang bị của 1 người khác.", "res://assets/ui/le_chan.png", "le_chan")
 	_add_hero(5, "Thánh Thiên", "Hồng Bàng", 4, "Dũng Nữ", "Đòn Trảm của bạn khiến mục tiêu phải đánh ra 2 lá Đỡ mới có thể triệt tiêu nếu mục tiêu có lượng Máu hiện tại nhiều hơn bạn.", "res://assets/ui/thanh_thien.png", "thanh_thien")
 	_add_hero(6, "Vũ Thị Thục", "Hồng Bàng", 3, "Trinh Liệt", "Mỗi khi chịu sát thương từ đòn Trảm, bạn được rút 1 lá bài trong vùng chơi của nguồn gây sát thương.", "res://assets/ui/bat_nan.png", "bat_nan")
-	_add_hero(7, "Nàng Nội", "Hồng Bàng", 4, "Tiên Phong", "Trong lượt đầu tiên của trận đấu, bạn được rút thêm 2 lá bài và không bị giới hạn số lần ra lá Trảm trong lượt đầu tiên.", "res://assets/ui/nang_noi.png", "nang_noi")
+	_add_hero(7, "Nàng Nội", "Hồng Bàng", 4, "Tiên Phong", "Trong lượt chơi đầu tiên của bạn, bạn được rút thêm 2 lá bài và không bị giới hạn lượt dùng Trảm trong lượt này. Trong lượt này, nếu bạn có ít hơn 3 lá Trảm trong tay, Trảm của bạn không thể Né, nếu bạn có nhiều hơn hoặc bằng 3 Trảm trong tay, bạn rút 1 lá.", "res://assets/ui/nang_noi.png", "nang_noi")
 	_add_hero(8, "Triệu Quốc Đạt", "Hồng Bàng", 4, "Khởi Binh", "Khi người khác dùng Trảm gây sát thương thành công, bạn có thể chọn cho bạn và họ, mỗi người rút 1 lá bài.", "res://assets/ui/trieu_quoc_dat.png", "trieu_quoc_dat")
 	_add_hero(9, "Triệu Thị Trinh", "Hồng Bàng", 4, "Chiến Tượng", "Khi có trang bị trên ô Ngựa, sát thương gây ra bởi Trảm +1.", "res://assets/ui/ba_trieu.png", "ba_trieu")
 	_add_hero(10, "Lý Bí", "Hồng Bàng", 4, "Dựng Nước", "Đầu Giai đoạn Rút bài, bạn có thể bỏ qua việc rút bài để hồi 1 Máu và thu ngẫu nhiên 1 lá bài Đỏ từ xấp bài bỏ vào tay nếu có.", "res://assets/ui/ly_bi.png", "ly_bi")
@@ -1319,8 +1319,8 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 		]
 	elif id == 7:
 		skills = [
-			{"id": "tien_phong", "name": "Tiên Phong", "desc": "Trong lượt đầu tiên của trận đấu, bạn được rút thêm 2 lá bài và không bị giới hạn số lần ra lá Trảm trong lượt đầu tiên."},
-			{"id": "tran_tien", "name": "Trận Tiền", "desc": "Khi bạn hạ gục 1 người, bạn được lập tức rút 2 lá."}
+			{"id": "tien_phong", "name": "Tiên Phong", "desc": "Trong lượt chơi đầu tiên của bạn, bạn được rút thêm 2 lá bài và không bị giới hạn lượt dùng Trảm trong lượt này. Trong lượt này, nếu bạn có ít hơn 3 lá Trảm trong tay, Trảm của bạn không thể Né, nếu bạn có nhiều hơn hoặc bằng 3 Trảm trong tay, bạn rút 1 lá."},
+			{"id": "tran_tien", "name": "Trận Tiền", "desc": "Khi bạn hạ gục 1 người, bạn được chọn rút 2 lá hoặc hồi 1 máu."}
 		]
 	elif id == 8:
 		skills = [
