@@ -2681,7 +2681,7 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 	if seat == my_seat and _hero_has_skill(g, "trieu_dang"):
 		buttons.append({"id": "trieu_dang", "text": "🌊 TRIỀU DÂNG", "description": "Chọn 1 người khác có trang bị để hủy 1 trang bị của họ.", "selected": is_targeting_trieu_dang})
 	if seat == my_seat and _hero_has_skill(g, "bat_na"):
-		buttons.append({"id": "bat_na", "text": "🎭 BÁT NẠ", "description": "Một lần mỗi lượt: biến 1 Bài Cơ Bản thành Trảm không tính giới hạn.", "selected": is_targeting_bat_na})
+		buttons.append({"id": "bat_na", "text": "🎭 BÁT NẠ", "description": "1 lần/lượt: biến 1 lá bài thành Trảm không tính giới hạn (Cơ bản: rút 1; Cẩm nang: hủy 1 bài mục tiêu; Vũ khí: vô hạn tầm; Giáp: bỏ qua giáp).", "selected": is_targeting_bat_na})
 	if seat == my_seat and _hero_has_skill(g, "hung_suc"):
 		buttons.append({"id": "hung_suc", "text": "💪 HÙNG SỨC", "description": "Bỏ 1 Vũ Khí trên tay hoặc đang trang bị để gây 1 sát thương cho mục tiêu trong Tầm 1, sau đó rút 1 lá.", "selected": is_targeting_hung_suc})
 	if seat == my_seat and _hero_has_skill(g, "van_an"):
@@ -2943,8 +2943,8 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 			desc_text.text = "⚠️ [BÁT NẠ] chỉ dùng trong lượt của bạn."
 			return
 		is_targeting_bat_na = not is_targeting_bat_na
-		desc_text.text = "🎭 [BÁT NẠ] Chọn 1 Bài Cơ Bản và 1 mục tiêu trong tầm."
-		turn_indicator.text = "🎭 BÁT NẠ: CHỌN BÀI CƠ BẢN VÀ MỤC TIÊU"
+		desc_text.text = "🎭 [BÁT NẠ] Chọn 1 lá bài và 1 mục tiêu (Cơ bản: rút 1; Cẩm nang: hủy 1; Vũ khí: vô hạn tầm; Giáp: bỏ qua giáp)."
+		turn_indicator.text = "🎭 BÁT NẠ: CHỌN BÀI VÀ MỤC TIÊU"
 		_refresh_local_skill_buttons(s_num)
 		_update_action_btn()
 		return
@@ -4863,11 +4863,39 @@ func _update_action_btn() -> void:
 		card_play_btn.text = "🤝 ĐƯA BÀI → %s" % generals_data[selected_target_seat]["name"] if huynh_target_valid and huynh_card_valid else "🤝 HUYNH TRƯỞNG: CHỌN TƯỚNG VÀ BÀI"
 		return
 	if is_targeting_bat_na:
-		var bat_na_target_valid = selected_target_seat > 0 and selected_target_seat != my_seat and generals_data.has(selected_target_seat) and generals_data[selected_target_seat].get("is_alive", false)
-		var bat_na_card_valid = selected_card_ui != null and is_instance_valid(selected_card_ui) and int(_get_card_info_from_ui(selected_card_ui).get("cat", -1)) == 0
+		var bat_na_card = _get_card_info_from_ui(selected_card_ui) if (selected_card_ui != null and is_instance_valid(selected_card_ui)) else {}
+		var bat_na_card_valid = not bat_na_card.is_empty()
+		var card_cat = int(bat_na_card.get("cat", -1))
+		var card_sub = int(bat_na_card.get("sub", -1))
+		var is_weapon = (card_cat == 1 and card_sub == 6)
+		var is_armor = (card_cat == 1 and card_sub == 7)
+		var is_scroll = (card_cat == 2 or card_cat == 3)
+		var is_basic = (card_cat == 0)
+
+		var target_in_range = true
+		if selected_target_seat > 0 and not is_weapon:
+			target_in_range = _calculate_distance(my_seat, selected_target_seat) <= _get_attack_range(my_seat)
+
+		var bat_na_target_valid = selected_target_seat > 0 and selected_target_seat != my_seat and generals_data.has(selected_target_seat) and generals_data[selected_target_seat].get("is_alive", false) and target_in_range
 		card_play_btn.visible = true
 		card_play_btn.disabled = not (bat_na_target_valid and bat_na_card_valid)
-		card_play_btn.text = "🎭 BÁT NẠ → %s" % generals_data[selected_target_seat]["name"] if bat_na_target_valid and bat_na_card_valid else "🎭 BÁT NẠ: CHỌN BÀI CƠ BẢN VÀ MỤC TIÊU"
+
+		if bat_na_target_valid and bat_na_card_valid:
+			var effect_suffix = ""
+			if is_basic:
+				effect_suffix = " (RÚT 1 LÁ)"
+			elif is_scroll:
+				effect_suffix = " (HỦY 1 LÁ)"
+			elif is_weapon:
+				effect_suffix = " (VÔ HẠN TẦM)"
+			elif is_armor:
+				effect_suffix = " (BỎ QUA GIÁP)"
+			card_play_btn.text = "🎭 BÁT NẠ%s → %s" % [effect_suffix, generals_data[selected_target_seat]["name"].to_upper()]
+		else:
+			if selected_target_seat > 0 and not target_in_range:
+				card_play_btn.text = "⚠️ MỤC TIÊU NGOÀI TẦM ĐÁNH"
+			else:
+				card_play_btn.text = "🎭 BÁT NẠ: CHỌN BÀI VÀ MỤC TIÊU"
 		return
 	if is_targeting_dinh_quoc:
 		var dq_target_valid = selected_target_seat > 0 and selected_target_seat != my_seat and generals_data.has(selected_target_seat) and generals_data[selected_target_seat].get("is_alive", false)
@@ -5708,11 +5736,14 @@ func _on_card_play_btn_clicked() -> void:
 		return
 	if is_targeting_bat_na:
 		if selected_target_seat <= 0 or selected_card_ui == null or not is_instance_valid(selected_card_ui):
-			desc_text.text = "⚠️ [BÁT NẠ] cần chọn 1 Bài Cơ Bản và 1 mục tiêu."
+			desc_text.text = "⚠️ [BÁT NẠ] cần chọn 1 lá bài và 1 mục tiêu."
 			return
 		var bat_na_card = _get_card_info_from_ui(selected_card_ui)
-		if int(bat_na_card.get("cat", -1)) != 0:
-			desc_text.text = "⚠️ [BÁT NẠ] chỉ biến Bài Cơ Bản thành Trảm."
+		var card_cat = int(bat_na_card.get("cat", -1))
+		var card_sub = int(bat_na_card.get("sub", -1))
+		var is_weapon = (card_cat == 1 and card_sub == 6)
+		if not is_weapon and _calculate_distance(my_seat, selected_target_seat) > _get_attack_range(my_seat):
+			desc_text.text = "⚠️ [BÁT NẠ] mục tiêu ngoài tầm đánh (chỉ bài Vũ Khí mới không giới hạn khoảng cách)."
 			return
 		NetworkClient.send_use_skill("Bát Nạ", selected_target_seat, str(bat_na_card.get("id", "")))
 		is_targeting_bat_na = false
@@ -10592,6 +10623,7 @@ func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_e
 	var atk_has_thuan_thien = _has_equipped_weapon_name(atk, "Kiếm Thuận Thiên")
 
 	var failed_km = false
+	var ignore_armor = false
 	if is_network_mode:
 		var last_state_dict = NetworkClient.last_state if NetworkClient else {}
 		var active_c = last_state_dict.get("activeCard", {}) if last_state_dict is Dictionary else {}
@@ -10599,9 +10631,11 @@ func _prompt_dodge_reaction(attacker_seat: int, damage_amount: int = 1, damage_e
 			var failed_seats = active_c.get("khienMayFailedSeats", [])
 			if failed_seats is Array and my_seat in failed_seats:
 				failed_km = true
+			if bool(active_c.get("ignoreArmor", false)):
+				ignore_armor = true
 
 	if dodge_khien_may_btn:
-		if has_khien_may and not atk_has_thuan_thien and not failed_km:
+		if has_khien_may and not atk_has_thuan_thien and not ignore_armor and not failed_km:
 			dodge_khien_may_btn.visible = true
 			dodge_khien_may_btn.disabled = false
 			dodge_khien_may_btn.text = "🎲 LẬT KHIÊN MÂY (ĐỎ = ĐỠ)"

@@ -179,9 +179,27 @@ export function buildAiTurnPlans(state, ai, rules) {
       const eq = [...enemy.equipments].sort((a, b) => aiEquipmentValue(enemy, b) - aiEquipmentValue(enemy, a))[0];
       skill('Triều Dâng', enemy, eq, 100 + aiEquipmentValue(enemy, eq));
     }
-    if (heroHasSkill(ai, 'BAT_NA') && !used.BatNa && inRange(ai, enemy)) {
-      const cost = cheap.find((c) => c.category === C.BASIC && keep(c) < 60);
-      if (cost) skill('Bát Nạ', enemy, cost, attack - keep(cost) / 3);
+    if (heroHasSkill(ai, 'BAT_NA') && !used.BatNa) {
+      const candidates = [...hand, ...(ai.equipments || [])].filter((c) => {
+        const isWeapon = c.category === C.EQUIPMENT && c.subType === S.WEAPON;
+        return isWeapon || inRange(ai, enemy);
+      });
+      if (candidates.length > 0) {
+        const pickScore = (c) => {
+          let score = attack - keep(c) / 3;
+          if (c.category === C.BASIC) score += 20;
+          else if (c.category === C.INSTANT_SCROLL || c.category === C.DELAYED_SCROLL) {
+            if (enemy.hand?.length || enemy.equipments?.length) score += 25;
+          } else if (c.category === C.EQUIPMENT && c.subType === S.ARMOR) {
+            if (enemy.equipments?.some((e) => e.subType === S.ARMOR)) score += 35;
+          }
+          return score;
+        };
+        const bestCandidate = candidates.sort((a, b) => pickScore(b) - pickScore(a))[0];
+        if (bestCandidate && pickScore(bestCandidate) > 30) {
+          skill('Bát Nạ', enemy, bestCandidate, pickScore(bestCandidate));
+        }
+      }
     }
     if (heroHasSkill(ai, 'HUNG_SUC') && distance(ai, enemy) <= 1) {
       const cost = [...hand, ...(ai.equipments || [])].filter((c) => c.subType === S.WEAPON).sort((a, b) => aiEquipmentValue(ai, a) - aiEquipmentValue(ai, b))[0];

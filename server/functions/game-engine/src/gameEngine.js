@@ -1741,7 +1741,8 @@ function startSlashResolution(state, slashCard, casterSeat, targetSeat, options 
   caster.wineBonusDamage = 0;
   if (isCurrentTurnActor) state.isWineBuffActive = false;
 
-  const hasThuanThien = getEquippedWeapon(caster, "Thuận Thiên");
+  const ignoreArmor = Boolean(options.ignoreArmor || slashCard.ignoreArmor);
+  const hasThuanThien = getEquippedWeapon(caster, "Thuận Thiên") || ignoreArmor;
   const giapTaySonBlock = firstEquipmentHook(target, 'blockSlash', { slash: slashCard });
   if (!hasThuanThien && giapTaySonBlock) {
     if (continueLienChauAfterSkippedSlash(state, slashCard, casterSeat, options)) return { success: true, state };
@@ -1808,6 +1809,7 @@ function startSlashResolution(state, slashCard, casterSeat, targetSeat, options 
       targetSeat,
       damage: totalDamage,
       damageElement,
+      ignoreArmor,
       isWineBuff: isWine,
       nghichYSourceSeat: casterSeat,
       oaiNhuocRequired
@@ -1838,6 +1840,7 @@ function startSlashResolution(state, slashCard, casterSeat, targetSeat, options 
       targetSeat,
       damage: totalDamage,
       damageElement,
+      ignoreArmor,
       isWineBuff: isWine,
       countsTowardTurnSlashLimit,
       canVeGuardSeat: canVeGuard.seat,
@@ -1871,6 +1874,7 @@ function startSlashResolution(state, slashCard, casterSeat, targetSeat, options 
       targetSeat,
       damage: totalDamage,
       damageElement,
+      ignoreArmor,
       phaCuongDichBonus: Boolean(slashCard.phaCuongDichBonus || options.phaCuongDichBonus),
       isWineBuff: isWine,
       countsTowardTurnSlashLimit,
@@ -1907,6 +1911,7 @@ function startSlashResolution(state, slashCard, casterSeat, targetSeat, options 
     targetSeat,
     damage: totalDamage,
     damageElement,
+    ignoreArmor,
     phaCuongDichBonus: Boolean(slashCard.phaCuongDichBonus || options.phaCuongDichBonus),
     isWineBuff: isWine,
     countsTowardTurnSlashLimit,
@@ -3172,6 +3177,7 @@ function startTargetCardSelection(state, card, casterSeat, targetSeat, selection
     cardName: card.name,
     options,
     effectType: selectionOptions.effectType || "TARGET_CARD",
+    batNaSlash: selectionOptions.batNaSlash || null,
     title: selectionOptions.title || "",
     description: selectionOptions.description || "",
     remainingCount: Math.max(1, Number(selectionOptions.remainingCount) || 1)
@@ -3741,6 +3747,7 @@ function completeTargetCardSelection(state, chooserSeat, targetCardId) {
     : selection.effectType === "UU_THIEP" ? "UU_THIEP_STEAL"
     : selection.effectType === "THUONG_NGAU" ? "THUONG_NGAU_DESTROY"
     : selection.effectType === "DOAN_DAO" ? "DOAN_DAO_DESTROY"
+    : selection.effectType === "BAT_NA" ? "BAT_NA_DESTROY"
     : selection.effectType === "TAU_VI" ? "TAU_VI_DISCARD_EQUIPMENT"
     : selection.effectType === "PHU_DE" ? "PHU_DE_RETURN_EQUIPMENT"
     : selection.effectType === "FLAWLESS_DEFENSE" ? "PLAY_FLAWLESS_DEFENSE"
@@ -3760,9 +3767,13 @@ function completeTargetCardSelection(state, chooserSeat, targetCardId) {
   if (selection.effectType === "UU_THIEP") {
     desc = `🐎 <b>${caster ? caster.generalName : 'Lã Đường'}</b> kích hoạt [Ưu Thiếp], cướp lá Trang bị [${publicTargetName}] của <b>${target.generalName}</b>!`;
   }
+  if (selection.effectType === "BAT_NA") {
+    desc = `🎭 <b>${caster ? caster.generalName : 'Vũ Thị Thục'}</b> kích hoạt [Bát Nạ], hủy [${publicTargetName}] của <b>${target.generalName}</b> trước khi Trảm!`;
+  }
   const skillActs = selection.effectType === "BINH_SAN" ? [{ name: "Bình Sạn", seat: chooserSeat }]
     : selection.effectType === "CO_LAU" ? [{ name: "Cờ Lau", seat: chooserSeat }]
     : selection.effectType === "UU_THIEP" ? [{ name: "Ưu Thiếp", seat: chooserSeat }]
+    : selection.effectType === "BAT_NA" ? [{ name: "Bát Nạ", seat: chooserSeat }]
     : [];
   recordAction(state, {
     type: actionType,
@@ -3801,6 +3812,15 @@ function completeTargetCardSelection(state, chooserSeat, targetCardId) {
       cardName: selection.cardName,
       description: `📜 <b>${caster?.generalName || "Người chơi"}</b> dùng [Phủ Để Trừu Tân], đưa trang bị về tay ${target.generalName} và rút 1 lá.`
     });
+  }
+  if (selection.effectType === "BAT_NA" && selection.batNaSlash) {
+    const { slash, casterSeat, targetSeat: batNaTargetSeat, options: slashOptions } = selection.batNaSlash;
+    resetTargetCardSelection(state);
+    checkGameOver(state);
+    if (state.gameOver) return { success: true, state };
+    const targetPlayer = state.players.find((p) => p.seat === batNaTargetSeat);
+    if (!targetPlayer || !isLivingPlayer(targetPlayer)) return { success: true, state };
+    return startSlashResolution(state, slash, casterSeat, batNaTargetSeat, slashOptions);
   }
   resetTargetCardSelection(state);
   checkGameOver(state);
@@ -7370,9 +7390,9 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       }
       if (cardId === "KHIEN_MAY" || cardId === "KHIEN_MAY_BEN" || cardId === "khien_may") {
         const caster = state.players.find(x => x.seat === (state.activeCard ? state.activeCard.casterSeat : 0));
-        const hasThuanThien = getEquippedWeapon(caster, "Thuận Thiên");
+        const hasThuanThien = getEquippedWeapon(caster, "Thuận Thiên") || Boolean(state.activeCard?.ignoreArmor);
         if (hasThuanThien) {
-          return { error: "Đối phương trang bị Kiếm Thuận Thiên, đòn Trảm bỏ qua Trang bị Giáp!" };
+          return { error: state.activeCard?.ignoreArmor ? "Đòn Trảm bỏ qua Trang bị Giáp!" : "Đối phương trang bị Kiếm Thuận Thiên, đòn Trảm bỏ qua Trang bị Giáp!" };
         }
         const armor = getEquippedKhienMay(respondent);
         if (!armor) return { error: "Không có Khiên Mây Bện để phán xét" };
@@ -8075,7 +8095,7 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
   const attackerHasThuanThien = isDirectSlashDamage && getEquippedWeapon(attacker, "Thuận Thiên");
 
   const attackerHasQuyNam = isDirectSlashDamage && attacker && heroHasSkill(attacker, "QUY_NAM");
-  if (attackerHasQuyNam) {
+  if (attackerHasQuyNam || Boolean(options?.ignoreArmor || state.activeCard?.ignoreArmor)) {
     options.ignoreArmor = true;
   }
   if (finalDamage > 0 && heroHasSkill(target, "HOI_HO") && !attackerHasQuyNam && !target.usedSkills?.HoiHoConsumed && !target.usedSkills?.TramUsedThisTurn) {
@@ -9712,7 +9732,7 @@ export function handleAIReaction(state, aiSeat) {
 
   if (state.phase === "AWAIT_SLASH_DEFENSE" && state.waitingTargetSeat === aiSeat) {
     const caster = state.players.find((player) => player.seat === state.activeCard?.casterSeat);
-    const hasThuanThien = !!getEquippedWeapon(caster, "Thuận Thiên");
+    const hasThuanThien = !!getEquippedWeapon(caster, "Thuận Thiên") || Boolean(state.activeCard?.ignoreArmor);
     const hasKhienMay = !hasThuanThien && !!getEquippedKhienMay(ai);
     const alreadyFailed = state.activeCard?.khienMayFailedSeats?.includes(aiSeat);
     if (hasKhienMay && !alreadyFailed) {
@@ -11309,17 +11329,55 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
   if (norm.includes("bát nạ") || norm.includes("bat na")) {
     if (!heroHasSkill(player, "BAT_NA")) return { error: "Chỉ Vũ Thị Thục mới có thể dùng Bát Nạ" };
     if (player.usedSkills?.BatNa) return { error: "Bát Nạ chỉ dùng 1 lần mỗi lượt" };
-    const cardIndex = player.hand.findIndex((card) => card.id === cardId && card.category === CARD_CATEGORIES.BASIC);
-    if (cardIndex < 0) return { error: "Bát Nạ cần chọn 1 lá Bài Cơ Bản trên tay" };
-    const sourceCard = player.hand.splice(cardIndex, 1)[0];
-    const slash = { ...sourceCard, name: "Trảm", subType: CARD_SUBTYPES.ATTACK_NORMAL, category: CARD_CATEGORIES.BASIC };
-    const target = state.players.find((candidate) => candidate.seat === Number(targetSeat));
-    if (!target || !isLivingPlayer(target) || target.seat === seat || !hasWeaponRange(state, seat, target.seat)) {
-      player.hand.splice(cardIndex, 0, sourceCard);
-      return { error: "Bát Nạ cần chọn 1 mục tiêu khác trong tầm đánh" };
+    let cardIndex = player.hand.findIndex((card) => card.id === cardId);
+    let sourceCard = null;
+    let fromEquip = false;
+    if (cardIndex >= 0) {
+      sourceCard = player.hand.splice(cardIndex, 1)[0];
+    } else {
+      const equipIndex = player.equipments?.findIndex((card) => card.id === cardId);
+      if (equipIndex >= 0) {
+        sourceCard = player.equipments.splice(equipIndex, 1)[0];
+        fromEquip = true;
+      }
     }
+    if (!sourceCard) return { error: "Bát Nạ cần chọn 1 lá bài trên tay hoặc trang bị" };
+
+    const isBasic = sourceCard.category === CARD_CATEGORIES.BASIC;
+    const isScroll = sourceCard.category === CARD_CATEGORIES.INSTANT_SCROLL || sourceCard.category === CARD_CATEGORIES.DELAYED_SCROLL;
+    const isWeapon = sourceCard.category === CARD_CATEGORIES.EQUIPMENT && sourceCard.subType === CARD_SUBTYPES.WEAPON;
+    const isArmor = sourceCard.category === CARD_CATEGORIES.EQUIPMENT && sourceCard.subType === CARD_SUBTYPES.ARMOR;
+
+    const target = state.players.find((candidate) => candidate.seat === Number(targetSeat));
+    const restoreCard = () => {
+      if (fromEquip) {
+        player.equipments = player.equipments || [];
+        player.equipments.push(sourceCard);
+      } else {
+        player.hand.splice(cardIndex, 0, sourceCard);
+      }
+    };
+
+    if (!target || !isLivingPlayer(target) || target.seat === seat) {
+      restoreCard();
+      return { error: "Bát Nạ cần chọn 1 người chơi khác còn sống" };
+    }
+
+    if (!isWeapon && !hasWeaponRange(state, seat, target.seat)) {
+      restoreCard();
+      return { error: "Bát Nạ cần chọn 1 mục tiêu khác trong tầm đánh (hoặc dùng bài Vũ Khí để không giới hạn tầm)" };
+    }
+
+    const slash = {
+      ...sourceCard,
+      name: "Trảm",
+      subType: CARD_SUBTYPES.ATTACK_NORMAL,
+      category: CARD_CATEGORIES.BASIC,
+      ignoreArmor: isArmor
+    };
+
     if (isDaTrachSlashBlocked(target, slash)) {
-      player.hand.splice(cardIndex, 0, sourceCard);
+      restoreCard();
       recordAction(state, {
         type: "DA_TRACH_TRIGGERED",
         casterSeat: seat,
@@ -11331,10 +11389,60 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
       });
       return { success: true, state, blocked: true };
     }
+
     if (!player.usedSkills) player.usedSkills = {};
     player.usedSkills.BatNa = true;
-    recordAction(state, { type: "BAT_NA_TRIGGERED", casterSeat: seat, targetSeat: target.seat, cardId: slash.id, cardName: slash.name, skillActivations: [{ name: "Bát Nạ", seat }], description: `🎭 ${player.generalName} dùng [Bát Nạ], biến 1 Bài Cơ Bản thành Trảm không tính giới hạn lượt.` });
-    return startSlashResolution(state, slash, seat, target.seat, { countsTowardTurnSlashLimit: false });
+
+    let bonusDesc = "";
+    if (isBasic) bonusDesc = ", rút 1 lá";
+    else if (isScroll) bonusDesc = ", hủy 1 lá của mục tiêu";
+    else if (isWeapon) bonusDesc = ", không giới hạn khoảng cách";
+    else if (isArmor) bonusDesc = ", bỏ qua Giáp mục tiêu";
+
+    recordAction(state, {
+      type: "BAT_NA_TRIGGERED",
+      casterSeat: seat,
+      targetSeat: target.seat,
+      cardId: slash.id,
+      cardName: slash.name,
+      skillActivations: [{ name: "Bát Nạ", seat }],
+      description: `🎭 <b>${player.generalName}</b> dùng [Bát Nạ] với ${formatCardText(sourceCard)} thành Trảm không tính giới hạn lượt${bonusDesc}.`
+    });
+
+    if (isBasic) {
+      drawCards(state, seat, 1);
+      recordAction(state, {
+        type: "BAT_NA_DRAW",
+        casterSeat: seat,
+        cardId: slash.id,
+        description: `🎭 <b>${player.generalName}</b> kích hoạt hiệu ứng Bát Nạ (Lá Cơ Bản), rút 1 lá bài.`
+      });
+      return startSlashResolution(state, slash, seat, target.seat, { countsTowardTurnSlashLimit: false, ignoreArmor: isArmor });
+    }
+
+    if (isScroll) {
+      const targetOptions = buildTargetCardOptions(state, target.seat, true, true, false);
+      if (targetOptions.length > 0) {
+        return startTargetCardSelection(state, { id: slash.id, name: "Bát Nạ", subType: CARD_SUBTYPES.DISMANTLE }, seat, target.seat, {
+          allowDelayed: true,
+          includeHand: true,
+          operation: "DESTROY",
+          effectType: "BAT_NA",
+          batNaSlash: { slash, casterSeat: seat, targetSeat: target.seat, options: { countsTowardTurnSlashLimit: false, ignoreArmor: isArmor } },
+          title: "🎭 [BÁT NẠ] CHỌN 1 LÁ CỦA MỤC TIÊU ĐỂ HỦY",
+          description: `🎭 [Bát Nạ] Hủy 1 lá của ${target.generalName} trước khi Trảm có tác dụng`
+        });
+      }
+      recordAction(state, {
+        type: "BAT_NA_NO_TARGET_CARDS",
+        casterSeat: seat,
+        targetSeat: target.seat,
+        description: `🎭 [Bát Nạ] <b>${target.generalName}</b> không có bài để hủy, đòn Trảm phát động trực tiếp.`
+      });
+      return startSlashResolution(state, slash, seat, target.seat, { countsTowardTurnSlashLimit: false, ignoreArmor: isArmor });
+    }
+
+    return startSlashResolution(state, slash, seat, target.seat, { countsTowardTurnSlashLimit: false, ignoreArmor: isArmor });
   }
 
   if (norm.includes("hổ phù") || norm.includes("ho phu")) {

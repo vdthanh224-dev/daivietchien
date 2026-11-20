@@ -1315,7 +1315,7 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 	elif id == 6:
 		skills = [
 			{"id": "trinh_liet", "name": "Trinh Liệt", "desc": "Mỗi khi chịu sát thương từ đòn Trảm, bạn được rút 1 lá bài trong vùng chơi của nguồn gây sát thương."},
-			{"id": "bat_na", "name": "Bát Nạ", "desc": "Trong Giai đoạn Ra bài giới hạn 1 lần, bạn có thể biến 1 lá Bài Cơ Bản thành lá Trảm thường không tính vào giới hạn lần sử dụng Trảm trong lượt."}
+			{"id": "bat_na", "name": "Bát Nạ", "desc": "Trong giai đoạn ra bài giới hạn một lần, bạn có thể dùng 1 lá bài như 1 lá Trảm thường không tính vào giới hạn sử dụng Trảm trong lượt. Nếu đó là lá cơ bản, bạn rút 1 lá; nếu đó là lá Cẩm Nang, bạn hủy 1 lá của mục tiêu trước khi Trảm có tác dụng; nếu đó là lá Vũ khí, Trảm này không giới hạn khoảng cách; nếu đó là lá Giáp, Trảm này bỏ qua Giáp mục tiêu."}
 		]
 	elif id == 7:
 		skills = [
