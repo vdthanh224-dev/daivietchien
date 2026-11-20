@@ -600,11 +600,17 @@ export function initGame(roomId, playersInput, modeId = "2v2") {
       heroId,
       generalName: hero?.name || p.generalName || `Tướng Ghế ${index + 1}`,
       maxHp,
-      hp: (Number.isFinite(Number(p.hp)) && Number(p.hp) > 0)
-        ? Number(p.hp)
-        : (Number.isFinite(Number(hero?.startingHp)) && Number(hero?.startingHp) > 0
-          ? Number(hero.startingHp)
-          : maxHp),
+      startingHp: (Number.isFinite(Number(p.startingHp)) && Number(p.startingHp) > 0)
+        ? Number(p.startingHp)
+        : ((Number.isFinite(Number(hero?.startingHp)) && Number(hero?.startingHp) > 0) ? Number(hero.startingHp) : maxHp),
+      hp: (() => {
+        const heroStart = (Number.isFinite(Number(hero?.startingHp)) && Number(hero?.startingHp) > 0) ? Number(hero.startingHp) : null;
+        const playerStart = (Number.isFinite(Number(p.startingHp)) && Number(p.startingHp) > 0) ? Number(p.startingHp) : heroStart;
+        if (playerStart !== null && (p.hp === undefined || p.hp === null || Number(p.hp) === maxHp || Number(p.hp) === baseMaxHp)) {
+          return playerStart;
+        }
+        return (Number.isFinite(Number(p.hp)) && Number(p.hp) > 0) ? Number(p.hp) : (playerStart !== null ? playerStart : maxHp);
+      })(),
       role,
       teamId: resolveRoleTeamId(modeRules, role, p.seat || index + 1) || resolvePlayerTeamId(modeRules, p, p.seat || index + 1),
       isAlly: modeRules.victory === "DYNASTY_ROLES" ? (role === "KING" || role === "LOYALIST") : resolvePlayerIsAlly(modeRules, p, p.seat || index + 1),

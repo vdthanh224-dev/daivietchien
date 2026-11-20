@@ -1486,6 +1486,8 @@ function makeDraftSlots(rawSlots, boundSeat, payload) {
       hoverHeroId: 0,
       hoverHeroName: "",
       maxHp: HERO_MAX_HP[heroId] || 4,
+      startingHp: HEROES[`HERO_${heroId}`]?.startingHp || HERO_MAX_HP[heroId] || 4,
+      hp: HEROES[`HERO_${heroId}`]?.startingHp || HERO_MAX_HP[heroId] || 4,
       isLocked: Boolean(matched.isLocked && heroId > 0),
     };
   }), modeId);
@@ -1537,7 +1539,12 @@ function finishDraftAndStartBattle(roomId, room) {
 
   for (const slot of draft.slots) {
     const baseHp = HERO_MAX_HP[slot.heroId] || 4;
+    const heroInfo = HEROES[`HERO_${slot.heroId}`];
     slot.maxHp = baseHp + (slot.role === "KING" ? 1 : 0);
+    slot.startingHp = (Number.isFinite(Number(heroInfo?.startingHp)) && Number(heroInfo?.startingHp) > 0)
+      ? Number(heroInfo.startingHp)
+      : slot.maxHp;
+    slot.hp = slot.startingHp;
   }
   const battlePlayers = draft.slots.map((slot) => ({
     seat: slot.seat,
@@ -1546,7 +1553,8 @@ function finishDraftAndStartBattle(roomId, room) {
     heroId: `HERO_${slot.heroId}`,
     generalName: slot.heroName || getHeroName(slot.heroId),
     maxHp: slot.maxHp,
-    hp: slot.maxHp,
+    startingHp: slot.startingHp || slot.maxHp,
+    hp: slot.startingHp || slot.maxHp,
     isAlly: slot.isDragon,
     isAI: slot.isAI,
     role: slot.role || "",
@@ -1675,6 +1683,8 @@ async function tickDraftRoom(roomId, room) {
       currentSlot.hoverHeroId = 0;
       currentSlot.hoverHeroName = "";
       currentSlot.maxHp = (HERO_MAX_HP[heroId] || 4) + (currentSlot.role === "KING" ? 1 : 0);
+      currentSlot.startingHp = HEROES[`HERO_${heroId}`]?.startingHp || currentSlot.maxHp;
+      currentSlot.hp = currentSlot.startingHp;
       currentSlot.isLocked = true;
       used.add(heroId);
       changed = true;
@@ -2108,6 +2118,8 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           pickedSlot.hoverHeroId = 0;
           pickedSlot.hoverHeroName = "";
           pickedSlot.maxHp = (HERO_MAX_HP[heroId] || 4) + (pickedSlot.role === "KING" ? 1 : 0);
+          pickedSlot.startingHp = HEROES[`HERO_${heroId}`]?.startingHp || pickedSlot.maxHp;
+          pickedSlot.hp = pickedSlot.startingHp;
           pickedSlot.isLocked = true;
 
           if (is2v2) {

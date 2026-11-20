@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { CARD_CATEGORIES, CARD_SUBTYPES } from "./functions/game-engine/src/deck.js";
 import { handlePlayCard, handleRespondAction, initGame } from "./functions/game-engine/src/gameEngine.js";
 
-const state = initGame("water-chain", [1, 2, 3, 4].map((seat) => ({ seat, heroId: `HERO_${seat}` })));
+const state = initGame("water-chain", [1, 2, 5, 4].map((hero, i) => ({ seat: i + 1, heroId: `HERO_${hero}` })));
 for (const player of state.players) {
   player.hand = [];
   player.equipments = [];

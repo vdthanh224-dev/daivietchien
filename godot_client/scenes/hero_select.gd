@@ -1018,14 +1018,20 @@ func _create_hero_grid_card(hero: Dictionary) -> Control:
 	lotus_hbox.add_theme_constant_override("separation", 1)
 	top_hbox.add_child(lotus_hbox)
 
-	var hp_count = int(hero.get("maxHp", 4))
-	var lotus_tex = load("res://assets/ui/lotus_full.png") if ResourceLoader.exists("res://assets/ui/lotus_full.png") else null
-	for i in range(hp_count):
+	var max_hp = int(hero.get("maxHp", 4))
+	var start_hp = int(hero.get("starting_hp", hero.get("startingHp", max_hp)))
+	var lotus_full_tex = load("res://assets/ui/lotus_full.png") if ResourceLoader.exists("res://assets/ui/lotus_full.png") else null
+	var lotus_empty_tex = load("res://assets/ui/lotus_empty.png") if ResourceLoader.exists("res://assets/ui/lotus_empty.png") else null
+	for i in range(max_hp):
 		var l_rect = TextureRect.new()
 		l_rect.custom_minimum_size = Vector2(11, 11)
 		l_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		l_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		if lotus_tex: l_rect.texture = lotus_tex
+		if i < start_hp:
+			if lotus_full_tex: l_rect.texture = lotus_full_tex
+		else:
+			if lotus_empty_tex: l_rect.texture = lotus_empty_tex
+			l_rect.modulate = Color(1, 1, 1, 0.75)
 		lotus_hbox.add_child(l_rect)
 
 	# 2. Avatar Container
@@ -1302,7 +1308,10 @@ func _inspect_hero(hero: Dictionary) -> void:
 
 	var fac = hero.get("faction", "")
 	inspect_title_lbl.text = hname.to_upper()
-	inspect_sub_lbl.text = "Thế Lực: %s • Máu: %d đóa sen %s" % [fac, hero.get("maxHp", 4), tag]
+	var inspect_max_hp = int(hero.get("maxHp", 4))
+	var inspect_start_hp = int(hero.get("starting_hp", hero.get("startingHp", inspect_max_hp)))
+	var inspect_hp_str = "%d/%d" % [inspect_start_hp, inspect_max_hp] if inspect_start_hp < inspect_max_hp else "%d" % inspect_max_hp
+	inspect_sub_lbl.text = "Thế Lực: %s • Máu: %s đóa sen %s" % [fac, inspect_hp_str, tag]
 
 	var tex = HeroDatabase.get_avatar_texture(hero.get("avatarPath", "")) if HeroDatabase else null
 	if tex: inspect_avatar_rect.texture = tex
@@ -1311,14 +1320,20 @@ func _inspect_hero(hero: Dictionary) -> void:
 	for child in inspect_lotus_container.get_children():
 		child.queue_free()
 
-	var hp_count = int(hero.get("maxHp", 4))
-	var lotus_tex = load("res://assets/ui/lotus_full.png") if ResourceLoader.exists("res://assets/ui/lotus_full.png") else null
-	for i in range(hp_count):
+	var max_hp = int(hero.get("maxHp", 4))
+	var start_hp = int(hero.get("starting_hp", hero.get("startingHp", max_hp)))
+	var lotus_full_tex = load("res://assets/ui/lotus_full.png") if ResourceLoader.exists("res://assets/ui/lotus_full.png") else null
+	var lotus_empty_tex = load("res://assets/ui/lotus_empty.png") if ResourceLoader.exists("res://assets/ui/lotus_empty.png") else null
+	for i in range(max_hp):
 		var l_rect = TextureRect.new()
 		l_rect.custom_minimum_size = Vector2(18, 18)
 		l_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		l_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		if lotus_tex: l_rect.texture = lotus_tex
+		if i < start_hp:
+			if lotus_full_tex: l_rect.texture = lotus_full_tex
+		else:
+			if lotus_empty_tex: l_rect.texture = lotus_empty_tex
+			l_rect.modulate = Color(1, 1, 1, 0.75)
 		inspect_lotus_container.add_child(l_rect)
 
 	inspect_skill_title_lbl.text = "⚡ TUYỆT KỸ: [%s]" % HeroDatabase.get_skill_summary(int(hero.get("id", 0))).to_upper()

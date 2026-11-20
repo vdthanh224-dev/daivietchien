@@ -201,7 +201,7 @@ const HERO_SKILL_ACTIONS := {
 	,"CHINH_THONG_TARGETED": {"name": "Chính Thống"}
 	# Hổ Phù Trần Triều is equipment, not a hero skill.
 	,"MUU_DINH_PROMPT": {"name": "Mưu Định"}
-	,"HICH_NGHIA_TRIGGERED": {"name": "Hịch Nghĩa"}
+
 	# DODGE_SUCCESS, RESCUE_SUCCESS and NULLIFY_PLAYED are card responses.
 }
 const IMPLEMENTED_HERO_SKILL_NAMES := [
@@ -2470,7 +2470,14 @@ func _init_generals_from_draft() -> void:
 		var is_ally: bool = (is_drag == my_team_is_dragon) if not is_dynasty else (role_code in ["KING", "LOYALIST"] and local_dynasty_role in ["KING", "LOYALIST"])
 
 		var avatar_node = seat_to_avatar[s_num]
-		var start_hp = int(hero_info.get("starting_hp", h_hp))
+		var hero_starting_hp = int(hero_info.get("starting_hp", hero_info.get("startingHp", 0)))
+		var start_hp = 0
+		if slot_data.has("startingHp") or slot_data.has("starting_hp"):
+			start_hp = int(slot_data.get("startingHp", slot_data.get("starting_hp", 0)))
+		elif hero_starting_hp > 0:
+			start_hp = hero_starting_hp
+		elif slot_data.has("hp"):
+			start_hp = int(slot_data["hp"])
 		if start_hp <= 0:
 			start_hp = h_hp
 		avatar_node.setup_general(slug, h_name, h_faction, start_hp, h_hp, role_str, s_num, slot_user_name, is_p, is_ally)

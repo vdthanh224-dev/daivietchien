@@ -1595,6 +1595,8 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 		"faction": faction,
 		"maxHp": hp,
 		"starting_hp": starting_hp if starting_hp > 0 else hp,
+		"startingHp": starting_hp if starting_hp > 0 else hp,
+		"hp": starting_hp if starting_hp > 0 else hp,
 		"skills": skills,
 		"avatarPath": avatar_path,
 		"slug": slug

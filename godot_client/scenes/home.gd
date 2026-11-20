@@ -3404,7 +3404,11 @@ void fragment() {
 
 		# HP Row
 		var hp_lbl = Label.new()
-		hp_lbl.text = "🪷 %d Máu" % max_hp
+		var start_hp = int(h.get("starting_hp", h.get("startingHp", max_hp)))
+		if start_hp < max_hp:
+			hp_lbl.text = "🪷 %d/%d Máu" % [start_hp, max_hp]
+		else:
+			hp_lbl.text = "🪷 %d Máu" % max_hp
 		hp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		hp_lbl.add_theme_font_size_override("font_size", 11)
 		hp_lbl.add_theme_color_override("font_color", Color(0.4, 0.9, 0.6, 0.9) if is_owned else Color(0.5, 0.55, 0.6, 0.7))
@@ -3726,9 +3730,13 @@ func _show_hero_detail_popup(hero: Dictionary, is_owned: bool, parent_layer: Con
 
 	# Lotus Blossoms
 	var max_hp = int(hero.get("maxHp", 4))
+	var start_hp = int(hero.get("starting_hp", hero.get("startingHp", max_hp)))
 	var lotus_str = ""
 	for i in range(max_hp):
-		lotus_str += "🪷 "
+		if i < start_hp:
+			lotus_str += "🪷 "
+		else:
+			lotus_str += "🥀 "
 	var hp_icons_lbl = Label.new()
 	hp_icons_lbl.text = lotus_str.strip_edges()
 	hp_icons_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -3736,7 +3744,10 @@ func _show_hero_detail_popup(hero: Dictionary, is_owned: bool, parent_layer: Con
 	left_col.add_child(hp_icons_lbl)
 
 	var hp_text_lbl = Label.new()
-	hp_text_lbl.text = "%d Máu tối đa" % max_hp
+	if start_hp < max_hp:
+		hp_text_lbl.text = "%d/%d Máu" % [start_hp, max_hp]
+	else:
+		hp_text_lbl.text = "%d Máu tối đa" % max_hp
 	hp_text_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hp_text_lbl.add_theme_font_size_override("font_size", 12)
 	hp_text_lbl.add_theme_color_override("font_color", Color(0.4, 0.95, 0.6, 0.9))
@@ -4864,11 +4875,18 @@ func _show_fullscreen_than_dien() -> void:
 	sp_vbox.add_child(sp_name_lbl)
 
 	var sp_hp = int(current_spotlight_hero.get("maxHp", 4))
+	var sp_start_hp = int(current_spotlight_hero.get("starting_hp", current_spotlight_hero.get("startingHp", sp_hp)))
 	var lotus_text = ""
 	for i in range(sp_hp):
-		lotus_text += "🪷 "
+		if i < sp_start_hp:
+			lotus_text += "🪷 "
+		else:
+			lotus_text += "🥀 "
 	var sp_hp_lbl = Label.new()
-	sp_hp_lbl.text = "%s (%d Máu Tối Đa)" % [lotus_text.strip_edges(), sp_hp]
+	if sp_start_hp < sp_hp:
+		sp_hp_lbl.text = "%s (%d/%d Máu)" % [lotus_text.strip_edges(), sp_start_hp, sp_hp]
+	else:
+		sp_hp_lbl.text = "%s (%d Máu Tối Đa)" % [lotus_text.strip_edges(), sp_hp]
 	sp_hp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sp_hp_lbl.add_theme_font_size_override("font_size", 12)
 	sp_hp_lbl.add_theme_color_override("font_color", Color(0.4, 0.92, 0.60, 0.95))
@@ -5404,8 +5422,10 @@ func _build_gacha_card(res: Dictionary, is_small: bool) -> Control:
 	vbox.add_child(name_lbl)
 
 	var max_hp = int(hero.get("maxHp", 4))
+	var start_hp = int(hero.get("starting_hp", hero.get("startingHp", max_hp)))
+	var fact_hp_str = "%d/%d Máu" % [start_hp, max_hp] if start_hp < max_hp else "%d Máu" % max_hp
 	var fact_lbl = Label.new()
-	fact_lbl.text = "%s  •  🪷 %d Máu" % [hero.get("faction", "Đại Việt"), max_hp]
+	fact_lbl.text = "%s  •  🪷 %s" % [hero.get("faction", "Đại Việt"), fact_hp_str]
 	fact_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	fact_lbl.add_theme_font_size_override("font_size", 11 if is_small else 13)
 	fact_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
@@ -5762,8 +5782,9 @@ func _show_28_heroes_modal() -> void:
 		mid_vbox.add_theme_constant_override("separation", 2)
 
 		var max_hp = int(h.get("maxHp", 4))
+		var start_hp = int(h.get("starting_hp", h.get("startingHp", max_hp)))
 		var h_hp = Label.new()
-		h_hp.text = "🪷 %d Máu" % max_hp
+		h_hp.text = ("🪷 %d/%d Máu" % [start_hp, max_hp]) if start_hp < max_hp else ("🪷 %d Máu" % max_hp)
 		h_hp.add_theme_font_size_override("font_size", 11)
 		h_hp.add_theme_color_override("font_color", Color(0.4, 0.9, 0.6, 0.9))
 		mid_vbox.add_child(h_hp)
