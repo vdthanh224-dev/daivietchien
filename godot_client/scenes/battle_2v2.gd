@@ -2055,6 +2055,74 @@ func _ready() -> void:
 		_save_viewport_screenshot("res://battle_2v2_chain_screenshot.png")
 		get_tree().quit()
 
+	if "--screenshot-nhiep-chinh-duel" in cmd_args:
+		is_network_mode = false
+		await get_tree().create_timer(0.4).timeout
+		_animate_nhiep_chinh_duel({
+			"type": "NHIEP_CHINH_DUEL_RESULT",
+			"casterSeat": 1,
+			"targetSeat": 2,
+			"dvnGeneralName": "Dương Vân Nga",
+			"oppGeneralName": "Cao Lỗ",
+			"dvnCard": {
+				"id": "D80_HOA_D12",
+				"name": "Hỏa Sát",
+				"rank": 12,
+				"suit": "Diamond",
+				"cat": 0,
+				"desc": "Trảm thuộc tính Hỏa gây 1 sát thương"
+			},
+			"oppCard": {
+				"id": "D80_DO_S8",
+				"name": "Đỡ",
+				"rank": 8,
+				"suit": "Spade",
+				"cat": 0,
+				"desc": "Hóa giải hoàn toàn 1 đòn Trảm"
+			},
+			"dvnRank": 12,
+			"oppRank": 8,
+			"dvnWon": true,
+			"description": "👑 ĐẤU ĐIỂM [Nhiếp Chính]: Dương Vân Nga ra Hỏa Sát (Điểm 12), Cao Lỗ ra Đỡ (Điểm 8) → 👑 DƯƠNG VÂN NGA THẮNG!"
+		})
+		await get_tree().create_timer(0.8).timeout
+		_save_viewport_screenshot("res://battle_2v2_nhiep_chinh_duel_screenshot.png")
+		get_tree().quit()
+
+	if "--screenshot-nhiep-chinh-duel-lose" in cmd_args:
+		is_network_mode = false
+		await get_tree().create_timer(0.4).timeout
+		_animate_nhiep_chinh_duel({
+			"type": "NHIEP_CHINH_DUEL_RESULT",
+			"casterSeat": 1,
+			"targetSeat": 2,
+			"dvnGeneralName": "Dương Vân Nga",
+			"oppGeneralName": "Cao Lỗ",
+			"dvnCard": {
+				"id": "D80_DO_H5",
+				"name": "Đỡ",
+				"rank": 5,
+				"suit": "Heart",
+				"cat": 0,
+				"desc": "Hóa giải hoàn toàn 1 đòn Trảm"
+			},
+			"oppCard": {
+				"id": "D80_TRAM_C10",
+				"name": "Trảm",
+				"rank": 10,
+				"suit": "Club",
+				"cat": 0,
+				"desc": "Tấn công gây 1 sát thương"
+			},
+			"dvnRank": 5,
+			"oppRank": 10,
+			"dvnWon": false,
+			"description": "👑 ĐẤU ĐIỂM [Nhiếp Chính]: Dương Vân Nga ra Đỡ (Điểm 5), Cao Lỗ ra Trảm (Điểm 10) → ❌ THẤT BẠI (Điểm không lớn hơn)!"
+		})
+		await get_tree().create_timer(0.8).timeout
+		_save_viewport_screenshot("res://battle_2v2_nhiep_chinh_duel_lose_screenshot.png")
+		get_tree().quit()
+
 	if "--screenshot-iron-chain-direct" in cmd_args:
 		is_network_mode = false
 		if NetworkClient and NetworkClient.game_state_updated.is_connected(_on_network_game_state_updated):
@@ -7626,9 +7694,10 @@ func _apply_network_game_state(state: Dictionary) -> void:
 						"SUPPLY_SHORTAGE_TRIGGERED", "SUPPLY_SHORTAGE_PASSED",
 						"ACEDIA_TRIGGERED", "ACEDIA_PASSED",
 						"KHIEN_MAY_SUCCESS", "KHIEN_MAY_FAILED",
-						"BAI_COC_BACH_DANG_SAFE", "BAI_COC_BACH_DANG_TRIGGERED"
+						"BAI_COC_BACH_DANG_SAFE", "BAI_COC_BACH_DANG_TRIGGERED",
+						"NHIEP_CHINH_DUEL_RESULT"
 					]
-					var should_replay_action := (not initial_history_sync or h_seq == newest_history_seq) and (should_replay_skill or is_judgement_or_discard)
+					var should_replay_action := (not initial_history_sync or h_seq >= newest_history_seq - 1) and (should_replay_skill or is_judgement_or_discard)
 					if _should_replay_history_effect(h_type, current_delta) and should_replay_action:
 						_on_network_action_received(history_item)
 		while history_entries.size() > 50:
@@ -9710,8 +9779,9 @@ func _on_network_action_received(delta: Dictionary) -> void:
 		and attached_bai_coc_judge is Dictionary and not attached_bai_coc_judge.is_empty()
 	var is_visible_target_card_action = act_type in ["PLAY_SNATCH", "PLAY_DISMANTLE", "TRIEU_DANG_DESTROY", "THUONG_NGAU_DESTROY", "PLAY_FLAWLESS_DEFENSE", "BINH_SAN_DESTROY", "CO_LAU_DESTROY", "UU_THIEP_STEAL"]
 	var is_discard_event = act_type in ["DISCARD_CARDS", "THU_PHAP_DISCARD", "DA_TRACH_DISCARD", "COT_KINH_DISCARD"]
-	# Giáp, Phán xét, Bỏ bài phải hiện cho tất cả người chơi (kể cả nạn nhân vừa ra bài / người đang phán xét / Cột Kinh).
-	if caster_seat == my_seat and caster_seat > 0 and not is_discard_event and not is_an_tich_defense and not is_armor_event and not is_judgement_event and not is_visible_target_card_action and not is_confirmed_slash_after_bai_coc and not is_uat_khi_prompt and not is_visible_hero_skill_event:
+	var is_duel_event = act_type == "NHIEP_CHINH_DUEL_RESULT"
+	# Giáp, Phán xét, Bỏ bài, Đấu điểm phải hiện cho tất cả người chơi (kể cả nạn nhân vừa ra bài / người đang phán xét / Cột Kinh).
+	if caster_seat == my_seat and caster_seat > 0 and not is_discard_event and not is_an_tich_defense and not is_armor_event and not is_judgement_event and not is_visible_target_card_action and not is_confirmed_slash_after_bai_coc and not is_uat_khi_prompt and not is_visible_hero_skill_event and not is_duel_event:
 		return
 	var target_seats = delta.get("targetSeats", [])
 	if not (target_seats is Array):
@@ -9897,6 +9967,8 @@ func _on_network_action_received(delta: Dictionary) -> void:
 		var giver_name = generals_data[giver_seat].get("name", "Ghế %d" % giver_seat) if generals_data.has(giver_seat) else "Ghế %d" % giver_seat
 		var receiver_name = generals_data[receiver_seat].get("name", "Ghế %d" % receiver_seat) if generals_data.has(receiver_seat) else "Ghế %d" % receiver_seat
 		_animate_showcase_card(_get_card_display_name(given_card), "%s đưa 1 lá cho %s." % [giver_name, receiver_name], given_card)
+	elif act_type == "NHIEP_CHINH_DUEL_RESULT":
+		_animate_nhiep_chinh_duel(delta)
 	elif act_type in ["PLAY_SCROLL", "DELAYED_SCROLL_ATTACHED", "HARVEST_START", "THUY_TRIEU_RUT_PROMPT_GIVE", "HICH_TUONG_SI_PROMPT", "TARGET_CARD_PROMPT"]:
 		_show_remote_card_use(delta, "thi triển")
 	elif act_type in ["END_TURN", "end_turn", "TURN_ENDED", "TURN_START"]:
@@ -11547,6 +11619,14 @@ func _format_rank(r: Variant) -> String:
 
 func _normalize_card_rank_value(r: Variant) -> int:
 	return int(_format_rank(r))
+
+func _format_duel_rank(r: Variant) -> String:
+	var val = int(r)
+	match val:
+		11: return "J"
+		12: return "Q"
+		13: return "K"
+		_: return str(val)
 
 var _damage_vignette: ColorRect = null
 var _battlefield_shake_tween: Tween = null
@@ -14165,6 +14245,235 @@ func _animate_showcase_card(c_name: String, banner_text: String, card_info: Dict
 	var tw = create_tween().set_parallel(true)
 	tw.tween_property(entry, "modulate:a", 1.0, 0.16)
 	tw.tween_property(entry, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func _animate_nhiep_chinh_duel(data: Dictionary) -> void:
+	if ai_fast_forward_active:
+		return
+	_ensure_showcase_layer()
+
+	for entry in showcase_entries:
+		var node = entry.get("node")
+		if node and is_instance_valid(node):
+			node.queue_free()
+	showcase_entries.clear()
+
+	var dvn_seat: int = int(data.get("casterSeat", 0))
+	var opp_seat: int = int(data.get("targetSeat", 0))
+	var dvn_card_data: Dictionary = data.get("dvnCard", {})
+	var opp_card_data: Dictionary = data.get("oppCard", {})
+	var dvn_rank: int = int(data.get("dvnRank", dvn_card_data.get("rank", 0)))
+	var opp_rank: int = int(data.get("oppRank", opp_card_data.get("rank", 0)))
+	var dvn_won: bool = bool(data.get("dvnWon", dvn_rank > opp_rank))
+
+	var dvn_name: String = str(data.get("dvnGeneralName", ""))
+	if dvn_name.is_empty():
+		dvn_name = generals_data[dvn_seat].get("name", "Dương Vân Nga") if generals_data.has(dvn_seat) else "Dương Vân Nga"
+
+	var opp_name: String = str(data.get("oppGeneralName", ""))
+	if opp_name.is_empty():
+		opp_name = generals_data[opp_seat].get("name", "Ghế %d" % opp_seat) if generals_data.has(opp_seat) else "Đối thủ"
+
+	var duel_wrapper = PanelContainer.new()
+	duel_wrapper.name = "NhiepChinhDuelWrapper"
+	duel_wrapper.custom_minimum_size = Vector2(430, 275)
+	duel_wrapper.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	duel_wrapper.pivot_offset = Vector2(215, 137.5)
+	duel_wrapper.modulate.a = 0.0
+	duel_wrapper.scale = Vector2(0.75, 0.75)
+
+	var wrapper_style = StyleBoxFlat.new()
+	wrapper_style.bg_color = Color(0.03, 0.045, 0.08, 0.94)
+	wrapper_style.border_width_left = 2
+	wrapper_style.border_width_top = 2
+	wrapper_style.border_width_right = 2
+	wrapper_style.border_width_bottom = 2
+	wrapper_style.border_color = Color(0.85, 0.70, 0.28, 0.95)
+	wrapper_style.corner_radius_top_left = 12
+	wrapper_style.corner_radius_top_right = 12
+	wrapper_style.corner_radius_bottom_right = 12
+	wrapper_style.corner_radius_bottom_left = 12
+	wrapper_style.content_margin_left = 16
+	wrapper_style.content_margin_right = 16
+	wrapper_style.content_margin_top = 10
+	wrapper_style.content_margin_bottom = 10
+	wrapper_style.shadow_color = Color(0, 0, 0, 0.7)
+	wrapper_style.shadow_size = 12
+	duel_wrapper.add_theme_stylebox_override("panel", wrapper_style)
+
+	var main_vbox = VBoxContainer.new()
+	main_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	main_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	main_vbox.add_theme_constant_override("separation", 6)
+	duel_wrapper.add_child(main_vbox)
+
+	var title_lbl = Label.new()
+	title_lbl.text = "👑 ĐẤU ĐIỂM [NHIẾP CHÍNH] 👑"
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.add_theme_font_size_override("font_size", 13)
+	title_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.45, 1.0))
+	main_vbox.add_child(title_lbl)
+
+	var duel_row = HBoxContainer.new()
+	duel_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	duel_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	duel_row.add_theme_constant_override("separation", 16)
+	main_vbox.add_child(duel_row)
+
+	var col_dvn = _build_duel_card_column(dvn_name, dvn_card_data, dvn_won, true)
+	duel_row.add_child(col_dvn)
+
+	var vs_box = VBoxContainer.new()
+	vs_box.custom_minimum_size = Vector2(90, 210)
+	vs_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	vs_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vs_box.add_theme_constant_override("separation", 6)
+
+	var vs_lbl = Label.new()
+	vs_lbl.text = "⚔️ VS ⚔️"
+	vs_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vs_lbl.add_theme_font_size_override("font_size", 16)
+	vs_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5, 1.0))
+	vs_box.add_child(vs_lbl)
+
+	var rank_str_dvn = _format_duel_rank(dvn_rank)
+	var rank_str_opp = _format_duel_rank(opp_rank)
+	var score_lbl = Label.new()
+	score_lbl.text = "Điểm:\n%s  vs  %s" % [rank_str_dvn, rank_str_opp]
+	score_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	score_lbl.add_theme_font_size_override("font_size", 12)
+	score_lbl.add_theme_color_override("font_color", Color(0.85, 0.92, 1.0, 1.0))
+	vs_box.add_child(score_lbl)
+
+	var outcome_lbl = Label.new()
+	outcome_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	outcome_lbl.add_theme_font_size_override("font_size", 11)
+	if dvn_won:
+		outcome_lbl.text = "Dương Vân Nga\nThắng!"
+		outcome_lbl.add_theme_color_override("font_color", Color(0.35, 0.95, 0.55, 1.0))
+	else:
+		outcome_lbl.text = "Dương Vân Nga\nThất Bại!"
+		outcome_lbl.add_theme_color_override("font_color", Color(1.0, 0.45, 0.45, 1.0))
+	vs_box.add_child(outcome_lbl)
+
+	duel_row.add_child(vs_box)
+
+	var col_opp = _build_duel_card_column(opp_name, opp_card_data, not dvn_won, false)
+	duel_row.add_child(col_opp)
+
+	showcase_row.add_child(duel_wrapper)
+	showcase_center.visible = true
+
+	var display_duration := 4.2
+	showcase_entries.append({
+		"node": duel_wrapper,
+		"expires_at": Time.get_ticks_msec() / 1000.0 + display_duration
+	})
+
+	_add_log(str(data.get("description", "👑 [Nhiếp Chính] Đấu điểm!")))
+	AudioManager.play_skill()
+	if AudioManager.has_voice("Nhiếp Chính"):
+		AudioManager.play_voice("Nhiếp Chính")
+
+	var tw = create_tween().set_parallel(true)
+	tw.tween_property(duel_wrapper, "modulate:a", 1.0, 0.2)
+	tw.tween_property(duel_wrapper, "scale", Vector2.ONE, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func _build_duel_card_column(general_name: String, card_data: Dictionary, is_winner: bool, is_dvn: bool) -> VBoxContainer:
+	var col = VBoxContainer.new()
+	col.custom_minimum_size = Vector2(138, 235)
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_theme_constant_override("separation", 6)
+
+	# 1. Tên tướng đã xuất bài đó
+	var name_panel = PanelContainer.new()
+	name_panel.custom_minimum_size = Vector2(136, 26)
+	name_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var name_style = StyleBoxFlat.new()
+	name_style.bg_color = Color(0.06, 0.09, 0.16, 0.96)
+	name_style.border_width_left = 1
+	name_style.border_width_top = 1
+	name_style.border_width_right = 1
+	name_style.border_width_bottom = 1
+	name_style.border_color = Color(0.95, 0.80, 0.30, 0.95) if is_dvn else Color(0.40, 0.80, 1.0, 0.85)
+	name_style.corner_radius_top_left = 6
+	name_style.corner_radius_top_right = 6
+	name_style.corner_radius_bottom_right = 6
+	name_style.corner_radius_bottom_left = 6
+	name_style.content_margin_left = 4
+	name_style.content_margin_right = 4
+	name_style.content_margin_top = 2
+	name_style.content_margin_bottom = 2
+	name_panel.add_theme_stylebox_override("panel", name_style)
+
+	var name_lbl = Label.new()
+	name_lbl.text = ("👑 " if is_dvn else "⚔️ ") + general_name
+	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_lbl.add_theme_font_size_override("font_size", 11)
+	name_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.60, 1.0) if is_dvn else Color(0.85, 0.95, 1.0, 1.0))
+	name_lbl.clip_text = true
+	name_panel.add_child(name_lbl)
+	col.add_child(name_panel)
+
+	# 2. Lá bài xuất ra
+	var c_name = str(card_data.get("name", "Bài"))
+	var info = _get_showcase_card_info(c_name, card_data)
+	var card_ui = CardUIScene.instantiate()
+	_make_card_display_only(card_ui)
+	col.add_child(card_ui)
+	card_ui.setup_card_data(
+		str(info.get("id", "duel_card")),
+		str(info.get("name", c_name)),
+		info.get("rank", 0),
+		str(info.get("suit", "Spade")),
+		int(info.get("category", info.get("cat", 0))),
+		str(info.get("desc", "")),
+		int(info.get("subType", -1)),
+		true
+	)
+
+	# 3. 1 chữ Thắng và 1 chữ Thua (Result Badge)
+	var result_panel = PanelContainer.new()
+	result_panel.custom_minimum_size = Vector2(136, 30)
+	result_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var res_style = StyleBoxFlat.new()
+	if is_winner:
+		res_style.bg_color = Color(0.05, 0.26, 0.12, 0.98)
+		res_style.border_width_left = 2
+		res_style.border_width_top = 2
+		res_style.border_width_right = 2
+		res_style.border_width_bottom = 2
+		res_style.border_color = Color(0.25, 0.95, 0.50, 1.0)
+		res_style.shadow_color = Color(0.15, 0.85, 0.40, 0.45)
+		res_style.shadow_size = 6
+	else:
+		res_style.bg_color = Color(0.26, 0.05, 0.07, 0.98)
+		res_style.border_width_left = 2
+		res_style.border_width_top = 2
+		res_style.border_width_right = 2
+		res_style.border_width_bottom = 2
+		res_style.border_color = Color(1.0, 0.35, 0.35, 1.0)
+		res_style.shadow_color = Color(0.85, 0.15, 0.15, 0.35)
+		res_style.shadow_size = 5
+	res_style.corner_radius_top_left = 6
+	res_style.corner_radius_top_right = 6
+	res_style.corner_radius_bottom_right = 6
+	res_style.corner_radius_bottom_left = 6
+	res_style.content_margin_top = 2
+	res_style.content_margin_bottom = 2
+	result_panel.add_theme_stylebox_override("panel", res_style)
+
+	var res_lbl = Label.new()
+	res_lbl.text = "👑 THẮNG" if is_winner else "❌ THUA"
+	res_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	res_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	res_lbl.add_theme_font_size_override("font_size", 13)
+	res_lbl.add_theme_color_override("font_color", Color(0.45, 1.0, 0.65, 1.0) if is_winner else Color(1.0, 0.60, 0.60, 1.0))
+	result_panel.add_child(res_lbl)
+	col.add_child(result_panel)
+
+	return col
 
 func _animate_tien_thoai_morph(caster_seat: int, from_name: String, to_name: String, banner_text: String, card_info: Dictionary = {}, duration_override: float = 3.4) -> void:
 	_ensure_showcase_layer()

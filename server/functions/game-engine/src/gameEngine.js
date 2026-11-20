@@ -6301,11 +6301,30 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       type: "NHIEP_CHINH_DUEL_RESULT",
       casterSeat: pending.dvnSeat,
       targetSeat: opponent.seat,
-      dvnCard: { id: pending.dvnCard.id, name: pending.dvnCard.name, rank: pending.dvnCard.rank, suit: pending.dvnCard.suit },
-      oppCard: { id: oppCard.id, name: oppCard.name, rank: oppCard.rank, suit: oppCard.suit },
+      dvnGeneralName: dvnPlayer ? dvnPlayer.generalName : "Dương Vân Nga",
+      oppGeneralName: opponent.generalName || `Ghế ${opponent.seat}`,
+      dvnCard: {
+        id: pending.dvnCard.id,
+        name: pending.dvnCard.name,
+        rank: pending.dvnCard.rank,
+        suit: pending.dvnCard.suit,
+        category: pending.dvnCard.category,
+        subType: pending.dvnCard.subType,
+        desc: pending.dvnCard.desc
+      },
+      oppCard: {
+        id: oppCard.id,
+        name: oppCard.name,
+        rank: oppCard.rank,
+        suit: oppCard.suit,
+        category: oppCard.category,
+        subType: oppCard.subType,
+        desc: oppCard.desc
+      },
       dvnRank,
       oppRank,
       dvnWon,
+      skillActivations: [{ name: "Nhiếp Chính", seat: pending.dvnSeat }],
       description: `👑 <b>ĐẤU ĐIỂM [Nhiếp Chính]</b>: <b>${dvnPlayer ? dvnPlayer.generalName : "Dương Vân Nga"}</b> ra ${formatCardText(pending.dvnCard)} (Điểm ${dvnRank}), <b>${opponent.generalName}</b> ra ${formatCardText(oppCard)} (Điểm ${oppRank}) → ${dvnWon ? "👑 DƯƠNG VÂN NGA THẮNG!" : "❌ THẤT BẠI (Điểm không lớn hơn)!"}`
     });
 
