@@ -232,9 +232,10 @@ const IMPLEMENTED_HERO_SKILL_NAMES := [
 @onready var log_panel: Control = $TableTop/LogPanel
 @onready var deck_hud: Control = $TableTop/DeckHUD
 @onready var desc_text: Label = $TableTop/CardDescBar/Margin/Scroll/DescText
-@onready var card_play_btn: Button = $TableTop/CardPlayBtn
-@onready var end_turn_btn: Button = $TableTop/EndTurnBtn
-@onready var hich_recast_btn: Button = $TableTop/HichRecastBtn
+var action_btn_box: HBoxContainer = null
+@onready var card_play_btn: Button = ($TableTop/ActionButtonsBar/CardPlayBtn if has_node("TableTop/ActionButtonsBar/CardPlayBtn") else $TableTop/CardPlayBtn) as Button
+@onready var hich_recast_btn: Button = ($TableTop/ActionButtonsBar/HichRecastBtn if has_node("TableTop/ActionButtonsBar/HichRecastBtn") else $TableTop/HichRecastBtn) as Button
+@onready var end_turn_btn: Button = ($TableTop/ActionButtonsBar/EndTurnBtn if has_node("TableTop/ActionButtonsBar/EndTurnBtn") else $TableTop/EndTurnBtn) as Button
 @onready var turn_indicator: Label = $TableTop/TurnInfoBar/TurnLabel
 
 @onready var center_showcase: Control = $CenterArea/CardShowcase
@@ -4770,7 +4771,32 @@ func _get_van_sach_last_scroll_name() -> String:
 						return card_name
 	return ""
 
+func _ensure_action_buttons_bar() -> void:
+	if action_btn_box and is_instance_valid(action_btn_box):
+		return
+	action_btn_box = get_node_or_null("TableTop/ActionButtonsBar") as HBoxContainer
+	if not action_btn_box:
+		action_btn_box = HBoxContainer.new()
+		action_btn_box.name = "ActionButtonsBar"
+		action_btn_box.alignment = BoxContainer.ALIGNMENT_CENTER
+		action_btn_box.add_theme_constant_override("separation", 16)
+		action_btn_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		action_btn_box.set_anchors_preset(Control.PRESET_TOP_WIDE)
+		action_btn_box.offset_left = 60.0
+		action_btn_box.offset_right = -60.0
+		action_btn_box.offset_top = 428.0
+		action_btn_box.offset_bottom = 472.0
+		action_btn_box.custom_minimum_size = Vector2(0, 44)
+		$TableTop.add_child(action_btn_box)
+	if card_play_btn and is_instance_valid(card_play_btn) and card_play_btn.get_parent() != action_btn_box:
+		card_play_btn.reparent(action_btn_box, false)
+	if hich_recast_btn and is_instance_valid(hich_recast_btn) and hich_recast_btn.get_parent() != action_btn_box:
+		hich_recast_btn.reparent(action_btn_box, false)
+	if end_turn_btn and is_instance_valid(end_turn_btn) and end_turn_btn.get_parent() != action_btn_box:
+		end_turn_btn.reparent(action_btn_box, false)
+
 func _setup_action_button_styles() -> void:
+	_ensure_action_buttons_bar()
 	if not is_instance_valid(card_play_btn) or not is_instance_valid(end_turn_btn) or not is_instance_valid(hich_recast_btn):
 		return
 
@@ -4789,6 +4815,10 @@ func _setup_action_button_styles() -> void:
 	play_normal.shadow_color = Color(0.7, 0.15, 0.1, 0.45)
 	play_normal.shadow_size = 6
 	play_normal.shadow_offset = Vector2(0, 2)
+	play_normal.content_margin_left = 18.0
+	play_normal.content_margin_right = 18.0
+	play_normal.content_margin_top = 4.0
+	play_normal.content_margin_bottom = 4.0
 	card_play_btn.add_theme_stylebox_override("normal", play_normal)
 
 	var play_hover := play_normal.duplicate() as StyleBoxFlat
@@ -4827,6 +4857,10 @@ func _setup_action_button_styles() -> void:
 	end_normal.shadow_color = Color(0, 0, 0, 0.55)
 	end_normal.shadow_size = 5
 	end_normal.shadow_offset = Vector2(0, 2)
+	end_normal.content_margin_left = 18.0
+	end_normal.content_margin_right = 18.0
+	end_normal.content_margin_top = 4.0
+	end_normal.content_margin_bottom = 4.0
 	end_turn_btn.add_theme_stylebox_override("normal", end_normal)
 
 	var end_hover := end_normal.duplicate() as StyleBoxFlat
@@ -4857,6 +4891,10 @@ func _setup_action_button_styles() -> void:
 	recast_normal.shadow_color = Color(0, 0, 0, 0.55)
 	recast_normal.shadow_size = 5
 	recast_normal.shadow_offset = Vector2(0, 2)
+	recast_normal.content_margin_left = 16.0
+	recast_normal.content_margin_right = 16.0
+	recast_normal.content_margin_top = 4.0
+	recast_normal.content_margin_bottom = 4.0
 	hich_recast_btn.add_theme_stylebox_override("normal", recast_normal)
 
 	var recast_hover := recast_normal.duplicate() as StyleBoxFlat
@@ -4868,53 +4906,25 @@ func _setup_action_button_styles() -> void:
 func _apply_action_buttons_layout(is_van_sach: bool = false) -> void:
 	if not is_instance_valid(card_play_btn) or not is_instance_valid(end_turn_btn) or not is_instance_valid(hich_recast_btn):
 		return
+	_ensure_action_buttons_bar()
 	if is_van_sach:
-		card_play_btn.custom_minimum_size.x = 220.0
-		card_play_btn.size.x = 220.0
-		hich_recast_btn.custom_minimum_size.x = 230.0
-		hich_recast_btn.size.x = 230.0
-		end_turn_btn.custom_minimum_size.x = 110.0
-		end_turn_btn.size.x = 110.0
-		var total_w: float = 220.0 + 10.0 + 230.0 + 10.0 + 110.0
-		var start_x: float = 640.0 - total_w * 0.5
-		card_play_btn.position.x = start_x
-		hich_recast_btn.position.x = start_x + 220.0 + 10.0
-		end_turn_btn.position.x = start_x + 220.0 + 10.0 + 230.0 + 10.0
+		card_play_btn.custom_minimum_size = Vector2(200.0, 42.0)
+		hich_recast_btn.custom_minimum_size = Vector2(210.0, 42.0)
+		end_turn_btn.custom_minimum_size = Vector2(110.0, 42.0)
 	else:
-		var play_vis := card_play_btn.visible
-		var recast_vis := hich_recast_btn.visible
-		if play_vis:
-			card_play_btn.custom_minimum_size.x = 240.0
-			card_play_btn.size.x = 240.0
-			end_turn_btn.custom_minimum_size.x = 145.0
-			end_turn_btn.size.x = 145.0
-			if recast_vis:
-				hich_recast_btn.custom_minimum_size.x = 120.0
-				hich_recast_btn.size.x = 120.0
-				var total_w := 240.0 + 12.0 + 120.0 + 12.0 + 145.0
-				var start_x := 640.0 - total_w * 0.5
-				card_play_btn.position.x = start_x
-				hich_recast_btn.position.x = start_x + 240.0 + 12.0
-				end_turn_btn.position.x = start_x + 240.0 + 12.0 + 120.0 + 12.0
-			else:
-				var total_w := 240.0 + 16.0 + 145.0
-				var start_x := 640.0 - total_w * 0.5
-				card_play_btn.position.x = start_x
-				end_turn_btn.position.x = start_x + 240.0 + 16.0
+		if card_play_btn.visible:
+			card_play_btn.custom_minimum_size = Vector2(200.0, 42.0)
+			end_turn_btn.custom_minimum_size = Vector2(145.0, 42.0)
+			if hich_recast_btn.visible:
+				hich_recast_btn.custom_minimum_size = Vector2(120.0, 42.0)
 		else:
-			if recast_vis:
-				hich_recast_btn.custom_minimum_size.x = 130.0
-				hich_recast_btn.size.x = 130.0
-				end_turn_btn.custom_minimum_size.x = 150.0
-				end_turn_btn.size.x = 150.0
-				var total_w := 130.0 + 14.0 + 150.0
-				var start_x := 640.0 - total_w * 0.5
-				hich_recast_btn.position.x = start_x
-				end_turn_btn.position.x = start_x + 130.0 + 14.0
+			if hich_recast_btn.visible:
+				hich_recast_btn.custom_minimum_size = Vector2(130.0, 42.0)
+				end_turn_btn.custom_minimum_size = Vector2(150.0, 42.0)
 			else:
-				end_turn_btn.custom_minimum_size.x = 160.0
-				end_turn_btn.size.x = 160.0
-				end_turn_btn.position.x = 640.0 - 80.0
+				end_turn_btn.custom_minimum_size = Vector2(160.0, 42.0)
+	if action_btn_box and is_instance_valid(action_btn_box):
+		action_btn_box.queue_sort()
 
 func _update_action_btn() -> void:
 	if is_discard_phase:
@@ -7564,6 +7574,8 @@ func _enter_discard_phase(excess: int) -> void:
 	_add_log("⚠️ [BỎ BÀI]: Bạn cần chọn %d lá bài thừa trên tay để bỏ và kết thúc lượt!" % cards_to_discard_count)
 
 func _on_network_game_state_updated(state: Dictionary) -> void:
+	if not is_network_mode:
+		return
 	if state == null or not (state is Dictionary) or state.is_empty():
 		return
 	if str(state.get("status", "")) == "FINISHED":

@@ -295,43 +295,42 @@ text = "⏳ LƯỢT CỦA BẠN (40s)"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="CardPlayBtn" type="Button" parent="TableTop"]
-custom_minimum_size = Vector2(240, 42)
+[node name="ActionButtonsBar" type="HBoxContainer" parent="TableTop"]
+custom_minimum_size = Vector2(0, 44)
 layout_mode = 1
-anchors_preset = 0
-offset_left = 525.0
-offset_top = 430.0
-offset_right = 765.0
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 60.0
+offset_top = 428.0
+offset_right = -60.0
 offset_bottom = 472.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="CardPlayBtn" type="Button" parent="TableTop/ActionButtonsBar"]
+custom_minimum_size = Vector2(200, 42)
+layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 12
 text = "⚔️ XUẤT BÀI → ĐỐI THỦ"
 
-[node name="EndTurnBtn" type="Button" parent="TableTop"]
-custom_minimum_size = Vector2(145, 42)
-layout_mode = 1
-anchors_preset = 0
-offset_left = 780.0
-offset_top = 430.0
-offset_right = 925.0
-offset_bottom = 472.0
-focus_mode = 0
-theme_override_font_sizes/font_size = 12
-text = "⌛ KẾT THÚC LƯỢT"
-
-[node name="HichRecastBtn" type="Button" parent="TableTop"]
+[node name="HichRecastBtn" type="Button" parent="TableTop/ActionButtonsBar"]
 visible = false
 custom_minimum_size = Vector2(120, 42)
-layout_mode = 1
-anchors_preset = 0
-offset_left = 930.0
-offset_top = 430.0
-offset_right = 1050.0
-offset_bottom = 472.0
+layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 10
 text = "🔄 ĐỔI LÁ\nRÚT 1"
 tooltip_text = "Bỏ Hịch Tướng Sĩ để rút 1 lá bài khác."
+
+[node name="EndTurnBtn" type="Button" parent="TableTop/ActionButtonsBar"]
+custom_minimum_size = Vector2(145, 42)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 12
+text = "⌛ KẾT THÚC LƯỢT"
 
 [node name="CardDescBar" type="PanelContainer" parent="TableTop"]
 custom_minimum_size = Vector2(810, 38)
