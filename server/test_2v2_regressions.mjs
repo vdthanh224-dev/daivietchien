@@ -1557,6 +1557,11 @@ for (const [subType, name] of [
   const ownerCards = state.players[2].hand.length;
   applyDamageToPlayer(state, 2, 1, "Trảm", "NORMAL", true);
   assert.equal(state.phase, "AWAIT_KHOI_BINH");
+  // Set deck: Attacker draws first (popped from end), then Triệu Quốc Đạt draws Spade (Black) and stops
+  state._deck = [
+    { id: "KB_STOP_TQD", name: "Đỡ", suit: "Spade", rank: 7, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.DODGE },
+    { id: "KB_ATTACKER", name: "Trảm", suit: "Heart", rank: 8, category: CARD_CATEGORIES.BASIC, subType: CARD_SUBTYPES.ATTACK_NORMAL }
+  ];
   assert.equal(handleRespondAction(state, 3, true, null).success, true);
   assert.equal(state.players[0].hand.length, sourceCards + 1);
   assert.equal(state.players[2].hand.length, ownerCards + 1);
@@ -1568,8 +1573,11 @@ for (const [subType, name] of [
   put(state, 2, card("HUYNH_TRUONG_GIVE", "Bài đưa", CARD_SUBTYPES.PEACH));
   applyDamageToPlayer(state, 2, 1, "Kiểm thử");
   assert.equal(state.phase, "AWAIT_HUYNH_TRUONG");
+  const ownerCards = state.players[1].hand.length;
   assert.equal(handleUseSkill(state, 2, "Huynh Trưởng", 3, "HUYNH_TRUONG_GIVE").success, true);
   assert.equal(state.players[2].hand.some((c) => c.id === "HUYNH_TRUONG_GIVE"), true);
+  // Huynh Trưởng: gives 1 card (-1), draws 2 cards (+2) => net +1 card
+  assert.equal(state.players[1].hand.length, ownerCards + 1);
 }
 
 {

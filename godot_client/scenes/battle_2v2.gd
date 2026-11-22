@@ -8219,7 +8219,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			end_turn_btn.disabled = false
 			end_turn_btn.text = "TỪ CHỐI"
 			turn_indicator.text = "⚔️ KHỞI BINH: QUYẾT ĐỊNH (%ds)" % server_waiting_timer
-			desc_text.text = "⚔️ Bạn có thể cho mình và người dùng Trảm mỗi người rút 1 lá."
+			desc_text.text = "⚔️ [KHỞI BINH]: Cho bạn và người dùng Trảm rút 1 lá (nếu bạn rút bài Đỏ tiếp tục rút)."
 		else:
 			card_play_btn.visible = false
 			end_turn_btn.visible = false
@@ -8232,7 +8232,7 @@ func _apply_network_game_state(state: Dictionary) -> void:
 			end_turn_btn.disabled = false
 			end_turn_btn.text = "TỪ CHỐI"
 			turn_indicator.text = "🤝 HUYNH TRƯỞNG: CHỌN TƯỚNG VÀ BÀI (%ds)" % server_waiting_timer
-			desc_text.text = "🤝 Đưa 1 lá trên tay cho người khác, rồi rút 1 lá; hoặc từ chối."
+			desc_text.text = "🤝 [HUYNH TRƯỞNG]: Đưa 1 lá trên tay cho người khác, sau đó rút 2 lá; hoặc từ chối."
 			_update_action_btn()
 		else:
 			huynh_truong_pending = false

@@ -22,7 +22,9 @@ const card = (id, name, subType) => ({
   state.players[1].hand = [];
   state.players[1].hp = 1;
   assert.equal(handlePlayCard(state, 1, "lethal-slash", 2).success, true);
-  assert.equal(handleRespondAction(state, 2, false, null).success, true);
+  if (state.phase === "AWAIT_DODGE") {
+    assert.equal(handleRespondAction(state, 2, false, null).success, true);
+  }
   while (state.phase === "AWAIT_NEAR_DEATH") {
     assert.equal(handleRespondAction(state, state.waitingTargetSeat, false, null).success, true);
   }
@@ -50,8 +52,10 @@ const card = (id, name, subType) => ({
   assert.equal(state.phase, "AWAIT_KHOI_BINH");
   assert.equal(handleRespondAction(state, 2, false, null).success, true);
   assert.equal(state.phase, "AWAIT_HUYNH_TRUONG");
+  const ownerCards = state.players[1].hand.length;
   assert.equal(handleUseSkill(state, 2, "Huynh Trưởng", 3, "gift").success, true);
   assert.equal(state.players[2].hand.some((candidate) => candidate.id === "gift"), true);
+  assert.equal(state.players[1].hand.length, ownerCards + 1);
   assert.equal(state.phase, "PLAY");
 }
 

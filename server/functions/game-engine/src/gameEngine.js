@@ -1440,7 +1440,10 @@ function startNextKhoiBinhPrompt(state) {
   state.timerStartAt = Date.now();
   const source = state.players.find((player) => player.seat === next.sourceSeat);
   const owner = state.players.find((player) => player.seat === next.seat);
-  recordAction(state, { type: "KHOI_BINH_PROMPT", casterSeat: next.seat, targetSeat: next.sourceSeat, skillActivations: [{ name: "Khởi Binh", seat: next.seat }], description: `⚔️ ${owner?.generalName || "Triệu Quốc Đạt"} có thể phát động [Khởi Binh]: bản thân và ${source?.generalName || "người dùng Trảm"} mỗi người rút 1 lá.` });
+  const desc = next.sourceSeat === next.seat
+    ? `⚔️ ${owner?.generalName || "Triệu Quốc Đạt"} có thể phát động [Khởi Binh]: rút 1 lá (nếu là bài Đỏ tiếp tục rút).`
+    : `⚔️ ${owner?.generalName || "Triệu Quốc Đạt"} có thể phát động [Khởi Binh]: bản thân và ${source?.generalName || "người dùng Trảm"} mỗi người rút 1 lá (bản thân rút bài Đỏ tiếp tục rút).`;
+  recordAction(state, { type: "KHOI_BINH_PROMPT", casterSeat: next.seat, targetSeat: next.sourceSeat, skillActivations: [{ name: "Khởi Binh", seat: next.seat }], description: desc });
   return true;
 }
 
@@ -1457,7 +1460,7 @@ function startNextHuynhTruongPrompt(state) {
   state.waitingTimer = 40;
   state.timerStartAt = Date.now();
   const owner = state.players.find((player) => player.seat === next.seat);
-  recordAction(state, { type: "HUYNH_TRUONG_PROMPT", casterSeat: next.seat, skillActivations: [{ name: "Huynh Trưởng", seat: next.seat }], description: `🤝 ${owner?.generalName || "Triệu Quốc Đạt"} có thể phát động [Huynh Trưởng]: đưa 1 lá trên tay cho người khác, rồi rút 1 lá.` });
+  recordAction(state, { type: "HUYNH_TRUONG_PROMPT", casterSeat: next.seat, skillActivations: [{ name: "Huynh Trưởng", seat: next.seat }], description: `🤝 ${owner?.generalName || "Triệu Quốc Đạt"} có thể phát động [Huynh Trưởng]: đưa 1 lá trên tay cho người khác, rồi rút 2 lá.` });
   return true;
 }
 
@@ -6789,9 +6792,27 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
     state.khoiBinhQueue.shift();
     const source = state.players.find((player) => player.seat === pending.sourceSeat);
     if (accepted && isLivingPlayer(source)) {
-      drawCards(state, respondentSeat, 1);
-      drawCards(state, source.seat, 1);
-      recordAction(state, { type: "KHOI_BINH_DRAW", casterSeat: respondentSeat, targetSeat: source.seat, skillActivations: [{ name: "Khởi Binh", seat: respondentSeat }], description: `⚔️ ${respondent.generalName} kích hoạt [Khởi Binh], cả hai người rút 1 lá.` });
+      if (source.seat !== respondentSeat) {
+        drawCards(state, source.seat, 1);
+      }
+      const respondentCards = [];
+      while (respondentCards.length < 80) {
+        const drawn = drawCards(state, respondentSeat, 1);
+        if (!drawn || drawn.length === 0) break;
+        respondentCards.push(drawn[0]);
+        if (!isRedCardSuit(drawn[0].suit)) break;
+      }
+      const desc = source.seat !== respondentSeat
+        ? `⚔️ ${respondent.generalName} kích hoạt [Khởi Binh], cho ${source.generalName} rút 1 lá và bản thân rút ${respondentCards.length} lá.`
+        : `⚔️ ${respondent.generalName} kích hoạt [Khởi Binh], rút ${respondentCards.length} lá.`;
+      recordAction(state, {
+        type: "KHOI_BINH_DRAW",
+        casterSeat: respondentSeat,
+        targetSeat: source.seat,
+        cardsDrawn: respondentCards.length,
+        skillActivations: [{ name: "Khởi Binh", seat: respondentSeat }],
+        description: desc
+      });
     } else {
       recordAction(state, { type: "KHOI_BINH_DECLINED", casterSeat: respondentSeat, targetSeat: source?.seat, skillActivations: [{ name: "Khởi Binh", seat: respondentSeat }], description: `⚔️ ${respondent.generalName} từ chối kích hoạt [Khởi Binh].` });
     }
@@ -6817,7 +6838,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       }
       const givenCard = respondent.hand.splice(cardIndex, 1)[0];
       target.hand.push(givenCard);
-      drawCards(state, respondentSeat, 1);
+      drawCards(state, respondentSeat, 2);
       recordAction(state, {
         type: "HUYNH_TRUONG_TRIGGERED",
         casterSeat: respondentSeat,
@@ -6825,7 +6846,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         cardId: givenCard.id,
         cardName: givenCard.name,
         skillActivations: [{ name: "Huynh Trưởng", seat: respondentSeat }],
-        description: `🤝 ${respondent.generalName} kích hoạt [Huynh Trưởng], đưa 1 lá cho ${target.generalName} rồi rút 1 lá.`
+        description: `🤝 ${respondent.generalName} kích hoạt [Huynh Trưởng], đưa 1 lá cho ${target.generalName} rồi rút 2 lá.`
       });
     } else {
       recordAction(state, {
@@ -8305,7 +8326,7 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
 
   if (finalDamage > 0 && isDirectSlashDamage && attackerSeat > 0) {
     state.khoiBinhQueue = state.khoiBinhQueue || [];
-    for (const player of state.players) if (player.seat !== attackerSeat && isLivingPlayer(player) && heroHasSkill(player, "KHOI_BINH") && !state.khoiBinhQueue.some((pending) => pending.seat === player.seat && pending.sourceSeat === attackerSeat)) state.khoiBinhQueue.push({ seat: player.seat, sourceSeat: attackerSeat });
+    for (const player of state.players) if (isLivingPlayer(player) && heroHasSkill(player, "KHOI_BINH") && !state.khoiBinhQueue.some((pending) => pending.seat === player.seat && pending.sourceSeat === attackerSeat)) state.khoiBinhQueue.push({ seat: player.seat, sourceSeat: attackerSeat });
   }
   if (finalDamage > 0 && !options.skipDamageTriggers && heroHasSkill(target, "HUYNH_TRUONG")) {
     state.huynhTruongQueue = state.huynhTruongQueue || [];
@@ -9618,7 +9639,7 @@ export function handleAIReaction(state, aiSeat) {
   }
   if (state.phase === "AWAIT_KHOI_BINH" && state.waitingTargetSeat === aiSeat) {
     const sourceSeat = state.khoiBinhQueue?.[0]?.sourceSeat;
-    return handleRespondAction(state, aiSeat, friends.some((p) => p.seat === sourceSeat) || (ai.hand.length <= 1 && ai.hp <= 2), null);
+    return handleRespondAction(state, aiSeat, sourceSeat === aiSeat || friends.some((p) => p.seat === sourceSeat) || (ai.hand.length <= 1 && ai.hp <= 2), null);
   }
   if (state.phase === "AWAIT_HUYNH_TRUONG" && state.waitingTargetSeat === aiSeat) {
     const ally = allies[0];
@@ -11298,7 +11319,7 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
       if (!target || !isLivingPlayer(target) || target.seat === seat || cardIndex < 0) { state.huynhTruongQueue.unshift(pending); return { error: "Huynh Trưởng cần chọn 1 người khác và 1 lá trên tay để đưa" }; }
       const givenCard = player.hand.splice(cardIndex, 1)[0];
       target.hand.push(givenCard);
-      drawCards(state, seat, 1);
+      drawCards(state, seat, 2);
       recordAction(state, {
         type: "HUYNH_TRUONG_TRIGGERED",
         casterSeat: seat,
@@ -11306,7 +11327,7 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
         skillActivations: [{ name: "Huynh Trưởng", seat }],
         cardId: givenCard.id,
         cardName: givenCard.name,
-        description: `🤝 ${player.generalName} kích hoạt [Huynh Trưởng], đưa 1 lá cho ${target.generalName} rồi rút 1 lá.`
+        description: `🤝 ${player.generalName} kích hoạt [Huynh Trưởng], đưa 1 lá cho ${target.generalName} rồi rút 2 lá.`
       });
     }
     resetWaitingState(state, false);
