@@ -1232,9 +1232,9 @@ function startDaiVietColorChoice(state, player) {
 
 function isRedCardSuit(suit) {
   const c = cardColor(suit);
-  if (c === "RED" || c === "WHITE") return true;
+  if (c === "RED") return true;
   const s = String(suit || "").trim().toLowerCase();
-  return s === "heart" || s === "diamond" || s === "co" || s === "cơ" || s === "ro" || s === "rô" || s === "red" || s === "♥" || s === "♦";
+  return s === "heart" || s === "co" || s === "cơ" || s === "đỏ" || s === "do" || s === "red" || s === "♥";
 }
 
 function isBlackCardSuit(suit) {

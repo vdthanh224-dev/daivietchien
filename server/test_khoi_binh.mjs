@@ -23,7 +23,9 @@ function playSuccessfulSlash(state, slashId, attackerSeat = 1, targetSeat = 2) {
   }
 }
 
-// 1. Khởi Binh when an ally/other character uses Trảm: Red chaining test
+// 1. Khởi Binh when an ally/other character uses Trảm: Red (Đỏ) chaining test
+// Đại Việt Chiến có 4 màu: ĐỎ (Heart), TRẮNG (Diamond), VÀNG (Club), ĐEN (Spade)
+// Chỉ có màu ĐỎ mới được tiếp tục rút. Trắng/Vàng/Đen đều dừng chuỗi.
 {
   const state = initGame("khoi-binh-chain", players);
   state.players[0].hand = [card("slash", "Trảm", CARD_SUBTYPES.ATTACK_NORMAL)];
@@ -35,14 +37,14 @@ function playSuccessfulSlash(state, slashId, attackerSeat = 1, targetSeat = 2) {
   assert.equal(state.waitingTargetSeat, 3);
 
   // Set up deck at AWAIT_KHOI_BINH so:
-  // First card drawn (for attacker): Black (Club)
+  // First card drawn (for attacker): Vàng (Club)
   // For Triệu Quốc Đạt:
-  // Card 1: Heart (Red) -> triggers chain
-  // Card 2: Diamond (Red) -> triggers chain
-  // Card 3: Spade (Black) -> stops chain!
+  // Card 1: Heart (Đỏ) -> triggers chain
+  // Card 2: Heart (Đỏ) -> triggers chain
+  // Card 3: Diamond (Trắng) -> NOT ĐỎ -> stops chain!
   state._deck = [
-    card("c-stop", "Đỡ", CARD_SUBTYPES.DODGE, "Spade"),
-    card("c-red2", "Bánh Chưng", CARD_SUBTYPES.PEACH, "Diamond"),
+    card("c-stop", "Đỡ", CARD_SUBTYPES.DODGE, "Diamond"),
+    card("c-red2", "Bánh Chưng", CARD_SUBTYPES.PEACH, "Heart"),
     card("c-red1", "Trảm", CARD_SUBTYPES.ATTACK_NORMAL, "Heart"),
     card("c-atk", "Đỡ", CARD_SUBTYPES.DODGE, "Club")
   ];
@@ -53,11 +55,33 @@ function playSuccessfulSlash(state, slashId, attackerSeat = 1, targetSeat = 2) {
   assert.equal(handleRespondAction(state, 3, true, null).success, true);
   // Attacker drew 1 card (Club)
   assert.equal(state.players[0].hand.length, sourceCards + 1);
-  // Triệu Quốc Đạt drew 3 cards (Heart, Diamond, Spade)
+  // Triệu Quốc Đạt drew 3 cards (Heart, Heart, Diamond - stops because Diamond is Trắng)
   assert.equal(state.players[2].hand.length, ownerCards + 3);
   assert.equal(state.players[2].hand.some(c => c.id === "c-red1"), true);
   assert.equal(state.players[2].hand.some(c => c.id === "c-red2"), true);
   assert.equal(state.players[2].hand.some(c => c.id === "c-stop"), true);
+  assert.equal(state.phase, "PLAY");
+}
+
+// 1b. Khởi Binh: Diamond (Trắng) is NOT Red -> stops immediately after 1 draw
+{
+  const state = initGame("khoi-binh-white-stop", players);
+  state.players[0].hand = [card("slash-w", "Trảm", CARD_SUBTYPES.ATTACK_NORMAL)];
+  state.players[1].hand = [];
+
+  playSuccessfulSlash(state, "slash-w", 1, 2);
+  assert.equal(state.phase, "AWAIT_KHOI_BINH");
+
+  // Attacker draws Club; Triệu Quốc Đạt draws Diamond (Trắng), stops immediately
+  state._deck = [
+    card("c-white", "Khiên Mây", CARD_SUBTYPES.ARMOR, "Diamond"),
+    card("c-atk", "Đỡ", CARD_SUBTYPES.DODGE, "Club")
+  ];
+
+  const ownerCards = state.players[2].hand.length;
+  assert.equal(handleRespondAction(state, 3, true, null).success, true);
+  assert.equal(state.players[2].hand.length, ownerCards + 1);
+  assert.equal(state.players[2].hand.some(c => c.id === "c-white"), true);
   assert.equal(state.phase, "PLAY");
 }
 
