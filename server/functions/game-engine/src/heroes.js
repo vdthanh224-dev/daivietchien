@@ -153,7 +153,7 @@ export const SKILLS = {
   TRAN_TIEN: { id: 'TRAN_TIEN', name: 'Trận Tiền', type: 'TRIGGERED', description: 'Khi bạn hạ gục 1 người, bạn được chọn rút 2 lá hoặc hồi 1 máu.' },
   KHOI_BINH: { id: 'KHOI_BINH', name: 'Khởi Binh', type: 'OPTIONAL', description: 'Khi một nhân vật dùng Trảm gây sát thương, bạn có thể cho bạn và người gây sát thương rút 1 lá bài, nếu bạn rút ra là bài Đỏ, bạn tiếp tục được rút 1 lá bài cho đến khi ra lá bài màu khác.' },
   HUYNH_TRUONG: { id: 'HUYNH_TRUONG', name: 'Huynh Trưởng', type: 'OPTIONAL', description: 'Khi bạn mất máu, bạn có thể chuyển 1 lá bài trên tay cho người khác, sau đó rút 2 lá.' },
-  CHIEN_TUONG: { id: 'CHIEN_TUONG', name: 'Chiến Tượng', type: 'PASSIVE', description: 'Khi có trang bị trên ô Ngựa, sát thương gây ra bởi Trảm +1.' },
+  CHIEN_TUONG: { id: 'CHIEN_TUONG', name: 'Chiến Tượng', type: 'PASSIVE', description: 'Mặc định bạn mang ngựa +1 (không thể bị hủy, nếu trang bị thêm ngựa +1 sẽ là +2). Khi có trang bị trên ô Ngựa, sát thương gây ra bởi Trảm +1.' },
   OAI_NHUOC: { id: 'OAI_NHUOC', name: 'Oai Nhược', type: 'TRIGGERED', description: 'Mỗi khi bạn đánh ra 1 lá Trảm - Hỏa hoặc Trảm - Thủy, đối phương phải bỏ 1 lá bài trên tay trước khi đánh ra lá Đỡ.' },
   DUNG_NUOC: { id: 'DUNG_NUOC', name: 'Dựng Nước', type: 'OPTIONAL', description: 'Đầu Giai đoạn Rút bài, bạn có thể bỏ qua việc rút bài để hồi 1 Máu và thu ngẫu nhiên 1 lá bài Đỏ từ xấp bài bỏ vào tay nếu có.' },
   XUNG_DE: { id: 'XUNG_DE', name: 'Xưng Đế', type: 'PASSIVE', description: 'Khi bạn không bị thương, giới hạn bài giữ trên tay của bạn được tăng thêm 2 lá.' },

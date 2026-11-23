@@ -1193,7 +1193,7 @@ func _init_all_heroes() -> void:
 	_add_hero(6, "Vũ Thị Thục", "Hồng Bàng", 3, "Trinh Liệt", "Mỗi khi chịu sát thương từ đòn Trảm, bạn được rút 1 lá bài trong vùng chơi của nguồn gây sát thương.", "res://assets/ui/bat_nan.png", "bat_nan")
 	_add_hero(7, "Nàng Nội", "Hồng Bàng", 4, "Tiên Phong", "Trong lượt chơi đầu tiên của bạn, bạn được rút thêm 2 lá bài và không bị giới hạn lượt dùng Trảm trong lượt này. Trong lượt này, nếu bạn có ít hơn 3 lá Trảm trong tay, Trảm của bạn không thể Né, nếu bạn có nhiều hơn hoặc bằng 3 Trảm trong tay, bạn rút 1 lá.", "res://assets/ui/nang_noi.png", "nang_noi")
 	_add_hero(8, "Triệu Quốc Đạt", "Hồng Bàng", 4, "Khởi Binh", "Khi một nhân vật dùng Trảm gây sát thương, bạn có thể cho bạn và người gây sát thương rút 1 lá bài, nếu bạn rút ra là bài Đỏ, bạn tiếp tục được rút 1 lá bài cho đến khi ra lá bài màu khác.", "res://assets/ui/trieu_quoc_dat.png", "trieu_quoc_dat")
-	_add_hero(9, "Triệu Thị Trinh", "Hồng Bàng", 4, "Chiến Tượng", "Khi có trang bị trên ô Ngựa, sát thương gây ra bởi Trảm +1.", "res://assets/ui/ba_trieu.png", "ba_trieu")
+	_add_hero(9, "Triệu Thị Trinh", "Hồng Bàng", 4, "Chiến Tượng", "Mặc định bạn mang ngựa +1 (không thể bị hủy, nếu trang bị thêm ngựa +1 sẽ là +2). Khi có trang bị trên ô Ngựa, sát thương gây ra bởi Trảm +1.", "res://assets/ui/ba_trieu.png", "ba_trieu")
 	_add_hero(10, "Lý Bí", "Hồng Bàng", 4, "Dựng Nước", "Đầu Giai đoạn Rút bài, bạn có thể bỏ qua việc rút bài để hồi 1 Máu và thu ngẫu nhiên 1 lá bài Đỏ từ xấp bài bỏ vào tay nếu có.", "res://assets/ui/ly_bi.png", "ly_bi")
 	_add_hero(11, "Triệu Túc", "Hồng Bàng", 4, "Tùng Nghĩa", "Khi vùng trang bị của bạn có ít nhất 1 lá Chiến Mã hoặc Áo Giáp, cuối lượt, bạn được rút 1 lá và giới hạn trữ bài +1.", "res://assets/ui/trieu_tuc.png", "trieu_tuc")
 	_add_hero(12, "Tinh Thiều", "Hồng Bàng", 3, "Hán Lâm", "Mỗi khi bạn dùng thành công một lá Bài Cẩm Nang, bạn được xem lá bài trên cùng của xấp bài rút và có quyền chọn để nguyên hay đặt xuống đáy, sau đó rút 1 lá.", "res://assets/ui/tinh_thieu.png", "tinh_thieu")
@@ -1329,7 +1329,7 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 		]
 	elif id == 9:
 		skills = [
-			{"id": "chien_tuong", "name": "Chiến Tượng", "desc": "Khi có trang bị trên ô Ngựa, sát thương gây ra bởi Trảm +1."},
+			{"id": "chien_tuong", "name": "Chiến Tượng", "desc": "Mặc định bạn mang ngựa +1 (không thể bị hủy, nếu trang bị thêm ngựa +1 sẽ là +2). Khi có trang bị trên ô Ngựa, sát thương gây ra bởi Trảm +1."},
 			{"id": "oai_nhuoc", "name": "Oai Nhược", "desc": "Mỗi khi bạn đánh ra 1 lá Trảm - Hỏa hoặc Trảm - Thủy, đối phương phải bỏ 1 lá bài trên tay trước khi đánh ra lá Đỡ."}
 		]
 	elif id == 10:

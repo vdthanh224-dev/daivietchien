@@ -1053,7 +1053,7 @@ function triggerDeNghiep(state, casterSeat, targetSeat) {
   });
 }
 
-function getDistance(state, fromSeat, toSeat) {
+export function getDistance(state, fromSeat, toSeat) {
   if (fromSeat === toSeat) return 0;
   const livingPlayers = (state.players || [])
     .filter(isLivingPlayer)
@@ -1076,6 +1076,9 @@ function getDistance(state, fromSeat, toSeat) {
   distance += (to.equipments || [])
     .filter((equipment) => equipment.subType === CARD_SUBTYPES.DEFENSIVE_HORSE)
     .reduce((total, equipment) => total + (Number(equipment.distMod) || 1), 0);
+  if (heroHasSkill(to, "CHIEN_TUONG")) {
+    distance += 1;
+  }
   const maxEquips = Math.max(0, ...(state.players || []).filter(isLivingPlayer).map(p => (p.equipments || []).length));
   if (heroHasSkill(from, "PHO_VUONG") && (from.equipments || []).length > 0 && (from.equipments || []).length >= maxEquips) {
     distance -= 1;
@@ -4723,7 +4726,7 @@ function continueSlashDamageAfterUatKhi(state, targetSeat, finalDamage, fallback
     }
   }
   if (finalDamage > 0 && isLivingPlayer(caster) && heroHasSkill(caster, "THAN_CHINH_LE_HOAN") && target && isLivingPlayer(target) && target.seat !== caster.seat) {
-    const hasDefGear = (target.equipments || []).some(e => e.subType === CARD_SUBTYPES.ARMOR || e.subType === CARD_SUBTYPES.DEFENSIVE_HORSE);
+    const hasDefGear = (target.equipments || []).some(e => e.subType === CARD_SUBTYPES.ARMOR || e.subType === CARD_SUBTYPES.DEFENSIVE_HORSE) || heroHasSkill(target, "CHIEN_TUONG");
     if (!hasDefGear && target.hp > 0) {
       if ((target.hand || []).length > 0) {
         state.phase = "AWAIT_THAN_CHINH_LE_HOAN";

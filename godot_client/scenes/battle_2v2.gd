@@ -11569,6 +11569,8 @@ func _calculate_distance(seat_a: int, seat_b: int) -> int:
 		d -= 1
 	if generals_data.has(seat_b) and generals_data[seat_b].get("equipped_def_horse", "") != "":
 		d += 1
+	if generals_data.has(seat_b) and _hero_has_skill(generals_data[seat_b], "chien_tuong"):
+		d += 1
 	# Cố Thủ increases the defensive distance while the target is wearing armor.
 	if generals_data.has(seat_b) \
 		and _hero_has_skill(generals_data[seat_b], "co_thu") \
