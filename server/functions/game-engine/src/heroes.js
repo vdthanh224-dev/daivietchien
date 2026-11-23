@@ -156,7 +156,7 @@ export const SKILLS = {
   CHIEN_TUONG: { id: 'CHIEN_TUONG', name: 'Chiến Tượng', type: 'PASSIVE', description: 'Mặc định bạn mang ngựa +1 (không thể bị hủy, nếu trang bị thêm ngựa +1 sẽ là +2). Khi có trang bị trên ô Ngựa, sát thương gây ra bởi Trảm +1.' },
   OAI_NHUOC: { id: 'OAI_NHUOC', name: 'Oai Nhược', type: 'TRIGGERED', description: 'Mỗi khi bạn đánh ra 1 lá Trảm - Hỏa hoặc Trảm - Thủy, đối phương phải bỏ 1 lá bài trên tay trước khi đánh ra lá Đỡ.' },
   DUNG_NUOC: { id: 'DUNG_NUOC', name: 'Dựng Nước', type: 'OPTIONAL', description: 'Đầu Giai đoạn Rút bài, bạn có thể bỏ qua việc rút bài để hồi 1 Máu và thu ngẫu nhiên 1 lá bài Đỏ từ xấp bài bỏ vào tay nếu có.' },
-  XUNG_DE: { id: 'XUNG_DE', name: 'Xưng Đế', type: 'PASSIVE', description: 'Khi bạn không bị thương, giới hạn bài giữ trên tay của bạn được tăng thêm 2 lá.' },
+  XUNG_DE: { id: 'XUNG_DE', name: 'Xưng Đế', type: 'TRIGGERED', description: 'Khi bạn không bị thương, cuối lượt, bạn rút 2 lá bài.' },
   TUNG_NGHIA: { id: 'TUNG_NGHIA', name: 'Tùng Nghĩa', type: 'TRIGGERED', description: 'Khi vùng trang bị của bạn có ít nhất 1 lá Chiến Mã hoặc Áo Giáp, cuối lượt, bạn được rút 1 lá và giới hạn trữ bài +1.' },
   TRUNG_KIEN: { id: 'TRUNG_KIEN', name: 'Trung Kiên', type: 'OPTIONAL', description: 'Khi một người sắp vào trạng thái tử trận, bạn có thể tự giảm 1 Máu để giúp người đó hồi đến 1 máu.' },
   VAN_SACH: { id: 'VAN_SACH', name: 'Văn Sách', type: 'OPTIONAL', description: 'Sau khi bạn sử dụng lá bài Cẩm Nang thứ hai trong lượt, bạn có thể bỏ 1 lá bài trên tay để rút 1 lá hoặc coi như là sử dụng lại lá cẩm nang gần nhất vừa sử dụng.' },

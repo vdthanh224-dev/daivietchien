@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   applyDamageToPlayer,
   executeCardEffect,
+  handleDiscardCards,
   handleEndTurn,
   handlePlayCard,
   handleRespondAction,
@@ -156,11 +157,39 @@ function game(heroIds = ["HERO_9", "HERO_1", "HERO_2", "HERO_3"]) {
   assert.equal(state.phase, "PLAY");
 }
 
+// Xưng Đế của Lý Bí: Khi bạn không bị thương, cuối lượt, bạn rút 2 lá bài (sau giai đoạn bỏ bài).
 {
+  // Case 1: Uninjured (4/4 HP), has 4 cards (no discard required). Draws 2 at end of turn => 6 cards.
   const state = game(["HERO_10", "HERO_1", "HERO_2", "HERO_3"]);
-  state.players[0].hand = Array.from({ length: 6 }, (_, index) => basic(`xung-${index}`));
+  state.players[0].hand = Array.from({ length: 4 }, (_, index) => basic(`xung-ok-${index}`));
+  state._deck = [basic("xung-draw-2"), basic("xung-draw-1")];
   handleEndTurn(state, 1);
-  assert.notEqual(state.phase, "DISCARD", "Xưng Đế phải cho giữ thêm 2 lá khi đầy Máu");
+  assert.equal(state.players[0].hand.length, 6, "Xưng Đế rút 2 lá cuối lượt khi đầy máu");
+  assert.equal(state.actionHistory.some((a) => a.type === "XUNG_DE_TRIGGERED"), true);
+}
+
+{
+  // Case 2: Injured (3/4 HP). Xưng Đế does NOT trigger.
+  const state = game(["HERO_10", "HERO_1", "HERO_2", "HERO_3"]);
+  state.players[0].hp = 3;
+  state.players[0].hand = Array.from({ length: 3 }, (_, index) => basic(`xung-inj-${index}`));
+  handleEndTurn(state, 1);
+  assert.equal(state.players[0].hand.length, 3, "Xưng Đế không kích hoạt khi bị thương");
+  assert.equal(state.actionHistory.some((a) => a.type === "XUNG_DE_TRIGGERED"), false);
+}
+
+{
+  // Case 3: Uninjured (4/4 HP), has 6 cards => must discard 2 cards down to 4.
+  // After discarding, Xưng Đế draws 2 cards => ends with 6 cards, never asked to discard again.
+  const state = game(["HERO_10", "HERO_1", "HERO_2", "HERO_3"]);
+  state.players[0].hand = Array.from({ length: 6 }, (_, index) => basic(`xung-disc-${index}`));
+  state._deck = [basic("xung-draw-b"), basic("xung-draw-a")];
+  handleEndTurn(state, 1);
+  assert.equal(state.phase, "DISCARD", "Phải bỏ 2 lá thừa trước");
+  handleDiscardCards(state, 1, ["xung-disc-0", "xung-disc-1"]);
+  assert.equal(state.players[0].hand.length, 6, "Sau khi bỏ bài, Xưng Đế rút 2 lá cuối lượt");
+  assert.equal(state.actionHistory.some((a) => a.type === "XUNG_DE_TRIGGERED"), true);
+  assert.notEqual(state.phase, "DISCARD", "Các lá rút từ Xưng Đế không bị bắt bỏ bài");
 }
 
 {

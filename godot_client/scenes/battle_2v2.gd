@@ -13625,8 +13625,6 @@ func _get_general_hand_limit(general: Dictionary) -> int:
 	var limit = int(general.get("hp", 0))
 	if general.get("thai_binh_buff", 0) > 0:
 		limit += int(general.get("thai_binh_buff", 0))
-	if _hero_has_skill(general, "xung_de") and int(general.get("hp", 0)) == int(general.get("max_hp", 0)):
-		limit += 2
 	var has_horse_or_armor = not str(general.get("equipped_armor", "")).is_empty() \
 		or not str(general.get("equipped_def_horse", "")).is_empty() \
 		or not str(general.get("equipped_off_horse", "")).is_empty()

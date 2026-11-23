@@ -1014,11 +1014,25 @@ export function getHandLimit(player) {
     return Number(player.permanentHandLimit);
   }
   let limit = Math.max(0, Number(player?.hp) || 0);
-  if (heroHasSkill(player, "XUNG_DE") && player.hp === player.maxHp) limit += 2;
   if (heroHasSkill(player, "TUNG_NGHIA") && hasHorseOrArmor(player)) limit += 1;
   if (heroHasSkill(player, "KHOAN_GIAN")) limit += getKhoanGianValue(player);
   if (heroHasSkill(player, "THAI_BINH_LY_CONG_UAN") && player.thaiBinhBuff) limit += player.thaiBinhBuff;
   return limit;
+}
+
+function triggerXungDe(state, player) {
+  if (!player || !heroHasSkill(player, "XUNG_DE") || player.usedSkills?.XungDe) return false;
+  if (!player.usedSkills) player.usedSkills = {};
+  player.usedSkills.XungDe = true;
+  if (player.hp < player.maxHp || player.hp <= 0) return false;
+  drawCards(state, player.seat, 2);
+  recordAction(state, {
+    type: "XUNG_DE_TRIGGERED",
+    casterSeat: player.seat,
+    skillActivations: [{ name: "Xưng Đế", seat: player.seat }],
+    description: `👑 <b>${player.generalName}</b> không bị thương (${player.hp}/${player.maxHp} Máu), cuối lượt kích hoạt [Xưng Đế] rút 2 lá bài.`
+  });
+  return true;
 }
 
 function triggerKhoanGianAfterDiscard(state, player) {
@@ -8641,9 +8655,6 @@ export function handleEndTurn(state, casterSeat) {
 
   // Nếu đang ở PLAY phase: Kiểm tra bài thừa so với máu
   const handLimit = getHandLimit(caster);
-  const tungNghiaBonus = heroHasSkill(caster, "TUNG_NGHIA") && hasHorseOrArmor(caster) ? 1 : 0;
-  const xungDeTriggered = heroHasSkill(caster, "XUNG_DE") && caster.hp === caster.maxHp
-    && caster.hand.length > Math.max(0, Number(caster.hp) || 0) + tungNghiaBonus;
   const excess = caster.hand.length - handLimit;
   if (!skipHandLimitCheck && excess > 0 && caster.hp > 0) {
     state.phase = "DISCARD";
@@ -8655,7 +8666,6 @@ export function handleEndTurn(state, casterSeat) {
       type: "DISCARD_PHASE",
       casterSeat,
       excess,
-      skillActivations: xungDeTriggered ? [{ name: "Xưng Đế", seat: casterSeat }] : [],
       description: `⚠️ ${caster.generalName} có ${caster.hand.length} lá, giới hạn giữ là ${handLimit}. Cần bỏ ${excess} lá thừa (40s)!`
     });
     return { success: true, state };
@@ -8689,19 +8699,10 @@ export function handleEndTurn(state, casterSeat) {
     return { success: true, state };
   }
 
-  // Lập Làng rút sau khi đã bỏ bài. Hai lá được nhận sau cùng không bị tính
+  // Lập Làng và Xưng Đế rút sau khi đã bỏ bài. Các lá được nhận sau cùng không bị tính
   // vào giới hạn bài trên tay của lượt vừa kết thúc.
   triggerLapLang(state, caster);
-
-  if (xungDeTriggered) {
-    recordAction(state, {
-      type: "XUNG_DE_TRIGGERED",
-      casterSeat,
-      skillActivations: [{ name: "Xưng Đế", seat: casterSeat }],
-      description: `👑 ${caster.generalName} kích hoạt [Xưng Đế], tăng giới hạn bài giữ trên tay thêm 2 lá.`
-    });
-  }
-
+  triggerXungDe(state, caster);
   triggerKhoanGianAfterDiscard(state, caster);
 
   // HERO_41_46_50_TURN_END
@@ -8924,6 +8925,7 @@ export function finishTurnEndSkills(state, p) {
   p.extraSlashLimit = 0;
 
   triggerLapLang(state, p);
+  triggerXungDe(state, p);
   triggerKhoanGianAfterDiscard(state, p);
 
   // Thủ Pháp là kỹ năng cuối lượt: chỉ kích hoạt sau khi đã bỏ hết bài thừa.
