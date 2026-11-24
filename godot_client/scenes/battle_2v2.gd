@@ -8407,6 +8407,10 @@ func _apply_network_game_state(state: Dictionary) -> void:
 				end_turn_btn.text = "TỪ CHỐI"
 				turn_indicator.text = "✨ HỊCH NGHĨA: HỒI 4 MÁU? (%ds)" % server_waiting_timer
 				desc_text.text = "Máu của bạn về 0. Bạn có thể chọn hồi lên đến 4 máu và mất kỹ năng này (giới hạn trữ bài vĩnh viễn là 4)."
+			elif server_phase == "AWAIT_TRUNG_KIEN":
+				card_play_btn.text = "🛡️ PHÁT ĐỘNG TRUNG KIÊN (RÚT 3 LÁ)"
+				turn_indicator.text = "🛡️ TRUNG KIÊN: CỨU NGƯỜI SẮP TỬ TRẬN (%ds)" % server_waiting_timer
+				desc_text.text = "Tự giảm 1 Máu để giúp người đó hồi đến 1 Máu. Sau đó, bạn rút 3 lá bài."
 			else:
 				card_play_btn.text = "🛡️ PHÁT ĐỘNG TRUNG KIÊN"
 				turn_indicator.text = "🛡️ TRUNG KIÊN: CỨU NGƯỜI SẮP TỬ TRẬN (%ds)" % server_waiting_timer

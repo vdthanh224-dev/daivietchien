@@ -203,14 +203,18 @@ function game(heroIds = ["HERO_9", "HERO_1", "HERO_2", "HERO_3"]) {
 }
 
 {
-  const state = game(["HERO_1", "HERO_11", "HERO_2", "HERO_3"]);
+  const state = game(["HERO_1", "HERO_11", "HERO_2", "HERO_4"]);
   state.players[0].hp = 1;
   state.players[1].hp = 4;
   applyDamageToPlayer(state, 1, 1, "test");
   assert.equal(state.phase, "AWAIT_TRUNG_KIEN");
+  state._deck = [basic("draw-c"), basic("draw-b"), basic("draw-a")];
+  state.players[1].hand = [];
   handleRespondAction(state, 2, true, null);
-  assert.equal(state.players[0].hp, 1);
-  assert.equal(state.players[1].hp, 3);
+  assert.equal(state.players[0].hp, 1, "Mục tiêu được hồi đến 1 Máu");
+  assert.equal(state.players[1].hp, 3, "Triệu Túc tự giảm 1 Máu");
+  assert.equal(state.players[1].hand.length, 3, "Triệu Túc kích hoạt Trung Kiên rút 3 lá bài");
+  assert.equal(state.actionHistory.some((a) => a.type === "TRUNG_KIEN_TRIGGERED" && a.description.includes("rút 3 lá bài")), true);
 }
 
 {

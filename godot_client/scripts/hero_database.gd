@@ -1340,7 +1340,7 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 	elif id == 11:
 		skills = [
 			{"id": "tung_nghia", "name": "Tùng Nghĩa", "desc": "Khi vùng trang bị của bạn có ít nhất 1 lá Chiến Mã hoặc Áo Giáp, cuối lượt, bạn được rút 1 lá và giới hạn trữ bài +1."},
-			{"id": "trung_kien", "name": "Trung Kiên", "desc": "Khi một người sắp vào trạng thái tử trận, bạn có thể tự giảm 1 Máu để giúp người đó hồi đến 1 máu."}
+			{"id": "trung_kien", "name": "Trung Kiên", "desc": "Khi một người sắp vào trạng thái tử trận, bạn có thể tự giảm 1 Máu để giúp người đó hồi đến 1 máu. Sau đó, bạn rút 3 lá bài."}
 		]
 	elif id == 12:
 		skills = [

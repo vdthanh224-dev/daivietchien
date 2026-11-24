@@ -6474,6 +6474,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       const beforeHp = target.hp;
       target.hp = 1;
       if (target.hp > beforeHp) triggerBaoLam(state, target.seat); triggerKhuyenNong(state, target.seat);
+      drawCards(state, respondent.seat, 3, true);
       state.pendingNearDeath = null;
       state.trungKienQueue = [];
       recordAction(state, {
@@ -6481,7 +6482,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         casterSeat: respondentSeat,
         targetSeat: target.seat,
         skillActivations: [{ name: "Trung Kiên", seat: respondentSeat }],
-        description: `🛡️ ${respondent.generalName} tự giảm 1 Máu kích hoạt [Trung Kiên], giúp ${target.generalName} hồi đến 1 Máu.`
+        description: `🛡️ ${respondent.generalName} tự giảm 1 Máu kích hoạt [Trung Kiên], giúp ${target.generalName} hồi đến 1 Máu và rút 3 lá bài.`
       });
       if (respondent.hp <= 0) {
         if (startNearDeathRescue(state, respondent, 0, 1)) return { success: true, state };
@@ -8124,7 +8125,7 @@ function startTrungKienPrompt(state, target, context) {
     casterSeat: helperSeat,
     targetSeat: target.seat,
     skillActivations: [{ name: "Trung Kiên", seat: helperSeat }],
-    description: `🛡️ ${helper?.generalName || "Triệu Túc"} có thể tự giảm 1 Máu kích hoạt [Trung Kiên], giúp ${target.generalName} hồi đến 1 Máu.`
+    description: `🛡️ ${helper?.generalName || "Triệu Túc"} có thể tự giảm 1 Máu kích hoạt [Trung Kiên], giúp ${target.generalName} hồi đến 1 Máu và rút 3 lá bài.`
   });
   return true;
 }
