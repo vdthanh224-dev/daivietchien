@@ -1204,7 +1204,7 @@ func _init_all_heroes() -> void:
 	_add_hero(17, "Mai Thúc Loan", "Hồng Bàng", 4, "Vạn An", "Giới hạn mỗi lượt 2 lần, bạn có thể dùng 2 lá bài bất kỳ trên tay để xem như sử dụng lá Cẩm Nang Bãi Cọc Bạch Đằng. Lần đầu sử dụng trong lượt, rút 1 lá bài.", "res://assets/ui/mai_thuc_loan.png", "mai_thuc_loan")
 	_add_hero(18, "Khúc Thừa Dụ", "Hồng Bàng", 3, "Khoan Giản", "Sau giai đoạn Bỏ bài, bạn được rút X lá, giới hạn trữ bài +X (X là một nửa số trang bị bạn đang mang, làm tròn lên).", "res://assets/ui/khuc_thua_du.png", "khuc_thua_du")
 	_add_hero(19, "Khúc Hạo", "Hồng Bàng", 3, "Khoan Hòa", "Cuối lượt của bạn, bạn rút 1 lá bài, sau đó bạn chọn tối đa 2 người chơi khác, mỗi người trong số họ rút 1 lá bài.", "res://assets/ui/khuc_hao.png", "khuc_hao")
-	_add_hero(20, "Dương Đình Nghệ", "Hồng Bàng", 4, "Nghĩa Tử", "Khi một người chơi khác bị nhận sát thương, bạn có thể bỏ 1 lá bài trên tay để chịu thay 1 sát thương cho họ.", "res://assets/ui/duong_dinh_nghe.png", "duong_dinh_nghe")
+	_add_hero(20, "Dương Đình Nghệ", "Hồng Bàng", 4, "Nghĩa Tử", "Khi một người chơi khác nhận sát thương, bạn có thể bỏ 1 lá trên tay để chịu thay họ 1 sát thương, sau đó rút 2 lá bài.", "res://assets/ui/duong_dinh_nghe.png", "duong_dinh_nghe")
 	_add_hero(21, "Kiều Công Tiễn", "Hồng Bàng", 3, "Nghịch Ý", "Khi trở thành mục tiêu của đòn Trảm, bạn có thể bỏ 1 lá bài trên tay để chuyển mục tiêu của đòn Trảm đó sang 1 người chơi khác trong tầm đánh của bạn.", "res://assets/ui/kieu_cong_tien.png", "kieu_cong_tien")
 	_add_hero(22, "Ngô Quyền", "Hồng Bàng", 3, "Thủy Chiến", "Bạn có thể dùng bất kỳ lá bài Trắng hoặc bài Vàng như một lá Bãi Cọc Bạch Đằng; bạn không thể trở thành mục tiêu của Bãi Cọc Bạch Đằng.", "res://assets/ui/ngo_quyen.png", "ngo_quyen")
 	_add_hero(23, "Dương Tam Kha", "Thăng Long", 4, "Đoạt Vị", "Khi có người chơi bị tiêu diệt, bạn thu lấy toàn bộ số bài trên tay và vùng trang bị của nạn nhân.", "res://assets/ui/duong_tam_kha.png", "duong_tam_kha")
@@ -1384,8 +1384,8 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 		]
 	elif id == 20:
 		skills = [
-			{"id": "nghia_tu", "name": "Nghĩa Tử", "desc": "Khi một người chơi khác bị nhận sát thương, bạn có thể bỏ 1 lá bài trên tay để chịu thay 1 sát thương cho họ."},
-			{"id": "duong_binh", "name": "Dưỡng Binh", "desc": "Mỗi khi bạn chịu thay sát thương, rút 2 lá."}
+			{"id": "nghia_tu", "name": "Nghĩa Tử", "desc": "Khi một người chơi khác nhận sát thương, bạn có thể bỏ 1 lá trên tay để chịu thay họ 1 sát thương, sau đó rút 2 lá bài."},
+			{"id": "duong_binh", "name": "Dưỡng Binh", "desc": "Cuối lượt của mỗi nhân vật khác, nếu không ai nhận sát thương, bạn rút 2 lá."}
 		]
 	elif id == 21:
 		skills = [

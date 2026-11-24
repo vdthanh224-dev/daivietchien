@@ -72,6 +72,7 @@ const HERO_SKILL_ACTIONS := {
 	"HOI_HO_REDUCED": {"name": "Hồi Hồ"},
 	"TAY_PHU_TRIGGERED": {"name": "Tây Phu"},
 	"NGHIA_TU_TRIGGERED": {"name": "Nghĩa Tử"},
+	"DUONG_BINH_DRAW": {"name": "Dưỡng Binh"},
 	"UU_THIEP_STEAL": {"name": "Ưu Thiếp"},
 	"UU_THIEP_NO_EQUIPMENT": {"name": "Ưu Thiếp"},
 	"UU_THIEP_TRIGGERED": {"name": "Ưu Thiếp"},
@@ -10205,7 +10206,7 @@ func _on_network_action_received(delta: Dictionary) -> void:
 				_play_smart_card_rays("Nam Quốc Sơn Hà", c_seat, target_int_seats)
 		_animate_showcase_card("Nam Quốc Sơn Hà", str(delta.get("description", "%s kích hoạt [Nam Quốc Sơn Hà] tăng 1 tầm đánh!" % c_name)))
 		AudioManager.play_skill()
-	elif act_type in ["OAI_NHUOC_DISCARD", "DUNG_NUOC_TRIGGERED", "TUNG_NGHIA_DRAW", "VAN_SACH_TRIGGERED", "HAN_LAM_KEEP", "HAN_LAM_BOTTOM", "TRUNG_KIEN_TRIGGERED", "LUC_DICH_DRAW"]:
+	elif act_type in ["OAI_NHUOC_DISCARD", "DUNG_NUOC_TRIGGERED", "TUNG_NGHIA_DRAW", "VAN_SACH_TRIGGERED", "HAN_LAM_KEEP", "HAN_LAM_BOTTOM", "TRUNG_KIEN_TRIGGERED", "LUC_DICH_DRAW", "DUONG_BINH_DRAW", "NGHIA_TU_TRIGGERED"]:
 		var skill_effect_names = {
 			"OAI_NHUOC_DISCARD": "Oai Nhược",
 			"DUNG_NUOC_TRIGGERED": "Dựng Nước",
@@ -10214,7 +10215,9 @@ func _on_network_action_received(delta: Dictionary) -> void:
 			"HAN_LAM_KEEP": "Hán Lâm",
 			"HAN_LAM_BOTTOM": "Hán Lâm",
 			"TRUNG_KIEN_TRIGGERED": "Trung Kiên",
-			"LUC_DICH_DRAW": "Lực Địch"
+			"LUC_DICH_DRAW": "Lực Địch",
+			"DUONG_BINH_DRAW": "Dưỡng Binh",
+			"NGHIA_TU_TRIGGERED": "Nghĩa Tử"
 		}
 		_animate_showcase_card(str(skill_effect_names.get(act_type, "Kỹ năng")), str(delta.get("description", "Kỹ năng được kích hoạt.")))
 	elif act_type in ["DAI_HONG_THUY_HIT", "DAI_HONG_THUY_PASSED", "LIGHTNING_HIT", "LIGHTNING_PASSED", "SUPPLY_SHORTAGE_TRIGGERED", "SUPPLY_SHORTAGE_PASSED", "ACEDIA_TRIGGERED", "ACEDIA_PASSED", "KHIEN_MAY_SUCCESS", "KHIEN_MAY_FAILED", "BAI_COC_BACH_DANG_SAFE", "BAI_COC_BACH_DANG_TRIGGERED"]:

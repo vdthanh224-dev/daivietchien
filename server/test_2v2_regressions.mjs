@@ -1704,7 +1704,7 @@ for (const [subType, name] of [
   assert.equal(res.success, true);
   // Player 1 took 1 damage (4 -> 3)
   assert.equal(state.players[0].hp, 3);
-  // Player 1 drew 2 cards from Dưỡng Binh
+  // Player 1 drew 2 cards from Nghĩa Tử
   assert.equal(state.players[0].hand.length, 2);
 }
 

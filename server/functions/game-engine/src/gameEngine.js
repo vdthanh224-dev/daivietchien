@@ -411,6 +411,7 @@ export function hydrateGameState(rawState, roomId = "") {
     : null;
   state.turnDamageDealt = !!state.turnDamageDealt;
   state.turnDamageDealtAmount = Math.max(0, Number(state.turnDamageDealtAmount) || 0);
+  state.anyDamageReceivedThisTurn = !!state.anyDamageReceivedThisTurn;
   state.isWineBuffActive = !!state.isWineBuffActive;
   state.actionSeq = Math.max(1, Number(state.actionSeq) || Number(state.lastAction?.seq) || 1);
   state.actionHistory = Array.isArray(state.actionHistory) ? state.actionHistory : [];
@@ -656,6 +657,7 @@ export function initGame(roomId, playersInput, modeId = "2v2") {
     slashesUsedThisTurn: 0,
     turnDamageDealt: false,
     turnDamageDealtAmount: 0,
+    anyDamageReceivedThisTurn: false,
     isWineBuffActive: false,
     activeCard: null,
     targetCardSelection: null,
@@ -3442,6 +3444,26 @@ function triggerPhongDuyen(state, player) {
   });
 }
 
+export function triggerDuongBinh(state, previousSeat) {
+  const anyoneDamaged = !!state.anyDamageReceivedThisTurn || (state.players || []).some((p) => p.damageReceivedThisTurn);
+  if (anyoneDamaged) return false;
+  const duongBinhPlayers = (state.players || []).filter(
+    (cand) => isLivingPlayer(cand) && cand.seat !== previousSeat && heroHasSkill(cand, "DUONG_BINH")
+  );
+  if (duongBinhPlayers.length === 0) return false;
+  const prevPlayer = state.players.find((p) => p.seat === previousSeat);
+  for (const player of duongBinhPlayers) {
+    drawCards(state, player.seat, 2, true);
+    recordAction(state, {
+      type: "DUONG_BINH_DRAW",
+      casterSeat: player.seat,
+      skillActivations: [{ name: "Dưỡng Binh", seat: player.seat }],
+      description: `🛡️ <b>${player.generalName}</b> kích hoạt [Dưỡng Binh] (lượt của ${prevPlayer?.generalName || "người khác"} không ai nhận sát thương), rút 2 lá bài.`
+    });
+  }
+  return true;
+}
+
 function buildAnDanOptions(state) {
   const options = [];
   for (const source of state.players || []) {
@@ -5690,20 +5712,14 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         attackerSeat: Number(pending.attackerSeat) || Number(state.activeCard?.casterSeat) || Number(state.turnSeat) || 0,
         skipNghiaTu: true
       });
-      const hasDuongBinh = heroHasSkill(respondent, "DUONG_BINH");
-      if (hasDuongBinh) {
-        drawCards(state, respondentSeat, 2, true);
-      }
+      drawCards(state, respondentSeat, 2, true);
       const skillActivations = [{ name: "Nghĩa Tử", seat: respondentSeat }];
-      if (hasDuongBinh) skillActivations.push({ name: "Dưỡng Binh", seat: respondentSeat });
       recordAction(state, {
         type: "NGHIA_TU_TRIGGERED",
         casterSeat: respondentSeat,
         targetSeat: pending.targetSeat,
         skillActivations,
-        description: hasDuongBinh
-          ? `🛡️ ${respondent.generalName} bỏ 1 lá kích hoạt [Nghĩa Tử], chịu thay 1 sát thương và rút 2 lá nhờ [Dưỡng Binh].`
-          : `🛡️ ${respondent.generalName} bỏ 1 lá kích hoạt [Nghĩa Tử], chịu thay 1 sát thương cho ${state.players.find((p) => p.seat === pending.targetSeat)?.generalName || "đồng đội"}.`
+        description: `🛡️ ${respondent.generalName} bỏ 1 lá kích hoạt [Nghĩa Tử], chịu thay 1 sát thương cho ${state.players.find((p) => p.seat === pending.targetSeat)?.generalName || "đồng đội"} và rút 2 lá bài.`
       });
       if (helperDamage.enteredNearDeath || state.phase === "AWAIT_TRUNG_KIEN") {
         state.pendingAfterNearDeath = { type: "NGHIA_TU_RESUME", pending };
@@ -8359,7 +8375,10 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
     for (const card of target.judgements.splice(0)) discardCard(state, card, true);
     recordAction(state, { type: "THIEN_CAM_CLEARED", casterSeat: target.seat, skillActivations: [{ name: "Thiên Cảm", seat: target.seat }], description: `🌙 ${target.generalName} kích hoạt [Thiên Cảm], bỏ toàn bộ Cẩm Nang Trì Hoãn khi còn 1 Máu.` });
   }
-  if (finalDamage > 0) target.damageReceivedThisTurn = true;
+  if (finalDamage > 0) {
+    target.damageReceivedThisTurn = true;
+    state.anyDamageReceivedThisTurn = true;
+  }
   if (finalDamage > 0 && !options.skipTurnDamageCredit && attackerSeat === state.turnSeat && attackerSeat !== targetSeat) {
     state.turnDamageDealt = true;
     state.turnDamageDealtAmount = (Number(state.turnDamageDealtAmount) || 0) + finalDamage;
@@ -9374,6 +9393,7 @@ function advanceTurn(state) {
   for (const player of state.players) {
     player.thuPhucCountThisTurn = 0;
   }
+  triggerDuongBinh(state, previousSeat);
   const previousPlayer = state.players.find((player) => player.seat === previousSeat);
   if (previousPlayer) {
     triggerPhongDuyen(state, previousPlayer);
@@ -9398,7 +9418,9 @@ function advanceTurn(state) {
       }
     }
   }
+  state.anyDamageReceivedThisTurn = false;
   for (const player of state.players) {
+    player.damageReceivedThisTurn = false;
     player.playPhaseDamageDealt = 0;
     if (player.usedSkills) delete player.usedSkills.ThangMocTurnResolved;
   }
