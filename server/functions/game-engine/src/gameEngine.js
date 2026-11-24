@@ -1799,10 +1799,7 @@ function startSlashResolution(state, slashCard, casterSeat, targetSeat, options 
     });
     return { success: true, state };
   }
-  const tranNamBypass = heroHasSkill(caster, "TRAN_NAM")
-    && slashCard.subType === CARD_SUBTYPES.ATTACK_NORMAL
-    && ["BLACK", "YELLOW"].includes(cardColor(slashCard.suit));
-  if (!hasThuanThien && !tranNamBypass && slashCard.subType === CARD_SUBTYPES.ATTACK_NORMAL
+  if (!hasThuanThien && slashCard.subType === CARD_SUBTYPES.ATTACK_NORMAL
       && target.equipments?.some((equipment) =>
         equipment.subType === CARD_SUBTYPES.ARMOR && equipment.name?.includes("Giáp Đồng"))) {
     if (continueLienChauAfterSkippedSlash(state, slashCard, casterSeat, options)) return { success: true, state };
@@ -1889,7 +1886,6 @@ function startSlashResolution(state, slashCard, casterSeat, targetSeat, options 
       oaiNhuocRequired: heroHasSkill(caster, "OAI_NHUOC") && [CARD_SUBTYPES.ATTACK_FIRE, CARD_SUBTYPES.ATTACK_WATER].includes(slashCard.subType),
       chienTuongBonus,
       cocNgamBonus,
-      tranNamBypass,
       options
     };
     recordAction(state, {
@@ -1903,7 +1899,11 @@ function startSlashResolution(state, slashCard, casterSeat, targetSeat, options 
   }
   const isPhaTong = Boolean(slashCard.phaTongActive || options.inheritedActiveCard?.phaTongActive);
   const isTienPhongUnavoidable = Boolean(slashCard.tienPhongUnavoidable);
-  if (isPhaTong || isTienPhongUnavoidable) {
+  const isTranNamUnavoidable = Boolean(slashCard.tranNamUnavoidable || options.inheritedActiveCard?.tranNamActive)
+    || (heroHasSkill(caster, "TRAN_NAM")
+      && slashCard.subType === CARD_SUBTYPES.ATTACK_NORMAL
+      && ["BLACK", "YELLOW"].includes(cardColor(slashCard.suit)));
+  if (isPhaTong || isTienPhongUnavoidable || isTranNamUnavoidable) {
     state.activeCard = {
       ...(options.inheritedActiveCard || {}),
       cardId: slashCard.id,
@@ -1922,20 +1922,25 @@ function startSlashResolution(state, slashCard, casterSeat, targetSeat, options 
       countsTowardTurnSlashLimit,
       phaTongActive: isPhaTong,
       tienPhongActive: isTienPhongUnavoidable,
+      tranNamActive: isTranNamUnavoidable,
       requiredDodgeCount: 0,
       dodgesUsed: 0,
       liemDaoEligible: !!firstEquipmentHook(caster, 'slashHitDrawOnce', { target })
     };
+    const skillName = isPhaTong ? "Phá Tống" : (isTienPhongUnavoidable ? "Tiên Phong" : "Trấn Nam");
+    const desc = isPhaTong
+      ? `⚔️ <b>${caster.generalName}</b> tung chiêu ${formatCardText(slashCard)} không thể Đỡ nhờ [Phá Tống] nhắm vào <b>${target.generalName}</b>!`
+      : (isTienPhongUnavoidable
+        ? `⚔️ <b>${caster.generalName}</b> kích hoạt [Tiên Phong] (có < 3 lá Trảm), đòn ${formatCardText(slashCard)} không thể Né nhắm vào <b>${target.generalName}</b>!`
+        : `⚔️ <b>${caster.generalName}</b> dùng Trảm thường Đen/Vàng kích hoạt [Trấn Nam], đòn ${formatCardText(slashCard)} không thể Đỡ nhắm vào <b>${target.generalName}</b>!`);
     recordAction(state, {
       type: "SLASH_ATTACK_UNAVOIDABLE",
       casterSeat,
       targetSeat,
       cardId: slashCard.id,
       cardName: slashCard.name,
-      skillActivations: [{ name: isPhaTong ? "Phá Tống" : "Tiên Phong", seat: casterSeat }],
-      description: isPhaTong
-        ? `⚔️ <b>${caster.generalName}</b> tung chiêu ${formatCardText(slashCard)} không thể Đỡ nhờ [Phá Tống] nhắm vào <b>${target.generalName}</b>!`
-        : `⚔️ <b>${caster.generalName}</b> kích hoạt [Tiên Phong] (có < 3 lá Trảm), đòn ${formatCardText(slashCard)} không thể Né nhắm vào <b>${target.generalName}</b>!`
+      skillActivations: [{ name: skillName, seat: casterSeat }],
+      description: desc
     });
     return resolveSlashDamageAfterDefense(state, targetSeat);
   }
@@ -1980,9 +1985,6 @@ function startSlashResolution(state, slashCard, casterSeat, targetSeat, options 
   if (chienTuongBonus > 0) skillActivations.push({ name: "Chiến Tượng", seat: casterSeat });
   if (requiredDodges > 1) skillActivations.push({ name: "Dũng Nữ", seat: casterSeat });
   if (heroHasSkill(caster, "NO_DINH") && caster.hp <= 2) skillActivations.push({ name: "Nỏ Đỉnh", seat: casterSeat });
-  if (tranNamBypass && target.equipments?.some((equipment) => equipment.subType === CARD_SUBTYPES.ARMOR && equipment.name?.includes("Giáp Đồng"))) {
-    skillActivations.push({ name: "Trấn Nam", seat: casterSeat });
-  }
   const isTienThoaiSlash = Boolean(slashCard.tienThoaiConvert || (heroHasSkill(caster, "TIEN_THOAI") && slashCard.originalCardName === "Đỡ"));
   if (isTienThoaiSlash) {
     skillActivations.push({ name: "Tiến Thoái", seat: casterSeat });
@@ -3053,17 +3055,6 @@ function beginNextAoeVictim(state) {
     const nextVictim = state.aoeVictimsQueue.shift();
     const victim = state.players.find((player) => player.seat === nextVictim);
     if (!victim || victim.hp <= 0) continue;
-    if (state.activeCard?.reqType === "SLASH" && heroHasSkill(victim, "TRAN_NAM")) {
-      recordAction(state, {
-        type: "TRAN_NAM_IMMUNE",
-        casterSeat: victim.seat,
-        targetSeat: victim.seat,
-        cardName: state.activeCard.cardName || "Giặc Tới",
-        skillActivations: [{ name: "Trấn Nam", seat: victim.seat }],
-        description: `🛡️ ${victim.generalName} kích hoạt [Trấn Nam], miễn nhiễm hoàn toàn sát thương từ [Giặc Tới].`
-      });
-      continue;
-    }
     // Hỏi Diệu Kế Phá Mưu trước khi bắt buộc nạn nhân Đỡ/Trảm
     if (state.activeCard && state.activeCard.cardName) {
       const aoecard = { id: state.activeCard.cardId, name: state.activeCard.cardName, subType: state.activeCard.reqType === "DODGE" ? "ARROW_RAIN" : "BARBARIAN_INVASION" };

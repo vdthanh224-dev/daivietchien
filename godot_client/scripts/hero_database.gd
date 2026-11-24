@@ -1349,7 +1349,7 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 		]
 	elif id == 13:
 		skills = [
-			{"id": "tran_nam", "name": "Trấn Nam", "desc": "Bạn miễn nhiễm hoàn toàn với sát thương từ Cẩm Nang Giặc Tới. Khi bạn dùng Trảm Thường Đen hoặc Vàng, mục tiêu không thể kích hoạt hiệu ứng của Giáp Đồng Sơn Vi."},
+			{"id": "tran_nam", "name": "Trấn Nam", "desc": "Bạn dùng Trảm thường Đen hoặc Vàng, mục tiêu không thể Đỡ."},
 			{"id": "hoa_dan", "name": "Hóa Dân", "desc": "Cuối lượt của bạn, nếu bạn đang đeo trang bị Áo Giáp, bạn có thể bỏ 1 trang bị bất kỳ để hồi 1 máu."}
 		]
 	elif id == 14:

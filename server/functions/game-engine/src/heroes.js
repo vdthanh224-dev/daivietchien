@@ -161,7 +161,7 @@ export const SKILLS = {
   TRUNG_KIEN: { id: 'TRUNG_KIEN', name: 'Trung Kiên', type: 'OPTIONAL', description: 'Khi một người sắp vào trạng thái tử trận, bạn có thể tự giảm 1 Máu để giúp người đó hồi đến 1 máu.' },
   VAN_SACH: { id: 'VAN_SACH', name: 'Văn Sách', type: 'OPTIONAL', description: 'Sau khi bạn sử dụng lá bài Cẩm Nang thứ hai trong lượt, bạn có thể bỏ 1 lá bài trên tay để rút 1 lá hoặc coi như là sử dụng lại lá cẩm nang gần nhất vừa sử dụng.' },
   HAN_LAM: { id: 'HAN_LAM', name: 'Hán Lâm', type: 'OPTIONAL', description: 'Mỗi khi bạn dùng thành công một lá Bài Cẩm Nang, bạn được xem lá bài trên cùng của xấp bài rút và có quyền chọn để nguyên hay đặt xuống đáy, sau đó rút 1 lá.' },
-  TRAN_NAM: { id: 'TRAN_NAM', name: 'Trấn Nam', type: 'PASSIVE', description: 'Bạn miễn nhiễm hoàn toàn với sát thương từ Cẩm Nang Giặc Tới. Khi bạn dùng Trảm Thường Đen hoặc Vàng, mục tiêu không thể kích hoạt hiệu ứng của Giáp Đồng Sơn Vi.' },
+  TRAN_NAM: { id: 'TRAN_NAM', name: 'Trấn Nam', type: 'PASSIVE', description: 'Bạn dùng Trảm thường Đen hoặc Vàng, mục tiêu không thể Đỡ.' },
   HOA_DAN: { id: 'HOA_DAN', name: 'Hóa Dân', type: 'OPTIONAL', description: 'Cuối lượt của bạn, nếu bạn đang đeo trang bị Áo Giáp, bạn có thể bỏ 1 trang bị bất kỳ để hồi 1 máu.' },
   DA_TRACH: { id: 'DA_TRACH', name: 'Dạ Trạch', type: 'PASSIVE', description: 'Khi bạn không còn lá bài nào trên tay, bạn không thể trở thành mục tiêu của các đòn Trảm. Đầu lượt, nếu trên tay bạn không có bài, bạn được rút thêm 1 lá. Cuối lượt, nếu trên tay bạn có bài, bạn có thể bỏ thêm 1 lá nếu muốn.' },
   NO_DINH: { id: 'NO_DINH', name: 'Nỏ Đỉnh', type: 'PASSIVE', description: 'Đòn Trảm của bạn đánh ra có Tầm đánh không giới hạn khi bạn có số Máu bé hơn hoặc bằng 2.' },

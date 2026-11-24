@@ -1598,17 +1598,11 @@ for (const [subType, name] of [
 }
 
 {
-  // 2. Phạm Tu (#13) - Trấn Nam: Black or Yellow Normal Slash bypasses Giáp Đồng Sơn Vi
+  // 2. Phạm Tu (#13) - Trấn Nam: Black or Yellow Normal Slash cannot be Dodged
   const state = freshState();
   state.players[0].heroId = 13; // Phạm Tu
-  state.players[1].equipments.push({
-    id: "ARMOR_DONG",
-    name: "Giáp Đồng Sơn Vi",
-    subType: CARD_SUBTYPES.ARMOR,
-    category: CARD_CATEGORIES.EQUIPMENT,
-    desc: "test"
-  });
-  // Yellow normal slash bypasses Giáp Đồng Sơn Vi
+  state.players[1].hp = 4;
+  // Yellow normal slash (Club): Unavoidable, cannot be dodged
   put(state, 1, {
     id: "YELLOW_SLASH",
     name: "Trảm Thường",
@@ -1619,19 +1613,13 @@ for (const [subType, name] of [
   });
   const resYellow = handlePlayCard(state, 1, "YELLOW_SLASH", 2);
   assert.equal(resYellow.success, true);
-  assert.equal(state.phase, "AWAIT_SLASH_DEFENSE");
-  assert.equal(state.waitingTargetSeat, 2);
+  assert.equal(state.players[1].hp, 3, "Target takes direct damage because slash cannot be dodged");
+  assert.equal(state.actionHistory.some((a) => a.type === "SLASH_ATTACK_UNAVOIDABLE" && a.skillActivations?.some((s) => s.name === "Trấn Nam")), true);
 
-  // Red normal slash does NOT bypass Giáp Đồng Sơn Vi
+  // Red normal slash (Heart): CAN be dodged -> enters AWAIT_SLASH_DEFENSE
   const stateRed = freshState();
   stateRed.players[0].heroId = 13;
-  stateRed.players[1].equipments.push({
-    id: "ARMOR_DONG_2",
-    name: "Giáp Đồng Sơn Vi",
-    subType: CARD_SUBTYPES.ARMOR,
-    category: CARD_CATEGORIES.EQUIPMENT,
-    desc: "test"
-  });
+  stateRed.players[1].hp = 4;
   put(stateRed, 1, {
     id: "RED_SLASH",
     name: "Trảm Thường",
@@ -1642,7 +1630,8 @@ for (const [subType, name] of [
   });
   const resRed = handlePlayCard(stateRed, 1, "RED_SLASH", 2);
   assert.equal(resRed.success, true);
-  assert.equal(stateRed.phase, "PLAY");
+  assert.equal(stateRed.phase, "AWAIT_SLASH_DEFENSE", "Red normal slash can be dodged");
+  assert.equal(stateRed.waitingTargetSeat, 2);
 }
 
 {

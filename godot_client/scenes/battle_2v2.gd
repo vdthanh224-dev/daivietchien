@@ -5276,14 +5276,16 @@ func _update_action_btn() -> void:
 		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 			var tgt = generals_data[selected_target_seat]
 			if tgt["is_alive"]:
-				var tien_phong_suffix = ""
+				var slash_suffix = ""
 				if _hero_has_skill(p_gen, "tien_phong") and int(p_gen.get("turns_taken", 0)) <= 1:
 					var hand_slashes = _count_hand_slashes()
 					if hand_slashes >= 3:
-						tien_phong_suffix = " (RÚT 1 LÁ)"
+						slash_suffix = " (RÚT 1 LÁ)"
 					else:
-						tien_phong_suffix = " (KHÔNG THỂ NÉ)"
-				card_play_btn.text = "⚔️ %s%s → %s" % [c_name.to_upper(), tien_phong_suffix, tgt["name"]]
+						slash_suffix = " (KHÔNG THỂ NÉ)"
+				elif _hero_has_skill(p_gen, "tran_nam") and c_name == "Trảm" and _get_card_color(c_info.get("suit", "")) in ["BLACK", "YELLOW"]:
+					slash_suffix = " (KHÔNG THỂ ĐỠ)"
+				card_play_btn.text = "⚔️ %s%s → %s" % [c_name.to_upper(), slash_suffix, tgt["name"]]
 				card_play_btn.visible = true
 				return
 		card_play_btn.text = "⚔️ CHỌN MỤC TIÊU..."
@@ -10697,7 +10699,6 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 
 	atk["last_slash_suit"] = slash_card_suit
 	var has_thuan_thien = _has_equipped_weapon_name(atk, "Kiếm Thuận Thiên")
-	var tran_nam_bypass := _hero_has_skill(atk, "tran_nam") and damage_element == "NORMAL" and _get_card_color(slash_card_suit) in ["BLACK", "YELLOW"]
 
 	# Trong chế độ cục bộ (Local): Đếm 40s trên đầu người bị trảm, tạm tắt trên đầu người đánh
 	if not is_network_mode:
@@ -10713,7 +10714,7 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 			desc_text.text = "🛡️ Đang chờ %s quyết định Đỡ hay Chịu đòn..." % tgt["name"]
 
 	# 1. Kiểm tra Giáp Đồng Sơn Vi (chỉ chặn Trảm Thường, bị Kiếm Thuận Thiên xuyên qua)
-	if not tran_nam_bypass and not has_thuan_thien and damage_element == "NORMAL" and "Giáp Đồng" in tgt.get("equipped_armor", ""):
+	if not has_thuan_thien and damage_element == "NORMAL" and "Giáp Đồng" in tgt.get("equipped_armor", ""):
 		_play_armor_effect(target_seat, "Giáp Đồng Sơn Vi")
 		AudioManager.play_voice("Giáp Đồng Sơn Vi")
 		_add_log("🛡️ [Giáp Đồng Sơn Vi] của %s đã vô hiệu hóa hoàn toàn đòn Trảm Thường!" % tgt["name"])
@@ -10727,11 +10728,16 @@ func _handle_slash_attack(attacker_seat: int, target_seat: int, damage_amount: i
 			_restore_turn_timer_to_attacker(attacker_seat, target_seat)
 		return
 
-	# 2. Kỹ năng Bùi Bị (Hero 98 - Dũng Hãn): Nếu Máu mục tiêu > Máu người Trảm thì không thể Đỡ
+	# 2. Đòn Trảm không thể Đỡ:
+	# - Bùi Bị (Hero 98 - Dũng Hãn): Nếu Máu mục tiêu > Máu người Trảm thì không thể Đỡ
+	# - Phạm Tu (Hero 13 - Trấn Nam): Trảm thường Đen hoặc Vàng thì mục tiêu không thể Đỡ
 	var cannot_be_dodged = false
 	if atk.get("hero_id", -1) == 98 and tgt.get("hp", 0) > atk.get("hp", 0):
 		cannot_be_dodged = true
 		_add_log("⚔️ Kỹ năng [Dũng Hãn] của %s: Đòn Trảm không thể bị Đỡ!" % atk["name"])
+	elif _hero_has_skill(atk, "tran_nam") and damage_element == "NORMAL" and _get_card_color(slash_card_suit) in ["BLACK", "YELLOW"]:
+		cannot_be_dodged = true
+		_add_log("⚔️ Kỹ năng [Trấn Nam] của %s: Trảm thường Đen/Vàng không thể bị Đỡ!" % atk["name"])
 
 	if cannot_be_dodged:
 		_animate_showcase_card("Không Thể Đỡ", "Đòn Trảm không thể bị hóa giải!")
