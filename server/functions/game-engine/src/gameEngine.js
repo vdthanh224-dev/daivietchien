@@ -9114,7 +9114,7 @@ function applyPendingJudgement(state) {
   return continueTurnStart(state);
 }
 
-function continueTurnStart(state) {
+export function continueTurnStart(state) {
   const turnStart = state.turnStart;
   if (!turnStart) return { success: true, state };
   turnStart.judgementCards = Array.isArray(turnStart.judgementCards) ? turnStart.judgementCards : [];
@@ -9265,7 +9265,19 @@ function continueTurnStart(state) {
     let extraDraw43to48 = 0;
     if (heroHasSkill(player, "NHIEP_CHINH_Y_LAN")) extraDraw43to48 += 1;
     if (heroHasSkill(player, "CUONG_KY") && getEquippedWeapon(player) && getEquippedArmor(player)) extraDraw43to48 += 1;
-    drawCards(state, player.seat, (firstTienPhongTurn ? drawCount + 2 : drawCount) + extraThaiBinh + extraDraw43to48);
+    let extraLucDich = 0;
+    if (heroHasSkill(player, "LUC_DICH")) {
+      extraLucDich = Math.min(4, Math.max(0, 4 - (player.equipments || []).length));
+      if (extraLucDich > 0) {
+        recordAction(state, {
+          type: "LUC_DICH_DRAW",
+          casterSeat: player.seat,
+          skillActivations: [{ name: "Lực Địch", seat: player.seat }],
+          description: `💪 <b>${player.generalName}</b> kích hoạt [Lực Địch], chưa mang ${extraLucDich} ô Trang bị nên rút thêm ${extraLucDich} lá bài.`
+        });
+      }
+    }
+    drawCards(state, player.seat, (firstTienPhongTurn ? drawCount + 2 : drawCount) + extraThaiBinh + extraDraw43to48 + extraLucDich);
   }
   if (!skipDraw && heroHasSkill(player, "XUNG_VUONG") && mostCards) {
     drawCards(state, player.seat, 1);

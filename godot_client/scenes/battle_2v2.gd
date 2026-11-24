@@ -35,6 +35,7 @@ const HERO_SKILL_ACTIONS := {
 	"DUNG_NUOC_DECLINED": {"name": "Dựng Nước"},
 	"XUNG_DE_TRIGGERED": {"name": "Xưng Đế"},
 	"TUNG_NGHIA_DRAW": {"name": "Tùng Nghĩa"},
+	"LUC_DICH_DRAW": {"name": "Lực Địch"},
 	"TRUNG_KIEN_TRIGGERED": {"name": "Trung Kiên"},
 	"HICH_NGHIA_TRIGGERED": {"name": "Hịch Nghĩa"},
 	"HICH_NGHIA_REVIVE": {"name": "Hịch Nghĩa"},
@@ -10204,7 +10205,7 @@ func _on_network_action_received(delta: Dictionary) -> void:
 				_play_smart_card_rays("Nam Quốc Sơn Hà", c_seat, target_int_seats)
 		_animate_showcase_card("Nam Quốc Sơn Hà", str(delta.get("description", "%s kích hoạt [Nam Quốc Sơn Hà] tăng 1 tầm đánh!" % c_name)))
 		AudioManager.play_skill()
-	elif act_type in ["OAI_NHUOC_DISCARD", "DUNG_NUOC_TRIGGERED", "TUNG_NGHIA_DRAW", "VAN_SACH_TRIGGERED", "HAN_LAM_KEEP", "HAN_LAM_BOTTOM", "TRUNG_KIEN_TRIGGERED"]:
+	elif act_type in ["OAI_NHUOC_DISCARD", "DUNG_NUOC_TRIGGERED", "TUNG_NGHIA_DRAW", "VAN_SACH_TRIGGERED", "HAN_LAM_KEEP", "HAN_LAM_BOTTOM", "TRUNG_KIEN_TRIGGERED", "LUC_DICH_DRAW"]:
 		var skill_effect_names = {
 			"OAI_NHUOC_DISCARD": "Oai Nhược",
 			"DUNG_NUOC_TRIGGERED": "Dựng Nước",
@@ -10212,7 +10213,8 @@ func _on_network_action_received(delta: Dictionary) -> void:
 			"VAN_SACH_TRIGGERED": "Văn Sách",
 			"HAN_LAM_KEEP": "Hán Lâm",
 			"HAN_LAM_BOTTOM": "Hán Lâm",
-			"TRUNG_KIEN_TRIGGERED": "Trung Kiên"
+			"TRUNG_KIEN_TRIGGERED": "Trung Kiên",
+			"LUC_DICH_DRAW": "Lực Địch"
 		}
 		_animate_showcase_card(str(skill_effect_names.get(act_type, "Kỹ năng")), str(delta.get("description", "Kỹ năng được kích hoạt.")))
 	elif act_type in ["DAI_HONG_THUY_HIT", "DAI_HONG_THUY_PASSED", "LIGHTNING_HIT", "LIGHTNING_PASSED", "SUPPLY_SHORTAGE_TRIGGERED", "SUPPLY_SHORTAGE_PASSED", "ACEDIA_TRIGGERED", "ACEDIA_PASSED", "KHIEN_MAY_SUCCESS", "KHIEN_MAY_FAILED", "BAI_COC_BACH_DANG_SAFE", "BAI_COC_BACH_DANG_TRIGGERED"]:
@@ -12646,9 +12648,18 @@ func _start_turn(seat_num: int) -> void:
 				g["avatar_node"].show_skill_banner("THÁI BÌNH", 2.0, true)
 			_add_log("🕊️ %s kích hoạt [Thái Bình], không ai mất từ 2 Máu trở lên nên rút thêm 2 lá và giới hạn giữ bài +2 lượt này." % g["name"])
 
+	var extra_luc_dich := 0
+	if not skip_draw_phase and _hero_has_skill(g, "luc_dich"):
+		var eq_count: int = _get_local_equipment_cards_for_song_cung(g).size()
+		extra_luc_dich = clampi(4 - eq_count, 0, 4)
+		if extra_luc_dich > 0:
+			if g.has("avatar_node") and is_instance_valid(g["avatar_node"]):
+				g["avatar_node"].show_skill_banner("LỰC ĐỊCH", 2.0, true)
+			_add_log("💪 %s kích hoạt [Lực Địch], chưa mang %d ô Trang bị nên rút thêm %d lá bài." % [g["name"], extra_luc_dich, extra_luc_dich])
+
 	if not skip_draw_phase:
 		var base_draw_count := (2 if _is_dynasty_battle() else 1) if is_first_turn else 2
-		var draw_cards_count = base_draw_count + extra_thai_binh
+		var draw_cards_count = base_draw_count + extra_thai_binh + extra_luc_dich
 		for k in range(draw_cards_count):
 			var card_info = _draw_card_from_pile()
 			if g["isPlayer"]:
