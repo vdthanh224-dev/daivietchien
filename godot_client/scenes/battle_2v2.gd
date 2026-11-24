@@ -401,6 +401,7 @@ var is_targeting_van_an: bool = false
 var local_van_an_uses: int = 0
 var is_targeting_dan_cau: bool = false
 var is_targeting_thuy_chien: bool = false
+var is_targeting_coc_ngam: bool = false
 var is_targeting_nghich_y: bool = false
 var selected_nghich_y_card_id: String = ""
 var is_targeting_thien_cam: bool = false
@@ -2815,6 +2816,8 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 		buttons.append({"id": "dan_cau", "text": "🌉 DẪN CẦU", "description": "Mỗi lượt 1 lần: trao 1 lá, ép Trảm mục tiêu chỉ định hoặc cướp 2 lá.", "selected": is_targeting_dan_cau})
 	if seat == my_seat and _hero_has_skill(g, "thuy_chien"):
 		buttons.append({"id": "thuy_chien", "text": "🌊 THỦY CHIẾN", "description": "Dùng bài Trắng hoặc bài Vàng như Bãi Cọc Bạch Đằng.", "selected": is_targeting_thuy_chien})
+	if seat == my_seat and _hero_has_skill(g, "coc_ngam"):
+		buttons.append({"id": "coc_ngam", "text": "🪵 CỌC NGẦM", "description": "Dùng lá bài Đen bất kỳ như Trảm Thủy.", "selected": is_targeting_coc_ngam})
 	if seat == my_seat and _hero_has_skill(g, "trac_lac"):
 		var cur_hp = int(g.get("hp", 4))
 		if cur_hp <= 2:
@@ -2889,6 +2892,8 @@ func _refresh_local_skill_buttons(seat: int) -> void:
 		avatar.set_skill_button_selected("trac_lac", is_using_trac_lac)
 		avatar.set_skill_button_selected("dinh_trieu", is_targeting_dinh_trieu)
 		avatar.set_skill_button_selected("chuyen_che", is_targeting_chuyen_che)
+		avatar.set_skill_button_selected("thuy_chien", is_targeting_thuy_chien)
+		avatar.set_skill_button_selected("coc_ngam", is_targeting_coc_ngam)
 	if avatar.has_method("set_treasure_skill_selected"):
 		avatar.set_treasure_skill_selected(is_targeting_drum_skill or is_targeting_ho_phu_skill)
 	_relayout_hand_cards()
@@ -3084,13 +3089,14 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 		_refresh_local_skill_buttons(s_num)
 		_update_action_btn()
 		return
-	if s_num == my_seat and skill_key in ["van_an", "cai_cach", "dan_cau", "thuy_chien"]:
+	if s_num == my_seat and skill_key in ["van_an", "cai_cach", "dan_cau", "thuy_chien", "coc_ngam"]:
 		if not is_player_turn or current_server_phase != "PLAY":
 			desc_text.text = "⚠️ Kỹ năng này chỉ dùng trong Giai đoạn Ra bài."
 			return
 		is_targeting_van_an = skill_key == "van_an" and not is_targeting_van_an
 		is_targeting_dan_cau = skill_key == "dan_cau" and not is_targeting_dan_cau
 		is_targeting_thuy_chien = skill_key == "thuy_chien" and not is_targeting_thuy_chien
+		is_targeting_coc_ngam = skill_key == "coc_ngam" and not is_targeting_coc_ngam
 		is_targeting_cai_cach = skill_key == "cai_cach" and not is_targeting_cai_cach
 		selected_target_seat = -1
 		dan_cau_forced_target_seat = -1
@@ -3113,9 +3119,12 @@ func _on_general_skill_clicked(s_num: int, skill_key: String = "") -> void:
 		elif is_targeting_thuy_chien:
 			desc_text.text = "🌊 [THỦY CHIẾN] Chọn 1 lá bài Trắng/bài Vàng và mục tiêu."
 			turn_indicator.text = "🌊 THỦY CHIẾN: CHỌN BÀI VÀ MỤC TIÊU"
+		elif is_targeting_coc_ngam:
+			desc_text.text = "🪵 [CỌC NGẦM] Chọn 1 lá bài Đen và mục tiêu trong tầm đánh."
+			turn_indicator.text = "🪵 CỌC NGẦM: CHỌN BÀI ĐEN VÀ MỤC TIÊU"
 		else:
 			_clear_hung_suc_equipped_weapon_previews()
-			desc_text.text = "🔄 Đã hủy chọn [CẢI CÁCH]."
+			desc_text.text = "🔄 Đã hủy chọn kỹ năng."
 		_refresh_local_skill_buttons(s_num)
 		_update_action_btn()
 		return
@@ -3431,6 +3440,7 @@ func _clear_all_skill_targeting() -> void:
 	is_targeting_tay_phu = false
 	is_targeting_dan_cau = false
 	is_targeting_thuy_chien = false
+	is_targeting_coc_ngam = false
 	is_targeting_nghich_y = false
 	selected_nghich_y_card_id = ""
 	is_targeting_chinh_thong = false
@@ -3973,6 +3983,16 @@ func _on_player_hand_card_clicked(card_node: Control, c_info: Dictionary) -> voi
 		card_node.set_selected(true)
 		_update_action_btn()
 		return
+	if is_targeting_coc_ngam:
+		var suit = str(c_info.get("suit", ""))
+		if _get_card_color(suit) != "BLACK":
+			desc_text.text = "⚠️ Cọc Ngầm chỉ dùng lá bài Đen."
+			return
+		if selected_card_ui and is_instance_valid(selected_card_ui): selected_card_ui.set_selected(false)
+		selected_card_ui = card_node
+		card_node.set_selected(true)
+		_update_action_btn()
+		return
 	if is_targeting_nghich_y:
 		if selected_card_ui and is_instance_valid(selected_card_ui): selected_card_ui.set_selected(false)
 		selected_card_ui = card_node
@@ -4460,6 +4480,18 @@ func _on_general_avatar_clicked(seat_num: int) -> void:
 			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
 		selected_target_seat = seat_num
 		g["avatar_node"].set_target_highlight(true)
+		_update_action_btn()
+		return
+
+	if is_targeting_coc_ngam:
+		if seat_num == my_seat:
+			desc_text.text = "⚠️ Không thể nhắm đòn Trảm Thủy vào chính mình."
+			return
+		if selected_target_seat > 0 and generals_data.has(selected_target_seat):
+			generals_data[selected_target_seat]["avatar_node"].set_target_highlight(false)
+		selected_target_seat = seat_num
+		g["avatar_node"].set_target_highlight(true)
+		desc_text.text = "🪵 Đã chọn mục tiêu %s cho Trảm Thủy [Cọc Ngầm]." % g["name"]
 		_update_action_btn()
 		return
 
@@ -5040,6 +5072,27 @@ func _update_action_btn() -> void:
 		card_play_btn.disabled = not thuy_ready
 		card_play_btn.text = "🌊 DÙNG THỦY CHIẾN" if thuy_ready else "🌊 THỦY CHIẾN: CHỌN BÀI VÀ MỤC TIÊU"
 		return
+	if is_targeting_coc_ngam:
+		var coc_card_info := _get_card_info_from_ui(selected_card_ui) if selected_card_ui and is_instance_valid(selected_card_ui) else {}
+		var is_black = not coc_card_info.is_empty() and _get_card_color(str(coc_card_info.get("suit", ""))) == "BLACK"
+		var in_range = false
+		if selected_target_seat > 0:
+			var dist = _calculate_distance(my_seat, selected_target_seat)
+			var atk_range = _get_attack_range(my_seat)
+			in_range = dist <= atk_range
+		var coc_ready := is_black and selected_target_seat > 0 and in_range
+		card_play_btn.visible = true
+		card_play_btn.disabled = not coc_ready
+		if not is_black:
+			card_play_btn.text = "🪵 CỌC NGẦM: CHỌN LÁ BÀI ĐEN"
+		elif selected_target_seat <= 0:
+			card_play_btn.text = "🪵 CỌC NGẦM: CHỌN MỤC TIÊU"
+		elif not in_range:
+			card_play_btn.text = "🪵 CỌC NGẦM: MỤC TIÊU NGOÀI TẦM ĐÁNH"
+		else:
+			var tgt_name = generals_data[selected_target_seat]["name"] if generals_data.has(selected_target_seat) else "Mục tiêu"
+			card_play_btn.text = "🌊 TRẢM THỦY [CỌC NGẦM] → %s" % tgt_name
+		return
 	if is_targeting_nghich_y:
 		var nghich_ready := not selected_nghich_y_card_id.is_empty() and selected_target_seat > 0
 		card_play_btn.visible = true
@@ -5308,6 +5361,7 @@ func _update_action_btn() -> void:
 	elif c_name == "Đỡ":
 		var p_gen = generals_data.get(my_seat, {})
 		var is_tien_thoai_hero = p_gen.get("hero_id", -1) == 47 or _hero_has_skill(p_gen, "tien_thoai")
+		var is_coc_ngam_hero = _hero_has_skill(p_gen, "coc_ngam") and card_is_black
 		if is_tien_thoai_hero:
 			if selected_target_seat > 0 and generals_data.has(selected_target_seat):
 				var tgt = generals_data[selected_target_seat]
@@ -5321,6 +5375,27 @@ func _update_action_btn() -> void:
 			card_play_btn.disabled = true
 			card_play_btn.visible = true
 			desc_text.text = "⚔️ [TIẾN THOÁI] Bạn có thể dùng lá Đỡ này như lá Trảm. Hãy chọn 1 mục tiêu để tấn công!"
+			return
+		elif is_coc_ngam_hero:
+			var max_slashes = _get_max_slashes_allowed(p_gen)
+			var slash_limit_reached: bool = slashes_used_this_turn >= max_slashes
+			if slash_limit_reached:
+				card_play_btn.visible = false
+				card_play_btn.disabled = true
+				desc_text.text = "⚠️ Bạn đã hết lượt Trảm trong lượt này."
+				return
+			if selected_target_seat > 0 and generals_data.has(selected_target_seat):
+				var tgt = generals_data[selected_target_seat]
+				if tgt["is_alive"]:
+					card_play_btn.text = "🌊 TRẢM THỦY [CỌC NGẦM] → %s" % tgt["name"]
+					card_play_btn.disabled = false
+					card_play_btn.visible = true
+					desc_text.text = "🌊 [CỌC NGẦM] Dùng lá Đỡ Đen như Trảm Thủy để tấn công %s!" % tgt["name"]
+					return
+			card_play_btn.text = "🌊 CHỌN MỤC TIÊU ĐỂ TRẢM THỦY [CỌC NGẦM]..."
+			card_play_btn.disabled = true
+			card_play_btn.visible = true
+			desc_text.text = "🌊 [CỌC NGẦM] Bạn có thể dùng lá Đỡ Đen này như Trảm Thủy. Hãy chọn 1 mục tiêu để tấn công!"
 			return
 		elif is_trac_lac_hero and card_is_black:
 			card_play_btn.disabled = false
@@ -5859,6 +5934,22 @@ func _on_card_play_btn_clicked() -> void:
 		NetworkClient.send_use_skill("Thủy Chiến", selected_target_seat, str(_get_card_info_from_ui(selected_card_ui).get("id", "")))
 		is_targeting_thuy_chien = false
 		return
+	if is_targeting_coc_ngam:
+		if selected_card_ui == null or selected_target_seat <= 0:
+			desc_text.text = "⚠️ [CỌC NGẦM] cần chọn 1 lá bài Đen và 1 mục tiêu."
+			return
+		var coc_card_info := _get_card_info_from_ui(selected_card_ui)
+		if _get_card_color(str(coc_card_info.get("suit", ""))) != "BLACK":
+			desc_text.text = "⚠️ [CỌC NGẦM] chỉ dùng được lá bài Đen."
+			return
+		if _calculate_distance(my_seat, selected_target_seat) > _get_attack_range(my_seat):
+			desc_text.text = "⚠️ [CỌC NGẦM] mục tiêu ngoài tầm đánh."
+			return
+		NetworkClient.send_use_skill("Cọc Ngầm", selected_target_seat, str(coc_card_info.get("id", "")))
+		is_targeting_coc_ngam = false
+		_refresh_local_skill_buttons(my_seat)
+		card_play_btn.disabled = true
+		return
 	if is_targeting_van_an or is_targeting_cai_cach:
 		if selected_two_card_skill_nodes.size() != 2:
 			desc_text.text = "⚠️ Cần chọn đúng 2 lá bài."
@@ -6236,7 +6327,8 @@ func _on_card_play_btn_clicked() -> void:
 
 	var p_gen = generals_data[my_seat]
 	var is_tien_thoai_hero = p_gen.get("hero_id", -1) == 47 or _hero_has_skill(p_gen, "tien_thoai")
-	if "Trảm" in c_name or (c_name == "Đỡ" and is_tien_thoai_hero):
+	var is_coc_ngam_hero = _hero_has_skill(p_gen, "coc_ngam") and _get_card_color(c_info.get("suit", "")) == "BLACK"
+	if "Trảm" in c_name or (c_name == "Đỡ" and is_tien_thoai_hero) or (c_name == "Đỡ" and is_coc_ngam_hero):
 		if selected_target_seat <= 0 or not generals_data.has(selected_target_seat):
 			desc_text.text = "⚠️ Vui lòng nhấp chọn 1 Tướng còn sống trên bàn để Trảm!"
 			return
@@ -6302,7 +6394,7 @@ func _on_card_play_btn_clicked() -> void:
 			is_wine_buff_active = false
 		var elem = "NORMAL"
 		if "Hỏa" in c_name or p_gen.get("equipped_weapon", "") == "Hỏa Mai Tây Sơn": elem = "FIRE"
-		elif "Thủy" in c_name or "Lôi" in c_name: elem = "WATER" # Accept old card names.
+		elif "Thủy" in c_name or "Lôi" in c_name or is_coc_ngam_hero: elem = "WATER" # Accept old card names.
 		slashes_used_this_turn += 1
 		var lien_targets: Array = [tgt["seat"]]
 		var lien_cost_id := ""
@@ -11061,7 +11153,11 @@ func _is_card_valid_for_reaction(card_ui: Control, required_type: String, attack
 		if "trảm" in c_name:
 			return true
 		var my_gen = generals_data.get(my_seat, {})
-		return allow_dodge_as_slash and (my_gen.get("hero_id", -1) == 47 or _hero_has_skill(my_gen, "tien_thoai")) and "đỡ" in c_name
+		if allow_dodge_as_slash and (my_gen.get("hero_id", -1) == 47 or _hero_has_skill(my_gen, "tien_thoai")) and "đỡ" in c_name:
+			return true
+		if _hero_has_skill(my_gen, "coc_ngam") and _get_card_color(str(info.get("suit", ""))) == "BLACK":
+			return true
+		return false
 	if required_type in ["Diệu Kế", "Diệu Kế Phá Mưu"]:
 		return "diệu kế" in c_name or c_sub_type == 10
 	if required_type in ["Bỏ bài", "Bài"]:

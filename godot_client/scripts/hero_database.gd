@@ -1395,7 +1395,7 @@ func _add_hero(id: int, name: String, faction: String, hp: int, skill_name: Stri
 	elif id == 22:
 		skills = [
 			{"id": "thuy_chien", "name": "Thủy Chiến", "desc": "Bạn có thể dùng bất kỳ lá bài Trắng hoặc bài Vàng như một lá Bãi Cọc Bạch Đằng; bạn không thể trở thành mục tiêu của Bãi Cọc Bạch Đằng."},
-			{"id": "coc_ngam", "name": "Cọc Ngầm", "desc": "Khi đòn Trảm Thủy của bạn gây sát thương lên mục tiêu đang bị Cẩm Nang Bãi Cọc Bạch Đằng, sát thương đó được tăng thêm +1."}
+			{"id": "coc_ngam", "name": "Cọc Ngầm", "desc": "Bạn có thể dùng lá bài Đen bất kỳ như Trảm Thủy. Khi đòn Trảm Thủy của bạn gây sát thương lên mục tiêu đang bị Cẩm Nang Bãi Cọc Bạch Đằng, sát thương đó được tăng thêm +1."}
 		]
 	elif id == 23:
 		skills = [

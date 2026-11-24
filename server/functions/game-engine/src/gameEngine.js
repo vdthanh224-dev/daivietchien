@@ -893,7 +893,9 @@ export function recordAction(state, action) {
     // Snapshot the real card before later state mutations can change it.
     action.card = cardSummary(actionCard);
     const canonicalCardName = getCardName(action.card);
-    if (canonicalCardName) action.cardName = canonicalCardName;
+    if (canonicalCardName && !action.tienThoaiConvert && !action.cocNgamConvert) {
+      action.cardName = canonicalCardName;
+    }
   }
   state.actionSeq = (state.actionSeq || 0) + 1;
   action.seq = state.actionSeq;
@@ -1327,6 +1329,7 @@ function canUseCardAsSlash(player, card) {
   if (isSlash(card)) return true;
   if (heroHasSkill(player, "TIEN_THOAI") && isDodge(card)) return true;
   if (heroHasSkill(player, "SON_CHIEN") && (card.subType === CARD_SUBTYPES.OFFENSIVE_HORSE || card.subType === CARD_SUBTYPES.DEFENSIVE_HORSE)) return true;
+  if (heroHasSkill(player, "COC_NGAM") && cardColor(card.suit) === "BLACK") return true;
   return false;
 }
 
@@ -1983,7 +1986,7 @@ function startSlashResolution(state, slashCard, casterSeat, targetSeat, options 
   const skillActivations = [];
   if (isThoBinh) skillActivations.push({ name: "Thổ Binh", seat: casterSeat });
   if (heroHasSkill(caster, "XA_THUAN")) skillActivations.push({ name: "Xạ Thuẫn", seat: casterSeat });
-  if (cocNgamBonus) skillActivations.push({ name: "Cọc Ngầm", seat: casterSeat });
+  if (cocNgamBonus || slashCard.cocNgamConvert) skillActivations.push({ name: "Cọc Ngầm", seat: casterSeat });
   if (chienTuongBonus > 0) skillActivations.push({ name: "Chiến Tượng", seat: casterSeat });
   if (requiredDodges > 1) skillActivations.push({ name: "Dũng Nữ", seat: casterSeat });
   if (heroHasSkill(caster, "NO_DINH") && caster.hp <= 2) skillActivations.push({ name: "Nỏ Đỉnh", seat: casterSeat });
@@ -2006,7 +2009,9 @@ function startSlashResolution(state, slashCard, casterSeat, targetSeat, options 
     baiCocJudgeCard: options.baiCocJudgeCard || null,
     description: isTienThoaiSlash
       ? `⚔️ <b>${caster.generalName}</b> kích hoạt [Tiến Thoái], dùng lá Đỡ như Trảm tấn công <b>${target.generalName}</b>!`
-      : (options.description || `🗡️ <b>${caster.generalName}</b> tung chiêu ${formatCardText(slashCard)}${isWine ? " <color=#FFD700><b>(kèm hiệu ứng Hủ Rượu: +1 Sát thương)</b></color>" : ""}${chienTuongBonus ? " <color=#FFD700><b>(Chiến Tượng: +1 Sát thương)</b></color>" : ""} nhắm vào <b>${target.generalName}</b>! (${oaiNhuocRequired ? "[Oai Nhược] mục tiêu chọn bỏ đúng 2 lá, gồm 1 lá Đỡ, hoặc chịu sát thương" : `Mục tiêu có 40s để Đỡ${requiredDodgeText}`})`)
+      : (slashCard.cocNgamConvert
+        ? `🌊 <b>${caster.generalName}</b> kích hoạt [Cọc Ngầm], dùng lá Đen như Trảm Thủy tấn công <b>${target.generalName}</b>!${cocNgamBonus ? " <color=#00BFFF><b>(Cọc Ngầm: +1 Sát thương lên Bãi Cọc)</b></color>" : ""}${isWine ? " <color=#FFD700><b>(kèm hiệu ứng Hủ Rượu: +1 Sát thương)</b></color>" : ""}${chienTuongBonus ? " <color=#FFD700><b>(Chiến Tượng: +1 Sát thương)</b></color>" : ""} (${oaiNhuocRequired ? "[Oai Nhược] mục tiêu chọn bỏ đúng 2 lá, gồm 1 lá Đỡ, hoặc chịu sát thương" : `Mục tiêu có 40s để Đỡ${requiredDodgeText}`})`
+        : (options.description || `🗡️ <b>${caster.generalName}</b> tung chiêu ${formatCardText(slashCard)}${cocNgamBonus ? " <color=#00BFFF><b>(Cọc Ngầm: +1 Sát thương lên Bãi Cọc)</b></color>" : ""}${isWine ? " <color=#FFD700><b>(kèm hiệu ứng Hủ Rượu: +1 Sát thương)</b></color>" : ""}${chienTuongBonus ? " <color=#FFD700><b>(Chiến Tượng: +1 Sát thương)</b></color>" : ""} nhắm vào <b>${target.generalName}</b>! (${oaiNhuocRequired ? "[Oai Nhược] mục tiêu chọn bỏ đúng 2 lá, gồm 1 lá Đỡ, hoặc chịu sát thương" : `Mục tiêu có 40s để Đỡ${requiredDodgeText}`})`))
   });
   return { success: true, state };
 }
@@ -2240,6 +2245,18 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
       }
       if (heroHasSkill(caster, "THAU_THUY") && isSlash(card)) {
           card = { ...card, name: "Trảm Thủy", subType: CARD_SUBTYPES.ATTACK_WATER, element: "WATER" };
+      }
+      if (heroHasSkill(caster, "COC_NGAM") && cardColor(card.suit) === "BLACK") {
+        if (payload?.isWaterSlash || payload?.cocNgamConvert || isSlash(card) || (targetSeat && targetSeat !== casterSeat && (isDodge(card) || payload?.useSkill === "COC_NGAM" || payload?.fromSkill === "Cọc Ngầm"))) {
+          card = {
+            ...card,
+            name: "Trảm Thủy",
+            category: CARD_CATEGORIES.BASIC,
+            subType: CARD_SUBTYPES.ATTACK_WATER,
+            element: "WATER",
+            cocNgamConvert: true
+          };
+        }
       }
   }
   if (payload && card) {
@@ -7788,6 +7805,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       // card for Giặc Tới/Mưa Tên responses.
       responseCard = c;
       const isTienThoai = heroHasSkill(respondent, "TIEN_THOAI") && (isArrow ? isSlash(c) : isDodge(c));
+      const isCocNgam = !isArrow && heroHasSkill(respondent, "COC_NGAM") && cardColor(c.suit) === "BLACK" && !isSlash(c);
       discardCard(state, c);
       satisfied = true;
       if (isTienThoai) {
@@ -7795,6 +7813,8 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
           from: isArrow ? "Trảm" : "Đỡ",
           to: isArrow ? "Đỡ" : "Trảm"
         };
+      } else if (isCocNgam) {
+        state._lastCocNgamAOE = true;
       }
     }
 
@@ -7819,25 +7839,33 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
 
     const tienThoaiAoe = state._lastTienThoaiAOE || null;
     delete state._lastTienThoaiAOE;
+    const isCocNgamAoe = state._lastCocNgamAOE || false;
+    delete state._lastCocNgamAOE;
+    const aoeSkillActivations = [];
+    if (tienThoaiAoe) aoeSkillActivations.push({ name: "Tiến Thoái", seat: respondentSeat });
+    if (isCocNgamAoe) aoeSkillActivations.push({ name: "Cọc Ngầm", seat: respondentSeat });
     recordAction(state, {
       type: satisfied ? "AOE_DEFENDED" : "AOE_HIT",
       casterSeat: respondentSeat,
       targetSeat: respondentSeat,
       cardId: satisfied ? (responseCard?.id || state.discardTop?.id || "") : "",
-      cardName: satisfied ? (isArrow ? "Đỡ" : "Trảm") : "",
+      cardName: satisfied ? (isArrow ? "Đỡ" : (isCocNgamAoe ? "Trảm Thủy" : "Trảm")) : "",
       card: satisfied ? responseCard : null,
-      originalCardName: tienThoaiAoe ? tienThoaiAoe.from : (state.discardTop?.name || ""),
+      originalCardName: tienThoaiAoe ? tienThoaiAoe.from : (isCocNgamAoe ? (responseCard?.name || "") : (state.discardTop?.name || "")),
       tienThoaiConvert: tienThoaiAoe ? { from: tienThoaiAoe.from, to: tienThoaiAoe.to } : null,
-      skillActivations: tienThoaiAoe ? [{ name: "Tiến Thoái", seat: respondentSeat }] : [],
+      cocNgamConvert: isCocNgamAoe ? { from: responseCard?.name, to: "Trảm Thủy" } : null,
+      skillActivations: aoeSkillActivations,
       aoeName,
       armorEffect: aoeDamageResult.armorEffect || "",
       armorChargesRemaining: Number.isFinite(Number(aoeDamageResult.armorChargesRemaining)) ? aoeDamageResult.armorChargesRemaining : -1,
       armorExpired: aoeDamageResult.armorExpired === true,
       description: tienThoaiAoe
         ? `🛡️ <b>${respondent.generalName}</b> kích hoạt [Tiến Thoái], dùng lá ${tienThoaiAoe.from} như ${tienThoaiAoe.to} né đòn diện rộng thành công!`
-        : (satisfied
-          ? `🛡️ ${respondent.generalName} đã né đòn diện rộng thành công!`
-          : `💥 ${respondent.generalName} không ra bài né, bị mất 1 máu (${respondent.hp}/${respondent.maxHp})!`)
+        : (isCocNgamAoe
+          ? `🌊 <b>${respondent.generalName}</b> kích hoạt [Cọc Ngầm], dùng ${formatCardText(responseCard)} như Trảm Thủy né đòn diện rộng thành công!`
+          : (satisfied
+            ? `🛡️ ${respondent.generalName} đã né đòn diện rộng thành công!`
+            : `💥 ${respondent.generalName} không ra bài né, bị mất 1 máu (${respondent.hp}/${respondent.maxHp})!`))
     });
 
     // Chuyển sang nạn nhân kế tiếp nếu còn
@@ -7856,6 +7884,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       {
         const s = respondent.hand.splice(idx, 1)[0];
         const isTienThoai = heroHasSkill(respondent, "TIEN_THOAI") && isDodge(s);
+        const isCocNgam = heroHasSkill(respondent, "COC_NGAM") && cardColor(s.suit) === "BLACK" && !isSlash(s);
         discardCard(state, s);
 
         const required = Math.max(1, Number(state.activeCard?.duelRequiredSlashes) || getDuelRequiredSlashCount(state, respondentSeat));
@@ -7868,10 +7897,11 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
             type: "DUEL_RESPOND_PARTIAL",
             casterSeat: respondentSeat,
             cardId: s.id,
-            cardName: isTienThoai ? "Trảm" : s.name,
-            originalCardName: isTienThoai ? "Đỡ" : "",
+            cardName: isTienThoai ? "Trảm" : (isCocNgam ? "Trảm Thủy" : s.name),
+            originalCardName: isTienThoai ? "Đỡ" : (isCocNgam ? (s.name || "") : ""),
             tienThoaiConvert: isTienThoai ? { from: "Đỡ", to: "Trảm" } : null,
-            skillActivations: isTienThoai ? [{ name: "Tiến Thoái", seat: respondentSeat }] : [],
+            cocNgamConvert: isCocNgam ? { from: s.name, to: "Trảm Thủy" } : null,
+            skillActivations: isTienThoai ? [{ name: "Tiến Thoái", seat: respondentSeat }] : (isCocNgam ? [{ name: "Cọc Ngầm", seat: respondentSeat }] : []),
             description: `🐯 ${respondent.generalName} đã ra ${used}/${required} lá Trảm cần thiết do [Phục Hổ].`
           });
           return { success: true, state };
@@ -7892,13 +7922,16 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
           type: "DUEL_RESPOND",
           casterSeat: respondentSeat,
           cardId: s.id,
-          cardName: isTienThoai ? "Trảm" : (s.name || "Trảm"),
-          originalCardName: isTienThoai ? "Đỡ" : (s.name || ""),
+          cardName: isTienThoai ? "Trảm" : (isCocNgam ? "Trảm Thủy" : (s.name || "Trảm")),
+          originalCardName: isTienThoai ? "Đỡ" : (isCocNgam ? (s.name || "") : (s.name || "")),
           tienThoaiConvert: isTienThoai ? { from: "Đỡ", to: "Trảm" } : null,
-          skillActivations: isTienThoai ? [{ name: "Tiến Thoái", seat: respondentSeat }] : [],
+          cocNgamConvert: isCocNgam ? { from: s.name, to: "Trảm Thủy" } : null,
+          skillActivations: isTienThoai ? [{ name: "Tiến Thoái", seat: respondentSeat }] : (isCocNgam ? [{ name: "Cọc Ngầm", seat: respondentSeat }] : []),
           description: isTienThoai
             ? `⚔️ <b>${respondent.generalName}</b> kích hoạt [Tiến Thoái], dùng ${formatCardText(s)} như Trảm đáp trả trong Huyết Chiến!`
-            : `⚔️ ${respondent.generalName} đáp trả 1 lá ${formatCardText(s)} trong Huyết Chiến!`
+            : (isCocNgam
+              ? `🌊 <b>${respondent.generalName}</b> kích hoạt [Cọc Ngầm], dùng ${formatCardText(s)} như Trảm Thủy đáp trả trong Huyết Chiến!`
+              : `⚔️ ${respondent.generalName} đáp trả 1 lá ${formatCardText(s)} trong Huyết Chiến!`)
         });
         return { success: true, state };
       }
@@ -11244,6 +11277,21 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
     const virtual = { id: `THUY_CHIEN_${seat}_${Date.now()}`, name: "Bãi Cọc Bạch Đằng", suit: source.suit, rank: source.rank, category: CARD_CATEGORIES.DELAYED_SCROLL, subType: CARD_SUBTYPES.BAI_COC_BACH_DANG, attachedBySeat: seat, desc: "Bãi Cọc Bạch Đằng" };
     recordAction(state, { type: "THUY_CHIEN_TRIGGERED", casterSeat: seat, targetSeat: target.seat, skillActivations: [{ name: "Thủy Chiến", seat }], description: `🌊 ${player.generalName} dùng 1 lá ${source.suit} như Bãi Cọc Bạch Đằng lên ${target.generalName}.` });
     return startNullifyChain(state, virtual, seat, target.seat);
+  }
+
+  if (norm.includes("cọc ngầm") || norm.includes("coc ngam")) {
+    if (state.phase !== "PLAY" || state.turnSeat !== seat || !heroHasSkill(player, "COC_NGAM")) {
+      return { error: "Cọc Ngầm chỉ dùng trong Giai đoạn Ra bài của bạn" };
+    }
+    const target = state.players.find((candidate) => candidate.seat === Number(targetSeat));
+    if (!target || !isLivingPlayer(target) || target.seat === seat) {
+      return { error: "Cọc Ngầm cần chọn 1 người chơi khác làm mục tiêu" };
+    }
+    const cardIndex = player.hand.findIndex((card) => card.id === cardId && cardColor(card.suit) === "BLACK");
+    if (cardIndex < 0) {
+      return { error: "Cọc Ngầm cần chọn 1 lá bài Đen trên tay" };
+    }
+    return handlePlayCard(state, seat, cardId, target.seat, { isWaterSlash: true, cocNgamConvert: true });
   }
 
   if (norm.includes("thiên cảm") || norm.includes("thien cam")) {
