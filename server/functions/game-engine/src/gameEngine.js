@@ -241,6 +241,47 @@ function getSeatsAfter(state, currentSeat, includeCurrent = false) {
  * This accepts both current raw snapshots and older sanitized snapshots,
  * including card arrays serialized as either card objects or card IDs.
  */
+function ensureMatchStatsBySeat(state) {
+  if (!state.matchStatsBySeat || typeof state.matchStatsBySeat !== "object") {
+    state.matchStatsBySeat = {};
+  }
+  for (const player of state.players || []) {
+    const key = String(player.seat);
+    const existing = state.matchStatsBySeat[key];
+    if (!existing || typeof existing !== "object") {
+      state.matchStatsBySeat[key] = { damageDealt: 0, cardsPlayed: 0 };
+    } else {
+      state.matchStatsBySeat[key] = {
+        damageDealt: Math.max(0, Number(existing.damageDealt) || 0),
+        cardsPlayed: Math.max(0, Number(existing.cardsPlayed) || 0)
+      };
+    }
+  }
+  return state.matchStatsBySeat;
+}
+
+function recordSeatMatchStat(state, seat, field, amount = 1) {
+  const cleanSeat = Number(seat);
+  const delta = Number(amount) || 0;
+  if (!Number.isInteger(cleanSeat) || cleanSeat <= 0 || delta <= 0) return;
+  const statsBySeat = ensureMatchStatsBySeat(state);
+  const key = String(cleanSeat);
+  if (!statsBySeat[key]) statsBySeat[key] = { damageDealt: 0, cardsPlayed: 0 };
+  statsBySeat[key][field] = Math.max(0, Number(statsBySeat[key][field]) || 0) + delta;
+}
+
+function buildPublicMatchStats(state) {
+  const statsBySeat = ensureMatchStatsBySeat(state);
+  const out = {};
+  for (const [seatKey, val] of Object.entries(statsBySeat)) {
+    out[seatKey] = {
+      damageDealt: Math.max(0, Number(val?.damageDealt) || 0),
+      cardsPlayed: Math.max(0, Number(val?.cardsPlayed) || 0)
+    };
+  }
+  return out;
+}
+
 export function hydrateGameState(rawState, roomId = "") {
   if (!rawState || typeof rawState !== "object") return null;
   const state = rawState;
@@ -311,6 +352,7 @@ export function hydrateGameState(rawState, roomId = "") {
   });
   if (state.players.some((player) => !player)) return null;
 
+  ensureMatchStatsBySeat(state);
   const version = Number(state.version);
   if (!Number.isInteger(version) || version < 1) return null;
   state.version = version;
@@ -697,6 +739,7 @@ export function initGame(roomId, playersInput, modeId = "2v2") {
     discardTop: null,
     deckCount: deck.length,
     discardCount: 0,
+    matchStatsBySeat: ensureMatchStatsBySeat({ players }),
     players,
     _deck: deck, // Bộ bài ẩn trên server
     _discard: discard
@@ -1778,6 +1821,20 @@ function startSlashResolution(state, slashCard, casterSeat, targetSeat, options 
     });
   }
 
+  if (heroHasSkill(caster, "NAM_TAN") && options.discardSlash !== false && !slashCard._namTanEvaluated) {
+    slashCard._namTanEvaluated = true;
+    drawCards(state, casterSeat, 1);
+    recordAction(state, {
+      type: "NAM_TAN_DRAW",
+      casterSeat,
+      targetSeat,
+      cardId: slashCard.id,
+      cardName: slashCard.name,
+      skillActivations: [{ name: "Nam Tấn", seat: casterSeat }],
+      description: `⚔️ ${caster.generalName} kích hoạt [Nam Tấn], khi sử dụng Trảm rút 1 lá bài!`
+    });
+  }
+
   const isCurrentTurnActor = casterSeat === state.turnSeat;
   const isWine = !!caster.isWineBuffActive || (isCurrentTurnActor && state.isWineBuffActive);
   const wineBonus = heroHasSkill(caster, "BAO_NO") ? (caster.wineBonusDamage || (isWine ? 1 : 0)) : (isWine ? 1 : 0);
@@ -2033,6 +2090,7 @@ function resolveBorrowSwordSlash(state, continuation) {
   }
 
   const slashCard = validation.weaponOwner.hand.splice(slashIndex, 1)[0];
+  recordSeatMatchStat(state, weaponOwnerSeat, "cardsPlayed", 1);
   return startSlashResolution(state, slashCard, weaponOwnerSeat, forcedTargetSeat, {
     countsTowardTurnSlashLimit: false,
     resetOnBlock: true,
@@ -2186,7 +2244,7 @@ export function resolveCardInHand(hand, cardIdOrName) {
 /**
  * Xử lý khi một người chơi đánh ra 1 lá bài từ tay
  */
-export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payload = {}) {
+function handlePlayCardInner(state, casterSeat, cardId, targetSeat = 0, payload = {}, playTrack = null) {
   if (state.status === "FINISHED") return { error: "Trận đấu đã kết thúc" };
   casterSeat = Number(casterSeat);
   if (targetSeat !== undefined && targetSeat !== null && targetSeat !== "") {
@@ -2448,6 +2506,7 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
 
   const realCardIdx = caster.hand.findIndex((c) => c.id === selectedCard.id);
   const realCard = caster.hand.splice(realCardIdx >= 0 ? realCardIdx : cardIndex, 1)[0];
+  if (playTrack) playTrack.executed = true;
   const hoPhuTransferIndex = (state.hoPhuTransfers || []).findIndex((transfer) =>
     transfer.recipientSeat === casterSeat && transfer.cardId === realCard.id);
   if (hoPhuTransferIndex >= 0) {
@@ -2631,12 +2690,39 @@ export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payloa
   return startNullifyChain(state, card, casterSeat, targetSeat);
 }
 
+export function handlePlayCard(state, casterSeat, cardId, targetSeat = 0, payload = {}) {
+  const playTrack = { executed: false };
+  const result = handlePlayCardInner(state, casterSeat, cardId, targetSeat, payload, playTrack);
+  if (playTrack.executed && result?.success === true && !result?.error) {
+    recordSeatMatchStat(state, casterSeat, "cardsPlayed", 1);
+  }
+  return result;
+}
+
 /**
  * Khởi động chuỗi hỏi Diệu Kế Phá Mưu (AWAIT_NULLIFY) theo vòng 4 ghế
  */
 export function startNullifyChain(state, card, casterSeat, targetSeat = 0, continuation = null) {
   const caster = state.players.find(x => x.seat === casterSeat);
   const target = state.players.find(x => x.seat === targetSeat);
+  if (!continuation && card && !card._catCuTriggered && [CARD_SUBTYPES.SNATCH, CARD_SUBTYPES.DISMANTLE].includes(card.subType)) {
+    card._catCuTriggered = true;
+    for (const s of getSeatsAfter(state, casterSeat, true)) {
+      const catCuOwner = state.players.find((p) => p.seat === s);
+      if (isLivingPlayer(catCuOwner) && heroHasSkill(catCuOwner, "CAT_CU")) {
+        drawCards(state, catCuOwner.seat, 1);
+        recordAction(state, {
+          type: "CAT_CU_DRAW",
+          casterSeat: catCuOwner.seat,
+          targetSeat: catCuOwner.seat,
+          cardId: card.id,
+          cardName: card.name,
+          skillActivations: [{ name: "Cát Cứ", seat: catCuOwner.seat }],
+          description: `🏯 <b>${catCuOwner.generalName}</b> kích hoạt [Cát Cứ], có người sử dụng [${card.name || "Cẩm Nang"}] nên rút 1 lá!`
+        });
+      }
+    }
+  }
   const firstSeat = Number.isInteger(Number(state.turnSeat)) && Number(state.turnSeat) >= 1
     ? Number(state.turnSeat)
     : casterSeat;
@@ -2949,6 +3035,9 @@ function tryKhienMayDefense(state, targetSeat, sourceDescription) {
 }
 
 function beginSlashAfterDodge(state, caster, targetSeat, defenseName = "Đỡ", defenseSkill = "") {
+  if (defenseName !== "Khiên Mây Bện") {
+    recordSeatMatchStat(state, targetSeat, "cardsPlayed", 1);
+  }
   const target = state.players.find((player) => player.seat === targetSeat);
   const activeCard = state.activeCard || {};
   const defenseCard = state.discardTop;
@@ -3197,17 +3286,6 @@ function startTargetCardSelection(state, card, casterSeat, targetSeat, selection
     : [CARD_SUBTYPES.SNATCH, CARD_SUBTYPES.DISMANTLE].includes(card.subType);
   const caster = state.players.find((player) => player.seat === casterSeat);
   const target = state.players.find((player) => player.seat === targetSeat);
-  if (target && heroHasSkill(target, "CAT_CU") && [CARD_SUBTYPES.SNATCH, CARD_SUBTYPES.DISMANTLE].includes(card.subType)) {
-    drawCards(state, target.seat, 1);
-    recordAction(state, {
-      type: "CAT_CU_DRAW",
-      casterSeat,
-      targetSeat: target.seat,
-      skillActivations: [{ name: "Cát Cứ", seat: target.seat }],
-      description: `🏯 ${target.generalName} kích hoạt [Cát Cứ], bị chọn bởi ${card.name} nên rút 1 lá.`
-    });
-  }
-  // Build choices after Cát Cứ so its newly drawn card is available.
   const options = buildTargetCardOptions(state, targetSeat, allowDelayed, includeHand, selectionOptions.handEquipmentOnly === true);
   if (options.length === 0) {
     resetTargetCardSelection(state);
@@ -3876,6 +3954,18 @@ function completeTargetCardSelection(state, chooserSeat, targetCardId) {
   }
   if (selection.effectType === "TAU_VI") {
     drawCards(state, chooserSeat, 2);
+  }
+  if (selection.effectType === "BINH_SAN") {
+    drawCards(state, chooserSeat, 1);
+    recordAction(state, {
+      type: "BINH_SAN_DRAW",
+      casterSeat: chooserSeat,
+      targetSeat: target.seat,
+      cardId: selection.cardId,
+      cardName: selection.cardName,
+      skillActivations: [{ name: "Bình Sạn", seat: chooserSeat }],
+      description: `🪨 <b>${caster?.generalName || "Người chơi"}</b> kích hoạt [Bình Sạn], sau đó rút 1 lá bài!`
+    });
   }
   if (selection.effectType === "PHU_DE") {
     drawCards(state, chooserSeat, 1);
@@ -4681,16 +4771,6 @@ function continueSlashDamageAfterUatKhi(state, targetSeat, finalDamage, fallback
   const casterSeat = fallbackCasterSeat ?? activeCard.casterSeat ?? state.turnSeat;
   const caster = state.players.find((player) => player.seat === Number(casterSeat));
   const target = state.players.find((player) => player.seat === Number(targetSeat));
-  if (finalDamage > 0 && heroHasSkill(caster, "NAM_TAN")) {
-    drawCards(state, caster.seat, 1);
-    recordAction(state, {
-      type: "NAM_TAN_DRAW",
-      casterSeat: caster.seat,
-      targetSeat,
-      skillActivations: [{ name: "Nam Tấn", seat: caster.seat }],
-      description: `⚔️ ${caster.generalName} kích hoạt [Nam Tấn], Trảm gây sát thương nên rút 1 lá.`
-    });
-  }
   const liemDao = firstEquipmentHook(caster, 'slashHitDrawOnce', { targetSeat })?.card;
   if (finalDamage > 0 && activeCard.liemDaoEligible && liemDao && !caster.usedSkills?.LiemDao) {
     if (!caster.usedSkills) caster.usedSkills = {};
@@ -5679,6 +5759,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       );
       if (!slash) return { error: "Dẫn Cầu cần đánh một lá Trảm hợp lệ" };
       respondent.hand = respondent.hand.filter((card) => card.id !== slash.id);
+      recordSeatMatchStat(state, respondentSeat, "cardsPlayed", 1);
       recordAction(state, {
         type: "DAN_CAU_SLASH_CONFIRMED",
         casterSeat: respondentSeat,
@@ -7003,6 +7084,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
           nullifyRound: (Number(state.activeCard?.nullifyRound) || 0) + 1,
           nullifyBySeat: respondentSeat
         };
+        recordSeatMatchStat(state, respondentSeat, "cardsPlayed", 1);
 
         if (newQuerySeats.length > 0) {
             chain.querySeats = newQuerySeats;
@@ -7808,6 +7890,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       const isCocNgam = !isArrow && heroHasSkill(respondent, "COC_NGAM") && cardColor(c.suit) === "BLACK" && !isSlash(c);
       discardCard(state, c);
       satisfied = true;
+      recordSeatMatchStat(state, respondentSeat, "cardsPlayed", 1);
       if (isTienThoai) {
         state._lastTienThoaiAOE = {
           from: isArrow ? "Trảm" : "Đỡ",
@@ -7886,6 +7969,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
         const isTienThoai = heroHasSkill(respondent, "TIEN_THOAI") && isDodge(s);
         const isCocNgam = heroHasSkill(respondent, "COC_NGAM") && cardColor(s.suit) === "BLACK" && !isSlash(s);
         discardCard(state, s);
+        recordSeatMatchStat(state, respondentSeat, "cardsPlayed", 1);
 
         const required = Math.max(1, Number(state.activeCard?.duelRequiredSlashes) || getDuelRequiredSlashCount(state, respondentSeat));
         const used = Math.max(0, Number(state.activeCard?.duelSlashesUsed) || 0) + 1;
@@ -8037,6 +8121,7 @@ export function handleRespondAction(state, respondentSeat, accepted, cardId, tar
       if (idx < 0) return { error: "Lá cứu không còn hợp lệ" };
       const rescueCard = respondent.hand.splice(idx, 1)[0];
       discardCard(state, rescueCard);
+      recordSeatMatchStat(state, respondentSeat, "cardsPlayed", 1);
       const isTracLacUsed = canTracLacWine && isBlackCardSuit(rescueCard.suit) && !isWine(rescueCard);
 
       const beforeHp = victim.hp;
@@ -8411,6 +8496,9 @@ export function applyDamageToPlayer(state, targetSeat, damage, sourceDescription
   if (finalDamage > 0) {
     target.damageReceivedThisTurn = true;
     state.anyDamageReceivedThisTurn = true;
+    if (attackerSeat > 0 && attackerSeat !== targetSeat) {
+      recordSeatMatchStat(state, attackerSeat, "damageDealt", finalDamage);
+    }
   }
   if (finalDamage > 0 && !options.skipTurnDamageCredit && attackerSeat === state.turnSeat && attackerSeat !== targetSeat) {
     state.turnDamageDealt = true;
@@ -9504,6 +9592,7 @@ function finishMatch(state, winningRole, winningTeamId, winnerLabel, winningSeat
   state.result = {
     matchId: state.matchId || state.roomId,
     winningRole, winningTeamId, winnerLabel, winningSeats,
+    statsBySeat: buildPublicMatchStats(state),
     finishedAt: Date.now(),
   };
   state.waitingTargetSeat = 0;
@@ -9520,7 +9609,16 @@ export function getMatchResult(state, requestingSeat) {
   const player = state.players.find((p) => p.seat === Number(requestingSeat));
   if (!player) return null;
   const isWinner = state.result.winningSeats.includes(player.seat);
-  return { ...state.result, isWinner, silver: isWinner ? 150 : 75, exp: isWinner ? 20 : 12 };
+  const isPractice = String(state.modeId || "") === "practice_2v2";
+  const silver = isPractice ? (isWinner ? 30 : 15) : (isWinner ? 150 : 75);
+  const exp = isPractice ? (isWinner ? 10 : 5) : (isWinner ? 20 : 12);
+  return {
+    ...state.result,
+    statsBySeat: buildPublicMatchStats(state),
+    isWinner,
+    silver,
+    exp,
+  };
 }
 
 function checkGameOver(state) {
@@ -10695,6 +10793,7 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
             : null
         }
       : null,
+    matchStatsBySeat: buildPublicMatchStats(state),
     lastAction: sanitizeActionForClient(state.lastAction, viewerSeat),
     // Keep the recent log bounded so a long match cannot exceed the client's
     // WebSocket packet limit. The authoritative server history stays intact.
@@ -11244,6 +11343,9 @@ export function handleUseSkill(state, seat, skillId, targetSeat = 0, cardId = nu
     const handIndex = player.hand.findIndex((card) => card.id === cardId && card.category === CARD_CATEGORIES.EQUIPMENT);
     const equipIndex = player.equipments.findIndex((card) => card.id === cardId);
     if (handIndex < 0 && equipIndex < 0) return { error: "Bình Sạn cần bỏ 1 lá trang bị" };
+    if ((target.hand || []).length === 0 && (target.equipments || []).length === 0 && (target.judgements || []).length === 0) {
+      return { error: "Mục tiêu không có bài trong vùng chơi để Bình Sạn" };
+    }
     const cost = handIndex >= 0 ? player.hand.splice(handIndex, 1)[0] : player.equipments.splice(equipIndex, 1)[0];
     discardCard(state, cost);
     return startTargetCardSelection(state, { id: `BINH_SAN_${seat}_${Date.now()}`, name: "Bình Sạn", subType: CARD_SUBTYPES.DISMANTLE }, seat, target.seat, { allowDelayed: true, includeHand: true, operation: "DESTROY", effectType: "BINH_SAN" });

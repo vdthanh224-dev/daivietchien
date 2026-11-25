@@ -42,6 +42,7 @@ var room_id: String = ""
 var my_seat: int = 1
 var seat_is_explicit: bool = false
 var active_mode_id: String = "2v2"
+var pending_offline_practice: bool = false
 var last_state: Dictionary = {}
 var last_heartbeat_time: float = 0.0
 var last_processed_action_seq: int = -1
@@ -172,8 +173,8 @@ func connect_to_server(url: String = "") -> void:
 	if is_connected_to_server:
 		return
 	if is_connecting():
-		# Nếu đã kết nối đang diễn ra nhưng bị treo quá 5s, buộc reset và kết nối lại
-		if candidate_timer > 5.0:
+		# Render cold starts routinely take 15-28s; avoid resetting prematurely at 5s.
+		if candidate_timer > 25.0:
 			if socket:
 				socket.close()
 			is_scanning_candidates = false

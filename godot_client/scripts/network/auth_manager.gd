@@ -1748,12 +1748,16 @@ func claim_match_reward(result: Dictionary, mode_id: String, stake_recorded: boo
 	if match_id.is_empty() or claimed_match_rewards.has(match_id):
 		return false
 	var is_win := bool(result.get("isWinner", false))
+	var is_practice := (mode_id == "practice_2v2")
 	claimed_match_rewards[match_id] = true
-	current_silver += 150 if is_win else 75
-	if is_win:
-		current_wins += 1
-	else:
-		current_losses += 1
+	var silver_gain := (30 if is_win else 15) if is_practice else int(result.get("silver", 150 if is_win else 75))
+	var exp_gain := (10 if is_win else 5) if is_practice else int(result.get("exp", 20 if is_win else 12))
+	current_silver += silver_gain
+	if not is_practice:
+		if is_win:
+			current_wins += 1
+		else:
+			current_losses += 1
 	if mode_id == "2v2":
 		var rank_result = RankSystem.process_match_result_for_match(is_win, current_2v2_rank_index, current_2v2_stars,
 			current_2v2_accumulation_points, stake_recorded, stake_amount)
@@ -1764,10 +1768,10 @@ func claim_match_reward(result: Dictionary, mode_id: String, stake_recorded: boo
 		current_2v2_entry_stake_amount = 0
 	if DailyQuestSystem:
 		DailyQuestSystem.record_progress("battle", 1)
-		if is_win:
+		if is_win and not is_practice:
 			DailyQuestSystem.record_progress("win", 1)
 	# add_exp saves the complete updated profile and the claim marker together.
-	add_exp(20 if is_win else 12)
+	add_exp(exp_gain)
 	save_profile_to_appwrite(Callable(), true)
 	sync_leaderboard_entry(Callable(), true)
 	return true

@@ -1058,40 +1058,40 @@ func _init_equipment_slots() -> void:
 		equip_container.move_child(defensive_mount_slot.get_parent(), 2)
 		equip_container.move_child(treasure_slot, 3)
 
-	_style_equip_slot(weapon_slot, Color(0.95, 0.40, 0.30, 0.85), Color(0.18, 0.05, 0.05, 0.78))
-	_style_equip_slot(armor_slot, Color(0.35, 0.72, 0.95, 0.85), Color(0.04, 0.12, 0.22, 0.78))
-	_style_equip_slot(defensive_mount_slot, Color(0.30, 0.85, 0.50, 0.85), Color(0.04, 0.18, 0.10, 0.78))
-	_style_equip_slot(offensive_mount_slot, Color(0.95, 0.75, 0.25, 0.85), Color(0.20, 0.15, 0.04, 0.78))
-	_style_equip_slot(treasure_slot, Color(0.95, 0.85, 0.35, 0.90), Color(0.20, 0.16, 0.04, 0.78))
+	_style_equip_slot(weapon_slot, Color(0.95, 0.40, 0.30, 0.90), Color(0.14, 0.04, 0.05, 0.88))
+	_style_equip_slot(armor_slot, Color(0.35, 0.72, 0.95, 0.90), Color(0.04, 0.11, 0.20, 0.88))
+	_style_equip_slot(defensive_mount_slot, Color(0.30, 0.85, 0.50, 0.90), Color(0.04, 0.16, 0.09, 0.88))
+	_style_equip_slot(offensive_mount_slot, Color(0.95, 0.75, 0.25, 0.90), Color(0.18, 0.13, 0.04, 0.88))
+	_style_equip_slot(treasure_slot, Color(0.95, 0.85, 0.35, 0.92), Color(0.18, 0.14, 0.04, 0.88))
 
 	if is_instance_valid(weapon_slot):
 		weapon_slot.visible = (equipped_items.get("weapon", "") != "")
 		if is_instance_valid(weapon_label):
-			weapon_label.add_theme_font_size_override("font_size", 11)
+			weapon_label.add_theme_font_size_override("font_size", 10)
 			weapon_label.text = ""
 			weapon_label.modulate.a = 1.0
 	if is_instance_valid(armor_slot):
 		armor_slot.visible = (equipped_items.get("armor", "") != "")
 		if is_instance_valid(armor_label):
-			armor_label.add_theme_font_size_override("font_size", 11)
+			armor_label.add_theme_font_size_override("font_size", 10)
 			armor_label.text = ""
 			armor_label.modulate.a = 1.0
 	if is_instance_valid(defensive_mount_slot):
 		defensive_mount_slot.visible = defensive_mount_equipped
 		if is_instance_valid(defensive_mount_label):
-			defensive_mount_label.add_theme_font_size_override("font_size", 11)
+			defensive_mount_label.add_theme_font_size_override("font_size", 10)
 			defensive_mount_label.text = ""
 			defensive_mount_label.modulate.a = 1.0
 	if is_instance_valid(offensive_mount_slot):
 		offensive_mount_slot.visible = offensive_mount_equipped
 		if is_instance_valid(offensive_mount_label):
-			offensive_mount_label.add_theme_font_size_override("font_size", 11)
+			offensive_mount_label.add_theme_font_size_override("font_size", 10)
 			offensive_mount_label.text = ""
 			offensive_mount_label.modulate.a = 1.0
 	if is_instance_valid(treasure_slot):
 		treasure_slot.visible = (equipped_items.get("treasure", "") != "")
 		if is_instance_valid(treasure_label):
-			treasure_label.add_theme_font_size_override("font_size", 11)
+			treasure_label.add_theme_font_size_override("font_size", 10)
 			treasure_label.text = ""
 			treasure_label.modulate.a = 1.0
 	_refresh_mount_slots_visibility()
@@ -1913,11 +1913,50 @@ func setup_general(p_id: String, p_name: String, p_faction: String = "Trần", p
 
 const LOTUS_FULL_TEX = preload("res://assets/ui/lotus_full.png")
 const LOTUS_EMPTY_TEX = preload("res://assets/ui/lotus_empty.png")
+var hp_numeric_label: Label = null
+
+func _ensure_hp_numeric_label() -> Label:
+	if is_instance_valid(hp_numeric_label):
+		return hp_numeric_label
+	var pill := PanelContainer.new()
+	pill.name = "HPNumericPill"
+	pill.z_index = 42
+	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pill.position = Vector2(0, 28)
+	pill.custom_minimum_size = Vector2(24, 15)
+	pill.size = Vector2(24, 15)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.04, 0.06, 0.11, 0.88)
+	sb.border_color = Color(0.68, 0.54, 0.24, 0.72)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(3)
+	sb.content_margin_left = 1
+	sb.content_margin_right = 1
+	pill.add_theme_stylebox_override("panel", sb)
+	hp_numeric_label = Label.new()
+	hp_numeric_label.name = "HPNumericLabel"
+	hp_numeric_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hp_numeric_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hp_numeric_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hp_numeric_label.add_theme_font_size_override("font_size", 9)
+	hp_numeric_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
+	hp_numeric_label.add_theme_constant_override("outline_size", 2)
+	pill.add_child(hp_numeric_label)
+	add_child(pill)
+	return hp_numeric_label
 
 func update_hp(p_hp: int, p_max_hp: int, is_initial: bool = false) -> void:
 	var old_hp = current_hp
 	current_hp = clamp(p_hp, 0, p_max_hp)
 	max_hp = p_max_hp
+	var hp_lbl := _ensure_hp_numeric_label()
+	hp_lbl.text = "%d/%d" % [current_hp, max_hp]
+	if current_hp <= 1:
+		hp_lbl.add_theme_color_override("font_color", Color(1.0, 0.42, 0.42, 1.0))
+	elif current_hp * 2 <= max_hp:
+		hp_lbl.add_theme_color_override("font_color", Color(1.0, 0.82, 0.35, 1.0))
+	else:
+		hp_lbl.add_theme_color_override("font_color", Color(0.55, 0.98, 0.68, 1.0))
 	# A revived general must immediately leave the near-death pulse, regardless of
 	# whether the heal came from a local rescue or a synchronized server update.
 	if current_hp > 0 and (near_death_tween or (near_death_halo and near_death_halo.visible)):

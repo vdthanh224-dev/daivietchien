@@ -59,8 +59,13 @@ var inspect_sub_lbl: Label
 var inspect_avatar_rect: TextureRect
 var inspect_lotus_container: HBoxContainer
 var inspect_skill_title_lbl: Label
-var inspect_skill_desc_lbl: Label
+var inspect_skill_desc_lbl: RichTextLabel
 var lock_in_btn: Button
+var draft_filter_faction: String = "Tất cả"
+var draft_search_query: String = ""
+var draft_faction_buttons: Dictionary = {}
+var draft_pool_title_lbl: Label = null
+var draft_exit_confirm_modal: Control = null
 var lock_in_btn_lbl: Label
 var role_info_lbl: Label
 var dynasty_role_description: RichTextLabel
@@ -131,11 +136,13 @@ func _ready() -> void:
 		available_heroes = dynasty_pool.slice(0, mini(8, dynasty_pool.size()))
 
 	_build_ui()
-	# Chỉ người đang tới lượt mới được thấy bể tướng; các ghế còn lại chỉ chờ.
+	# Người chơi chưa tới lượt vẫn xem được bể tướng ở chế độ xem trước (không khóa được).
 	var initial_seat = NetworkClient.my_seat if NetworkClient and NetworkClient.my_seat >= 1 else 1
 	if current_mode_id == "2v2" and initial_seat != 1:
-		_rebuild_hero_grid([])
-		draft_status_lbl.text = "Đang chờ người chơi 1 chọn."
+		if hero_wait_lbl and is_instance_valid(hero_wait_lbl):
+			hero_wait_lbl.text = "⏳ Đang chờ Người chơi 1 chọn — Bạn có thể xem trước & lọc tướng bên dưới"
+			hero_wait_lbl.visible = true
+		draft_status_lbl.text = "⏳ Đang chờ người chơi 1 chọn..."
 		draft_status_lbl.add_theme_color_override("font_color", COLOR_DRAGON_CYAN)
 
 	if not available_heroes.is_empty():
@@ -143,18 +150,19 @@ func _ready() -> void:
 
 	_connect_network_draft()
 
-	# Kiểm tra kết nối máy chủ WebSocket Render Cloud
-	if NetworkClient:
-		# A scene transition can land while the autoload is between reconnect
-		# attempts. Start the cloud connection here instead of failing before
-		# NetworkClient's next heartbeat gets a chance to run.
+	# Kiểm tra kết nối máy chủ WebSocket Render Cloud (chịu cold-start tới 32s)
+	if "--screenshot-hero-select" in args:
+		is_network_mode = false
+	elif NetworkClient:
 		if not NetworkClient.is_connected_to_server:
 			if not NetworkClient.is_connecting():
 				NetworkClient.connect_to_server()
 			var wait_t := 0.0
-			while wait_t < 15.0 and not NetworkClient.is_connected_to_server:
-				await get_tree().create_timer(0.1).timeout
-				wait_t += 0.1
+			while wait_t < 32.0 and not NetworkClient.is_connected_to_server:
+				if wait_t >= 2.0 and draft_status_lbl and is_instance_valid(draft_status_lbl):
+					draft_status_lbl.text = "🌐 Đang kết nối máy chủ (%ds)..." % int(ceil(32.0 - wait_t))
+				await get_tree().create_timer(0.2).timeout
+				wait_t += 0.2
 				if not NetworkClient.is_connecting() and not NetworkClient.is_connected_to_server:
 					NetworkClient.connect_to_server()
 		is_network_mode = NetworkClient.is_connected_to_server
@@ -383,10 +391,59 @@ func _setup_local_disjoint_hero_pools(round_num: int) -> void:
 			draft_slots[admin_slot_idx]["candidateHeroes"] = admin_pool
 			draft_slots[admin_slot_idx]["candidateHeroIds"] = admin_ids
 
+func _get_preview_pool() -> Array[Dictionary]:
+	var is_user_admin := AuthManager != null and AuthManager.is_admin()
+	if not full_available_heroes_pool.is_empty():
+		var res: Array[Dictionary] = []
+		for h in full_available_heroes_pool:
+			var hid := int(h.get("id", 0))
+			if hid >= 1 and (is_user_admin or hid <= 50) and not selected_hero_ids.has(hid):
+				res.append(h)
+		if not res.is_empty():
+			return res
+	return available_heroes.duplicate()
+
+func _hero_matches_draft_filter(hero: Dictionary) -> bool:
+	if draft_filter_faction != "Tất cả":
+		var fac := str(hero.get("faction", "")).strip_edges()
+		if fac != draft_filter_faction:
+			return false
+	var q := draft_search_query.strip_edges().to_lower()
+	if not q.is_empty():
+		var hid := int(hero.get("id", 0))
+		var hname := str(hero.get("name", "")).to_lower()
+		var fac_l := str(hero.get("faction", "")).to_lower()
+		var sname := HeroDatabase.get_skill_summary(hid).to_lower() if HeroDatabase else ""
+		var sdesc := HeroDatabase.get_skill_details(hid).to_lower() if HeroDatabase else ""
+		if not (q in hname or q in fac_l or q in sname or q in sdesc):
+			return false
+	return true
+
+func _apply_hero_grid_filters() -> void:
+	for hid_key in hero_card_nodes.keys():
+		var card := hero_card_nodes[hid_key] as Control
+		if not is_instance_valid(card):
+			continue
+		var hid_val := int(hid_key)
+		if hid_val in selected_hero_ids and (not is_player_locked or available_heroes.size() > 1):
+			card.visible = false
+			card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			continue
+		var hero_dict: Dictionary = {}
+		for h in available_heroes:
+			if int(h.get("id", 0)) == hid_val:
+				hero_dict = h
+				break
+		var matched := hero_dict.is_empty() or _hero_matches_draft_filter(hero_dict)
+		card.visible = matched
+		card.mouse_filter = Control.MOUSE_FILTER_STOP if matched else Control.MOUSE_FILTER_IGNORE
+
 func _rebuild_hero_grid(heroes_to_show: Array[Dictionary]) -> void:
 	available_heroes = heroes_to_show
+	if draft_pool_title_lbl and is_instance_valid(draft_pool_title_lbl):
+		draft_pool_title_lbl.text = "🎴 DANH TƯỚNG KHẢ DỤNG (%d TƯỚNG) • Chạm thẻ để xem tuyệt kỹ:" % heroes_to_show.size()
 	if hero_wait_lbl and is_instance_valid(hero_wait_lbl):
-		hero_wait_lbl.visible = heroes_to_show.is_empty()
+		hero_wait_lbl.visible = (not _is_my_turn() and not is_player_locked and current_mode_id == "2v2") or heroes_to_show.is_empty()
 	if hero_grid_scroll and is_instance_valid(hero_grid_scroll):
 		hero_grid_scroll.visible = not heroes_to_show.is_empty()
 	if not is_instance_valid(hero_grid_scroll): return
@@ -399,11 +456,7 @@ func _rebuild_hero_grid(heroes_to_show: Array[Dictionary]) -> void:
 		var card = _create_hero_grid_card(hero)
 		grid.add_child(card)
 		hero_card_nodes[hero["id"]] = card
-		var hid_val := int(hero.get("id", 0))
-		if hid_val in selected_hero_ids:
-			if not is_player_locked or heroes_to_show.size() > 1:
-				card.visible = false
-				card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_apply_hero_grid_filters()
 
 	# Nếu người chơi đã khóa tướng, ưu tiên hiển thị và soi chính tướng đã chọn của mình
 	if is_player_locked:
@@ -706,11 +759,16 @@ func _build_header() -> void:
 	turn_timer_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 	tb_hbox.add_child(turn_timer_lbl)
 
-	# Nút Rời Phòng / Hủy
+	var exit_spacer := Control.new()
+	exit_spacer.custom_minimum_size = Vector2(14, 0)
+	hbox.add_child(exit_spacer)
+
+	# Nút Rời Phòng / Hủy (tách khỏi đồng hồ + xác nhận trước khi thoát)
 	var exit_btn = Button.new()
-	exit_btn.custom_minimum_size = Vector2(36, 36)
-	exit_btn.text = "✕"
+	exit_btn.custom_minimum_size = Vector2(46, 36)
+	exit_btn.text = "✕ Rời"
 	exit_btn.tooltip_text = "Rời phòng chọn tướng"
+	exit_btn.add_theme_font_size_override("font_size", 11)
 	_style_cancel_small_btn(exit_btn)
 	exit_btn.pressed.connect(_on_exit_pressed)
 	hbox.add_child(exit_btn)
@@ -858,23 +916,71 @@ func _build_center_grid_column() -> Control:
 		col.add_child(dynasty_phase_label)
 
 	var count_str = str(available_heroes.size())
-	var title = Label.new()
-	title.text = "🎴 DANH TƯỚNG KHẢ DỤNG (%s TƯỚNG SỞ HỮU & FREE TUẦN) • Chạm thẻ để xem tuyệt kỹ:" % count_str
-	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	title.add_theme_font_size_override("font_size", 13)
-	title.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0, 0.95))
-	col.add_child(title)
+	draft_pool_title_lbl = Label.new()
+	draft_pool_title_lbl.text = "🎴 DANH TƯỚNG KHẢ DỤNG (%s TƯỚNG) • Chạm thẻ để xem tuyệt kỹ:" % count_str
+	draft_pool_title_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	draft_pool_title_lbl.add_theme_font_size_override("font_size", 13)
+	draft_pool_title_lbl.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0, 0.95))
+	col.add_child(draft_pool_title_lbl)
 
 	hero_wait_lbl = Label.new()
-	hero_wait_lbl.text = "ĐANG CHỜ NGƯỜI CHƠI 1 CHỌN"
-	hero_wait_lbl.add_theme_font_size_override("font_size", 30)
+	hero_wait_lbl.text = "⏳ Đang chờ Người chơi 1 chọn — Bạn có thể xem trước danh sách bên dưới"
+	hero_wait_lbl.add_theme_font_size_override("font_size", 12)
 	hero_wait_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
 	hero_wait_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hero_wait_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	hero_wait_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hero_wait_lbl.custom_minimum_size = Vector2(0, 220)
+	hero_wait_lbl.custom_minimum_size = Vector2(0, 28)
 	hero_wait_lbl.visible = available_heroes.is_empty()
 	col.add_child(hero_wait_lbl)
+
+	# Thanh tìm kiếm & lọc Thế lực nhanh (Hồng Bàng / Thăng Long / Đông A)
+	var filter_row := HBoxContainer.new()
+	filter_row.add_theme_constant_override("separation", 6)
+	col.add_child(filter_row)
+
+	var search_edit := LineEdit.new()
+	search_edit.placeholder_text = "🔍 Tìm tên tướng / kỹ năng..."
+	search_edit.clear_button_enabled = true
+	search_edit.size_flags_horizontal = SIZE_EXPAND_FILL
+	search_edit.custom_minimum_size = Vector2(150, 28)
+	search_edit.add_theme_font_size_override("font_size", 11)
+	search_edit.text_changed.connect(func(q: String):
+		draft_search_query = q
+		_apply_hero_grid_filters()
+	)
+	filter_row.add_child(search_edit)
+
+	draft_faction_buttons.clear()
+	for fac_name in ["Tất cả", "Hồng Bàng", "Thăng Long", "Đông A"]:
+		var fbtn := Button.new()
+		fbtn.text = fac_name
+		fbtn.custom_minimum_size = Vector2(68, 28)
+		fbtn.focus_mode = Control.FOCUS_NONE
+		fbtn.add_theme_font_size_override("font_size", 11)
+		var f_str: String = fac_name
+		var _apply_pill_style := func(b: Button, active: bool) -> void:
+			var sb := StyleBoxFlat.new()
+			sb.bg_color = Color(0.18, 0.34, 0.52, 0.96) if active else Color(0.08, 0.11, 0.18, 0.88)
+			sb.border_color = COLOR_GOLD_ACCENT if active else Color(0.32, 0.42, 0.58, 0.65)
+			sb.set_border_width_all(1)
+			sb.set_corner_radius_all(6)
+			sb.content_margin_left = 8
+			sb.content_margin_right = 8
+			b.add_theme_stylebox_override("normal", sb)
+			b.add_theme_stylebox_override("hover", sb)
+			b.add_theme_stylebox_override("pressed", sb)
+			b.add_theme_color_override("font_color", COLOR_GOLD_ACCENT if active else Color(0.84, 0.90, 0.98, 1.0))
+		_apply_pill_style.call(fbtn, fac_name == draft_filter_faction)
+		fbtn.pressed.connect(func():
+			AudioManager.play_card_select()
+			draft_filter_faction = f_str
+			for k in draft_faction_buttons.keys():
+				_apply_pill_style.call(draft_faction_buttons[k], k == draft_filter_faction)
+			_apply_hero_grid_filters()
+		)
+		draft_faction_buttons[fac_name] = fbtn
+		filter_row.add_child(fbtn)
 
 	var scroll = ScrollContainer.new()
 	hero_grid_scroll = scroll
@@ -1267,10 +1373,15 @@ func _build_right_inspect_column() -> Control:
 	inspect_skill_title_lbl.add_theme_color_override("font_color", COLOR_GOLD_PRIMARY)
 	sp_vbox.add_child(inspect_skill_title_lbl)
 
-	inspect_skill_desc_lbl = Label.new()
-	inspect_skill_desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	inspect_skill_desc_lbl.add_theme_font_size_override("font_size", 12)
-	inspect_skill_desc_lbl.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0, 0.9))
+	inspect_skill_desc_lbl = RichTextLabel.new()
+	inspect_skill_desc_lbl.bbcode_enabled = true
+	inspect_skill_desc_lbl.fit_content = true
+	inspect_skill_desc_lbl.scroll_active = false
+	inspect_skill_desc_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	inspect_skill_desc_lbl.add_theme_font_size_override("normal_font_size", 12)
+	inspect_skill_desc_lbl.add_theme_font_size_override("bold_font_size", 12)
+	inspect_skill_desc_lbl.add_theme_color_override("default_color", Color(0.92, 0.95, 1.0, 0.95))
+	inspect_skill_desc_lbl.size_flags_horizontal = SIZE_EXPAND_FILL
 	inspect_skill_desc_lbl.size_flags_vertical = SIZE_EXPAND_FILL
 	sp_vbox.add_child(inspect_skill_desc_lbl)
 
@@ -1337,7 +1448,7 @@ func _inspect_hero(hero: Dictionary) -> void:
 		inspect_lotus_container.add_child(l_rect)
 
 	inspect_skill_title_lbl.text = "⚡ TUYỆT KỸ: [%s]" % HeroDatabase.get_skill_summary(int(hero.get("id", 0))).to_upper()
-	inspect_skill_desc_lbl.text = HeroDatabase.get_skill_details(int(hero.get("id", 0)))
+	inspect_skill_desc_lbl.text = _format_skill_bbcode(HeroDatabase.get_skill_details(int(hero.get("id", 0))))
 
 	if _is_my_turn() and not is_player_locked and NetworkClient and NetworkClient.is_connected_to_server:
 		NetworkClient.send_hover_hero(hid, hname)
@@ -2191,7 +2302,8 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 						my_candidate_hero_ids = new_ids
 				elif not is_my_active_seat:
 					my_candidate_hero_ids.clear()
-					_rebuild_hero_grid([])
+					if hero_card_nodes.is_empty():
+						_rebuild_hero_grid(_get_preview_pool())
 				elif is_my_active_seat and hero_card_nodes.is_empty():
 					_show_fallback_candidate_pool()
 				break
@@ -2254,9 +2366,10 @@ func _on_server_draft_state_updated(data: Dictionary) -> void:
 				_rebuild_hero_grid([own_hero])
 				draft_status_lbl.text = "✅ BẠN ĐÃ CHỌN: %s" % own_hero.get("name", "TƯỚNG")
 			else:
-				_rebuild_hero_grid([])
+				if hero_card_nodes.is_empty():
+					_rebuild_hero_grid(_get_preview_pool())
 				if hero_wait_lbl and is_instance_valid(hero_wait_lbl):
-					hero_wait_lbl.text = "ĐANG CHỜ NGƯỜI CHƠI %d CHỌN" % waiting_seat
+					hero_wait_lbl.text = "⏳ Đang chờ Người chơi %d chọn — Xem trước tướng bên dưới" % waiting_seat
 					hero_wait_lbl.visible = true
 				draft_status_lbl.text = "ĐANG CHỜ NGƯỜI CHƠI %d CHỌN" % waiting_seat
 		elif current_mode_id.begins_with("dynasty_"):
@@ -2385,8 +2498,97 @@ func _show_battle_launch_dialog() -> void:
 	)
 	btn_hbox.add_child(home_btn)
 
+func _format_skill_bbcode(raw_text: String) -> String:
+	var out := raw_text.replace("[", "[lb]").replace("]", "[rb]")
+	var patterns := [
+		["(*UTF)(*UCP)(?i)\\b(sát thương|Trảm - Hỏa|Trảm - Thủy|Trảm - Lôi|Trảm|Huyết Chiến|Mưa Tên Liên Châu|Giặc Tới|Đại Hồng Thủy)\\b", "[b][color=#FF7A7A]$1[/color][/b]"],
+		["(*UTF)(*UCP)(?i)\\b(hồi [0-9]+ Máu|Bánh Chưng|Hủ Rượu|Đỡ)\\b", "[b][color=#6EE7B7]$1[/color][/b]"],
+		["(*UTF)(*UCP)(?i)\\b(rút thêm [0-9X]+ lá(?: bài)?|rút [0-9X]+ lá(?: bài)?|Ngựa \\+1|Ngựa -1|Trang bị|Vũ Khí|Áo Giáp|Cẩm Nang)\\b", "[b][color=#5CE1E6]$1[/color][/b]"],
+		["(*UTF)(*UCP)(?i)\\b(Cuối lượt|Đầu lượt|Giai đoạn Rút bài|Giai đoạn Ra bài|Giai đoạn Bỏ bài|Phán xét|bài Đen|bài Đỏ|bài Trắng|bài Vàng|Đen|Đỏ|Trắng|Vàng)\\b", "[b][color=#FFD86B]$1[/color][/b]"]
+	]
+	for p in patterns:
+		var re := RegEx.new()
+		if re.compile(p[0]) == OK:
+			out = re.sub(out, p[1], true)
+	out = out.replace("[lb]", "[").replace("[rb]", "]")
+	return out
+
 func _on_exit_pressed() -> void:
 	AudioManager.play_card_select()
+	if not is_draft_active or OS.has_feature("headless"):
+		_confirm_exit_draft()
+		return
+	if draft_exit_confirm_modal and is_instance_valid(draft_exit_confirm_modal):
+		draft_exit_confirm_modal.visible = true
+		return
+	draft_exit_confirm_modal = Control.new()
+	draft_exit_confirm_modal.set_anchors_preset(PRESET_FULL_RECT)
+	draft_exit_confirm_modal.z_index = 400
+	draft_exit_confirm_modal.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(draft_exit_confirm_modal)
+
+	var dim := ColorRect.new()
+	dim.set_anchors_preset(PRESET_FULL_RECT)
+	dim.color = Color(0.01, 0.02, 0.05, 0.80)
+	draft_exit_confirm_modal.add_child(dim)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(PRESET_FULL_RECT)
+	draft_exit_confirm_modal.add_child(center)
+
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(430, 190)
+	var ps := StyleBoxFlat.new()
+	ps.bg_color = Color(0.06, 0.09, 0.16, 0.98)
+	ps.border_color = Color(0.95, 0.42, 0.42, 0.92)
+	ps.set_border_width_all(2)
+	ps.set_corner_radius_all(12)
+	ps.content_margin_left = 20
+	ps.content_margin_right = 20
+	ps.content_margin_top = 16
+	ps.content_margin_bottom = 16
+	panel.add_theme_stylebox_override("panel", ps)
+	center.add_child(panel)
+
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 12)
+	panel.add_child(vb)
+
+	var t := Label.new()
+	t.text = "⚠️ RỜI PHÒNG CHỌN TƯỚNG?"
+	t.add_theme_font_size_override("font_size", 16)
+	t.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+	vb.add_child(t)
+
+	var d := Label.new()
+	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	d.text = "Nếu thoát ngay bây giờ, quá trình chọn tướng của bạn sẽ bị hủy và quay lại Sảnh chính."
+	d.add_theme_font_size_override("font_size", 13)
+	d.add_theme_color_override("font_color", Color(0.88, 0.92, 0.98, 1.0))
+	vb.add_child(d)
+
+	var hb := HBoxContainer.new()
+	hb.alignment = BoxContainer.ALIGNMENT_END
+	hb.add_theme_constant_override("separation", 10)
+	vb.add_child(hb)
+
+	var stay := Button.new()
+	stay.text = "Ở LẠI CHỌN TƯỚNG"
+	stay.custom_minimum_size = Vector2(160, 36)
+	stay.pressed.connect(func():
+		if is_instance_valid(draft_exit_confirm_modal):
+			draft_exit_confirm_modal.visible = false
+	)
+	hb.add_child(stay)
+
+	var leave := Button.new()
+	leave.text = "RỜI PHÒNG"
+	leave.custom_minimum_size = Vector2(120, 36)
+	_style_cancel_small_btn(leave)
+	leave.pressed.connect(_confirm_exit_draft)
+	hb.add_child(leave)
+
+func _confirm_exit_draft() -> void:
 	is_draft_active = false
 	if NetworkClient:
 		NetworkClient.room_id = ""

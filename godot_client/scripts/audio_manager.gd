@@ -7,6 +7,15 @@ var voice_player: AudioStreamPlayer
 var clips: Dictionary = {}
 var voice_cache: Dictionary = {}
 
+const AUDIO_SETTINGS_PATH := "user://audio_settings.cfg"
+
+var bgm_volume: float = 0.80
+var sfx_volume: float = 0.90
+var voice_volume: float = 0.95
+var is_muted: bool = false
+
+signal audio_settings_changed
+
 const SKILL_VOICE_KEYS := {
 	"chế nỏ": "che_no",
 	"cơ biến": "co_bien",
@@ -91,8 +100,74 @@ func _ready() -> void:
 	voice_player.volume_db = 2.0
 	add_child(voice_player)
 
+	_load_audio_settings()
 	_preload_audio()
 	call_deferred("play_bgm", "bgm_battle")
+
+func _load_audio_settings() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(AUDIO_SETTINGS_PATH) == OK:
+		bgm_volume = clampf(float(cfg.get_value("audio", "bgm_volume", 0.80)), 0.0, 1.0)
+		sfx_volume = clampf(float(cfg.get_value("audio", "sfx_volume", 0.90)), 0.0, 1.0)
+		voice_volume = clampf(float(cfg.get_value("audio", "voice_volume", 0.95)), 0.0, 1.0)
+		is_muted = bool(cfg.get_value("audio", "is_muted", false))
+	_apply_bgm_volume()
+
+func _save_audio_settings() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("audio", "bgm_volume", bgm_volume)
+	cfg.set_value("audio", "sfx_volume", sfx_volume)
+	cfg.set_value("audio", "voice_volume", voice_volume)
+	cfg.set_value("audio", "is_muted", is_muted)
+	cfg.save(AUDIO_SETTINGS_PATH)
+
+func _effective_volume_db(base_db: float, level_01: float) -> float:
+	if is_muted or level_01 <= 0.001:
+		return -80.0
+	return clampf(base_db + linear_to_db(clampf(level_01, 0.001, 1.0)), -80.0, 12.0)
+
+func _apply_bgm_volume() -> void:
+	if bgm_player:
+		bgm_player.volume_db = _effective_volume_db(-8.0, bgm_volume)
+		bgm_player.stream_paused = is_muted or bgm_volume <= 0.001
+
+func _update_active_channel_players(channel: String, base_db: float, level_01: float) -> void:
+	var target_db := _effective_volume_db(base_db, level_01)
+	for child in get_children():
+		if child is AudioStreamPlayer and child.has_meta("audio_channel") and str(child.get_meta("audio_channel")) == channel:
+			child.volume_db = target_db
+			if is_muted or level_01 <= 0.001:
+				child.stop()
+
+func set_bgm_volume(level_01: float) -> void:
+	bgm_volume = clampf(level_01, 0.0, 1.0)
+	_apply_bgm_volume()
+	_save_audio_settings()
+	audio_settings_changed.emit()
+
+func set_sfx_volume(level_01: float) -> void:
+	sfx_volume = clampf(level_01, 0.0, 1.0)
+	_update_active_channel_players("sfx", 0.0, sfx_volume)
+	_save_audio_settings()
+	audio_settings_changed.emit()
+
+func set_voice_volume(level_01: float) -> void:
+	voice_volume = clampf(level_01, 0.0, 1.0)
+	_update_active_channel_players("voice", 2.0, voice_volume)
+	_save_audio_settings()
+	audio_settings_changed.emit()
+
+func set_muted(muted: bool) -> void:
+	is_muted = muted
+	_apply_bgm_volume()
+	_update_active_channel_players("sfx", 0.0, sfx_volume)
+	_update_active_channel_players("voice", 2.0, voice_volume)
+	_save_audio_settings()
+	audio_settings_changed.emit()
+
+func toggle_mute() -> bool:
+	set_muted(not is_muted)
+	return is_muted
 
 func _preload_audio() -> void:
 	var list = [
@@ -113,16 +188,20 @@ func play_bgm(music_name: String = "bgm_battle") -> void:
 		if bgm_player.stream != clips[music_name] or not bgm_player.playing:
 			bgm_player.stream = clips[music_name]
 			bgm_player.play()
+		_apply_bgm_volume()
 
 func stop_bgm() -> void:
 	if bgm_player and bgm_player.playing:
 		bgm_player.stop()
 
 func play_sfx(name: String, vol_db: float = 0.0) -> void:
+	if is_muted or sfx_volume <= 0.001:
+		return
 	if clips.has(name) and sfx_player:
 		var p = AudioStreamPlayer.new()
+		p.set_meta("audio_channel", "sfx")
 		p.stream = clips[name]
-		p.volume_db = vol_db
+		p.volume_db = _effective_volume_db(vol_db, sfx_volume)
 		add_child(p)
 		p.play()
 		p.finished.connect(p.queue_free)
@@ -161,11 +240,14 @@ func play_victory() -> void:
 	play_sfx("sfx_victory", 3.0)
 
 func play_sfx_with_pitch(name: String, pitch: float = 1.0, vol_db: float = 0.0) -> void:
+	if is_muted or sfx_volume <= 0.001:
+		return
 	if clips.has(name):
 		var p = AudioStreamPlayer.new()
+		p.set_meta("audio_channel", "sfx")
 		p.stream = clips[name]
 		p.pitch_scale = pitch
-		p.volume_db = vol_db
+		p.volume_db = _effective_volume_db(vol_db, sfx_volume)
 		add_child(p)
 		p.play()
 		p.finished.connect(p.queue_free)
@@ -213,10 +295,13 @@ func play_voice(card_or_skill_name: String, is_female: bool = false) -> void:
 			chosen_stream = voice_cache[key]
 
 	if chosen_stream != null:
+		if is_muted or voice_volume <= 0.001:
+			return
 		var p = AudioStreamPlayer.new()
+		p.set_meta("audio_channel", "voice")
 		p.stream = chosen_stream
 		p.pitch_scale = 1.0
-		p.volume_db = 2.0
+		p.volume_db = _effective_volume_db(2.0, voice_volume)
 		add_child(p)
 		p.play()
 		p.finished.connect(p.queue_free)

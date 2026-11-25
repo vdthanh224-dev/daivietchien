@@ -92,11 +92,12 @@ layout_mode = 2
 mouse_filter = 2
 
 [node name="SuitRankLabel" type="Label" parent="Panel/Margin/VBox/SubHeader"]
+custom_minimum_size = Vector2(18, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
-theme_override_font_sizes/font_size = 12
-text = "♠ A"
+theme_override_font_sizes/font_size = 11
+text = "8"
 vertical_alignment = 1
 
 [node name="CategoryLabel" type="Label" parent="Panel/Margin/VBox/SubHeader"]
@@ -107,6 +108,7 @@ theme_override_font_sizes/font_size = 10
 text = "Cơ Bản"
 horizontal_alignment = 2
 vertical_alignment = 1
+clip_text = false
 
 [node name="Artwork" type="TextureRect" parent="Panel/Margin/VBox"]
 layout_mode = 2

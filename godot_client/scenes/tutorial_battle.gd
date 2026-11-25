@@ -1939,5 +1939,6 @@ func _play_slash_effect(target_center: Vector2) -> void:
 
 func _on_claim_reward_clicked() -> void:
 	claim_reward_btn.release_focus()
-	AuthManager.set_onboarding_done()
+	if AuthManager and AuthManager.is_logged_in:
+		AuthManager.set_onboarding_done()
 	get_tree().change_scene_to_file("res://scenes/home.tscn")

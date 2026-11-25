@@ -89,8 +89,8 @@ func _build_ui() -> void:
 	_style_button(toggle_button)
 	add_child(toggle_button)
 	if channel == "battle":
-		toggle_button.position = Vector2(14, 52)
-		toggle_button.size = Vector2(146, 32)
+		toggle_button.position = Vector2(142, 10)
+		toggle_button.size = Vector2(114, 28)
 	else:
 		toggle_button.set_anchors_and_offsets_preset(PRESET_BOTTOM_LEFT)
 		toggle_button.offset_left = 24
@@ -102,9 +102,9 @@ func _build_ui() -> void:
 	panel = PanelContainer.new()
 	panel.name = "ChatWindow"
 	panel.set_anchors_and_offsets_preset(PRESET_BOTTOM_LEFT)
-	panel.offset_left = 18 if channel == "battle" else 24
-	panel.offset_right = 288 if channel == "battle" else 464
-	panel.offset_top = -238 if channel == "battle" else -284
+	panel.offset_left = 18 if channel == "battle" else 20
+	panel.offset_right = 288 if channel == "battle" else 338
+	panel.offset_top = -238 if channel == "battle" else -226
 	panel.offset_bottom = -18 if channel == "battle" else -24
 	panel.add_theme_stylebox_override("panel", _style(Color(0.035, 0.045, 0.075, 0.96), Color(0.69, 0.55, 0.27, 0.9)))
 	add_child(panel)

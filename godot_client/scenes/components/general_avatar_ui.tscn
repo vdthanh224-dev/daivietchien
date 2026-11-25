@@ -271,13 +271,13 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_top_banner")
 [node name="Margin" type="MarginContainer" parent="Frame/TopBanner"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/margin_left = 4
-theme_override_constants/margin_right = 4
+theme_override_constants/margin_left = 3
+theme_override_constants/margin_right = 3
 
 [node name="HBox" type="HBoxContainer" parent="Frame/TopBanner/Margin"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 4
+theme_override_constants/separation = 3
 alignment = 1
 
 [node name="RoleBadge" type="Label" parent="Frame/TopBanner/Margin/HBox"]
@@ -295,7 +295,7 @@ layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 0.92, 0.58, 1)
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 11
 text = "Lý Thường Kiệt"
 horizontal_alignment = 0
 vertical_alignment = 1
@@ -378,50 +378,53 @@ layout_mode = 1
 anchors_preset = 9
 anchor_bottom = 1.0
 anchor_right = 1.0
-offset_left = 6.0
-offset_top = 100.0
-offset_right = -50.0
+offset_left = 4.0
+offset_top = 92.0
+offset_right = -48.0
 offset_bottom = -34.0
 grow_vertical = 2
 mouse_filter = 2
 theme_override_constants/separation = 2
+alignment = 2
 
 [node name="WeaponSlot" type="PanelContainer" parent="Frame/EquipContainer"]
-custom_minimum_size = Vector2(0, 16)
+custom_minimum_size = Vector2(0, 14)
 layout_mode = 2
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxEmpty_click_btn")
 
 [node name="Label" type="Label" parent="Frame/EquipContainer/WeaponSlot"]
-modulate = Color(1, 1, 1, 0.45)
 layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.95)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 10
 text = ""
+clip_text = true
+text_overrun_behavior = 3
 
 [node name="ArmorSlot" type="PanelContainer" parent="Frame/EquipContainer"]
-custom_minimum_size = Vector2(0, 16)
+custom_minimum_size = Vector2(0, 14)
 layout_mode = 2
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxEmpty_click_btn")
 
 [node name="Label" type="Label" parent="Frame/EquipContainer/ArmorSlot"]
-modulate = Color(1, 1, 1, 0.45)
 layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.95)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 10
 text = ""
+clip_text = true
+text_overrun_behavior = 3
 
 [node name="MountRow" type="HBoxContainer" parent="Frame/EquipContainer"]
-custom_minimum_size = Vector2(0, 22)
+custom_minimum_size = Vector2(0, 18)
 layout_mode = 2
 size_flags_horizontal = 3
 z_index = 50
@@ -431,14 +434,13 @@ theme_override_constants/separation = 2
 alignment = 0
 
 [node name="DefensiveMountSlot" type="PanelContainer" parent="Frame/EquipContainer/MountRow"]
-custom_minimum_size = Vector2(0, 20)
+custom_minimum_size = Vector2(0, 16)
 layout_mode = 2
 clip_contents = false
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxEmpty_click_btn")
 
 [node name="Label" type="Label" parent="Frame/EquipContainer/MountRow/DefensiveMountSlot"]
-modulate = Color(1, 1, 1, 0.45)
 layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
@@ -446,20 +448,19 @@ theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.95)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 10
 text = ""
 horizontal_alignment = 1
 clip_text = false
 
 [node name="OffensiveMountSlot" type="PanelContainer" parent="Frame/EquipContainer/MountRow"]
-custom_minimum_size = Vector2(0, 20)
+custom_minimum_size = Vector2(0, 16)
 layout_mode = 2
 clip_contents = false
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxEmpty_click_btn")
 
 [node name="Label" type="Label" parent="Frame/EquipContainer/MountRow/OffensiveMountSlot"]
-modulate = Color(1, 1, 1, 0.45)
 layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
@@ -467,41 +468,42 @@ theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.95)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 10
 text = ""
 horizontal_alignment = 2
 vertical_alignment = 1
 clip_text = false
 
 [node name="MountDivider" type="Label" parent="Frame/EquipContainer/MountRow"]
-custom_minimum_size = Vector2(8, 20)
+custom_minimum_size = Vector2(6, 16)
 layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.9, 0.82, 0.45, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 2
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 10
 text = "|"
 horizontal_alignment = 1
 vertical_alignment = 1
 visible = false
 
 [node name="TreasureSlot" type="PanelContainer" parent="Frame/EquipContainer"]
-custom_minimum_size = Vector2(0, 16)
+custom_minimum_size = Vector2(0, 14)
 layout_mode = 2
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxEmpty_click_btn")
 
 [node name="Label" type="Label" parent="Frame/EquipContainer/TreasureSlot"]
-modulate = Color(1, 1, 1, 0.45)
 layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.95)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 10
 text = ""
+clip_text = true
+text_overrun_behavior = 3
 
 [node name="TargetBorder" type="ReferenceRect" parent="."]
 visible = false

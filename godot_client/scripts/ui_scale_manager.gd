@@ -2,7 +2,8 @@ extends Node
 
 ## Dùng giao diện Mobile 135% ngay từ lúc khởi động trên mọi thiết bị.
 ## Không đọc lựa chọn scale cũ để các bản cài đặt trước cũng nhận mặc định này.
-const DEFAULT_SCALE: float = 1.35
+const DEFAULT_SCALE: float = 1.0
+const MOBILE_SCALE: float = 1.18
 var current_scale: float = DEFAULT_SCALE
 
 # Sàn cỡ chữ tối thiểu trên thiết bị di động (tránh các cỡ chữ 8, 9, 10px quá nhỏ)
@@ -43,7 +44,7 @@ func is_mobile_mode() -> bool:
 	return is_mobile_device() or current_scale > 1.0
 
 func _init_scale() -> void:
-	current_scale = DEFAULT_SCALE
+	current_scale = MOBILE_SCALE if is_mobile_device() else DEFAULT_SCALE
 
 ## Hàm tính cỡ chữ theo tỉ lệ hiện tại
 func scale_font(base_size: int) -> int:

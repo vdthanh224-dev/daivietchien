@@ -3,6 +3,10 @@ extends Control
 
 signal card_clicked(card_ui: Control)
 signal card_selected_state_changed(card_ui: Control, is_selected: bool)
+signal card_drag_started(card_ui: Control, global_pos: Vector2)
+signal card_drag_moved(card_ui: Control, global_pos: Vector2)
+signal card_drag_released(card_ui: Control, global_pos: Vector2)
+signal card_hold_inspect(card_ui: Control, active: bool)
 
 const CardResourceScript = preload("res://scripts/resources/card_resource.gd")
 const CardDatabaseScript = preload("res://scripts/resources/card_database.gd")
@@ -24,12 +28,19 @@ var original_y: float = 0.0
 var tween: Tween
 var card_name: String = ""
 var equipped_badge: Label = null
+var _press_active: bool = false
+var _press_start_global: Vector2 = Vector2.ZERO
+var _is_dragging_card: bool = false
+var _is_hold_inspecting: bool = false
+var _hold_token: int = 0
+var _suppress_next_press: bool = false
 
 func _ready() -> void:
 	if click_button:
 		click_button.pressed.connect(_on_card_button_pressed)
 		click_button.mouse_entered.connect(_on_card_mouse_entered)
 		click_button.mouse_exited.connect(_on_card_mouse_exited)
+		click_button.gui_input.connect(_on_click_button_gui_input)
 
 	if card_data:
 		update_card(card_data)
@@ -132,18 +143,21 @@ func update_card(data: Resource) -> void:
 	var rank_str = data.get_rank_string()
 	# The card background already communicates the suit color; show only its point value.
 	suit_rank_lbl.text = rank_str
-	UIScaleManager.scale_node_font(suit_rank_lbl, 11)
+	suit_rank_lbl.custom_minimum_size = Vector2(18, 0)
+	suit_rank_lbl.add_theme_font_size_override("font_size", 11)
 
 	_apply_card_theme(data)
 
 	cat_lbl.text = data.get_category_name()
+	cat_lbl.clip_text = false
+	cat_lbl.add_theme_font_size_override("font_size", 10)
 	name_lbl.text = data.card_name
-	var base_card_font: int = 13
+	var base_card_font: int = 12
 	if data.card_name.length() >= 14:
 		base_card_font = 9
 	elif data.card_name.length() >= 10:
-		base_card_font = 11
-	UIScaleManager.scale_node_font(name_lbl, base_card_font)
+		base_card_font = 10
+	name_lbl.add_theme_font_size_override("font_size", base_card_font)
 
 	# Tải hình minh họa lá bài (Artwork)
 	if artwork_rect:
@@ -247,7 +261,66 @@ func _on_card_mouse_exited() -> void:
 	if not is_selected:
 		_animate_elevation(0.0, Vector2(1.0, 1.0))
 
+func _on_click_button_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_start_pointer_interaction(event.global_position)
+		else:
+			_end_pointer_interaction(event.global_position)
+	elif event is InputEventMouseMotion and _press_active:
+		_update_pointer_interaction(event.global_position)
+	elif event is InputEventScreenTouch and event.index == 0:
+		if event.pressed:
+			_start_pointer_interaction(event.position)
+		else:
+			_end_pointer_interaction(event.position)
+	elif event is InputEventScreenDrag and _press_active and event.index == 0:
+		_update_pointer_interaction(event.position)
+
+func _start_pointer_interaction(gpos: Vector2) -> void:
+	_press_active = true
+	_press_start_global = gpos
+	_is_dragging_card = false
+	_is_hold_inspecting = false
+	_suppress_next_press = false
+	_hold_token += 1
+	var token := _hold_token
+	get_tree().create_timer(0.38).timeout.connect(func():
+		if _press_active and token == _hold_token and not _is_dragging_card and is_inside_tree():
+			_is_hold_inspecting = true
+			_suppress_next_press = true
+			card_hold_inspect.emit(self, true)
+	)
+
+func _update_pointer_interaction(gpos: Vector2) -> void:
+	var dist := gpos.distance_to(_press_start_global)
+	if not _is_dragging_card and dist > 16.0:
+		_is_dragging_card = true
+		_suppress_next_press = true
+		_hold_token += 1
+		if _is_hold_inspecting:
+			_is_hold_inspecting = false
+			card_hold_inspect.emit(self, false)
+		card_drag_started.emit(self, gpos)
+	elif _is_dragging_card:
+		card_drag_moved.emit(self, gpos)
+
+func _end_pointer_interaction(gpos: Vector2) -> void:
+	if not _press_active:
+		return
+	_press_active = false
+	_hold_token += 1
+	if _is_hold_inspecting:
+		_is_hold_inspecting = false
+		card_hold_inspect.emit(self, false)
+	if _is_dragging_card:
+		_is_dragging_card = false
+		card_drag_released.emit(self, gpos)
+
 func _on_card_button_pressed() -> void:
+	if _suppress_next_press:
+		_suppress_next_press = false
+		return
 	set_selected(not is_selected)
 	card_clicked.emit(self)
 
