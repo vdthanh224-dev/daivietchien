@@ -84,6 +84,8 @@ var hero_stage_container: Control = null
 var hero_sprite: TextureRect = null
 var hero_dialogue_bubble: PanelContainer = null
 var hero_dialogue_label: Label = null
+var _hero_dialogue_tween: Tween = null
+var _last_hero_quote_idx: int = -1
 var current_selected_mode: String = "2v2" # "2v2", "dynasty_5", "dynasty_8"
 var mode_selector_btn: Button = null
 var mode_drawer_panel: PanelContainer = null
@@ -96,8 +98,6 @@ var _social_friends: Array = []
 var _social_incoming: Array = []
 var _social_search_results: Array = []
 var _last_friend_search_query: String = ""
-var hero_nameplate_lbl: Label = null
-var hero_status_sub_lbl: Label = null
 var _active_hero_id: int = 47
 var _active_hero_slug: String = "ly_thuong_kiet"
 var _left_hero_cards_container: VBoxContainer = null
@@ -114,6 +114,8 @@ func _ready() -> void:
 	_load_user_data()
 	if AuthManager:
 		AuthManager.profile_updated.connect(_load_user_data)
+	if HeroDatabase and not HeroDatabase.skin_equipped.is_connected(_on_hero_skin_equipped):
+		HeroDatabase.skin_equipped.connect(_on_hero_skin_equipped)
 	if NetworkClient:
 		if not NetworkClient.social_list_updated.is_connected(_on_social_list_updated):
 			NetworkClient.social_list_updated.connect(_on_social_list_updated)
@@ -553,7 +555,7 @@ func _build_hero_center_stage() -> void:
 
 	# Neon Holographic Ring / Backdrop Aura
 	var aura_panel := Panel.new()
-	aura_panel.position = Vector2(62, 52)
+	aura_panel.position = Vector2(62, 92)
 	aura_panel.size = Vector2(390, 390)
 	aura_panel.mouse_filter = MOUSE_FILTER_IGNORE
 	var aura_sb := StyleBoxFlat.new()
@@ -567,7 +569,7 @@ func _build_hero_center_stage() -> void:
 	stage.add_child(aura_panel)
 
 	var inner_ring := Panel.new()
-	inner_ring.position = Vector2(94, 84)
+	inner_ring.position = Vector2(94, 124)
 	inner_ring.size = Vector2(326, 326)
 	inner_ring.mouse_filter = MOUSE_FILTER_IGNORE
 	var ir_sb := StyleBoxFlat.new()
@@ -581,7 +583,7 @@ func _build_hero_center_stage() -> void:
 	# Standing Hero Portrait
 	hero_sprite = TextureRect.new()
 	hero_sprite.name = "HeroStagePortrait"
-	hero_sprite.position = Vector2(57, 16)
+	hero_sprite.position = Vector2(57, 56)
 	hero_sprite.size = Vector2(400, 470)
 	hero_sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	hero_sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -591,22 +593,22 @@ func _build_hero_center_stage() -> void:
 
 	# Subtle Neon Pedestal Shadow + Breathing Float Animation
 	var float_tw := hero_sprite.create_tween().set_loops()
-	float_tw.tween_property(hero_sprite, "position:y", 8.0, 2.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	float_tw.tween_property(hero_sprite, "position:y", 16.0, 2.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	float_tw.tween_property(hero_sprite, "position:y", 48.0, 2.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	float_tw.tween_property(hero_sprite, "position:y", 56.0, 2.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 	# Clickable hitbox over Hero Stage -> quote/voice reaction
 	var tap_btn := Button.new()
-	tap_btn.position = Vector2(95, 34)
+	tap_btn.position = Vector2(95, 72)
 	tap_btn.size = Vector2(325, 435)
 	_style_transparent_button(tap_btn)
-	tap_btn.tooltip_text = "Chạm để tương tác với Danh Tướng"
+	tap_btn.tooltip_text = "Chạm để nghe thoại Danh Tướng"
 	tap_btn.pressed.connect(_trigger_hero_interaction)
 	stage.add_child(tap_btn)
 
 	# Speech Dialogue Bubble
 	hero_dialogue_bubble = PanelContainer.new()
-	hero_dialogue_bubble.position = Vector2(290, 32)
-	hero_dialogue_bubble.custom_minimum_size = Vector2(230, 58)
+	hero_dialogue_bubble.position = Vector2(276, 56)
+	hero_dialogue_bubble.custom_minimum_size = Vector2(236, 58)
 	hero_dialogue_bubble.visible = false
 	hero_dialogue_bubble.z_index = 12
 	hero_dialogue_bubble.mouse_filter = MOUSE_FILTER_IGNORE
@@ -625,56 +627,14 @@ func _build_hero_center_stage() -> void:
 	stage.add_child(hero_dialogue_bubble)
 
 	hero_dialogue_label = Label.new()
+	hero_dialogue_label.custom_minimum_size = Vector2(212, 0)
 	hero_dialogue_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hero_dialogue_label.add_theme_font_size_override("font_size", 12)
 	hero_dialogue_label.add_theme_color_override("font_color", Color(0.95, 0.98, 1.0, 1.0))
 	hero_dialogue_bubble.add_child(hero_dialogue_label)
 
-	# Pedestal Nameplate Plaque
-	var plaque := PanelContainer.new()
-	plaque.position = Vector2(88, 480)
-	plaque.custom_minimum_size = Vector2(340, 88)
-	var pl_sb := StyleBoxFlat.new()
-	pl_sb.bg_color = Color(0.05, 0.07, 0.13, 0.88)
-	pl_sb.border_color = Color(0.98, 0.34, 0.70, 0.78)
-	pl_sb.set_border_width_all(2)
-	pl_sb.set_corner_radius_all(18)
-	pl_sb.content_margin_left = 18
-	pl_sb.content_margin_right = 18
-	pl_sb.content_margin_top = 8
-	pl_sb.content_margin_bottom = 8
-	pl_sb.shadow_color = Color(0.18, 0.82, 1.0, 0.25)
-	pl_sb.shadow_size = 16
-	plaque.add_theme_stylebox_override("panel", pl_sb)
-	stage.add_child(plaque)
-
-	var pl_vbox := VBoxContainer.new()
-	pl_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	pl_vbox.add_theme_constant_override("separation", 3)
-	plaque.add_child(pl_vbox)
-
-	hero_status_sub_lbl = Label.new()
-	hero_status_sub_lbl.text = "⚡ ĐANG XUẤT TRẬN"
-	hero_status_sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hero_status_sub_lbl.add_theme_font_size_override("font_size", 10)
-	hero_status_sub_lbl.add_theme_color_override("font_color", Color(0.24, 0.90, 1.0, 1.0))
-	pl_vbox.add_child(hero_status_sub_lbl)
-
-	hero_nameplate_lbl = Label.new()
-	hero_nameplate_lbl.text = "Lý Thường Kiệt / 47"
-	hero_nameplate_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hero_nameplate_lbl.add_theme_font_size_override("font_size", 18)
-	hero_nameplate_lbl.add_theme_color_override("font_color", Color(1.0, 0.93, 0.65, 1.0))
-	pl_vbox.add_child(hero_nameplate_lbl)
-
-	var hint_lbl := Label.new()
-	hint_lbl.text = "Chạm Danh Tướng để nghe lời hiệu triệu"
-	hint_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint_lbl.add_theme_font_size_override("font_size", 10)
-	hint_lbl.add_theme_color_override("font_color", Color(0.72, 0.78, 0.90, 0.82))
-	pl_vbox.add_child(hint_lbl)
-
-	_select_hero_by_slug(_active_hero_slug)
+	var init_bg_id: int = AuthManager.current_profile_bg if AuthManager else 0
+	_select_hero_by_id(init_bg_id if init_bg_id > 0 else 47)
 
 func _build_left_character_column() -> void:
 	var col = Control.new()
@@ -702,36 +662,61 @@ func _on_left_hero_prev_page() -> void:
 func _on_left_hero_next_page() -> void:
 	pass
 
-func _select_hero_by_slug(slug: String) -> void:
+func _select_hero_by_id(hero_id: int) -> void:
+	var target_id: int = hero_id if hero_id > 0 else 47
+	var prev_id: int = _active_hero_id
+	var slug: String = "ly_thuong_kiet"
+	var avatar_path: String = "res://assets/ui/ly_thuong_kiet.png"
+	if HeroDatabase:
+		var hd: Dictionary = HeroDatabase.get_hero(target_id)
+		if hd.is_empty() and target_id != 47:
+			target_id = 47
+			hd = HeroDatabase.get_hero(47)
+		if not hd.is_empty():
+			target_id = int(hd.get("id", target_id))
+			slug = str(hd.get("slug", slug))
+			avatar_path = str(hd.get("avatarPath", avatar_path))
+	_active_hero_id = target_id
 	_active_hero_slug = slug
-	var hero_name = "Lý Thường Kiệt"
-	var hero_id = 47
+	if prev_id != _active_hero_id:
+		_last_hero_quote_idx = -1
+
+	var hero_tex: Texture2D = null
+	var eq_skin_id: String = HeroDatabase.get_equipped_skin_id(_active_hero_id) if HeroDatabase else "default"
+	if HeroDatabase:
+		hero_tex = HeroDatabase.get_skin_texture(_active_hero_id, eq_skin_id)
+		if not hero_tex:
+			hero_tex = HeroDatabase.get_avatar_texture(avatar_path, _active_hero_id)
+	if not hero_tex:
+		var trans_path = "res://assets/heroes_transparent/%s.png" % _active_hero_slug
+		if ResourceLoader.exists(trans_path):
+			hero_tex = load(trans_path)
+		elif ResourceLoader.exists("res://assets/ui/%s.png" % _active_hero_slug):
+			hero_tex = load("res://assets/ui/%s.png" % _active_hero_slug)
+
+	if is_instance_valid(hero_sprite) and hero_tex:
+		hero_sprite.texture = hero_tex
+
+	if is_instance_valid(_top_avatar_rect):
+		if hero_tex:
+			_top_avatar_rect.texture = hero_tex
+		else:
+			var av_path = "res://assets/ui/%s.png" % _active_hero_slug
+			if ResourceLoader.exists(av_path):
+				_top_avatar_rect.texture = load(av_path)
+
+func _select_hero_by_slug(slug: String) -> void:
+	var target_id: int = 47
 	if HeroDatabase:
 		for h in HeroDatabase.get_all_heroes():
 			if str(h.get("slug", "")).to_lower() == slug.to_lower() or str(h.get("avatarPath", "")).get_file().get_basename().to_lower() == slug.to_lower():
-				hero_name = str(h.get("name", hero_name))
-				hero_id = int(h.get("id", hero_id))
+				target_id = int(h.get("id", target_id))
 				break
-	_active_hero_id = hero_id
+	_select_hero_by_id(target_id)
 
-	if is_instance_valid(hero_sprite):
-		var trans_path = "res://assets/heroes_transparent/%s.png" % slug
-		if ResourceLoader.exists(trans_path):
-			hero_sprite.texture = load(trans_path)
-		elif ResourceLoader.exists("res://assets/ui/%s.png" % slug):
-			hero_sprite.texture = load("res://assets/ui/%s.png" % slug)
-
-	if is_instance_valid(hero_nameplate_lbl):
-		hero_nameplate_lbl.text = "%s / %02d" % [hero_name, _active_hero_id]
-	if is_instance_valid(hero_status_sub_lbl):
-		hero_status_sub_lbl.text = "ĐANG XUẤT TRẬN"
-
-	if is_instance_valid(_top_avatar_rect):
-		var av_path = "res://assets/ui/%s.png" % slug
-		if ResourceLoader.exists(av_path):
-			_top_avatar_rect.texture = load(av_path)
-		elif is_instance_valid(hero_sprite) and hero_sprite.texture:
-			_top_avatar_rect.texture = hero_sprite.texture
+func _on_hero_skin_equipped(hero_id: int, _skin_id: String) -> void:
+	if hero_id == _active_hero_id or hero_id == (AuthManager.current_profile_bg if AuthManager else 0):
+		_select_hero_by_id(_active_hero_id)
 
 func _build_right_action_deck() -> void:
 	var deck = Control.new()
@@ -1932,22 +1917,31 @@ func _on_battle_cta_pressed() -> void:
 func _trigger_hero_interaction() -> void:
 	AudioManager.play_skill()
 	if is_instance_valid(hero_dialogue_bubble):
+		if _hero_dialogue_tween and _hero_dialogue_tween.is_valid():
+			_hero_dialogue_tween.kill()
 		hero_dialogue_bubble.visible = true
 		hero_dialogue_bubble.modulate.a = 1.0
 		if is_instance_valid(hero_dialogue_label):
-			var quotes = [
+			var quotes: Array[String] = HeroDatabase.get_hero_quotes(_active_hero_id) if HeroDatabase and HeroDatabase.has_method("get_hero_quotes") else [
 				"Nam quốc sơn hà Nam đế cư!",
 				"Quyết chiến vì giang sơn Đại Việt!",
-				"Tướng quân đã sẵn sàng xuất trận chưa?",
-				"Phá Tống bình Chiêm, uy danh thiên cổ!"
+				"Tướng quân đã sẵn sàng xuất trận chưa?"
 			]
-			hero_dialogue_label.text = quotes[randi() % quotes.size()]
+			var q_idx := randi() % quotes.size()
+			if quotes.size() > 1 and q_idx == _last_hero_quote_idx:
+				q_idx = (q_idx + 1 + (randi() % (quotes.size() - 1))) % quotes.size()
+			_last_hero_quote_idx = q_idx
+			hero_dialogue_label.text = quotes[q_idx]
 		var tw = create_tween()
+		_hero_dialogue_tween = tw
 		tw.tween_property(hero_dialogue_bubble, "scale", Vector2(1.05, 1.05), 0.15)
 		tw.tween_property(hero_dialogue_bubble, "scale", Vector2(1.0, 1.0), 0.15)
-		tw.tween_interval(3.5)
+		tw.tween_interval(3.8)
 		tw.tween_property(hero_dialogue_bubble, "modulate:a", 0.0, 0.4)
-		tw.tween_callback(func(): hero_dialogue_bubble.visible = false)
+		tw.tween_callback(func():
+			if is_instance_valid(hero_dialogue_bubble):
+				hero_dialogue_bubble.visible = false
+		)
 
 func _style_secondary_mode_button(btn: Button) -> void:
 	var normal = StyleBoxFlat.new()
@@ -2441,11 +2435,9 @@ func _load_user_data() -> void:
 		if is_instance_valid(ticket_label):
 			ticket_label.text = "%s Vé" % _format_number(current_hero_tickets)
 
-		# Cập nhật ảnh Danh Tướng trung tâm theo tướng sở hữu/chọn
-		var active_slug = _active_hero_slug
-		if AuthManager.current_generals.size() > 0:
-			active_slug = str(AuthManager.current_generals[0]).to_lower()
-		_select_hero_by_slug(active_slug)
+		# Cập nhật ảnh Danh Tướng trung tâm và avatar cạnh tên theo Hình Nền Hồ Sơ (mặc định Lý Thường Kiệt #47)
+		var bg_hero_id: int = AuthManager.current_profile_bg if AuthManager else 0
+		_select_hero_by_id(bg_hero_id if bg_hero_id > 0 else 47)
 		_update_quest_nav_indicator()
 		_refresh_inventory_content()
 		_update_mail_badge()
@@ -10312,7 +10304,7 @@ func _build_profile_bg_selection_content() -> Control:
 			var eq_skin_id = HeroDatabase.get_equipped_skin_id(hid)
 			var skin_tex = HeroDatabase.get_skin_texture(hid, eq_skin_id)
 			if not skin_tex:
-				var av = str(h.get("avatar", ""))
+				var av = str(h.get("avatarPath", h.get("avatar", "")))
 				if ResourceLoader.exists(av): skin_tex = load(av)
 
 			var h_card = PanelContainer.new()

@@ -11,6 +11,7 @@ var all_heroes: Array[Dictionary] = []
 var hero_dict: Dictionary = {}
 var equipped_skins: Dictionary = {}
 
+const HeroQuotesData = preload("res://scripts/hero_quotes_data.gd")
 const EQUIPPED_SKINS_SAVE_PATH = "user://equipped_skins.json"
 
 const HERO_SKINS_DATA: Dictionary = {
@@ -1148,6 +1149,22 @@ func get_available_pick_heroes() -> Array[Dictionary]:
 
 func get_all_heroes() -> Array[Dictionary]:
 	return all_heroes
+
+func get_hero_quotes(hero_id: int) -> Array[String]:
+	var out: Array[String] = []
+	var raw = HeroQuotesData.QUOTES.get(hero_id, [])
+	if raw is Array:
+		for line in raw:
+			var clean := str(line).strip_edges()
+			if not clean.is_empty():
+				out.append(clean)
+	if out.is_empty():
+		var h = get_hero(hero_id)
+		var hname := str(h.get("name", "Danh Tướng"))
+		out.append("%s đã sẵn sàng xuất trận vì giang sơn Đại Việt!" % hname)
+		out.append("Tướng quân cần %s ra tay chốn sa trường ư?" % hname)
+		out.append("Giữ vững chính khí, quyết không lùi bước trước quân thù!")
+	return out
 
 func get_avatar_texture(avatar_path: String, hero_id: int = 0) -> Texture2D:
 	var hid = hero_id
