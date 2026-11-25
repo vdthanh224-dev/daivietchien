@@ -20,6 +20,7 @@ signal chat_history_received(channel: String, target_room: String)
 signal chat_error(channel: String, message: String)
 
 const CHAT_HISTORY_LIMIT: int = 50
+const LOBBY_CHAT_CACHE_FILE := "user://lobby_chat_cache.json"
 var chat_messages: Dictionary = {}
 var _pending_chat_channels: Array[String] = []
 var _chat_unavailable: bool = false
@@ -98,6 +99,7 @@ func _ready() -> void:
 	if OS.is_debug_build() or OS.has_feature("editor"):
 		DisplayServer.window_set_title("Đại Việt Chiến - [CỬA SỔ %d - GHẾ %d]" % [my_seat, my_seat])
 	_load_server_config()
+	_load_lobby_chat_cache()
 	_start_priority_connection()
 
 func is_connecting() -> bool:
@@ -306,12 +308,20 @@ func _handle_server_message(raw_json: String) -> void:
 			var incoming = data.get("messages", [])
 			if not incoming is Array:
 				return
+			# Keep locally cached lobby messages if a restarted server temporarily returns an empty snapshot.
+			if channel == "lobby" and incoming.is_empty() and not chat_messages.get(key, []).is_empty():
+				chat_history_received.emit(channel, target_room)
+				return
 			chat_messages[key] = []
 			for message in incoming.slice(-CHAT_HISTORY_LIMIT):
 				if message is Dictionary:
 					_cache_chat_message(key, message)
+			if channel == "lobby":
+				_save_lobby_chat_cache()
 			chat_history_received.emit(channel, target_room)
 		elif _cache_chat_message(key, data):
+			if channel == "lobby":
+				_save_lobby_chat_cache()
 			chat_message_received.emit(data)
 		return
 	if msg_type == "CHAT_ERROR":
@@ -421,6 +431,36 @@ func _cache_chat_message(key: String, message: Dictionary) -> bool:
 func get_chat_messages(channel: String) -> Array:
 	return chat_messages.get(_chat_key(channel, room_id), []).duplicate(true)
 
+func _can_persist_lobby_chat_cache() -> bool:
+	return AuthManager == null or not AuthManager.disable_session_save
+
+func _load_lobby_chat_cache() -> void:
+	if not _can_persist_lobby_chat_cache() or not FileAccess.file_exists(LOBBY_CHAT_CACHE_FILE):
+		return
+	var file := FileAccess.open(LOBBY_CHAT_CACHE_FILE, FileAccess.READ)
+	if not file:
+		return
+	var parsed = JSON.parse_string(file.get_as_text())
+	file.close()
+	if not parsed is Array:
+		return
+	var key := _chat_key("lobby")
+	if not chat_messages.has(key):
+		chat_messages[key] = []
+	for message in parsed.slice(-CHAT_HISTORY_LIMIT):
+		if message is Dictionary:
+			_cache_chat_message(key, message)
+
+func _save_lobby_chat_cache() -> void:
+	if not _can_persist_lobby_chat_cache():
+		return
+	var key := _chat_key("lobby")
+	var messages: Array = chat_messages.get(key, []).slice(-CHAT_HISTORY_LIMIT)
+	var file := FileAccess.open(LOBBY_CHAT_CACHE_FILE, FileAccess.WRITE)
+	if file:
+		file.store_string(JSON.stringify(messages))
+		file.close()
+
 func request_chat_history(channel: String) -> void:
 	if _chat_unavailable:
 		chat_error.emit(channel, CHAT_UNAVAILABLE_MESSAGE)
@@ -431,6 +471,24 @@ func request_chat_history(channel: String) -> void:
 	if channel == "battle":
 		payload["roomId"] = room_id
 	send_json(payload)
+
+func _build_social_chat_profile() -> Dictionary:
+	var mil_pts: int = AuthManager.get_military_points() if AuthManager else 0
+	return {
+		"userId": AuthManager.current_user_id if AuthManager else "",
+		"userName": AuthManager.current_user_name if AuthManager else "",
+		"title": AuthManager.current_title if AuthManager else "",
+		"profileBg": maxi(0, AuthManager.current_profile_bg) if AuthManager else 0,
+		"level": maxi(1, AuthManager.current_level) if AuthManager else 1,
+		"exp": maxi(0, AuthManager.current_exp) if AuthManager else 0,
+		"rankIndex": maxi(0, AuthManager.current_2v2_rank_index) if AuthManager else 0,
+		"rankStars": maxi(0, AuthManager.current_2v2_stars) if AuthManager else 0,
+		"rankAcc": maxi(0, AuthManager.current_2v2_accumulation_points) if AuthManager else 0,
+		"militaryPoints": maxi(0, mil_pts),
+		"wins": maxi(0, AuthManager.current_wins) if AuthManager else 0,
+		"losses": maxi(0, AuthManager.current_losses) if AuthManager else 0,
+		"generalsCount": maxi(1, AuthManager.current_generals.size()) if AuthManager else 1
+	}
 
 func send_chat_message(channel: String, text: String) -> bool:
 	if not is_connected_to_server or socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
@@ -443,51 +501,21 @@ func send_chat_message(channel: String, text: String) -> bool:
 	if text.is_empty() or text.length() > 280:
 		chat_error.emit(channel, "Nhập tin nhắn từ 1 đến 280 ký tự")
 		return false
-	var mil_pts: int = AuthManager.get_military_points() if AuthManager else 0
-	var payload: Dictionary = {
-		"action": "CHAT_SEND",
-		"channel": channel,
-		"text": text,
-		"userId": AuthManager.current_user_id if AuthManager else "",
-		"userName": AuthManager.current_user_name if AuthManager else "",
-		"title": AuthManager.current_title if AuthManager else "",
-		"profileBg": AuthManager.current_profile_bg if AuthManager else 0,
-		"level": AuthManager.current_level if AuthManager else 1,
-		"exp": AuthManager.current_exp if AuthManager else 0,
-		"rankIndex": AuthManager.current_2v2_rank_index if AuthManager else 0,
-		"rankStars": AuthManager.current_2v2_stars if AuthManager else 0,
-		"rankAcc": AuthManager.current_2v2_accumulation_points if AuthManager else 0,
-		"militaryPoints": mil_pts,
-		"wins": AuthManager.current_wins if AuthManager else 0,
-		"losses": AuthManager.current_losses if AuthManager else 0,
-		"generalsCount": AuthManager.current_generals.size() if AuthManager else 1
-	}
+	var payload: Dictionary = _build_social_chat_profile()
+	payload["action"] = "CHAT_SEND"
+	payload["channel"] = channel
+	payload["text"] = text
 	if channel == "battle":
 		payload["roomId"] = room_id
 	send_json(payload)
 	return true
 
-
 func register_social_profile() -> void:
 	if not AuthManager or AuthManager.current_user_id.is_empty():
 		return
-	var mil_pts: int = AuthManager.get_military_points() if AuthManager else 0
-	send_json({
-		"action": "SOCIAL_REGISTER",
-		"userId": AuthManager.current_user_id,
-		"userName": AuthManager.current_user_name,
-		"level": AuthManager.current_level if AuthManager else 1,
-		"exp": AuthManager.current_exp if AuthManager else 0,
-		"title": AuthManager.current_title if AuthManager else "",
-		"profileBg": AuthManager.current_profile_bg if AuthManager else 0,
-		"rankIndex": AuthManager.current_2v2_rank_index if AuthManager else 0,
-		"rankStars": AuthManager.current_2v2_stars if AuthManager else 0,
-		"rankAcc": AuthManager.current_2v2_accumulation_points if AuthManager else 0,
-		"militaryPoints": mil_pts,
-		"wins": AuthManager.current_wins if AuthManager else 0,
-		"losses": AuthManager.current_losses if AuthManager else 0,
-		"generalsCount": AuthManager.current_generals.size() if AuthManager else 1
-	})
+	var payload: Dictionary = _build_social_chat_profile()
+	payload["action"] = "SOCIAL_REGISTER"
+	send_json(payload)
 
 func request_friend_list() -> void:
 	if AuthManager and not AuthManager.current_user_id.is_empty():

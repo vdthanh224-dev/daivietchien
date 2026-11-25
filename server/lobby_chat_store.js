@@ -6,6 +6,7 @@ export const LOBBY_CHAT_DOCUMENT_TYPE = "LOBBY_CHAT_MESSAGE_V1";
 export function createLobbyChatStore({ request, documentsPath, limit = LOBBY_CHAT_HISTORY_LIMIT,
   documentType = LOBBY_CHAT_DOCUMENT_TYPE, onCleanupError = () => {} }) {
   let queue = Promise.resolve();
+  let knownTotal = null;
   const serial = (operation) => {
     const pending = queue.then(operation);
     queue = pending.catch(() => {});
@@ -14,7 +15,7 @@ export function createLobbyChatStore({ request, documentsPath, limit = LOBBY_CHA
   const call = (path, options = {}) => request(path, { signal: AbortSignal.timeout(5000), ...options });
   const query = (method, attribute, values) => ({ method, ...(attribute ? { attribute } : {}), ...(values ? { values } : {}) });
 
-  async function list(offset = 0) {
+  async function listPage(offset = 0) {
     const queries = [query("equal", "userId", [documentType]), query("orderDesc", "timestamp"),
       query("orderDesc", "$sequence"), query("limit", null, [limit]), query("offset", null, [offset])];
     const search = queries.map((value, i) => `queries[${i}]=${encodeURIComponent(JSON.stringify(value))}`).join("&");
@@ -22,7 +23,13 @@ export function createLobbyChatStore({ request, documentsPath, limit = LOBBY_CHA
     if (!response?.ok) throw new Error(`Cannot read lobby history (${response?.status || "offline"})`);
     const body = await response.json();
     if (!Array.isArray(body.documents)) throw new Error("Invalid lobby history response");
-    return body.documents;
+    const total = Number.isFinite(Number(body.total)) ? Number(body.total) : null;
+    if (total !== null) knownTotal = total;
+    return { total, documents: body.documents };
+  }
+
+  async function list(offset = 0) {
+    return (await listPage(offset)).documents;
   }
 
   function decode(document) {
@@ -50,14 +57,24 @@ export function createLobbyChatStore({ request, documentsPath, limit = LOBBY_CHA
   }
 
   async function prune() {
+    if (knownTotal !== null && knownTotal <= limit) return;
     // Re-read the overflow page after each batch: deleting a page shifts offsets.
     for (let page = 0; page < 10; page++) {
-      const overflow = await list(limit);
-      if (!overflow.length) return;
+      const { documents: overflow } = await listPage(limit);
+      if (!overflow.length) {
+        knownTotal = knownTotal !== null ? Math.min(knownTotal, limit) : limit;
+        return;
+      }
       for (const document of overflow) {
         if (document.userId !== documentType || !String(document.$id).startsWith("lc_")) continue;
         const response = await call(`${documentsPath}/${encodeURIComponent(document.$id)}`, { method: "DELETE" });
         if (!response?.ok && response?.status !== 404) throw new Error(`Cannot trim lobby history (${response?.status || "offline"})`);
+        if (knownTotal !== null) knownTotal = Math.max(0, knownTotal - 1);
+      }
+      // Avoid a trailing empty Appwrite query once the last overflow page has fewer than `limit` docs.
+      if (overflow.length < limit) {
+        knownTotal = limit;
+        return;
       }
     }
   }
@@ -82,11 +99,12 @@ export function createLobbyChatStore({ request, documentsPath, limit = LOBBY_CHA
         }
       } else if (!response?.ok) {
         throw new Error(`Cannot save lobby message (${response?.status || "offline"})`);
+      } else if (knownTotal !== null) {
+        knownTotal += 1;
       }
     }
-    // Cleanup once per batch. This avoids one extra Appwrite read for every
-    // chat message while preserving the same durable history limit.
-    if (cleanup) {
+    // Skip prune reads entirely while stored count is within `limit`.
+    if (cleanup && (knownTotal === null || knownTotal > limit)) {
       try { await prune(); } catch (error) { onCleanupError(error); }
     }
     return normalizedMessages;

@@ -296,13 +296,15 @@ func _render_messages() -> void:
 		}
 		var meta_idx = _meta_cache.size()
 		_meta_cache.append(player_meta)
+		var safe_sender := sender_disp.replace("[", "[lb]")
+		var safe_title := title_id.replace("[", "[lb]")
 		# Tên người chơi có link để click xem hồ sơ
-		messages_view.append_text("[url=%d][color=#fadb72]%s[/color][/url]" % [meta_idx, sender_disp])
+		messages_view.append_text("[url=%d][color=#fadb72]%s[/color][/url]" % [meta_idx, safe_sender])
 		# Danh hiệu bên cạnh tên (ví dụ: ADMIN 7 sắc cầu vồng nhấp nháy neon)
 		if title_id == "admin":
 			messages_view.append_text(" [url=%d][rainbow freq=0.6 sat=1.0 val=1.0]ADMIN[/rainbow][/url]" % meta_idx)
 		elif not title_id.is_empty():
-			messages_view.append_text(" [url=%d][color=#e0b0ff][%s][/color][/url]" % [meta_idx, title_id.to_upper()])
+			messages_view.append_text(" [url=%d][color=#e0b0ff][%s][/color][/url]" % [meta_idx, safe_title.to_upper()])
 		messages_view.append_text(": ")
 		# add_text bảo vệ tin nhắn của người chơi tránh bị tiêm BBCode
 		messages_view.add_text(str(message.get("text", "")) + "\n")

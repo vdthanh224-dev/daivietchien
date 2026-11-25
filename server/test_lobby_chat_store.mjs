@@ -51,5 +51,25 @@ const tiedDb = createAppwriteChatFixture();
 const tied = createLobbyChatStore({ ...options, request: tiedDb.request });
 for (let i = 0; i < 110; i++) await tied.append({ ...message(i), timestamp: 1800000000000 });
 assert.deepEqual((await tied.history()).map((m) => m.id), Array.from({ length: 50 }, (_, i) => `message-${i + 60}`));
-await assert.rejects(store.append({ ...message(200), channel: "battle" }), /Invalid/);
+assert.rejects(store.append({ ...message(200), channel: "battle" }), /Invalid/);
+
+// Verify Appwrite read quota optimizations:
+// 1) When stored total <= limit (known from history()), appending causes 0 list/prune reads.
+// 2) When stored total exceeds limit by 1 page, prune() stops after 1 list() instead of a trailing empty query.
+const quotaDb = createAppwriteChatFixture();
+let getCount = 0;
+const countedRequest = async (path, reqOptions = {}) => {
+  if ((reqOptions.method || "GET") === "GET") getCount += 1;
+  return quotaDb.request(path, reqOptions);
+};
+const quotaStore = createLobbyChatStore({ ...options, request: countedRequest });
+for (let i = 0; i < 38; i++) await quotaStore.append(message(i));
+await quotaStore.history();
+const readsAfterBaseline = getCount;
+for (let i = 38; i < 50; i++) await quotaStore.append(message(i));
+assert.equal(getCount, readsAfterBaseline, "Appending while total <= limit must trigger 0 prune reads");
+await quotaStore.append(message(50));
+assert.equal(getCount - readsAfterBaseline, 1, "Pruning a single overflow item must perform only 1 list read");
+assert.equal((await quotaStore.history()).length, 50);
+
 console.log("PASS: durable 50-message lobby history, restart, retention, concurrent sends, idempotency, isolation and recovery");

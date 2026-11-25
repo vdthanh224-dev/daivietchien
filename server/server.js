@@ -49,8 +49,9 @@ const APPWRITE_MATCHMAKING_DATABASE = "game";
 const APPWRITE_MATCHMAKING_COLLECTION = "matchmaking_queue";
 const APPWRITE_MATCHMAKING_MAX_AGE_MS = 180000;
 const APPWRITE_MATCHMAKING_POLL_MS = 5000;
-const APPWRITE_CHAT_ENABLED = (typeof Deno !== "undefined" && Deno.env?.get("APPWRITE_CHAT_ENABLED") === "true")
-  || (typeof process !== "undefined" && process.env?.APPWRITE_CHAT_ENABLED === "true");
+const APPWRITE_CHAT_ENV = (typeof Deno !== "undefined" ? Deno.env?.get("APPWRITE_CHAT_ENABLED") : undefined)
+  ?? (typeof process !== "undefined" ? process.env?.APPWRITE_CHAT_ENABLED : undefined);
+const APPWRITE_CHAT_ENABLED = APPWRITE_CHAT_ENV !== "false";
 const lobbyChatStore = createLobbyChatStore({
   request: appwriteMatchmakingRequest,
   documentsPath: `/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents`,
@@ -66,7 +67,7 @@ let lobbyChatHistoryLoadPromise = null;
 let lobbyChatHistoryRetryAt = 0;
 const LOBBY_CHAT_HISTORY_RETRY_MS = 30000;
 let lobbyChatQueue = Promise.resolve();
-const LOBBY_CHAT_FLUSH_INTERVAL_MS = 30000;
+const LOBBY_CHAT_FLUSH_INTERVAL_MS = 60000;
 const LOBBY_CHAT_FLUSH_BATCH_SIZE = 20;
 let pendingLobbyChatMessages = [];
 let lobbyChatFlushTimer = null;
@@ -1001,11 +1002,14 @@ console.log("🎮 [Deno Server] Đại Việt Chiến 2v2 Unified Game Server (1
 const RENDER_EXTERNAL_URL = (typeof Deno !== "undefined" && Deno.env?.get("RENDER_EXTERNAL_URL"))
   || "https://daivietchien.onrender.com";
 
-setInterval(async () => {
-  const hasActiveConnection = [...lobbyChatSockets].some((socket) => socket.readyState === WebSocket.OPEN)
+function hasAnyOpenSocket() {
+  return [...lobbyChatSockets].some((socket) => socket.readyState === WebSocket.OPEN)
     || [...socialProfiles.values()].some((profile) => profile.socket?.readyState === WebSocket.OPEN)
     || [...rooms.values()].some((room) => [...(room.sockets?.values?.() || [])].some((socket) => socket?.readyState === WebSocket.OPEN));
-  if (!hasActiveConnection) return;
+}
+
+setInterval(async () => {
+  if (!hasAnyOpenSocket()) return;
   try {
     await fetch(`${RENDER_EXTERNAL_URL}/`, {
       headers: { "User-Agent": "DaiVietChien-KeepAlive/1.0" },
@@ -1015,8 +1019,30 @@ setInterval(async () => {
   }
 }, 9 * 60 * 1000);
 
-// Sync initial social profiles after boot without a 24/7 background polling loop.
-syncSocialProfilesFromAppwrite();
+// Flush buffered lobby chat cleanly before container shutdown on Linux/Render.
+if (typeof Deno !== "undefined" && typeof Deno.addSignalListener === "function" && Deno.build?.os !== "windows") {
+  for (const sig of ["SIGTERM", "SIGINT"]) {
+    try {
+      Deno.addSignalListener(sig, async () => {
+        if (lobbyChatFlushTimer) {
+          clearTimeout(lobbyChatFlushTimer);
+          lobbyChatFlushTimer = null;
+        }
+        try {
+          await flushLobbyChatMessages();
+        } catch (_err) {
+          // Best-effort flush before process exit.
+        }
+        Deno.exit(0);
+      });
+    } catch (_err) {
+      // Ignore unsupported signal listeners in constrained sandboxes.
+    }
+  }
+}
+
+// Social profiles sync lazily on FRIEND_SEARCH / FRIEND_REQUEST instead of
+// scanning all LEADERBOARD_PLAYER docs on every Render cold boot.
 
 function ensureLocalRoom(roomId, players = null, forceReinit = false, modeId = "2v2") {
   let room = rooms.get(roomId);
@@ -1887,7 +1913,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
               socket.send(JSON.stringify({ type: "FRIEND_SEARCH_RESULT", results: [], query: rawQuery }));
               return;
             }
-            if (Date.now() - lastSocialAppwriteSync > 15 * 60 * 1000) {
+            if (Date.now() - lastSocialAppwriteSync > 30 * 60 * 1000) {
               await syncSocialProfilesFromAppwrite();
             }
             const tokens = queryNorm.split(/\s+/).filter(Boolean);
@@ -1951,7 +1977,7 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           if (action === "FRIEND_REQUEST") {
             const targetId = socialUserId(payload.targetUserId);
             if (!targetId || targetId === socialId) return sendSocialError(socket, "Người chơi không hợp lệ");
-            if (!socialProfiles.has(targetId) && Date.now() - lastSocialAppwriteSync > 15 * 60 * 1000) {
+            if (!socialProfiles.has(targetId) && Date.now() - lastSocialAppwriteSync > 30 * 60 * 1000) {
               await syncSocialProfilesFromAppwrite();
             }
             if (!socialProfiles.has(targetId)) return sendSocialError(socket, "Không tìm thấy người chơi này");
@@ -2386,6 +2412,14 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
         const social = socialProfiles.get(socket.socialUserId);
         if (social?.socket === socket) social.socket = null;
         sendSocialSnapshot(socket.socialUserId);
+      }
+      if (APPWRITE_CHAT_ENABLED && pendingLobbyChatMessages.length > 0 && !hasAnyOpenSocket()) {
+        if (lobbyChatFlushTimer) {
+          clearTimeout(lobbyChatFlushTimer);
+          lobbyChatFlushTimer = null;
+        }
+        const flushOp = lobbyChatQueue.then(() => flushLobbyChatMessages());
+        lobbyChatQueue = flushOp.catch(() => {});
       }
       // Capture identity before delayed cleanup; reconnects can mutate these
       // handler variables before the timer fires.

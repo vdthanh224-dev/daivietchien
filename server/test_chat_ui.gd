@@ -69,6 +69,8 @@ func _run() -> void:
 	lobby.input.text = "Bản nháp"
 	lobby._on_history("lobby", "")
 	check(lobby.input.text == "Bản nháp", "Reconnect should retain the draft")
+	packet({"type": "CHAT_HISTORY", "channel": "lobby", "roomId": "", "messages": []})
+	check(network.get_chat_messages("lobby").size() == 3, "Empty server history must not wipe cached lobby messages")
 	lobby._pending_text = "Bản nháp"
 	packet({"type": "CHAT_MESSAGE", "channel": "lobby", "id": "lobby-4", "userId": "chat-ui-test", "userName": "Tướng Quân", "text": "Bản nháp"})
 	check(lobby.input.text.is_empty(), "Only the server acknowledgment should clear a sent draft")

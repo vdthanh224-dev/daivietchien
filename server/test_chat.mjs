@@ -12,6 +12,7 @@ for (const [statement, names, path] of [...source.matchAll(/^import\s+\{([\s\S]*
 }
 let handler;
 const errors = [];
+const bootGetPaths = [];
 let testNow = Date.now();
 const chatDb = createAppwriteChatFixture();
 class TestDate extends Date { static now() { return testNow; } }
@@ -20,15 +21,19 @@ const sandbox = {
   console: { log() {}, warn() {}, error: (...args) => errors.push(args.join(" ")) },
   WebSocket: { OPEN: 1, CLOSED: 3 },
   setInterval() {}, setTimeout() {}, clearInterval() {}, clearTimeout() {},
-  fetch: chatDb.request,
+  fetch: (path, options = {}) => {
+    if ((options.method || "GET") === "GET") bootGetPaths.push(String(path));
+    return chatDb.request(path, options);
+  },
   Deno: {
-    env: { get(k) { if (k === "APPWRITE_CHAT_ENABLED") return "true"; } },
+    env: { get() { return undefined; } },
     serve(_options, callback) { handler = callback; },
     upgradeWebSocket(request) { return { socket: request.socket, response: {} }; },
   },
 };
 source += "\nglobalThis.chatTests = { rooms, lobbyChatSockets, activeMatchmakingSockets, waitLobby: () => lobbyChatQueue, flushLobby: () => flushLobbyChatMessages(), pendingLobby: () => pendingLobbyChatMessages };";
 vm.runInNewContext(source, sandbox, { filename: "server.js" });
+assert.equal(bootGetPaths.length, 0, "Cold boot must not scan Appwrite profiles or chat before any client requests them");
 const { rooms, lobbyChatSockets } = sandbox.chatTests;
 async function connect(userId, appHandler = handler, tests = sandbox.chatTests) {
   const socket = {
