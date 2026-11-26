@@ -36,6 +36,8 @@ var modal_panel: PanelContainer
 var modal_title_label: Label
 var modal_scroll: ScrollContainer
 var modal_content_container: VBoxContainer
+var _modal_open_seq: int = 0
+var _modal_tween: Tween = null
 var mail_badge: Control = null
 var checkin_btn_ref: Button = null
 
@@ -2228,7 +2230,7 @@ func _build_modal_layer() -> void:
 	modal_overlay = ColorRect.new()
 	modal_overlay.set_anchors_preset(PRESET_FULL_RECT)
 	modal_overlay.color = Color(0.02, 0.04, 0.08, 0.75)
-	modal_overlay.z_index = 100
+	modal_overlay.z_index = 250
 	modal_overlay.visible = false
 	add_child(modal_overlay)
 
@@ -2667,13 +2669,64 @@ func _cancel_matchmaking_internal() -> void:
 	elif mm_active_room_id != "" and my_uid != "":
 		AppwriteMatchmaking.leave_room_slot(mm_active_room_id, my_uid)
 
+## Giữ đồng bộ z_index và thứ tự node con để overlay lớp trên luôn hiển thị và nhận thao tác chuột/chạm trước lớp dưới.
+func _sync_overlay_order() -> void:
+	var toast: Node = get_node_or_null("HeroUpgradeToast")
+	var layers: Array = [
+		{"node": _fullscreen_heroes_panel, "z": 85},
+		{"node": _fullscreen_than_dien_panel, "z": 85},
+		{"node": _gacha_reveal_layer, "z": 120},
+		{"node": modal_overlay, "z": 250},
+		{"node": levelup_overlay, "z": 280},
+		{"node": toast, "z": 300}
+	]
+	for item in layers:
+		var n = item["node"]
+		if n != null and is_instance_valid(n):
+			if n is CanvasItem:
+				(n as CanvasItem).z_index = int(item["z"])
+			n.move_to_front()
+
+func _close_mode_drawer() -> void:
+	if is_instance_valid(mode_drawer_panel):
+		mode_drawer_panel.visible = false
+
+func _hide_modal_immediate() -> void:
+	_modal_open_seq += 1
+	if _modal_tween != null and _modal_tween.is_valid():
+		_modal_tween.kill()
+		_modal_tween = null
+	_close_mode_drawer()
+	if is_instance_valid(modal_overlay):
+		modal_overlay.visible = false
+	if is_instance_valid(modal_panel):
+		modal_panel.scale = Vector2.ONE
+		modal_panel.modulate.a = 1.0
+		modal_panel.custom_minimum_size = Vector2(840, 530)
+	if is_instance_valid(modal_scroll):
+		modal_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		modal_scroll.scroll_vertical = 0
+	if is_instance_valid(modal_content_container):
+		for child in modal_content_container.get_children():
+			child.queue_free()
+
 func _show_modal(title_text: String, content_node: Node) -> void:
 	if is_matchmaking_active and not title_text.begins_with("⚔️ TÌM TRẬN"):
 		_cancel_matchmaking_internal()
 
+	_modal_open_seq += 1
+	if _modal_tween != null and _modal_tween.is_valid():
+		_modal_tween.kill()
+		_modal_tween = null
+
+	_close_mode_drawer()
+
+	var prev_title := modal_title_label.text if is_instance_valid(modal_title_label) else ""
 	AudioManager.play_card_draw()
 	if is_instance_valid(modal_title_label):
 		modal_title_label.text = title_text
+	if prev_title != title_text and is_instance_valid(modal_scroll):
+		modal_scroll.scroll_vertical = 0
 
 	# Clear previous content
 	if is_instance_valid(modal_content_container):
@@ -2685,6 +2738,7 @@ func _show_modal(title_text: String, content_node: Node) -> void:
 
 	if is_instance_valid(modal_overlay):
 		modal_overlay.visible = true
+	_sync_overlay_order()
 	if is_instance_valid(modal_panel):
 		if title_text.begins_with("⚔️ TÌM TRẬN") or title_text == "TRẬN ĐẤU ĐANG DIỄN RA":
 			modal_panel.custom_minimum_size = Vector2(580, 310)
@@ -2721,6 +2775,7 @@ func _show_modal(title_text: String, content_node: Node) -> void:
 		modal_panel.scale = Vector2(0.9, 0.9)
 		modal_panel.modulate.a = 0.0
 		var tw = create_tween().set_parallel(true)
+		_modal_tween = tw
 		tw.tween_property(modal_panel, "scale", Vector2(1.0, 1.0), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		tw.tween_property(modal_panel, "modulate:a", 1.0, 0.15)
 
@@ -2728,17 +2783,30 @@ func _hide_modal() -> void:
 	if is_matchmaking_active:
 		_cancel_matchmaking_internal()
 
+	_modal_open_seq += 1
+	var hide_seq: int = _modal_open_seq
+	if _modal_tween != null and _modal_tween.is_valid():
+		_modal_tween.kill()
+		_modal_tween = null
+
 	AudioManager.play_card_select()
 	if is_instance_valid(modal_panel):
 		var tw = create_tween().set_parallel(true)
+		_modal_tween = tw
 		tw.tween_property(modal_panel, "scale", Vector2(0.9, 0.9), 0.15)
 		tw.tween_property(modal_panel, "modulate:a", 0.0, 0.15)
 		await tw.finished
+		if _modal_open_seq != hide_seq:
+			return
+		_modal_tween = null
+	if is_instance_valid(modal_overlay):
+		modal_overlay.visible = false
+	if is_instance_valid(modal_panel):
+		modal_panel.scale = Vector2.ONE
+		modal_panel.modulate.a = 1.0
 		modal_panel.custom_minimum_size = Vector2(840, 530)
 		if is_instance_valid(modal_scroll):
 			modal_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	if is_instance_valid(modal_overlay):
-		modal_overlay.visible = false
 	if is_instance_valid(modal_content_container):
 		for child in modal_content_container.get_children():
 			child.queue_free()
@@ -2948,13 +3016,15 @@ func _run_exp_animation_loop(lvl: int, cur_exp: int, remaining: int, on_finished
 		)
 
 func _show_level_up_modal(old_lvl: int, new_lvl: int, on_close: Callable = Callable()) -> void:
+	_close_mode_drawer()
 	if levelup_overlay != null and is_instance_valid(levelup_overlay):
 		levelup_overlay.queue_free()
 
 	levelup_overlay = Control.new()
 	levelup_overlay.set_anchors_preset(PRESET_FULL_RECT)
-	levelup_overlay.z_index = 120
+	levelup_overlay.z_index = 280
 	add_child(levelup_overlay)
+	_sync_overlay_order()
 
 	# 1. Dark Vignette Background
 	var bg_dim = ColorRect.new()
@@ -3351,7 +3421,7 @@ func _show_hero_upgrade_toast(hero_name: String) -> void:
 		old_toast.free()
 	var toast = PanelContainer.new()
 	toast.name = "HeroUpgradeToast"
-	toast.z_index = 260
+	toast.z_index = 300
 	toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	toast.set_anchors_preset(PRESET_CENTER_TOP)
 	toast.grow_horizontal = GROW_DIRECTION_BOTH
@@ -3381,6 +3451,7 @@ func _show_hero_upgrade_toast(hero_name: String) -> void:
 	lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.45, 1.0))
 	toast.add_child(lbl)
 	add_child(toast)
+	_sync_overlay_order()
 
 	toast.modulate.a = 0.0
 	var tw = toast.create_tween()
@@ -3405,6 +3476,7 @@ func _execute_hero_lv2_upgrade(hero_id: int) -> Dictionary:
 
 # --- Fullscreen Danh Tướng Gallery ---
 func _show_fullscreen_heroes() -> void:
+	_hide_modal_immediate()
 	if is_instance_valid(_fullscreen_heroes_panel):
 		_fullscreen_heroes_panel.queue_free()
 		_fullscreen_heroes_panel = null
@@ -3415,6 +3487,7 @@ func _show_fullscreen_heroes() -> void:
 	fs.z_index = 85
 	_fullscreen_heroes_panel = fs
 	add_child(fs)
+	_sync_overlay_order()
 
 	# Fullscreen dark royal background
 	var bg = ColorRect.new()
@@ -5540,6 +5613,7 @@ func _style_than_dien_summon_5_btn(btn: Button) -> void:
 
 # --- THẦN ĐIỆN (SANCTUARY / GACHA) ---
 func _show_fullscreen_than_dien() -> void:
+	_hide_modal_immediate()
 	if is_instance_valid(_fullscreen_than_dien_panel):
 		_fullscreen_than_dien_panel.queue_free()
 		_fullscreen_than_dien_panel = null
@@ -5550,6 +5624,7 @@ func _show_fullscreen_than_dien() -> void:
 	fs.z_index = 85
 	_fullscreen_than_dien_panel = fs
 	add_child(fs)
+	_sync_overlay_order()
 
 	# 1. Dark royal backdrop with temple atmosphere
 	var bg = ColorRect.new()
@@ -6539,6 +6614,7 @@ func _build_gacha_card(res: Dictionary, is_small: bool) -> Control:
 	return card
 
 func _play_gacha_reveal_animation(results: Array, count: int) -> void:
+	_hide_modal_immediate()
 	if is_instance_valid(_gacha_reveal_layer):
 		_gacha_reveal_layer.queue_free()
 		_gacha_reveal_layer = null
@@ -6549,6 +6625,7 @@ func _play_gacha_reveal_animation(results: Array, count: int) -> void:
 	rev.z_index = 120
 	_gacha_reveal_layer = rev
 	add_child(rev)
+	_sync_overlay_order()
 
 	# Deep mystical dark backdrop
 	var bg = ColorRect.new()
@@ -9915,7 +9992,6 @@ func _build_shop_content() -> Control:
 	_style_bronze_drum_cta(go_than_dien_btn)
 	go_than_dien_btn.pressed.connect(func():
 		AudioManager.play_card_select()
-		_hide_modal()
 		_show_fullscreen_than_dien()
 	)
 	bottom_row.add_child(go_than_dien_btn)
