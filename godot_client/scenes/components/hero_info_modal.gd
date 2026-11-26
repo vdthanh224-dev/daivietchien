@@ -203,7 +203,8 @@ func display_general(g: Dictionary, my_seat: int = 1) -> void:
 	if is_instance_valid(dynasty_label):
 		dynasty_label.text = faction
 	if is_instance_valid(hero_name_label):
-		hero_name_label.text = hero_name
+		var hero_lv := int(g.get("hero_level", 1))
+		hero_name_label.text = ("%s  ★Lv.2" % hero_name) if hero_lv >= 2 else hero_name
 
 	# HP Blossoms Display
 	_update_hp_display(current_hp, max_hp)

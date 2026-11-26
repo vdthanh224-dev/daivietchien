@@ -2600,9 +2600,15 @@ func _init_generals_from_draft() -> void:
 		if hero_info == null or not (hero_info is Dictionary) or hero_info.is_empty():
 			hero_info = HeroDatabase.get_hero(fallback_hero_ids[i % fallback_hero_ids.size()])
 
+		var h_id_resolved := int(hero_info.get("id", s_num))
+		var slot_hero_lv := int(slot_data.get("heroLevel", slot_data.get("hero_level", 0)))
+		if slot_hero_lv <= 0:
+			slot_hero_lv = HeroDatabase.get_hero_level(h_id_resolved) if (is_p and HeroDatabase and HeroDatabase.has_method("get_hero_level")) else 1
+		var lv_hp_stats: Dictionary = HeroDatabase.get_hero_hp_stats(h_id_resolved, slot_hero_lv) if (HeroDatabase and HeroDatabase.has_method("get_hero_hp_stats")) else {}
 		var h_name = hero_info.get("name", "Tướng %d" % s_num)
 		var h_faction = hero_info.get("faction", "Thăng Long")
-		var h_hp = int(slot_data.get("maxHp", hero_info.get("maxHp", hero_info.get("hp", 4))))
+		var role_code_hp := str(slot_data.get("role", ""))
+		var h_hp = int(slot_data.get("maxHp", int(lv_hp_stats.get("max_hp", hero_info.get("maxHp", hero_info.get("hp", 4)))) + (1 if role_code_hp == "KING" else 0)))
 		
 		var slug = hero_info.get("slug", "")
 		if slug == "":
@@ -2631,11 +2637,11 @@ func _init_generals_from_draft() -> void:
 		var is_ally: bool = (is_drag == my_team_is_dragon) if not is_dynasty else (role_code in ["KING", "LOYALIST"] and local_dynasty_role in ["KING", "LOYALIST"])
 
 		var avatar_node = seat_to_avatar[s_num]
-		var hero_starting_hp = int(hero_info.get("starting_hp", hero_info.get("startingHp", 0)))
+		var hero_starting_hp = int(lv_hp_stats.get("starting_hp", hero_info.get("starting_hp", hero_info.get("startingHp", 0))))
 		var start_hp = 0
 		if slot_data.has("startingHp") or slot_data.has("starting_hp"):
 			start_hp = int(slot_data.get("startingHp", slot_data.get("starting_hp", 0)))
-		elif hero_starting_hp > 0:
+		elif int(lv_hp_stats.get("base_starting_hp", hero_starting_hp)) < int(lv_hp_stats.get("base_max_hp", h_hp)):
 			start_hp = hero_starting_hp
 		elif slot_data.has("hp"):
 			start_hp = int(slot_data["hp"])
@@ -2677,6 +2683,7 @@ func _init_generals_from_draft() -> void:
 			"name": h_name,
 			"player_name": slot_user_name,
 			"hero_id": int(hero_info.get("id", s_num)),
+			"hero_level": slot_hero_lv,
 			"faction": h_faction,
 			"hp": start_hp,
 			"max_hp": h_hp,
@@ -7383,6 +7390,7 @@ func _build_initial_server_players() -> Array:
 			"seat": seat,
 			"userId": u_id,
 			"heroId": "HERO_" + h_id if not h_id.begins_with("HERO_") else h_id,
+			"heroLevel": int(g.get("hero_level", 1)),
 			"generalName": g.get("name", "Tướng %d" % seat),
 			"maxHp": g.get("max_hp", 4),
 			"hp": g.get("hp", 4),
@@ -8156,6 +8164,8 @@ func _apply_network_game_state(state: Dictionary) -> void:
 				my_team_is_dragon = g["isDragon"]
 		var server_hp = int(p.get("hp", g["hp"]))
 		var server_max_hp = int(p.get("maxHp", g["max_hp"]))
+		if p.has("heroLevel"):
+			g["hero_level"] = int(p.get("heroLevel", g.get("hero_level", 1)))
 		# The server hides other players' roles. Do not erase a role already
 		# received from the private draft snapshot when the incoming value is empty.
 		# 2v2 is team based; any legacy server fallback role must never replace

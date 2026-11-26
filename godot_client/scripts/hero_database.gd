@@ -1106,6 +1106,28 @@ func _get_day_of_year(year: int, month: int, day: int) -> int:
 	doy += day
 	return doy
 
+func get_hero_level(hero_id: int) -> int:
+	if AuthManager and AuthManager.has_method("get_hero_level"):
+		return AuthManager.get_hero_level(hero_id)
+	return 1
+
+func get_hero_hp_stats(hero_id: int, level_override: int = -1) -> Dictionary:
+	var hero := get_hero(hero_id)
+	var base_max := int(hero.get("maxHp", 4))
+	var base_start := int(hero.get("starting_hp", hero.get("startingHp", base_max)))
+	if base_start <= 0:
+		base_start = base_max
+	var lv := level_override if level_override >= 1 else get_hero_level(hero_id)
+	var bonus := 1 if lv >= 2 else 0
+	return {
+		"level": lv,
+		"bonus_hp": bonus,
+		"base_max_hp": base_max,
+		"base_starting_hp": base_start,
+		"max_hp": base_max + bonus,
+		"starting_hp": base_start + bonus,
+	}
+
 func is_hero_owned(hero_id: int) -> bool:
 	if AuthManager and AuthManager.is_admin():
 		return true

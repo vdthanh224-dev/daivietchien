@@ -3265,6 +3265,144 @@ func _show_level_up_modal(old_lvl: int, new_lvl: int, on_close: Callable = Calla
 	pop_tw.tween_property(box, "scale", Vector2(1.0, 1.0), 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	pop_tw.tween_property(box, "modulate:a", 1.0, 0.25)
 
+func _build_shard_progress_bar(shards: int, target: int = 100, bar_height: float = 16.0, show_text: bool = true, is_max_level: bool = false, compact: bool = false) -> Control:
+	var wrap = Control.new()
+	wrap.custom_minimum_size = Vector2(0, bar_height)
+	wrap.size_flags_horizontal = SIZE_EXPAND_FILL
+	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	var safe_target := maxi(1, target)
+	var ratio := 1.0 if is_max_level else clampf(float(shards) / float(safe_target), 0.0, 1.0)
+	var is_ready := (not is_max_level) and shards >= safe_target
+
+	var track = Panel.new()
+	track.set_anchors_preset(PRESET_FULL_RECT)
+	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	track.clip_contents = true
+	var tr_style = StyleBoxFlat.new()
+	tr_style.bg_color = Color(0.05, 0.07, 0.12, 0.96)
+	tr_style.border_width_left = 1
+	tr_style.border_width_top = 1
+	tr_style.border_width_right = 1
+	tr_style.border_width_bottom = 1
+	if is_max_level:
+		tr_style.border_color = Color(0.85, 0.62, 1.0, 0.90)
+	elif is_ready:
+		tr_style.border_color = Color(1.0, 0.85, 0.30, 0.95)
+	else:
+		tr_style.border_color = Color(0.32, 0.66, 0.92, 0.72)
+	var r := int(clampf(bar_height * 0.45, 2.0, 8.0))
+	tr_style.corner_radius_top_left = r
+	tr_style.corner_radius_top_right = r
+	tr_style.corner_radius_bottom_right = r
+	tr_style.corner_radius_bottom_left = r
+	track.add_theme_stylebox_override("panel", tr_style)
+	wrap.add_child(track)
+
+	if ratio > 0.0:
+		var fill = Panel.new()
+		fill.anchor_left = 0.0
+		fill.anchor_top = 0.0
+		fill.anchor_right = ratio
+		fill.anchor_bottom = 1.0
+		fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var fl_style = StyleBoxFlat.new()
+		if is_max_level:
+			fl_style.bg_color = Color(0.58, 0.30, 0.85, 0.95)
+		elif is_ready:
+			fl_style.bg_color = Color(0.95, 0.74, 0.20, 0.96)
+		else:
+			fl_style.bg_color = Color(0.20, 0.68, 0.96, 0.94)
+		fl_style.corner_radius_top_left = maxi(1, r - 1)
+		fl_style.corner_radius_top_right = maxi(1, r - 1)
+		fl_style.corner_radius_bottom_right = maxi(1, r - 1)
+		fl_style.corner_radius_bottom_left = maxi(1, r - 1)
+		fill.add_theme_stylebox_override("panel", fl_style)
+		track.add_child(fill)
+
+	if show_text:
+		var lbl = Label.new()
+		lbl.set_anchors_preset(PRESET_FULL_RECT)
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if is_max_level:
+			lbl.text = "★ ĐÃ ĐẠT LEVEL 2 (%d Mảnh)" % shards if not compact else "★ LEVEL 2"
+			lbl.add_theme_color_override("font_color", Color(1.0, 0.95, 0.75, 1.0))
+		elif is_ready:
+			lbl.text = "✨ ĐỦ %d/%d MẢNH — ĐỘT PHÁ NGAY!" % [shards, safe_target] if not compact else "✨ ĐỦ %d/%d" % [shards, safe_target]
+			lbl.add_theme_color_override("font_color", Color(0.10, 0.06, 0.0, 1.0))
+		else:
+			lbl.text = "🧩 %d / %d Mảnh" % [shards, safe_target] if not compact else "%d/%d" % [shards, safe_target]
+			lbl.add_theme_color_override("font_color", Color(0.94, 0.98, 1.0, 1.0))
+		if is_ready:
+			lbl.add_theme_constant_override("outline_size", 0)
+		else:
+			lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+			lbl.add_theme_constant_override("outline_size", 2)
+		lbl.add_theme_font_size_override("font_size", 10 if compact else 11)
+		wrap.add_child(lbl)
+
+	return wrap
+
+func _show_hero_upgrade_toast(hero_name: String) -> void:
+	var old_toast := get_node_or_null("HeroUpgradeToast")
+	if is_instance_valid(old_toast):
+		old_toast.free()
+	var toast = PanelContainer.new()
+	toast.name = "HeroUpgradeToast"
+	toast.z_index = 260
+	toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	toast.set_anchors_preset(PRESET_CENTER_TOP)
+	toast.grow_horizontal = GROW_DIRECTION_BOTH
+	toast.offset_top = 24
+	var st = StyleBoxFlat.new()
+	st.bg_color = Color(0.12, 0.08, 0.22, 0.97)
+	st.border_color = Color(1.0, 0.85, 0.30, 1.0)
+	st.border_width_left = 2
+	st.border_width_top = 2
+	st.border_width_right = 2
+	st.border_width_bottom = 2
+	st.corner_radius_top_left = 10
+	st.corner_radius_top_right = 10
+	st.corner_radius_bottom_right = 10
+	st.corner_radius_bottom_left = 10
+	st.shadow_color = Color(1.0, 0.78, 0.22, 0.55)
+	st.shadow_size = 14
+	st.content_margin_left = 20
+	st.content_margin_right = 20
+	st.content_margin_top = 10
+	st.content_margin_bottom = 10
+	toast.add_theme_stylebox_override("panel", st)
+
+	var lbl = Label.new()
+	lbl.text = "✨ ĐỘT PHÁ THÀNH CÔNG! %s ĐẠT LEVEL 2 (+1 Máu hiện tại & +1 Máu tối đa)" % hero_name.to_upper()
+	lbl.add_theme_font_size_override("font_size", 14)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.45, 1.0))
+	toast.add_child(lbl)
+	add_child(toast)
+
+	toast.modulate.a = 0.0
+	var tw = toast.create_tween()
+	tw.tween_property(toast, "modulate:a", 1.0, 0.18)
+	tw.tween_interval(2.2)
+	tw.tween_property(toast, "modulate:a", 0.0, 0.35)
+	tw.tween_callback(toast.queue_free)
+
+func _execute_hero_lv2_upgrade(hero_id: int) -> Dictionary:
+	if not AuthManager:
+		return {"ok": false, "reason": "Chưa kết nối tài khoản."}
+	var res := AuthManager.upgrade_hero_to_level2(hero_id)
+	if res.get("ok", false):
+		AudioManager.play_victory()
+		_refresh_user_profile_ui()
+		_refresh_inventory_content()
+		var h_info := HeroDatabase.get_hero(hero_id) if HeroDatabase else {}
+		_show_hero_upgrade_toast(str(h_info.get("name", "Tướng #%d" % hero_id)))
+	else:
+		AudioManager.play_parry()
+	return res
+
 # --- Fullscreen Danh Tướng Gallery ---
 func _show_fullscreen_heroes() -> void:
 	if is_instance_valid(_fullscreen_heroes_panel):
@@ -3322,12 +3460,15 @@ func _show_fullscreen_heroes() -> void:
 	var all_heroes: Array[Dictionary] = HeroDatabase.get_all_heroes().duplicate() if HeroDatabase else []
 	var owned_map: Dictionary = {}
 	var owned_count: int = 0
+	var upgraded_count: int = 0
 	for h in all_heroes:
 		var hid: int = int(h.get("id", 0))
 		var is_owned: bool = HeroDatabase.is_hero_owned(hid) if HeroDatabase else false
 		owned_map[hid] = is_owned
 		if is_owned:
 			owned_count += 1
+			if AuthManager and AuthManager.is_hero_level2(hid):
+				upgraded_count += 1
 
 	all_heroes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		var a_id: int = int(a.get("id", 0))
@@ -3340,7 +3481,7 @@ func _show_fullscreen_heroes() -> void:
 	)
 
 	var count_lbl = Label.new()
-	count_lbl.text = "Bách Tướng Đại Việt • Đã chiêu mộ: %d / %d danh tướng" % [owned_count, all_heroes.size()]
+	count_lbl.text = "Bách Tướng Đại Việt • Đã chiêu mộ: %d / %d • Đột phá Lv.2: %d" % [owned_count, all_heroes.size(), upgraded_count]
 	count_lbl.add_theme_font_size_override("font_size", 13)
 	count_lbl.add_theme_color_override("font_color", Color(0.55, 0.88, 0.7, 1.0))
 	title_vbox.add_child(count_lbl)
@@ -3479,24 +3620,39 @@ void fragment() {
 		var is_owned = owned_map.get(hid, false)
 		var hname = str(h.get("name", "Vô Danh"))
 		var faction = str(h.get("faction", "Đại Việt"))
-		var max_hp = int(h.get("maxHp", 4))
+		var hp_st: Dictionary = HeroDatabase.get_hero_hp_stats(hid) if (HeroDatabase and HeroDatabase.has_method("get_hero_hp_stats")) else {}
+		var hero_lv: int = int(hp_st.get("level", 1))
+		var is_lv2: bool = hero_lv >= 2
+		var max_hp = int(hp_st.get("max_hp", h.get("maxHp", 4)))
+		var start_hp = int(hp_st.get("starting_hp", h.get("starting_hp", h.get("startingHp", max_hp))))
+		var cur_shards: int = AuthManager.get_hero_shards(hid) if AuthManager else 0
+		var req_lv2: int = AuthManager.UPGRADE_LV2_SHARDS_COST if AuthManager else 100
 		var avatar_path = str(h.get("avatarPath", ""))
 
 		# Card Container
 		var card = PanelContainer.new()
-		card.custom_minimum_size = Vector2(175, 235)
+		card.custom_minimum_size = Vector2(175, 250)
 		card.size_flags_horizontal = SIZE_EXPAND_FILL
 
 		var card_style = StyleBoxFlat.new()
-		if is_owned:
+		if is_owned and is_lv2:
+			card_style.bg_color = Color(0.14, 0.10, 0.22, 0.96)
+			card_style.border_color = Color(1.0, 0.84, 0.30, 0.95)
+			card_style.border_width_left = 2
+			card_style.border_width_top = 2
+			card_style.border_width_right = 2
+			card_style.border_width_bottom = 2
+			card_style.shadow_color = Color(1.0, 0.78, 0.22, 0.35)
+			card_style.shadow_size = 7
+		elif is_owned:
 			card_style.bg_color = Color(0.10, 0.13, 0.19, 0.95)
-			card_style.border_color = Color(0.85, 0.72, 0.32, 0.8)
-			card_style.border_width_left = 1
-			card_style.border_width_top = 1
-			card_style.border_width_right = 1
-			card_style.border_width_bottom = 1
-			card_style.shadow_color = Color(0.85, 0.72, 0.32, 0.15)
-			card_style.shadow_size = 4
+			card_style.border_color = Color(0.45, 0.88, 1.0, 0.88) if cur_shards >= req_lv2 else Color(0.85, 0.72, 0.32, 0.8)
+			card_style.border_width_left = 2 if cur_shards >= req_lv2 else 1
+			card_style.border_width_top = 2 if cur_shards >= req_lv2 else 1
+			card_style.border_width_right = 2 if cur_shards >= req_lv2 else 1
+			card_style.border_width_bottom = 2 if cur_shards >= req_lv2 else 1
+			card_style.shadow_color = Color(0.35, 0.82, 1.0, 0.28) if cur_shards >= req_lv2 else Color(0.85, 0.72, 0.32, 0.15)
+			card_style.shadow_size = 5 if cur_shards >= req_lv2 else 4
 		else:
 			card_style.bg_color = Color(0.06, 0.07, 0.09, 0.95)
 			card_style.border_color = Color(0.32, 0.34, 0.40, 0.45)
@@ -3538,9 +3694,9 @@ void fragment() {
 		top_row.add_child(fac_lbl)
 		cv.add_child(top_row)
 
-		# Portrait image
+		# Portrait image (wrap children in plain Control so overlay badge never stretches inside PanelContainer)
 		var img_box = PanelContainer.new()
-		img_box.custom_minimum_size = Vector2(0, 120)
+		img_box.custom_minimum_size = Vector2(0, 118)
 		img_box.clip_contents = true
 		var ib_style = StyleBoxFlat.new()
 		ib_style.bg_color = Color(0.04, 0.05, 0.07, 0.8)
@@ -3550,6 +3706,12 @@ void fragment() {
 		ib_style.corner_radius_bottom_left = 6
 		img_box.add_theme_stylebox_override("panel", ib_style)
 
+		var portrait_stage = Control.new()
+		portrait_stage.custom_minimum_size = Vector2(0, 118)
+		portrait_stage.clip_contents = true
+		portrait_stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		img_box.add_child(portrait_stage)
+
 		var card_bg = TextureRect.new()
 		card_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 		card_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -3558,10 +3720,10 @@ void fragment() {
 		card_bg.texture = preload("res://assets/ui/hero_backgrounds/bg_hero_white.png")
 		if not is_owned:
 			card_bg.material = gray_mat
-		img_box.add_child(card_bg)
+		portrait_stage.add_child(card_bg)
 
 		var img = TextureRect.new()
-		img.custom_minimum_size = Vector2(0, 120)
+		img.set_anchors_preset(Control.PRESET_FULL_RECT)
 		img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		var tex = HeroDatabase.get_avatar_texture(avatar_path, hid)
@@ -3569,7 +3731,48 @@ void fragment() {
 			img.texture = tex
 		if not is_owned:
 			img.material = gray_mat
-		img_box.add_child(img)
+		portrait_stage.add_child(img)
+
+		# Corner Level / Upgrade-Ready Pill overlay on Portrait
+		var lv_pill = PanelContainer.new()
+		lv_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		lv_pill.position = Vector2(5, 5)
+		var lvp_s = StyleBoxFlat.new()
+		lvp_s.corner_radius_top_left = 4
+		lvp_s.corner_radius_top_right = 4
+		lvp_s.corner_radius_bottom_right = 4
+		lvp_s.corner_radius_bottom_left = 4
+		lvp_s.content_margin_left = 5
+		lvp_s.content_margin_right = 5
+		lvp_s.content_margin_top = 1
+		lvp_s.content_margin_bottom = 1
+		lvp_s.border_width_left = 1
+		lvp_s.border_width_top = 1
+		lvp_s.border_width_right = 1
+		lvp_s.border_width_bottom = 1
+		var lv_pill_lbl = Label.new()
+		lv_pill_lbl.add_theme_font_size_override("font_size", 9)
+		if is_lv2:
+			lvp_s.bg_color = Color(0.32, 0.14, 0.50, 0.94)
+			lvp_s.border_color = Color(1.0, 0.85, 0.30, 0.95)
+			lv_pill_lbl.text = "★ LV.2"
+			lv_pill_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.45, 1.0))
+			lv_pill.visible = true
+		elif is_owned and cur_shards >= req_lv2:
+			lvp_s.bg_color = Color(0.10, 0.32, 0.46, 0.94)
+			lvp_s.border_color = Color(0.45, 0.90, 1.0, 0.95)
+			lv_pill_lbl.text = "⬆ ĐỘT PHÁ"
+			lv_pill_lbl.add_theme_color_override("font_color", Color(0.85, 0.98, 1.0, 1.0))
+			lv_pill.visible = true
+		else:
+			lvp_s.bg_color = Color(0.08, 0.10, 0.15, 0.82)
+			lvp_s.border_color = Color(0.35, 0.40, 0.50, 0.5)
+			lv_pill_lbl.text = "LV.1"
+			lv_pill_lbl.add_theme_color_override("font_color", Color(0.75, 0.80, 0.90, 0.85))
+			lv_pill.visible = is_owned
+		lv_pill.add_theme_stylebox_override("panel", lvp_s)
+		lv_pill.add_child(lv_pill_lbl)
+		portrait_stage.add_child(lv_pill)
 		cv.add_child(img_box)
 
 		# Name
@@ -3580,22 +3783,22 @@ void fragment() {
 		name_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.65, 1.0) if is_owned else Color(0.70, 0.72, 0.76, 0.9))
 		cv.add_child(name_lbl)
 
-		# HP Row
+		# HP Row (reflects +1 Lv.2 HP)
 		var hp_lbl = Label.new()
-		var start_hp = int(h.get("starting_hp", h.get("startingHp", max_hp)))
-		if start_hp < max_hp:
-			hp_lbl.text = "🪷 %d/%d Máu" % [start_hp, max_hp]
-		else:
-			hp_lbl.text = "🪷 %d Máu" % max_hp
+		var hp_base_txt := ("🪷 %d/%d Máu" % [start_hp, max_hp]) if start_hp < max_hp else ("🪷 %d Máu" % max_hp)
+		hp_lbl.text = (hp_base_txt + " ★Lv.2") if is_lv2 else hp_base_txt
 		hp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		hp_lbl.add_theme_font_size_override("font_size", 11)
-		hp_lbl.add_theme_color_override("font_color", Color(0.4, 0.9, 0.6, 0.9) if is_owned else Color(0.5, 0.55, 0.6, 0.7))
+		hp_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.35, 1.0) if is_lv2 else (Color(0.4, 0.9, 0.6, 0.9) if is_owned else Color(0.5, 0.55, 0.6, 0.7)))
 		cv.add_child(hp_lbl)
 
-		# Status Badge Pill
+		# Status Badge Pill or Shard Progress
 		var status_panel = PanelContainer.new()
 		var sp_style = StyleBoxFlat.new()
-		if is_owned:
+		if is_lv2:
+			sp_style.bg_color = Color(0.24, 0.12, 0.36, 0.90)
+			sp_style.border_color = Color(0.98, 0.82, 0.32, 0.85)
+		elif is_owned:
 			sp_style.bg_color = Color(0.08, 0.28, 0.16, 0.85)
 			sp_style.border_color = Color(0.35, 0.85, 0.55, 0.7)
 		else:
@@ -3616,12 +3819,27 @@ void fragment() {
 		status_panel.add_theme_stylebox_override("panel", sp_style)
 
 		var status_lbl = Label.new()
-		status_lbl.text = "✅ ĐÃ SỞ HỮU" if is_owned else "🔒 CHƯA SỞ HỮU"
+		if is_lv2:
+			status_lbl.text = "👑 LEVEL 2 · +1 MÁU"
+			status_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.48, 1.0))
+		elif is_owned:
+			status_lbl.text = "✅ ĐÃ SỞ HỮU"
+			status_lbl.add_theme_color_override("font_color", Color(0.6, 1.0, 0.75, 1.0))
+		else:
+			status_lbl.text = "🔒 CHƯA SỞ HỮU"
+			status_lbl.add_theme_color_override("font_color", Color(0.65, 0.68, 0.72, 0.8))
 		status_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		status_lbl.add_theme_font_size_override("font_size", 10)
-		status_lbl.add_theme_color_override("font_color", Color(0.6, 1.0, 0.75, 1.0) if is_owned else Color(0.65, 0.68, 0.72, 0.8))
 		status_panel.add_child(status_lbl)
 		cv.add_child(status_panel)
+
+		# Mini shard bar directly inside gallery card when hero has shards
+		var shard_bar_holder := VBoxContainer.new()
+		shard_bar_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		shard_bar_holder.visible = (cur_shards > 0)
+		if cur_shards > 0:
+			shard_bar_holder.add_child(_build_shard_progress_bar(cur_shards, req_lv2, 13.0, true, is_lv2, true))
+		cv.add_child(shard_bar_holder)
 
 		# Clickable Button overlay
 		var click_btn = Button.new()
@@ -3645,13 +3863,74 @@ void fragment() {
 					skills_text += " " + str(sk.get("name", "")) + " " + str(sk.get("desc", ""))
 		hero_card_records.append({
 			"card": card,
+			"card_style": card_style,
 			"img_node": img,
+			"hp_lbl": hp_lbl,
+			"status_lbl": status_lbl,
+			"status_style": sp_style,
+			"lv_pill": lv_pill,
+			"lv_pill_lbl": lv_pill_lbl,
+			"lv_pill_style": lvp_s,
+			"shard_bar_holder": shard_bar_holder,
 			"name": hname,
 			"faction": faction,
 			"skills": skills_text,
 			"id": str(hid),
 			"is_owned": is_owned
 		})
+
+	if AuthManager and AuthManager.has_signal("hero_upgraded"):
+		var on_hero_upgraded = func(ch_hid: int, _new_lv: int):
+			var new_up_cnt := 0
+			for rec in hero_card_records:
+				var rec_id := int(rec.get("id", 0))
+				if bool(rec.get("is_owned", false)) and AuthManager.is_hero_level2(rec_id):
+					new_up_cnt += 1
+				if rec_id == ch_hid:
+					var h_stats: Dictionary = HeroDatabase.get_hero_hp_stats(rec_id) if (HeroDatabase and HeroDatabase.has_method("get_hero_hp_stats")) else {}
+					var n_max := int(h_stats.get("max_hp", 4))
+					var n_start := int(h_stats.get("starting_hp", n_max))
+					var r_shards := AuthManager.get_hero_shards(rec_id)
+					var hl: Label = rec.get("hp_lbl")
+					if is_instance_valid(hl):
+						var base_hp_t := ("🪷 %d/%d Máu" % [n_start, n_max]) if n_start < n_max else ("🪷 %d Máu" % n_max)
+						hl.text = base_hp_t + " ★Lv.2"
+						hl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.35, 1.0))
+					var sl: Label = rec.get("status_lbl")
+					if is_instance_valid(sl):
+						sl.text = "👑 LEVEL 2 · +1 MÁU"
+						sl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.48, 1.0))
+					var cs_box: StyleBoxFlat = rec.get("card_style")
+					if cs_box:
+						cs_box.bg_color = Color(0.14, 0.10, 0.22, 0.96)
+						cs_box.border_color = Color(1.0, 0.84, 0.30, 0.95)
+						cs_box.border_width_left = 2
+						cs_box.border_width_top = 2
+						cs_box.border_width_right = 2
+						cs_box.border_width_bottom = 2
+					var lvp: PanelContainer = rec.get("lv_pill")
+					var lvpl: Label = rec.get("lv_pill_lbl")
+					var lvps: StyleBoxFlat = rec.get("lv_pill_style")
+					if is_instance_valid(lvp) and is_instance_valid(lvpl) and lvps:
+						lvp.visible = true
+						lvps.bg_color = Color(0.32, 0.14, 0.50, 0.94)
+						lvps.border_color = Color(1.0, 0.85, 0.30, 0.95)
+						lvpl.text = "★ LV.2"
+						lvpl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.45, 1.0))
+					var sbh: VBoxContainer = rec.get("shard_bar_holder")
+					if is_instance_valid(sbh):
+						for c in sbh.get_children():
+							c.queue_free()
+						sbh.visible = (r_shards > 0)
+						if r_shards > 0:
+							sbh.add_child(_build_shard_progress_bar(r_shards, AuthManager.UPGRADE_LV2_SHARDS_COST, 13.0, true, true, true))
+			if is_instance_valid(count_lbl):
+				count_lbl.text = "Bách Tướng Đại Việt • Đã chiêu mộ: %d / %d • Đột phá Lv.2: %d" % [owned_count, all_heroes.size(), new_up_cnt]
+		AuthManager.hero_upgraded.connect(on_hero_upgraded)
+		fs.tree_exiting.connect(func():
+			if AuthManager and AuthManager.has_signal("hero_upgraded") and AuthManager.hero_upgraded.is_connected(on_hero_upgraded):
+				AuthManager.hero_upgraded.disconnect(on_hero_upgraded)
+		)
 
 	if HeroDatabase and HeroDatabase.has_signal("skin_equipped"):
 		var on_skin_equipped = func(ch_hid: int, _s_id: String):
@@ -3685,7 +3964,7 @@ void fragment() {
 					matched_owned += 1
 		no_hero_lbl.visible = (matched_count == 0)
 		if q.is_empty():
-			count_lbl.text = "Bách Tướng Đại Việt • Đã chiêu mộ: %d / %d danh tướng" % [owned_count, all_heroes.size()]
+			count_lbl.text = "Bách Tướng Đại Việt • Đã chiêu mộ: %d / %d • Đột phá Lv.2: %d" % [owned_count, all_heroes.size(), upgraded_count]
 		else:
 			count_lbl.text = "🔍 Tìm thấy: %d / %d danh tướng (Đã chiêu mộ: %d)" % [matched_count, all_heroes.size(), matched_owned]
 	)
@@ -3696,7 +3975,7 @@ void fragment() {
 	tw.tween_property(fs, "modulate:a", 1.0, 0.18)
 
 # --- Hero Detail Popup (Opened from Fullscreen Gallery) ---
-func _show_hero_detail_popup(hero: Dictionary, is_owned: bool, parent_layer: Control) -> void:
+func _show_hero_detail_popup(hero: Dictionary, is_owned: bool, parent_layer: Control, initial_tab: String = "skills") -> void:
 	if not is_instance_valid(parent_layer):
 		return
 
@@ -3808,6 +4087,11 @@ func _show_hero_detail_popup(hero: Dictionary, is_owned: bool, parent_layer: Con
 	pb_style.corner_radius_bottom_left = 8
 	portrait_box.add_theme_stylebox_override("panel", pb_style)
 
+	var det_stage = Control.new()
+	det_stage.custom_minimum_size = Vector2(248, 258)
+	det_stage.clip_contents = true
+	portrait_box.add_child(det_stage)
+
 	var popup_bg = TextureRect.new()
 	popup_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	popup_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -3827,13 +4111,14 @@ func _show_hero_detail_popup(hero: Dictionary, is_owned: bool, parent_layer: Con
 		var gray_mat_bg = ShaderMaterial.new()
 		gray_mat_bg.shader = gray_shader_bg
 		popup_bg.material = gray_mat_bg
-	portrait_box.add_child(popup_bg)
+	det_stage.add_child(popup_bg)
 
 	var hid = int(hero.get("id", 0))
 	var hero_skins = HeroDatabase.get_hero_skins(hid) if HeroDatabase else []
 	var cur_equipped_skin = HeroDatabase.get_equipped_skin_id(hid) if HeroDatabase else "default"
 
 	var big_img = TextureRect.new()
+	big_img.set_anchors_preset(Control.PRESET_FULL_RECT)
 	big_img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	big_img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	var tex = HeroDatabase.get_avatar_texture(str(hero.get("avatarPath", "")), hid)
@@ -3852,7 +4137,31 @@ func _show_hero_detail_popup(hero: Dictionary, is_owned: bool, parent_layer: Con
 		var gray_mat = ShaderMaterial.new()
 		gray_mat.shader = gray_shader
 		big_img.material = gray_mat
-	portrait_box.add_child(big_img)
+	det_stage.add_child(big_img)
+
+	# Level Badge overlay on Portrait top-left (inside plain Control so it keeps badge size)
+	var det_lv_badge = PanelContainer.new()
+	det_lv_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	det_lv_badge.position = Vector2(8, 8)
+	var dlb_style = StyleBoxFlat.new()
+	dlb_style.corner_radius_top_left = 6
+	dlb_style.corner_radius_top_right = 6
+	dlb_style.corner_radius_bottom_right = 6
+	dlb_style.corner_radius_bottom_left = 6
+	dlb_style.border_width_left = 1
+	dlb_style.border_width_top = 1
+	dlb_style.border_width_right = 1
+	dlb_style.border_width_bottom = 1
+	dlb_style.content_margin_left = 8
+	dlb_style.content_margin_right = 8
+	dlb_style.content_margin_top = 2
+	dlb_style.content_margin_bottom = 2
+	det_lv_badge.add_theme_stylebox_override("panel", dlb_style)
+	var det_lv_lbl = Label.new()
+	det_lv_lbl.add_theme_font_size_override("font_size", 11)
+	det_lv_badge.add_child(det_lv_lbl)
+	det_lv_badge.visible = is_owned
+	det_stage.add_child(det_lv_badge)
 	left_col.add_child(portrait_box)
 
 	var name_lbl = Label.new()
@@ -3906,29 +4215,15 @@ func _show_hero_detail_popup(hero: Dictionary, is_owned: bool, parent_layer: Con
 	faction_lbl.add_theme_color_override("font_color", Color(0.75, 0.8, 0.85, 0.8))
 	left_col.add_child(faction_lbl)
 
-	# Lotus Blossoms
-	var max_hp = int(hero.get("maxHp", 4))
-	var start_hp = int(hero.get("starting_hp", hero.get("startingHp", max_hp)))
-	var lotus_str = ""
-	for i in range(max_hp):
-		if i < start_hp:
-			lotus_str += "🪷 "
-		else:
-			lotus_str += "🥀 "
+	# Lotus Blossoms (reflects Lv.2 +1 current & +1 max HP)
 	var hp_icons_lbl = Label.new()
-	hp_icons_lbl.text = lotus_str.strip_edges()
 	hp_icons_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hp_icons_lbl.add_theme_font_size_override("font_size", 16)
 	left_col.add_child(hp_icons_lbl)
 
 	var hp_text_lbl = Label.new()
-	if start_hp < max_hp:
-		hp_text_lbl.text = "%d/%d Máu" % [start_hp, max_hp]
-	else:
-		hp_text_lbl.text = "%d Máu tối đa" % max_hp
 	hp_text_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hp_text_lbl.add_theme_font_size_override("font_size", 12)
-	hp_text_lbl.add_theme_color_override("font_color", Color(0.4, 0.95, 0.6, 0.9))
 	left_col.add_child(hp_text_lbl)
 
 	# Ownership Pill
@@ -3960,35 +4255,73 @@ func _show_hero_detail_popup(hero: Dictionary, is_owned: bool, parent_layer: Con
 	own_panel.add_child(own_lbl)
 	left_col.add_child(own_panel)
 
-	var cur_hero_shards: int = AuthManager.get_hero_shards(hid) if AuthManager else 0
-	if cur_hero_shards > 0:
-		var shard_panel = PanelContainer.new()
-		var sp_style = StyleBoxFlat.new()
-		sp_style.bg_color = Color(0.12, 0.16, 0.28, 0.95)
-		sp_style.border_color = Color(0.42, 0.84, 1.0, 0.85)
-		sp_style.border_width_left = 1
-		sp_style.border_width_top = 1
-		sp_style.border_width_right = 1
-		sp_style.border_width_bottom = 1
-		sp_style.corner_radius_top_left = 6
-		sp_style.corner_radius_top_right = 6
-		sp_style.corner_radius_bottom_right = 6
-		sp_style.corner_radius_bottom_left = 6
-		sp_style.content_margin_left = 8
-		sp_style.content_margin_right = 8
-		sp_style.content_margin_top = 4
-		sp_style.content_margin_bottom = 4
-		shard_panel.add_theme_stylebox_override("panel", sp_style)
+	var shard_panel = PanelContainer.new()
+	var sp_style = StyleBoxFlat.new()
+	sp_style.bg_color = Color(0.09, 0.14, 0.24, 0.95)
+	sp_style.border_color = Color(0.42, 0.84, 1.0, 0.85)
+	sp_style.border_width_left = 1
+	sp_style.border_width_top = 1
+	sp_style.border_width_right = 1
+	sp_style.border_width_bottom = 1
+	sp_style.corner_radius_top_left = 6
+	sp_style.corner_radius_top_right = 6
+	sp_style.corner_radius_bottom_right = 6
+	sp_style.corner_radius_bottom_left = 6
+	sp_style.content_margin_left = 8
+	sp_style.content_margin_right = 8
+	sp_style.content_margin_top = 4
+	sp_style.content_margin_bottom = 4
+	shard_panel.add_theme_stylebox_override("panel", sp_style)
 
-		var shard_lbl = Label.new()
-		shard_lbl.text = "🧩 Đang có: %d Mảnh tướng" % cur_hero_shards
-		shard_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		shard_lbl.add_theme_font_size_override("font_size", 11)
-		shard_lbl.add_theme_color_override("font_color", Color(0.62, 0.90, 1.0, 1.0))
-		shard_panel.add_child(shard_lbl)
-		left_col.add_child(shard_panel)
+	var shard_lbl = Label.new()
+	shard_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	shard_lbl.add_theme_font_size_override("font_size", 11)
+	shard_panel.add_child(shard_lbl)
+	left_col.add_child(shard_panel)
 
-	# --- RIGHT COLUMN (Tabs: Kỹ Năng & Ngoại Trang) ---
+	var refresh_detail_hero_stats = func():
+		var hp_st: Dictionary = HeroDatabase.get_hero_hp_stats(hid) if (HeroDatabase and HeroDatabase.has_method("get_hero_hp_stats")) else {}
+		var cur_lv: int = int(hp_st.get("level", 1))
+		var is_lv2_now: bool = cur_lv >= 2
+		var max_hp: int = int(hp_st.get("max_hp", hero.get("maxHp", 4)))
+		var start_hp: int = int(hp_st.get("starting_hp", hero.get("starting_hp", hero.get("startingHp", max_hp))))
+		var lotus_str := ""
+		for i in range(max_hp):
+			lotus_str += "🪷 " if i < start_hp else "🥀 "
+		hp_icons_lbl.text = lotus_str.strip_edges()
+		if is_lv2_now:
+			hp_text_lbl.text = ("%d/%d Máu (+1 Lv.2)" % [start_hp, max_hp]) if start_hp < max_hp else ("%d Máu tối đa (+1 Lv.2)" % max_hp)
+			hp_text_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.38, 1.0))
+			dlb_style.bg_color = Color(0.32, 0.14, 0.50, 0.96)
+			dlb_style.border_color = Color(1.0, 0.85, 0.30, 1.0)
+			det_lv_lbl.text = "★ LEVEL 2"
+			det_lv_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.45, 1.0))
+			pb_style.border_color = Color(1.0, 0.85, 0.32, 0.95)
+		else:
+			hp_text_lbl.text = ("%d/%d Máu" % [start_hp, max_hp]) if start_hp < max_hp else ("%d Máu tối đa" % max_hp)
+			hp_text_lbl.add_theme_color_override("font_color", Color(0.4, 0.95, 0.6, 0.9))
+			dlb_style.bg_color = Color(0.10, 0.12, 0.18, 0.92)
+			dlb_style.border_color = Color(0.45, 0.55, 0.70, 0.7)
+			det_lv_lbl.text = "LEVEL 1"
+			det_lv_lbl.add_theme_color_override("font_color", Color(0.85, 0.90, 0.98, 0.95))
+		var cur_sh: int = AuthManager.get_hero_shards(hid) if AuthManager else 0
+		var req_sh: int = AuthManager.UPGRADE_LV2_SHARDS_COST if AuthManager else 100
+		if cur_sh > 0 or is_lv2_now:
+			shard_panel.visible = true
+			if is_lv2_now:
+				shard_lbl.text = "👑 Đã đạt Lv.2 · Mảnh: %d" % cur_sh
+				shard_lbl.add_theme_color_override("font_color", Color(1.0, 0.90, 0.48, 1.0))
+				sp_style.border_color = Color(0.95, 0.78, 0.30, 0.85)
+			else:
+				shard_lbl.text = "🧩 Mảnh: %d / %d" % [cur_sh, req_sh]
+				shard_lbl.add_theme_color_override("font_color", Color(1.0, 0.90, 0.40, 1.0) if cur_sh >= req_sh else Color(0.62, 0.90, 1.0, 1.0))
+				sp_style.border_color = Color(1.0, 0.84, 0.30, 0.92) if cur_sh >= req_sh else Color(0.42, 0.84, 1.0, 0.85)
+		else:
+			shard_panel.visible = false
+
+	refresh_detail_hero_stats.call()
+
+	# --- RIGHT COLUMN (Tabs: Kỹ Năng, Ngoại Trang, Đột Phá Lv.2) ---
 	var right_col = VBoxContainer.new()
 	right_col.size_flags_horizontal = SIZE_EXPAND_FILL
 	right_col.size_flags_vertical = SIZE_EXPAND_FILL
@@ -3997,21 +4330,26 @@ func _show_hero_detail_popup(hero: Dictionary, is_owned: bool, parent_layer: Con
 
 	# Tab Switcher Header
 	var tab_hbox = HBoxContainer.new()
-	tab_hbox.add_theme_constant_override("separation", 12)
+	tab_hbox.add_theme_constant_override("separation", 10)
 	right_col.add_child(tab_hbox)
 
 	var tab_skills_btn = Button.new()
-	tab_skills_btn.text = "⚔️ KỸ NĂNG VÕ TƯỚNG"
-	tab_skills_btn.custom_minimum_size = Vector2(175, 38)
+	tab_skills_btn.text = "⚔️ KỸ NĂNG"
+	tab_skills_btn.custom_minimum_size = Vector2(146, 38)
 	tab_skills_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	tab_hbox.add_child(tab_skills_btn)
 
 	var tab_skins_btn = Button.new()
 	var skin_count_text = " (%d)" % hero_skins.size() if hero_skins.size() > 1 else ""
 	tab_skins_btn.text = "✨ NGOẠI TRANG%s" % skin_count_text
-	tab_skins_btn.custom_minimum_size = Vector2(175, 38)
+	tab_skins_btn.custom_minimum_size = Vector2(166, 38)
 	tab_skins_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	tab_hbox.add_child(tab_skins_btn)
+
+	var tab_upgrade_btn = Button.new()
+	tab_upgrade_btn.custom_minimum_size = Vector2(154, 38)
+	tab_upgrade_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	tab_hbox.add_child(tab_upgrade_btn)
 
 	# Container for Skills
 	var skill_scroll = ScrollContainer.new()
@@ -4038,6 +4376,19 @@ func _show_hero_detail_popup(hero: Dictionary, is_owned: bool, parent_layer: Con
 	skin_list.add_theme_constant_override("separation", 12)
 	skin_scroll.add_child(skin_list)
 
+	# Container for Lv.2 Ascension (Đột Phá)
+	var upgrade_scroll = ScrollContainer.new()
+	upgrade_scroll.size_flags_horizontal = SIZE_EXPAND_FILL
+	upgrade_scroll.size_flags_vertical = SIZE_EXPAND_FILL
+	upgrade_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	upgrade_scroll.visible = false
+	right_col.add_child(upgrade_scroll)
+
+	var upgrade_vbox = VBoxContainer.new()
+	upgrade_vbox.size_flags_horizontal = SIZE_EXPAND_FILL
+	upgrade_vbox.add_theme_constant_override("separation", 12)
+	upgrade_scroll.add_child(upgrade_vbox)
+
 	var style_tab_active = func(btn: Button):
 		var sb = StyleBoxFlat.new()
 		sb.bg_color = Color(0.20, 0.16, 0.08, 0.95)
@@ -4048,15 +4399,15 @@ func _show_hero_detail_popup(hero: Dictionary, is_owned: bool, parent_layer: Con
 		sb.border_width_bottom = 2
 		sb.corner_radius_top_left = 8
 		sb.corner_radius_top_right = 8
-		sb.content_margin_left = 12
-		sb.content_margin_right = 12
+		sb.content_margin_left = 10
+		sb.content_margin_right = 10
 		sb.content_margin_top = 6
 		sb.content_margin_bottom = 6
 		btn.add_theme_stylebox_override("normal", sb)
 		btn.add_theme_stylebox_override("hover", sb)
 		btn.add_theme_stylebox_override("pressed", sb)
 		btn.add_theme_color_override("font_color", Color(1.0, 0.92, 0.55, 1.0))
-		btn.add_theme_font_size_override("font_size", 14)
+		btn.add_theme_font_size_override("font_size", 13)
 
 	var style_tab_inactive = func(btn: Button):
 		var sb = StyleBoxFlat.new()
@@ -4068,33 +4419,279 @@ func _show_hero_detail_popup(hero: Dictionary, is_owned: bool, parent_layer: Con
 		sb.border_width_bottom = 1
 		sb.corner_radius_top_left = 8
 		sb.corner_radius_top_right = 8
-		sb.content_margin_left = 12
-		sb.content_margin_right = 12
+		sb.content_margin_left = 10
+		sb.content_margin_right = 10
 		sb.content_margin_top = 6
 		sb.content_margin_bottom = 6
 		btn.add_theme_stylebox_override("normal", sb)
 		btn.add_theme_stylebox_override("hover", sb)
 		btn.add_theme_stylebox_override("pressed", sb)
-		btn.add_theme_color_override("font_color", Color(0.65, 0.68, 0.75, 0.8))
+		btn.add_theme_color_override("font_color", Color(0.65, 0.68, 0.75, 0.85))
 		btn.add_theme_font_size_override("font_size", 13)
 
-	var switch_to_tab = func(tab_name: String):
-		AudioManager.play_card_select()
+	var refresh_upgrade_panel_ref: Array[Callable] = []
+	var switch_to_tab = func(tab_name: String, play_sfx: bool = true):
+		if play_sfx:
+			AudioManager.play_card_select()
+		skill_scroll.visible = (tab_name == "skills")
+		skin_scroll.visible = (tab_name == "skins")
+		upgrade_scroll.visible = (tab_name == "upgrade")
 		if tab_name == "skills":
-			skill_scroll.visible = true
-			skin_scroll.visible = false
 			style_tab_active.call(tab_skills_btn)
 			style_tab_inactive.call(tab_skins_btn)
-		else:
-			skill_scroll.visible = false
-			skin_scroll.visible = true
+			style_tab_inactive.call(tab_upgrade_btn)
+		elif tab_name == "skins":
 			style_tab_active.call(tab_skins_btn)
 			style_tab_inactive.call(tab_skills_btn)
+			style_tab_inactive.call(tab_upgrade_btn)
+		else:
+			style_tab_active.call(tab_upgrade_btn)
+			style_tab_inactive.call(tab_skills_btn)
+			style_tab_inactive.call(tab_skins_btn)
 
-	style_tab_active.call(tab_skills_btn)
-	style_tab_inactive.call(tab_skins_btn)
+	var refresh_upgrade_panel = func():
+		for child in upgrade_vbox.get_children():
+			child.queue_free()
+		var up_info: Dictionary = AuthManager.can_upgrade_hero_to_lv2(hid) if AuthManager else {
+			"can_upgrade": false, "is_owned": is_owned, "is_max_level": false, "level": 1,
+			"shards": 0, "shards_needed": 100, "silver": 0, "silver_needed": 50000, "reason": "Chưa kết nối"
+		}
+		var cur_lv: int = int(up_info.get("level", 1))
+		var is_lv2: bool = bool(up_info.get("is_max_level", false))
+		var can_up: bool = bool(up_info.get("can_upgrade", false))
+		var cur_sh: int = int(up_info.get("shards", 0))
+		var req_sh: int = int(up_info.get("shards_needed", 100))
+		var cur_sil: int = int(up_info.get("silver", 0))
+		var req_sil: int = int(up_info.get("silver_needed", 50000))
+		var h_base: Dictionary = HeroDatabase.get_hero_hp_stats(hid, 1) if (HeroDatabase and HeroDatabase.has_method("get_hero_hp_stats")) else {}
+		var b_max := int(h_base.get("max_hp", 4))
+		var b_start := int(h_base.get("starting_hp", b_max))
+
+		if is_lv2:
+			tab_upgrade_btn.text = "👑 LEVEL 2 ★"
+		elif can_up:
+			tab_upgrade_btn.text = "⬆️ ĐỘT PHÁ ✨"
+		else:
+			tab_upgrade_btn.text = "⬆️ ĐỘT PHÁ (Lv.%d)" % cur_lv
+
+		# 1. Comparison Card: Lv.1 vs Lv.2
+		var comp_card = PanelContainer.new()
+		var cc_s = StyleBoxFlat.new()
+		cc_s.bg_color = Color(0.07, 0.08, 0.14, 0.96)
+		cc_s.border_color = Color(1.0, 0.85, 0.32, 0.9) if is_lv2 else Color(0.42, 0.78, 1.0, 0.65)
+		cc_s.border_width_left = 2
+		cc_s.border_width_top = 1
+		cc_s.border_width_right = 1
+		cc_s.border_width_bottom = 1
+		cc_s.corner_radius_top_left = 10
+		cc_s.corner_radius_top_right = 10
+		cc_s.corner_radius_bottom_right = 10
+		cc_s.corner_radius_bottom_left = 10
+		cc_s.content_margin_left = 14
+		cc_s.content_margin_right = 14
+		cc_s.content_margin_top = 12
+		cc_s.content_margin_bottom = 12
+		comp_card.add_theme_stylebox_override("panel", cc_s)
+		upgrade_vbox.add_child(comp_card)
+
+		var cc_v = VBoxContainer.new()
+		cc_v.add_theme_constant_override("separation", 8)
+		comp_card.add_child(cc_v)
+
+		var comp_hdr = Label.new()
+		comp_hdr.text = "👑 TƯỚNG ĐÃ ĐẠT CẤP ĐỘ TỐI ĐA (LEVEL 2)" if is_lv2 else "⚡ ĐỘT PHÁ DANH TƯỚNG LÊN LEVEL 2"
+		comp_hdr.add_theme_font_size_override("font_size", 14)
+		comp_hdr.add_theme_color_override("font_color", Color(1.0, 0.90, 0.42, 1.0))
+		cc_v.add_child(comp_hdr)
+
+		var tiers_hbox = HBoxContainer.new()
+		tiers_hbox.add_theme_constant_override("separation", 10)
+		cc_v.add_child(tiers_hbox)
+
+		var lv1_box = PanelContainer.new()
+		lv1_box.size_flags_horizontal = SIZE_EXPAND_FILL
+		var l1s = StyleBoxFlat.new()
+		l1s.bg_color = Color(0.10, 0.12, 0.18, 0.92)
+		l1s.border_color = Color(0.45, 0.55, 0.70, 0.5)
+		l1s.border_width_left = 1
+		l1s.border_width_top = 1
+		l1s.border_width_right = 1
+		l1s.border_width_bottom = 1
+		l1s.corner_radius_top_left = 8
+		l1s.corner_radius_top_right = 8
+		l1s.corner_radius_bottom_right = 8
+		l1s.corner_radius_bottom_left = 8
+		l1s.content_margin_left = 10
+		l1s.content_margin_right = 10
+		l1s.content_margin_top = 8
+		l1s.content_margin_bottom = 8
+		lv1_box.add_theme_stylebox_override("panel", l1s)
+		var l1_lbl = Label.new()
+		var lv1_hp_txt := "%d/%d" % [b_start, b_max] if b_start < b_max else "%d" % b_max
+		l1_lbl.text = "LEVEL 1 (Mặc định)\n🪷 Máu: %s" % lv1_hp_txt
+		l1_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l1_lbl.add_theme_font_size_override("font_size", 12)
+		l1_lbl.add_theme_color_override("font_color", Color(0.78, 0.84, 0.94, 0.9))
+		lv1_box.add_child(l1_lbl)
+		tiers_hbox.add_child(lv1_box)
+
+		var arrow_lbl = Label.new()
+		arrow_lbl.text = "➜"
+		arrow_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		arrow_lbl.add_theme_font_size_override("font_size", 20)
+		arrow_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.30, 1.0))
+		tiers_hbox.add_child(arrow_lbl)
+
+		var lv2_box = PanelContainer.new()
+		lv2_box.size_flags_horizontal = SIZE_EXPAND_FILL
+		var l2s = StyleBoxFlat.new()
+		l2s.bg_color = Color(0.22, 0.14, 0.32, 0.96) if is_lv2 else Color(0.14, 0.18, 0.28, 0.95)
+		l2s.border_color = Color(1.0, 0.85, 0.32, 0.95)
+		l2s.border_width_left = 2
+		l2s.border_width_top = 2
+		l2s.border_width_right = 2
+		l2s.border_width_bottom = 2
+		l2s.corner_radius_top_left = 8
+		l2s.corner_radius_top_right = 8
+		l2s.corner_radius_bottom_right = 8
+		l2s.corner_radius_bottom_left = 8
+		l2s.content_margin_left = 10
+		l2s.content_margin_right = 10
+		l2s.content_margin_top = 8
+		l2s.content_margin_bottom = 8
+		lv2_box.add_theme_stylebox_override("panel", l2s)
+		var l2_lbl = Label.new()
+		var lv2_hp_txt := "%d/%d" % [b_start + 1, b_max + 1] if b_start < b_max else "%d" % (b_max + 1)
+		l2_lbl.text = "★ LEVEL 2 (+1 Máu)\n🪷 Máu: %s (+1 Hiện tại & Tối đa)" % lv2_hp_txt
+		l2_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l2_lbl.add_theme_font_size_override("font_size", 12)
+		l2_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.48, 1.0))
+		lv2_box.add_child(l2_lbl)
+		tiers_hbox.add_child(lv2_box)
+
+		# 2. Progress & Requirements Card
+		var req_card = PanelContainer.new()
+		var rc_s = StyleBoxFlat.new()
+		rc_s.bg_color = Color(0.06, 0.07, 0.12, 0.95)
+		rc_s.border_color = Color(0.35, 0.45, 0.65, 0.55)
+		rc_s.border_width_left = 1
+		rc_s.border_width_top = 1
+		rc_s.border_width_right = 1
+		rc_s.border_width_bottom = 1
+		rc_s.corner_radius_top_left = 10
+		rc_s.corner_radius_top_right = 10
+		rc_s.corner_radius_bottom_right = 10
+		rc_s.corner_radius_bottom_left = 10
+		rc_s.content_margin_left = 14
+		rc_s.content_margin_right = 14
+		rc_s.content_margin_top = 12
+		rc_s.content_margin_bottom = 12
+		req_card.add_theme_stylebox_override("panel", rc_s)
+		upgrade_vbox.add_child(req_card)
+
+		var rc_v = VBoxContainer.new()
+		rc_v.add_theme_constant_override("separation", 8)
+		req_card.add_child(rc_v)
+
+		var bar_title = Label.new()
+		bar_title.text = "🧩 TIẾN ĐỘ MẢNH TƯỚNG %s:" % str(hero.get("name", "TƯỚNG")).to_upper()
+		bar_title.add_theme_font_size_override("font_size", 12)
+		bar_title.add_theme_color_override("font_color", Color(0.62, 0.90, 1.0, 1.0))
+		rc_v.add_child(bar_title)
+
+		rc_v.add_child(_build_shard_progress_bar(cur_sh, req_sh, 22.0, true, is_lv2, false))
+
+		if not is_lv2:
+			var shard_row = Label.new()
+			var ok_sh := cur_sh >= req_sh
+			shard_row.text = "• Mảnh tướng: %d / %d %s" % [cur_sh, req_sh, ("✅ Đã đủ" if ok_sh else "(Thiếu %d)" % (req_sh - cur_sh))]
+			shard_row.add_theme_font_size_override("font_size", 12)
+			shard_row.add_theme_color_override("font_color", Color(0.55, 0.96, 0.72, 1.0) if ok_sh else Color(0.86, 0.90, 0.96, 0.92))
+			rc_v.add_child(shard_row)
+
+			var sil_row = Label.new()
+			var ok_sil := cur_sil >= req_sil
+			sil_row.text = "• Phí nâng cấp: %s / %s Bạc 🪙 %s" % [_format_number(cur_sil), _format_number(req_sil), ("✅ Đã đủ" if ok_sil else "(Thiếu %s Bạc)" % _format_number(req_sil - cur_sil))]
+			sil_row.add_theme_font_size_override("font_size", 12)
+			sil_row.add_theme_color_override("font_color", Color(0.55, 0.96, 0.72, 1.0) if ok_sil else Color(1.0, 0.62, 0.52, 0.95))
+			rc_v.add_child(sil_row)
+
+			var up_btn = Button.new()
+			up_btn.custom_minimum_size = Vector2(0, 42)
+			up_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if can_up else Control.CURSOR_ARROW
+			if can_up:
+				up_btn.text = "⬆️ NÂNG TƯỚNG LÊN LEVEL 2 (-100 MẢNH, -50,000 BẠC)"
+				var u_s = StyleBoxFlat.new()
+				u_s.bg_color = Color(0.92, 0.70, 0.16, 1.0)
+				u_s.border_color = Color(1.0, 0.92, 0.55, 1.0)
+				u_s.border_width_left = 2
+				u_s.border_width_top = 2
+				u_s.border_width_right = 2
+				u_s.border_width_bottom = 2
+				u_s.corner_radius_top_left = 8
+				u_s.corner_radius_top_right = 8
+				u_s.corner_radius_bottom_right = 8
+				u_s.corner_radius_bottom_left = 8
+				u_s.shadow_color = Color(1.0, 0.80, 0.22, 0.5)
+				u_s.shadow_size = 8
+				up_btn.add_theme_stylebox_override("normal", u_s)
+				var u_h = u_s.duplicate()
+				u_h.bg_color = Color(1.0, 0.80, 0.25, 1.0)
+				up_btn.add_theme_stylebox_override("hover", u_h)
+				up_btn.add_theme_color_override("font_color", Color(0.10, 0.06, 0.0, 1.0))
+				up_btn.add_theme_font_size_override("font_size", 13)
+				up_btn.pressed.connect(func():
+					var res := _execute_hero_lv2_upgrade(hid)
+					if res.get("ok", false):
+						refresh_detail_hero_stats.call()
+						if not refresh_upgrade_panel_ref.is_empty():
+							refresh_upgrade_panel_ref[0].call()
+				)
+			else:
+				up_btn.text = "🔒 CHƯA ĐỦ ĐIỀU KIỆN (%s)" % str(up_info.get("reason", ""))
+				up_btn.disabled = true
+				var ud_s = StyleBoxFlat.new()
+				ud_s.bg_color = Color(0.14, 0.15, 0.20, 0.82)
+				ud_s.corner_radius_top_left = 8
+				ud_s.corner_radius_top_right = 8
+				ud_s.corner_radius_bottom_right = 8
+				ud_s.corner_radius_bottom_left = 8
+				up_btn.add_theme_stylebox_override("disabled", ud_s)
+				up_btn.add_theme_color_override("font_disabled_color", Color(0.65, 0.68, 0.76, 0.85))
+				up_btn.add_theme_font_size_override("font_size", 12)
+			rc_v.add_child(up_btn)
+		else:
+			var maxed_note = Label.new()
+			maxed_note.text = "✨ Danh tướng đã vĩnh viễn nhận +1 Máu hiện tại và +1 Máu tối đa khi ra trận ở mọi chế độ!"
+			maxed_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			maxed_note.add_theme_font_size_override("font_size", 12)
+			maxed_note.add_theme_color_override("font_color", Color(0.70, 0.96, 0.80, 1.0))
+			rc_v.add_child(maxed_note)
+
+		var req_tkt_sh: int = AuthManager.SHARDS_TO_HERO_TICKET if AuthManager else 30
+		if cur_sh >= req_tkt_sh and AuthManager:
+			var ex_tkt_btn = Button.new()
+			ex_tkt_btn.custom_minimum_size = Vector2(0, 34)
+			ex_tkt_btn.text = "📜 Quy đổi %d Mảnh dư → 1 Vé Hiệu Triệu (Hiện có %d mảnh)" % [req_tkt_sh, cur_sh]
+			_style_white_gold_button(ex_tkt_btn, 6, 2, Vector2(0, 1))
+			ex_tkt_btn.pressed.connect(func():
+				var res := AuthManager.exchange_hero_shards_for_ticket(hid, 1)
+				if res.get("ok", false):
+					AudioManager.play_victory()
+					_refresh_user_profile_ui()
+					_refresh_inventory_content()
+					refresh_detail_hero_stats.call()
+					if not refresh_upgrade_panel_ref.is_empty():
+						refresh_upgrade_panel_ref[0].call()
+			)
+			rc_v.add_child(ex_tkt_btn)
+
+	refresh_upgrade_panel_ref.append(refresh_upgrade_panel)
+	refresh_upgrade_panel.call()
+	switch_to_tab.call(initial_tab, false)
 	tab_skills_btn.pressed.connect(func(): switch_to_tab.call("skills"))
 	tab_skins_btn.pressed.connect(func(): switch_to_tab.call("skins"))
+	tab_upgrade_btn.pressed.connect(func(): switch_to_tab.call("upgrade"))
 
 	var skin_card_buttons: Array[Dictionary] = []
 
@@ -5598,9 +6195,11 @@ func _show_fullscreen_than_dien() -> void:
 	rpv.add_child(r1)
 
 	var shards_per_dupe_rule: int = AuthManager.SHARDS_PER_DUPLICATE_HERO if AuthManager else 10
+	var shards_lv2_rule: int = AuthManager.UPGRADE_LV2_SHARDS_COST if AuthManager else 100
+	var silver_lv2_rule: int = AuthManager.UPGRADE_LV2_SILVER_COST if AuthManager else 50000
 	var shards_per_tkt_rule: int = AuthManager.SHARDS_TO_HERO_TICKET if AuthManager else 30
 	var r2 = Label.new()
-	r2.text = "• Khi quay trúng Danh Tướng đã sở hữu → Tự động quy đổi thành +%d MẢNH TƯỚNG ĐÓ 🧩 (%d mảnh đổi 1 Vé Hiệu Triệu tại Túi Đồ)!" % [shards_per_dupe_rule, shards_per_tkt_rule]
+	r2.text = "• Khi quay trúng Danh Tướng đã sở hữu → Quy đổi +%d MẢNH TƯỚNG ĐÓ 🧩 (%d mảnh + %s Bạc nâng Level 2 +1 Máu hiện tại & tối đa; hoặc %d mảnh đổi 1 Vé)!" % [shards_per_dupe_rule, shards_lv2_rule, _format_number(silver_lv2_rule), shards_per_tkt_rule]
 	r2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	r2.add_theme_font_size_override("font_size", 11)
 	r2.add_theme_color_override("font_color", Color(0.55, 0.90, 1.0, 1.0))
@@ -5729,7 +6328,7 @@ func _build_gacha_card(res: Dictionary, is_small: bool) -> Control:
 	var hero_name: String = str(res.get("hero_name", hero.get("name", "Danh Tướng")))
 
 	var card = PanelContainer.new()
-	var card_size = Vector2(215, 395) if is_small else Vector2(340, 520)
+	var card_size = Vector2(215, 412) if is_small else Vector2(340, 540)
 	card.custom_minimum_size = card_size
 	card.pivot_offset = card_size / 2.0
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -5869,34 +6468,42 @@ func _build_gacha_card(res: Dictionary, is_small: bool) -> Control:
 		vbox.add_child(sk_lbl)
 	else:
 		var conv_panel = PanelContainer.new()
+		var g_hid := int(res.get("id", hero.get("id", 0)))
+		var g_lv2 := AuthManager.is_hero_level2(g_hid) if AuthManager else false
+		var req_lv2_sh: int = AuthManager.UPGRADE_LV2_SHARDS_COST if AuthManager else 100
+		var is_ready_lv2 := (not g_lv2) and total_shards >= req_lv2_sh
 		var cps = StyleBoxFlat.new()
-		cps.bg_color = Color(0.10, 0.20, 0.34, 0.96)
-		cps.border_color = Color(0.42, 0.84, 1.0, 0.92)
+		cps.bg_color = Color(0.14, 0.12, 0.24, 0.96) if (g_lv2 or is_ready_lv2) else Color(0.08, 0.16, 0.28, 0.96)
+		cps.border_color = Color(1.0, 0.85, 0.30, 0.95) if is_ready_lv2 else Color(0.42, 0.84, 1.0, 0.92)
 		cps.border_width_left = 1
 		cps.border_width_right = 1
 		cps.border_width_top = 1
 		cps.border_width_bottom = 1
-		cps.corner_radius_top_left = 6
-		cps.corner_radius_top_right = 6
-		cps.corner_radius_bottom_right = 6
-		cps.corner_radius_bottom_left = 6
-		cps.content_margin_left = 6
-		cps.content_margin_right = 6
-		cps.content_margin_top = 4
-		cps.content_margin_bottom = 4
+		cps.corner_radius_top_left = 8
+		cps.corner_radius_top_right = 8
+		cps.corner_radius_bottom_right = 8
+		cps.corner_radius_bottom_left = 8
+		cps.content_margin_left = 8
+		cps.content_margin_right = 8
+		cps.content_margin_top = 6
+		cps.content_margin_bottom = 6
 		conv_panel.add_theme_stylebox_override("panel", cps)
 
+		var conv_vbox = VBoxContainer.new()
+		conv_vbox.add_theme_constant_override("separation", 4)
+		conv_panel.add_child(conv_vbox)
+
 		var conv_lbl = Label.new()
-		var req_shards: int = AuthManager.SHARDS_TO_HERO_TICKET if AuthManager else 30
 		if is_small:
-			conv_lbl.text = "+%d Mảnh %s 🧩\n(Hiện có: %d)" % [shards_gain, hero_name, total_shards]
+			conv_lbl.text = "+%d Mảnh %s 🧩" % [shards_gain, hero_name]
 		else:
-			conv_lbl.text = "+%d MẢNH %s 🧩\n(Kho mảnh: %d/%d)" % [shards_gain, hero_name.to_upper(), total_shards, req_shards]
+			conv_lbl.text = "+%d MẢNH %s 🧩" % [shards_gain, hero_name.to_upper()]
 		conv_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		conv_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		conv_lbl.add_theme_font_size_override("font_size", 11 if is_small else 13)
-		conv_lbl.add_theme_color_override("font_color", Color(0.62, 0.92, 1.0, 1.0))
-		conv_panel.add_child(conv_lbl)
+		conv_lbl.add_theme_color_override("font_color", Color(1.0, 0.90, 0.45, 1.0) if is_ready_lv2 else Color(0.62, 0.92, 1.0, 1.0))
+		conv_vbox.add_child(conv_lbl)
+		conv_vbox.add_child(_build_shard_progress_bar(total_shards, req_lv2_sh, 14.0 if is_small else 16.0, true, g_lv2, is_small))
 		vbox.add_child(conv_panel)
 
 	# 5. Button Xem Kỹ Năng
@@ -5921,6 +6528,8 @@ func _build_gacha_card(res: Dictionary, is_small: bool) -> Control:
 	var bvs_hover = bvs_style.duplicate()
 	bvs_hover.bg_color = Color(0.20, 0.30, 0.45, 1.0)
 	btn_view_skill.add_theme_stylebox_override("hover", bvs_hover)
+	btn_view_skill.add_theme_color_override("font_color", Color(0.88, 0.94, 1.0, 1.0))
+	btn_view_skill.add_theme_color_override("font_hover_color", Color(1.0, 0.92, 0.55, 1.0))
 	btn_view_skill.pressed.connect(func():
 		AudioManager.play_card_select()
 		_show_hero_detail_popup(hero, true, _gacha_reveal_layer)
@@ -7681,6 +8290,8 @@ func _build_inventory_content() -> Control:
 			shard_ids.append(sh_id)
 	shard_ids.sort()
 	var shards_per_ticket: int = AuthManager.SHARDS_TO_HERO_TICKET if AuthManager else 30
+	var shards_lv2_req: int = AuthManager.UPGRADE_LV2_SHARDS_COST if AuthManager else 100
+	var silver_lv2_req: int = AuthManager.UPGRADE_LV2_SILVER_COST if AuthManager else 50000
 	for sh_id in shard_ids:
 		var sh_count := int(shards_map[str(sh_id)])
 		var sh_hero: Dictionary = HeroDatabase.get_hero(sh_id) if HeroDatabase else {}
@@ -7688,22 +8299,32 @@ func _build_inventory_content() -> Control:
 		var sh_faction := str(sh_hero.get("faction", "Đại Việt"))
 		var sh_avatar := str(sh_hero.get("avatarPath", ""))
 		var sh_tex: Texture2D = HeroDatabase.get_avatar_texture(sh_avatar, sh_id) if HeroDatabase else null
+		var up_info: Dictionary = AuthManager.can_upgrade_hero_to_lv2(sh_id) if AuthManager else {"level": 1, "can_upgrade": false, "is_max_level": false}
+		var sh_lv: int = int(up_info.get("level", 1))
+		var sh_is_max: bool = bool(up_info.get("is_max_level", false))
+		var sh_can_up: bool = bool(up_info.get("can_upgrade", false))
+		var sh_color := Color(0.86, 0.56, 1.0, 1.0) if sh_is_max else (Color(1.0, 0.85, 0.30, 1.0) if sh_count >= shards_lv2_req else Color(0.42, 0.84, 1.0, 1.0))
 		all_items.append({
 			"id": "hero_shard_%d" % sh_id,
 			"item_type": "hero_shard",
 			"hero_id": sh_id,
 			"hero_name": sh_name,
+			"hero_data": sh_hero,
+			"hero_level": sh_lv,
+			"is_max_level": sh_is_max,
+			"can_upgrade": sh_can_up,
+			"upgrade_info": up_info,
 			"name": "Mảnh %s" % sh_name,
 			"category": 3,
 			"category_name": "Mảnh Danh Tướng",
-			"rarity": "shard",
-			"rarity_name": sh_faction,
-			"rarity_color": Color(0.42, 0.84, 1.0, 1.0),
+			"rarity": "lv2" if sh_is_max else ("ready" if sh_can_up else "shard"),
+			"rarity_name": ("%s · ★Lv.2" % sh_faction) if sh_is_max else ("%s · Lv.1" % sh_faction),
+			"rarity_color": sh_color,
 			"icon": "🧩",
 			"texture": sh_tex,
 			"count": sh_count,
-			"desc": "Mảnh tướng riêng của %s (%s), tự động quy đổi khi quay trùng ở Thần Điện." % [sh_name, sh_faction],
-			"usage_tip": "💡 Quy đổi: %d Mảnh %s = 1 Vé Hiệu Triệu 📜 (Hiện có: %d/%d)." % [shards_per_ticket, sh_name, sh_count, shards_per_ticket]
+			"desc": "Mảnh tướng riêng của %s (%s). Đủ %d mảnh và %s Bạc để đột phá lên Level 2 (+1 Máu hiện tại & +1 Máu tối đa vĩnh viễn)." % [sh_name, sh_faction, shards_lv2_req, _format_number(silver_lv2_req)],
+			"usage_tip": "💡 Cũng có thể quy đổi %d Mảnh = 1 Vé Hiệu Triệu 📜 tại bên dưới." % shards_per_ticket
 		})
 
 	if _inventory_current_tab > 3:
@@ -7966,27 +8587,60 @@ func _build_inventory_content() -> Control:
 			var item = filtered_items[idx]
 			btn.tooltip_text = "%s (%s)" % [item["name"], item["rarity_name"]]
 
-			# Icon hoặc Chân dung tướng ở giữa
+			# Icon hoặc Chân dung tướng ở giữa (cùng khung nền & thanh tiến độ mảnh tướng)
+			var is_shard_slot := (str(item.get("item_type", "")) == "hero_shard")
 			var item_tex = item.get("texture", null)
 			if item_tex is Texture2D:
+				if is_shard_slot:
+					var slot_bg = TextureRect.new()
+					slot_bg.texture = preload("res://assets/ui/hero_backgrounds/bg_hero_white.png")
+					slot_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+					slot_bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+					slot_bg.set_anchors_preset(PRESET_FULL_RECT)
+					slot_bg.offset_left = 3
+					slot_bg.offset_top = 3
+					slot_bg.offset_right = -3
+					slot_bg.offset_bottom = -3
+					slot_bg.modulate = Color(0.55, 0.42, 0.85, 0.24) if bool(item.get("is_max_level", false)) else Color(0.28, 0.56, 0.88, 0.22)
+					slot_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+					btn.add_child(slot_bg)
+
 				var tex_rect = TextureRect.new()
 				tex_rect.texture = item_tex
 				tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 				tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 				tex_rect.set_anchors_preset(PRESET_FULL_RECT)
 				tex_rect.offset_left = 7
-				tex_rect.offset_top = 7
+				tex_rect.offset_top = 6
 				tex_rect.offset_right = -7
-				tex_rect.offset_bottom = -7
+				tex_rect.offset_bottom = -10 if is_shard_slot else -7
 				tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 				btn.add_child(tex_rect)
 
 				var shard_tag = Label.new()
-				shard_tag.text = str(item.get("icon", "🧩"))
 				shard_tag.position = Vector2(4, 2)
-				shard_tag.add_theme_font_size_override("font_size", 11)
 				shard_tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				if is_shard_slot and bool(item.get("is_max_level", false)):
+					shard_tag.text = "★2"
+					shard_tag.add_theme_font_size_override("font_size", 10)
+					shard_tag.add_theme_color_override("font_color", Color(1.0, 0.90, 0.42, 1.0))
+				elif is_shard_slot and int(item.get("count", 0)) >= (AuthManager.UPGRADE_LV2_SHARDS_COST if AuthManager else 100):
+					shard_tag.text = "⬆"
+					shard_tag.add_theme_font_size_override("font_size", 11)
+					shard_tag.add_theme_color_override("font_color", Color(1.0, 0.88, 0.30, 1.0))
+				else:
+					shard_tag.text = str(item.get("icon", "🧩"))
+					shard_tag.add_theme_font_size_override("font_size", 10)
 				btn.add_child(shard_tag)
+
+				if is_shard_slot:
+					var mini_bar := _build_shard_progress_bar(int(item.get("count", 0)), AuthManager.UPGRADE_LV2_SHARDS_COST if AuthManager else 100, 4.0, false, bool(item.get("is_max_level", false)), true)
+					mini_bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+					mini_bar.offset_left = 4
+					mini_bar.offset_right = -4
+					mini_bar.offset_top = -6
+					mini_bar.offset_bottom = -2
+					btn.add_child(mini_bar)
 			else:
 				var icon_lbl = Label.new()
 				icon_lbl.text = item["icon"]
@@ -8004,7 +8658,7 @@ func _build_inventory_content() -> Control:
 			qty_badge.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 			qty_badge.grow_vertical = Control.GROW_DIRECTION_BEGIN
 			qty_badge.offset_right = -3
-			qty_badge.offset_bottom = -3
+			qty_badge.offset_bottom = -8 if is_shard_slot else -3
 
 			var qb_style = StyleBoxFlat.new()
 			qb_style.bg_color = Color(0.02, 0.02, 0.06, 0.88)
@@ -8274,7 +8928,7 @@ func _populate_inventory_inspector(inspector_vbox: VBoxContainer, item: Dictiona
 	lore_panel.add_theme_stylebox_override("panel", lp_style)
 
 	var lore_vbox = VBoxContainer.new()
-	lore_vbox.add_theme_constant_override("separation", 8)
+	lore_vbox.add_theme_constant_override("separation", 6)
 
 	var desc_lbl = Label.new()
 	desc_lbl.text = str(item.get("desc", ""))
@@ -8282,6 +8936,49 @@ func _populate_inventory_inspector(inspector_vbox: VBoxContainer, item: Dictiona
 	desc_lbl.add_theme_font_size_override("font_size", 12)
 	desc_lbl.add_theme_color_override("font_color", Color(0.88, 0.88, 0.92))
 	lore_vbox.add_child(desc_lbl)
+
+	if str(item.get("item_type", "")) == "hero_shard":
+		var det_hid := int(item.get("hero_id", 0))
+		var det_cnt := int(item.get("count", 0))
+		var det_is_max := bool(item.get("is_max_level", false))
+		var det_req_lv2 := AuthManager.UPGRADE_LV2_SHARDS_COST if AuthManager else 100
+		var det_fee := AuthManager.UPGRADE_LV2_SILVER_COST if AuthManager else 50000
+		var det_cur_sil := AuthManager.current_silver if AuthManager else 0
+		var hp1: Dictionary = HeroDatabase.get_hero_hp_stats(det_hid, 1) if (HeroDatabase and HeroDatabase.has_method("get_hero_hp_stats")) else {}
+		var b_max := int(hp1.get("max_hp", 4))
+		var b_start := int(hp1.get("starting_hp", b_max))
+
+		lore_vbox.add_child(_build_shard_progress_bar(det_cnt, det_req_lv2, 18.0, true, det_is_max, false))
+
+		var bonus_card = PanelContainer.new()
+		var bc_s = StyleBoxFlat.new()
+		bc_s.bg_color = Color(0.10, 0.12, 0.22, 0.94)
+		bc_s.border_color = Color(0.95, 0.80, 0.32, 0.7) if (det_is_max or det_cnt >= det_req_lv2) else Color(0.38, 0.68, 0.92, 0.5)
+		bc_s.border_width_left = 1
+		bc_s.border_width_top = 1
+		bc_s.border_width_right = 1
+		bc_s.border_width_bottom = 1
+		bc_s.corner_radius_top_left = 6
+		bc_s.corner_radius_top_right = 6
+		bc_s.corner_radius_bottom_right = 6
+		bc_s.corner_radius_bottom_left = 6
+		bc_s.content_margin_left = 8
+		bc_s.content_margin_right = 8
+		bc_s.content_margin_top = 6
+		bc_s.content_margin_bottom = 6
+		bonus_card.add_theme_stylebox_override("panel", bc_s)
+		var bc_lbl = Label.new()
+		var hp_cmp := "%d/%d → %d/%d" % [b_start, b_max, b_start + 1, b_max + 1] if b_start < b_max else "%d → %d" % [b_max, b_max + 1]
+		if det_is_max:
+			bc_lbl.text = "👑 Cấp hiện tại: LEVEL 2 (%s Máu)\nĐã kích hoạt +1 Máu hiện tại & +1 Máu tối đa vĩnh viễn!" % (("%d/%d" % [b_start + 1, b_max + 1]) if b_start < b_max else str(b_max + 1))
+			bc_lbl.add_theme_color_override("font_color", Color(1.0, 0.90, 0.48, 1.0))
+		else:
+			bc_lbl.text = "⬆️ Đột phá Lv.2: 🪷 Máu %s (+1 Hiện tại & +1 Tối đa)\n💰 Phí: 100 Mảnh + %s Bạc (Đang có: %s Bạc)" % [hp_cmp, _format_number(det_fee), _format_number(det_cur_sil)]
+			bc_lbl.add_theme_color_override("font_color", Color(0.76, 0.94, 1.0, 1.0))
+		bc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		bc_lbl.add_theme_font_size_override("font_size", 11)
+		bonus_card.add_child(bc_lbl)
+		lore_vbox.add_child(bonus_card)
 
 	var tip_lbl = Label.new()
 	tip_lbl.text = str(item.get("usage_tip", ""))
@@ -8478,13 +9175,75 @@ func _populate_inventory_inspector(inspector_vbox: VBoxContainer, item: Dictiona
 		var sh_id := int(item.get("hero_id", 0))
 		var sh_count := int(item.get("count", 0))
 		var req_shards: int = AuthManager.SHARDS_TO_HERO_TICKET if AuthManager else 30
+		var up_info: Dictionary = item.get("upgrade_info", AuthManager.can_upgrade_hero_to_lv2(sh_id) if AuthManager else {})
+		var can_up_lv2: bool = bool(up_info.get("can_upgrade", false))
+		var is_max_lv: bool = bool(up_info.get("is_max_level", false))
+
+		# Primary Action: Upgrade Hero to Level 2
+		var up_btn = Button.new()
+		up_btn.custom_minimum_size = Vector2(0, 38)
+		if is_max_lv:
+			up_btn.text = "👑 ĐÃ ĐẠT LEVEL 2 (+1 MÁU TỐI ĐA & HIỆN TẠI)"
+			up_btn.disabled = true
+			var max_st = StyleBoxFlat.new()
+			max_st.bg_color = Color(0.24, 0.12, 0.36, 0.95)
+			max_st.border_color = Color(0.95, 0.80, 0.32, 0.8)
+			max_st.border_width_left = 1
+			max_st.border_width_top = 1
+			max_st.border_width_right = 1
+			max_st.border_width_bottom = 1
+			max_st.corner_radius_top_left = 6
+			max_st.corner_radius_top_right = 6
+			max_st.corner_radius_bottom_right = 6
+			max_st.corner_radius_bottom_left = 6
+			up_btn.add_theme_stylebox_override("disabled", max_st)
+			up_btn.add_theme_color_override("font_color_disabled", Color(1.0, 0.90, 0.45))
+			up_btn.add_theme_font_size_override("font_size", 11)
+		elif can_up_lv2 and AuthManager:
+			up_btn.text = "⬆️ NÂNG TƯỚNG LÊN LEVEL 2 (-100 MẢNH, -50,000 BẠC)"
+			var up_style = StyleBoxFlat.new()
+			up_style.bg_color = Color(0.92, 0.72, 0.16, 1.0)
+			up_style.border_color = Color(1.0, 0.92, 0.55, 1.0)
+			up_style.border_width_left = 2
+			up_style.border_width_top = 2
+			up_style.border_width_right = 2
+			up_style.border_width_bottom = 2
+			up_style.corner_radius_top_left = 6
+			up_style.corner_radius_top_right = 6
+			up_style.corner_radius_bottom_right = 6
+			up_style.corner_radius_bottom_left = 6
+			up_btn.add_theme_stylebox_override("normal", up_style)
+			up_btn.add_theme_stylebox_override("hover", up_style)
+			up_btn.add_theme_color_override("font_color", Color(0.10, 0.06, 0.0, 1.0))
+			up_btn.add_theme_font_size_override("font_size", 11)
+			up_btn.pressed.connect(func():
+				_execute_hero_lv2_upgrade(sh_id)
+			)
+		else:
+			up_btn.text = "🔒 NÂNG LEVEL 2 (%s)" % str(up_info.get("reason", "Cần 100 Mảnh + 50,000 Bạc"))
+			up_btn.disabled = true
+			var dis_up = StyleBoxFlat.new()
+			dis_up.bg_color = Color(0.14, 0.13, 0.20, 0.78)
+			dis_up.corner_radius_top_left = 6
+			dis_up.corner_radius_top_right = 6
+			dis_up.corner_radius_bottom_right = 6
+			dis_up.corner_radius_bottom_left = 6
+			up_btn.add_theme_stylebox_override("disabled", dis_up)
+			up_btn.add_theme_color_override("font_color_disabled", Color(0.62, 0.66, 0.76))
+			up_btn.add_theme_font_size_override("font_size", 11)
+		act_vbox.add_child(up_btn)
+
+		# Secondary compact row: Ticket exchange + Hero Detail / Thần Điện
+		var sec_row = HBoxContainer.new()
+		sec_row.add_theme_constant_override("separation", 6)
 
 		var ex_btn = Button.new()
-		ex_btn.custom_minimum_size = Vector2(0, 36)
+		ex_btn.size_flags_horizontal = SIZE_EXPAND_FILL
+		ex_btn.custom_minimum_size = Vector2(0, 32)
 		if sh_count >= req_shards and AuthManager:
-			ex_btn.text = "📜 ĐỔI %d MẢNH → 1 VÉ HIỆU TRIỆU" % req_shards
+			ex_btn.text = "📜 ĐỔI %d MẢNH → 1 VÉ" % req_shards
 			var ex_style = StyleBoxFlat.new()
-			ex_style.bg_color = Color(0.18, 0.56, 0.85, 1.0)
+			ex_style.bg_color = Color(0.16, 0.48, 0.78, 1.0)
 			ex_style.corner_radius_top_left = 6
 			ex_style.corner_radius_top_right = 6
 			ex_style.corner_radius_bottom_right = 6
@@ -8492,6 +9251,7 @@ func _populate_inventory_inspector(inspector_vbox: VBoxContainer, item: Dictiona
 			ex_btn.add_theme_stylebox_override("normal", ex_style)
 			ex_btn.add_theme_stylebox_override("hover", ex_style)
 			ex_btn.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+			ex_btn.add_theme_font_size_override("font_size", 11)
 			ex_btn.pressed.connect(func():
 				var res := AuthManager.exchange_hero_shards_for_ticket(sh_id, 1)
 				if res.get("ok", false):
@@ -8502,7 +9262,7 @@ func _populate_inventory_inspector(inspector_vbox: VBoxContainer, item: Dictiona
 					AudioManager.play_parry()
 			)
 		else:
-			ex_btn.text = "📜 ĐỔI VÉ HIỆU TRIỆU (CẦN %d/%d MẢNH)" % [sh_count, req_shards]
+			ex_btn.text = "📜 ĐỔI VÉ (%d/%d)" % [sh_count, req_shards]
 			ex_btn.disabled = true
 			var dis_ex = StyleBoxFlat.new()
 			dis_ex.bg_color = Color(0.16, 0.14, 0.20, 0.7)
@@ -8512,35 +9272,22 @@ func _populate_inventory_inspector(inspector_vbox: VBoxContainer, item: Dictiona
 			dis_ex.corner_radius_bottom_left = 6
 			ex_btn.add_theme_stylebox_override("disabled", dis_ex)
 			ex_btn.add_theme_color_override("font_color_disabled", Color(0.58, 0.62, 0.72))
-		act_vbox.add_child(ex_btn)
+			ex_btn.add_theme_font_size_override("font_size", 11)
+		sec_row.add_child(ex_btn)
 
-		var batches: int = int(sh_count / req_shards)
-		if batches >= 2 and AuthManager:
-			var max_btn = Button.new()
-			max_btn.custom_minimum_size = Vector2(0, 32)
-			max_btn.text = "🌟 ĐỔI NHANH %d VÉ (%d MẢNH)" % [batches, batches * req_shards]
-			_style_white_gold_button(max_btn, 6, 2, Vector2(0, 1))
-			max_btn.pressed.connect(func():
-				var res := AuthManager.exchange_hero_shards_for_ticket(sh_id, batches)
-				if res.get("ok", false):
-					AudioManager.play_victory()
-					_refresh_user_profile_ui()
-					_refresh_inventory_content()
-				else:
-					AudioManager.play_parry()
-			)
-			act_vbox.add_child(max_btn)
-
-		var goto_td = Button.new()
-		goto_td.custom_minimum_size = Vector2(0, 32)
-		goto_td.text = "⛩️ ĐẾN THẦN ĐIỆN"
-		_style_white_gold_button(goto_td, 6, 2, Vector2(0, 1))
-		goto_td.pressed.connect(func():
+		var inspect_hero_btn = Button.new()
+		inspect_hero_btn.custom_minimum_size = Vector2(110, 32)
+		inspect_hero_btn.text = "👁️ XEM TƯỚNG"
+		_style_white_gold_button(inspect_hero_btn, 6, 2, Vector2(0, 1))
+		inspect_hero_btn.add_theme_font_size_override("font_size", 11)
+		var captured_sh_hero: Dictionary = item.get("hero_data", HeroDatabase.get_hero(sh_id) if HeroDatabase else {})
+		inspect_hero_btn.pressed.connect(func():
 			AudioManager.play_card_select()
-			if is_instance_valid(modal_overlay): modal_overlay.visible = false
-			_show_fullscreen_than_dien()
+			if is_instance_valid(modal_overlay):
+				_show_hero_detail_popup(captured_sh_hero, HeroDatabase.is_hero_owned(sh_id) if HeroDatabase else true, modal_overlay, "upgrade")
 		)
-		act_vbox.add_child(goto_td)
+		sec_row.add_child(inspect_hero_btn)
+		act_vbox.add_child(sec_row)
 
 	inspector_vbox.add_child(act_vbox)
 

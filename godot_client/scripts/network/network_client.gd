@@ -549,7 +549,8 @@ func send_join_draft(target_room: String, seat: int, user_id: String, user_name:
 		"availableHeroIds": available_hero_ids,
 		"isAdmin": AuthManager != null and AuthManager.is_admin(),
 		"title": AuthManager.current_title if AuthManager else "",
-		"profileBg": AuthManager.current_profile_bg if AuthManager else 0
+		"profileBg": AuthManager.current_profile_bg if AuthManager else 0,
+		"heroLevels": AuthManager.hero_levels.duplicate() if AuthManager else {}
 	}
 	if not slots_data.is_empty():
 		payload["slots"] = slots_data
@@ -580,12 +581,15 @@ func send_matchmaking_stop() -> void:
 	print("[NetworkClient] Gửi MATCHMAKING_STOP tới Render server")
 
 func send_pick_hero(hero_id: int, hero_name: String = "") -> void:
+	var h_level: int = AuthManager.get_hero_level(hero_id) if (AuthManager and AuthManager.has_method("get_hero_level")) else 1
 	send_json({
 		"action": "PICK_HERO",
 		"roomId": room_id,
 		"seat": my_seat,
 		"heroId": hero_id,
-		"heroName": hero_name
+		"heroName": hero_name,
+		"heroLevel": h_level,
+		"heroLevels": AuthManager.hero_levels.duplicate() if AuthManager else {}
 	})
 
 func send_hover_hero(hero_id: int, hero_name: String = "") -> void:

@@ -8,6 +8,7 @@ signal password_recovery_sent(message: String)
 signal password_recovery_failed(error_message: String)
 signal password_reset_succeeded(message: String)
 signal password_reset_failed(error_message: String)
+signal hero_upgraded(hero_id: int, new_level: int)
 
 const ENDPOINT = "https://sgp.cloud.appwrite.io/v1"
 const PROJECT_ID = "6a885457002da3f3d47e"
@@ -31,9 +32,13 @@ var current_silver: int = 5000
 var current_gold: int = 0
 const SHARDS_PER_DUPLICATE_HERO: int = 10
 const SHARDS_TO_HERO_TICKET: int = 30
+const UPGRADE_LV2_SHARDS_COST: int = 100
+const UPGRADE_LV2_SILVER_COST: int = 50000
+const MAX_HERO_LEVEL: int = 2
 
 var current_generals: Array = ["ly_thuong_kiet"]
 var hero_shards: Dictionary = {}
+var hero_levels: Dictionary = {}
 var current_hero_tickets: int = 0
 var current_skin_tickets: int = 0
 var checkin_7day_claimed: Array = []
@@ -364,6 +369,103 @@ func exchange_hero_shards_for_ticket(hero_id: int, batch_count: int = 1) -> Dict
 		"tickets_gained": batch_count,
 		"shards_spent": needed,
 		"remaining": remaining
+	}
+
+func _parse_hero_levels(raw_val) -> Dictionary:
+	var source: Dictionary = {}
+	if raw_val is String and raw_val.strip_edges() != "":
+		var parsed = JSON.parse_string(raw_val)
+		if parsed is Dictionary:
+			source = parsed
+	elif raw_val is Dictionary:
+		source = raw_val
+	var cleaned: Dictionary = {}
+	for k in source.keys():
+		var hid := int(str(k).strip_edges())
+		var lv := int(source[k])
+		if hid > 0 and lv >= 2:
+			cleaned[str(hid)] = clampi(lv, 2, MAX_HERO_LEVEL)
+	return cleaned
+
+func get_hero_level(hero_id: int) -> int:
+	if hero_id <= 0:
+		return 1
+	return MAX_HERO_LEVEL if int(hero_levels.get(str(hero_id), 1)) >= 2 else 1
+
+func is_hero_level2(hero_id: int) -> bool:
+	return get_hero_level(hero_id) >= 2
+
+func get_hero_hp_bonus(hero_id: int) -> int:
+	return 1 if is_hero_level2(hero_id) else 0
+
+func get_upgraded_hero_ids() -> Array[int]:
+	var ids: Array[int] = []
+	for k in hero_levels.keys():
+		var hid := int(str(k))
+		if hid > 0 and int(hero_levels[k]) >= 2:
+			ids.append(hid)
+	ids.sort()
+	return ids
+
+func can_upgrade_hero_to_lv2(hero_id: int) -> Dictionary:
+	var shards := get_hero_shards(hero_id)
+	var cur_lv := get_hero_level(hero_id)
+	var is_owned := HeroDatabase.is_hero_owned(hero_id) if (HeroDatabase and hero_id > 0) else false
+	var is_max := cur_lv >= MAX_HERO_LEVEL
+	var reason := ""
+	if hero_id <= 0:
+		reason = "Danh tướng không hợp lệ."
+	elif not is_owned:
+		reason = "Hãy chiêu mộ danh tướng này trước khi nâng cấp."
+	elif is_max:
+		reason = "Tướng đã đạt cấp tối đa (Level 2)."
+	elif shards < UPGRADE_LV2_SHARDS_COST and current_silver < UPGRADE_LV2_SILVER_COST:
+		reason = "Cần đủ %d mảnh và %s Bạc." % [UPGRADE_LV2_SHARDS_COST, str(UPGRADE_LV2_SILVER_COST)]
+	elif shards < UPGRADE_LV2_SHARDS_COST:
+		reason = "Còn thiếu %d mảnh nữa (%d/%d)." % [UPGRADE_LV2_SHARDS_COST - shards, shards, UPGRADE_LV2_SHARDS_COST]
+	elif current_silver < UPGRADE_LV2_SILVER_COST:
+		reason = "Thiếu %d Bạc làm phí nâng cấp." % [UPGRADE_LV2_SILVER_COST - current_silver]
+	var ready := (hero_id > 0 and is_owned and not is_max and shards >= UPGRADE_LV2_SHARDS_COST and current_silver >= UPGRADE_LV2_SILVER_COST)
+	return {
+		"can_upgrade": ready,
+		"is_owned": is_owned,
+		"is_max_level": is_max,
+		"level": cur_lv,
+		"shards": shards,
+		"shards_needed": UPGRADE_LV2_SHARDS_COST,
+		"silver": current_silver,
+		"silver_needed": UPGRADE_LV2_SILVER_COST,
+		"reason": reason
+	}
+
+func upgrade_hero_to_level2(hero_id: int) -> Dictionary:
+	var check_info := can_upgrade_hero_to_lv2(hero_id)
+	if not bool(check_info.get("can_upgrade", false)):
+		return {
+			"ok": false,
+			"reason": str(check_info.get("reason", "Không thể nâng cấp.")),
+			"details": check_info
+		}
+	var remaining_shards := int(check_info["shards"]) - UPGRADE_LV2_SHARDS_COST
+	var key := str(hero_id)
+	if remaining_shards <= 0:
+		hero_shards.erase(key)
+	else:
+		hero_shards[key] = remaining_shards
+	current_silver -= UPGRADE_LV2_SILVER_COST
+	hero_levels[key] = MAX_HERO_LEVEL
+	save_session()
+	save_profile_to_appwrite()
+	hero_upgraded.emit(hero_id, MAX_HERO_LEVEL)
+	profile_updated.emit()
+	return {
+		"ok": true,
+		"hero_id": hero_id,
+		"new_level": MAX_HERO_LEVEL,
+		"shards_spent": UPGRADE_LV2_SHARDS_COST,
+		"silver_spent": UPGRADE_LV2_SILVER_COST,
+		"remaining_shards": remaining_shards,
+		"remaining_silver": current_silver
 	}
 
 # --- Danh hiệu & Nền hồ sơ tướng ---
@@ -998,6 +1100,10 @@ func fetch_profile_from_appwrite(on_completed: Callable = Callable()) -> void:
 						hero_shards = _parse_hero_shards(data["heroShards"])
 					else:
 						hero_shards = {}
+					if data.has("heroLevels"):
+						hero_levels = _parse_hero_levels(data["heroLevels"])
+					else:
+						hero_levels = {}
 
 					if data.has("heroTickets"):
 						current_hero_tickets = int(data["heroTickets"])
@@ -1165,6 +1271,7 @@ func _execute_save_profile_to_appwrite() -> void:
 		"losses": current_losses,
 		"generals": ",".join(current_generals),
 		"heroShards": JSON.stringify(hero_shards),
+		"heroLevels": JSON.stringify(hero_levels),
 		"tutorialRewardClaimed": tutorial_reward_claimed,
 		"onboardingComplete": onboarding_completed or tutorial_reward_claimed,
 		"tutorialCompleted": onboarding_completed or tutorial_reward_claimed,
@@ -1616,6 +1723,7 @@ func reset_to_defaults() -> void:
 	_debug_calendar_date.clear()
 	current_generals = ["ly_thuong_kiet"]
 	hero_shards.clear()
+	hero_levels.clear()
 	current_2v2_points = 1200
 	current_2v2_rank_index = 0
 	current_2v2_stars = 0
@@ -2093,6 +2201,7 @@ func save_session() -> void:
 			"monthlyCheckinMilestones": monthly_checkin_milestones,
 			"generals": current_generals,
 			"heroShards": hero_shards,
+			"heroLevels": hero_levels,
 			"rank2v2Points": current_2v2_points,
 			"rank2v2Index": current_2v2_rank_index,
 			"rank2v2Stars": current_2v2_stars,
@@ -2190,6 +2299,7 @@ func load_saved_session() -> void:
 					if current_generals.is_empty():
 						current_generals = ["ly_thuong_kiet"]
 					hero_shards = _parse_hero_shards(data.get("heroShards", {}))
+					hero_levels = _parse_hero_levels(data.get("heroLevels", {}))
 					current_2v2_points = int(data.get("rank2v2Points", 1200))
 					current_2v2_rank_index = int(data.get("rank2v2Index", 0))
 					current_2v2_stars = int(data.get("rank2v2Stars", 0))

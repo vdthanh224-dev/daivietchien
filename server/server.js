@@ -1191,7 +1191,7 @@ function sanitizeDraftMessageForClient(message, seat, modeId) {
   const dynasty = String(modeId || "").startsWith("dynasty_");
   const slots = (message.slots || []).map((slot) => {
     const { role, heroId, heroName, hoverHeroId, hoverHeroName,
-      candidateHeroIds, availableHeroIds, maxHp, ...publicSlot } = slot;
+      candidateHeroIds, availableHeroIds, heroLevels, heroLevel, maxHp, startingHp, hp, ...publicSlot } = slot;
     const own = Number(slot.seat) === Number(seat);
     const publicKing = dynasty && role === "KING" && slot.isLocked;
     const revealHero = completed || own || publicKing;
@@ -1200,7 +1200,10 @@ function sanitizeDraftMessageForClient(message, seat, modeId) {
       role: own || role === "KING" ? role || "" : undefined,
       heroId: revealHero ? heroId || 0 : 0,
       heroName: revealHero ? heroName || "" : "",
+      heroLevel: revealHero ? normalizeHeroLevel(heroLevel) : undefined,
       maxHp: revealHero ? maxHp : undefined,
+      startingHp: revealHero ? startingHp : undefined,
+      hp: revealHero ? hp : undefined,
       hoverHeroId: own ? hoverHeroId || 0 : 0,
       hoverHeroName: own ? hoverHeroName || "" : "",
       candidateHeroIds: own ? candidateHeroIds || [] : [],
@@ -1487,6 +1490,43 @@ function draftMessage(roomId, draft, room = null) {
   };
 }
 
+function normalizeHeroLevel(value) {
+  return Number(value) >= 2 ? 2 : 1;
+}
+
+function sanitizeHeroLevelsMap(raw) {
+  const clean = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return clean;
+  for (const [rawKey, rawVal] of Object.entries(raw)) {
+    const hid = Number(rawKey);
+    const lv = normalizeHeroLevel(rawVal);
+    if (Number.isInteger(hid) && hid >= 1 && hid <= 100 && lv >= 2) {
+      clean[String(hid)] = 2;
+    }
+  }
+  return clean;
+}
+
+function applyDraftSlotHeroStats(slot, heroId, explicitLevel = null) {
+  const hid = Number(heroId || slot?.heroId || 0);
+  if (!slot || !hid) return;
+  const resolvedLv = normalizeHeroLevel(
+    explicitLevel !== null && explicitLevel !== undefined
+      ? explicitLevel
+      : (slot.heroLevels?.[String(hid)] ?? slot.heroLevels?.[hid] ?? slot.heroLevel ?? 1)
+  );
+  const levelBonus = resolvedLv >= 2 ? 1 : 0;
+  const heroInfo = HEROES[`HERO_${hid}`];
+  const baseMaxHp = (HERO_MAX_HP[hid] || 4) + levelBonus;
+  const rawStartingHp = Number(heroInfo?.startingHp);
+  slot.heroLevel = resolvedLv;
+  slot.maxHp = baseMaxHp + (slot.role === "KING" ? 1 : 0);
+  slot.startingHp = (Number.isFinite(rawStartingHp) && rawStartingHp > 0)
+    ? (rawStartingHp + levelBonus)
+    : slot.maxHp;
+  slot.hp = slot.startingHp;
+}
+
 function makeDraftSlots(rawSlots, boundSeat, payload) {
   const modeId = String(payload.modeId || "2v2");
   const seatCount = draftSeatCount(modeId);
@@ -1498,6 +1538,12 @@ function makeDraftSlots(rawSlots, boundSeat, payload) {
     const isRealUid = matchedUid !== "" && matchedUid !== "empty" && !isBotUid;
     const isAI = isRealUid ? false : (matched.isAI !== undefined ? Boolean(matched.isAI) : isBotUid);
     const heroId = Number(matched.heroId || matched.hero_id || 0);
+    const slotLevels = sanitizeHeroLevelsMap(matched.heroLevels);
+    const slotHeroLevel = normalizeHeroLevel(matched.heroLevel ?? (heroId > 0 ? slotLevels[String(heroId)] : 1));
+    const bonusHp = slotHeroLevel >= 2 ? 1 : 0;
+    const baseMaxHp = (HERO_MAX_HP[heroId] || 4) + bonusHp;
+    const rawStartHp = Number(HEROES[`HERO_${heroId}`]?.startingHp);
+    const startHp = (Number.isFinite(rawStartHp) && rawStartHp > 0) ? (rawStartHp + bonusHp) : baseMaxHp;
     return {
       seat,
       seatNumber: seat,
@@ -1506,14 +1552,16 @@ function makeDraftSlots(rawSlots, boundSeat, payload) {
       isAI,
       isDragon: matched.isDragon !== undefined ? Boolean(matched.isDragon) : dragonSeats.has(seat),
       availableHeroIds: Array.isArray(matched.availableHeroIds) ? matched.availableHeroIds.map(Number) : [],
+      heroLevels: slotLevels,
+      heroLevel: slotHeroLevel,
       role: "",
       heroId,
       heroName: String(matched.heroName || ""),
       hoverHeroId: 0,
       hoverHeroName: "",
-      maxHp: HERO_MAX_HP[heroId] || 4,
-      startingHp: HEROES[`HERO_${heroId}`]?.startingHp || HERO_MAX_HP[heroId] || 4,
-      hp: HEROES[`HERO_${heroId}`]?.startingHp || HERO_MAX_HP[heroId] || 4,
+      maxHp: baseMaxHp,
+      startingHp: startHp,
+      hp: startHp,
       isLocked: Boolean(matched.isLocked && heroId > 0),
     };
   }), modeId);
@@ -1564,19 +1612,14 @@ function finishDraftAndStartBattle(roomId, room) {
   if (!draft || draft.isCompleted || !draft.slots.every((slot) => slot.isLocked && slot.heroId > 0)) return;
 
   for (const slot of draft.slots) {
-    const baseHp = HERO_MAX_HP[slot.heroId] || 4;
-    const heroInfo = HEROES[`HERO_${slot.heroId}`];
-    slot.maxHp = baseHp + (slot.role === "KING" ? 1 : 0);
-    slot.startingHp = (Number.isFinite(Number(heroInfo?.startingHp)) && Number(heroInfo?.startingHp) > 0)
-      ? Number(heroInfo.startingHp)
-      : slot.maxHp;
-    slot.hp = slot.startingHp;
+    applyDraftSlotHeroStats(slot, slot.heroId);
   }
   const battlePlayers = draft.slots.map((slot) => ({
     seat: slot.seat,
     userId: slot.userId,
     userName: slot.userName || "",
     heroId: `HERO_${slot.heroId}`,
+    heroLevel: normalizeHeroLevel(slot.heroLevel),
     generalName: slot.heroName || getHeroName(slot.heroId),
     maxHp: slot.maxHp,
     startingHp: slot.startingHp || slot.maxHp,
@@ -1708,9 +1751,7 @@ async function tickDraftRoom(roomId, room) {
       currentSlot.heroName = getHeroName(heroId);
       currentSlot.hoverHeroId = 0;
       currentSlot.hoverHeroName = "";
-      currentSlot.maxHp = (HERO_MAX_HP[heroId] || 4) + (currentSlot.role === "KING" ? 1 : 0);
-      currentSlot.startingHp = HEROES[`HERO_${heroId}`]?.startingHp || currentSlot.maxHp;
-      currentSlot.hp = currentSlot.startingHp;
+      applyDraftSlotHeroStats(currentSlot, heroId);
       currentSlot.isLocked = true;
       used.add(heroId);
       changed = true;
@@ -2080,6 +2121,9 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           if (payload.userName) slot.userName = String(payload.userName);
           const wasAdmin = slot.isAdmin === true;
           slot.isAdmin = payload.isAdmin === true;
+          if (payload.heroLevels && typeof payload.heroLevels === "object") {
+            slot.heroLevels = sanitizeHeroLevelsMap(payload.heroLevels);
+          }
           if (wasAdmin !== slot.isAdmin && !slot.isLocked) slot.candidateHeroIds = [];
           if (Array.isArray(payload.availableHeroIds)) {
             slot.availableHeroIds = Array.from(new Set(payload.availableHeroIds.map(Number).filter((id) => Number.isInteger(id) && id > 0)));
@@ -2139,13 +2183,15 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
             return socket.send(JSON.stringify({ type: "ERROR", error: "Tướng này không nằm trong bể tướng của bạn" }));
           }
           const pickedSlot = requestedSlot;
+          if (payload.heroLevels && typeof payload.heroLevels === "object") {
+            pickedSlot.heroLevels = sanitizeHeroLevelsMap(payload.heroLevels);
+          }
+          const explicitHeroLevel = payload.heroLevel !== undefined ? normalizeHeroLevel(payload.heroLevel) : null;
           pickedSlot.heroId = heroId;
           pickedSlot.heroName = String(payload.heroName || getHeroName(heroId));
           pickedSlot.hoverHeroId = 0;
           pickedSlot.hoverHeroName = "";
-          pickedSlot.maxHp = (HERO_MAX_HP[heroId] || 4) + (pickedSlot.role === "KING" ? 1 : 0);
-          pickedSlot.startingHp = HEROES[`HERO_${heroId}`]?.startingHp || pickedSlot.maxHp;
-          pickedSlot.hp = pickedSlot.startingHp;
+          applyDraftSlotHeroStats(pickedSlot, heroId, explicitHeroLevel);
           pickedSlot.isLocked = true;
 
           if (is2v2) {

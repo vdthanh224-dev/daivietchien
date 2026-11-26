@@ -298,11 +298,12 @@ export function hydrateGameState(rawState, roomId = "") {
     seenSeats.add(seat);
     const heroId = normalizeHeroId(rawPlayer.heroId, rawPlayer.generalName);
     const hero = getHeroById(heroId);
+    const heroLevel = Math.max(1, Math.min(2, Number(rawPlayer.heroLevel) || 1));
     const suppliedMaxHp = Number(rawPlayer.maxHp);
     const role = rawPlayer.role || (modeRules.roleDistribution || [])[seat - 1] || "REBEL";
     const baseMaxHp = Number.isFinite(suppliedMaxHp)
       ? Math.max(3, suppliedMaxHp)
-      : (hero?.maxHp || 4);
+      : ((hero?.maxHp || 4) + (heroLevel >= 2 ? 1 : 0));
     const maxHp = baseMaxHp;
     const hp = Number(rawPlayer.hp);
     const persistedUsedSkills = rawPlayer.usedSkills && typeof rawPlayer.usedSkills === "object"
@@ -323,6 +324,7 @@ export function hydrateGameState(rawState, roomId = "") {
       // wrong skill buttons (for example Trao Bào on Ỷ Lan).
       generalName: hero?.name || rawPlayer.generalName || `Tướng Ghế ${seat}`,
       heroId,
+      heroLevel,
       maxHp: Number.isFinite(maxHp) && maxHp > 0 ? maxHp : 4,
       // Keep negative HP during the rescue window so repeated rescues have the right cost.
       hp: Number.isFinite(hp) ? Math.min(hp, maxHp) : 0,
@@ -629,11 +631,14 @@ export function initGame(roomId, playersInput, modeId = "2v2") {
     // only generalName/maxHp, while newer clients send a string heroId.
     const heroId = normalizeHeroId(p.heroId, p.generalName);
     const hero = getHeroById(heroId);
+    const heroLevel = Math.max(1, Math.min(2, Number(p.heroLevel) || 1));
+    const levelHpBonus = heroLevel >= 2 ? 1 : 0;
     const role = p.role || dynastyRoles[index] || "REBEL";
     const baseMaxHp = (Number.isFinite(Number(p.maxHp)) && Number(p.maxHp) > 0)
       ? Number(p.maxHp)
-      : (hero?.maxHp || 4);
+      : ((hero?.maxHp || 4) + levelHpBonus);
     const maxHp = baseMaxHp;
+    const rawHeroStart = (Number.isFinite(Number(hero?.startingHp)) && Number(hero?.startingHp) > 0) ? (Number(hero.startingHp) + levelHpBonus) : null;
     const hand = [];
     for (let i = 0; i < 4; i++) {
       if (deck.length > 0) hand.push(deck.pop());
@@ -642,13 +647,14 @@ export function initGame(roomId, playersInput, modeId = "2v2") {
       seat: p.seat || index + 1,
       userId: p.userId || `user_${index + 1}`,
       heroId,
+      heroLevel,
       generalName: hero?.name || p.generalName || `Tướng Ghế ${index + 1}`,
       maxHp,
       startingHp: (Number.isFinite(Number(p.startingHp)) && Number(p.startingHp) > 0)
         ? Number(p.startingHp)
-        : ((Number.isFinite(Number(hero?.startingHp)) && Number(hero?.startingHp) > 0) ? Number(hero.startingHp) : maxHp),
+        : (rawHeroStart !== null ? rawHeroStart : maxHp),
       hp: (() => {
-        const heroStart = (Number.isFinite(Number(hero?.startingHp)) && Number(hero?.startingHp) > 0) ? Number(hero.startingHp) : null;
+        const heroStart = rawHeroStart;
         const playerStart = (Number.isFinite(Number(p.startingHp)) && Number(p.startingHp) > 0) ? Number(p.startingHp) : heroStart;
         if (playerStart !== null && (p.hp === undefined || p.hp === null || Number(p.hp) === maxHp || Number(p.hp) === baseMaxHp)) {
           return playerStart;
@@ -10806,6 +10812,7 @@ export function sanitizeGameStateForClient(state, requestingSeat = 0) {
       userId: p.userId,
       userName: p.userName || "",
       heroId: p.heroId,
+      heroLevel: Math.max(1, Math.min(2, Number(p.heroLevel) || 1)),
       generalName: isDynastyMode && p.isAlive === false && dynastyRoleLabel(p.role)
         ? `${p.generalName} · ${dynastyRoleLabel(p.role)}`
         : p.generalName,

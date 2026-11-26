@@ -1124,8 +1124,11 @@ func _create_hero_grid_card(hero: Dictionary) -> Control:
 	lotus_hbox.add_theme_constant_override("separation", 1)
 	top_hbox.add_child(lotus_hbox)
 
-	var max_hp = int(hero.get("maxHp", 4))
-	var start_hp = int(hero.get("starting_hp", hero.get("startingHp", max_hp)))
+	var hid_card := int(hero.get("id", 0))
+	var hp_stats: Dictionary = HeroDatabase.get_hero_hp_stats(hid_card) if (HeroDatabase and HeroDatabase.has_method("get_hero_hp_stats")) else {}
+	var max_hp = int(hp_stats.get("max_hp", hero.get("maxHp", 4)))
+	var start_hp = int(hp_stats.get("starting_hp", hero.get("starting_hp", hero.get("startingHp", max_hp))))
+	var card_hero_lv = int(hp_stats.get("level", 1))
 	var lotus_full_tex = load("res://assets/ui/lotus_full.png") if ResourceLoader.exists("res://assets/ui/lotus_full.png") else null
 	var lotus_empty_tex = load("res://assets/ui/lotus_empty.png") if ResourceLoader.exists("res://assets/ui/lotus_empty.png") else null
 	for i in range(max_hp):
@@ -1186,6 +1189,37 @@ func _create_hero_grid_card(hero: Dictionary) -> Control:
 		fb_lbl.add_theme_color_override("font_color", Color(0.1, 0.05, 0.0, 1.0))
 		fb_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		free_badge.add_child(fb_lbl)
+
+	# Huy hiệu Level 2 (Góc trên phải avatar)
+	if card_hero_lv >= 2:
+		var lv_badge = PanelContainer.new()
+		lv_badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		lv_badge.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		lv_badge.offset_left = -46
+		lv_badge.offset_top = 2
+		lv_badge.offset_right = -2
+		var lb_s = StyleBoxFlat.new()
+		lb_s.bg_color = Color(0.28, 0.14, 0.45, 0.94)
+		lb_s.border_color = Color(1.0, 0.85, 0.30, 0.95)
+		lb_s.border_width_left = 1
+		lb_s.border_width_top = 1
+		lb_s.border_width_right = 1
+		lb_s.border_width_bottom = 1
+		lb_s.corner_radius_top_left = 4
+		lb_s.corner_radius_top_right = 4
+		lb_s.corner_radius_bottom_right = 4
+		lb_s.corner_radius_bottom_left = 4
+		lb_s.content_margin_left = 4
+		lb_s.content_margin_right = 4
+		lv_badge.add_theme_stylebox_override("panel", lb_s)
+		av_container.add_child(lv_badge)
+
+		var lb_lbl = Label.new()
+		lb_lbl.text = "★Lv.2"
+		lb_lbl.add_theme_font_size_override("font_size", 9)
+		lb_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.45, 1.0))
+		lb_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lv_badge.add_child(lb_lbl)
 
 	# 3. Bottom Bar: Thế Lực + Kỹ Năng trên thanh riêng
 	var fac_lbl = Label.new()
@@ -1418,11 +1452,14 @@ func _inspect_hero(hero: Dictionary) -> void:
 	var tag = "[⭐ FREE TUẦN]" if is_free else "[ĐÃ SỞ HỮU]"
 
 	var fac = hero.get("faction", "")
-	inspect_title_lbl.text = hname.to_upper()
-	var inspect_max_hp = int(hero.get("maxHp", 4))
-	var inspect_start_hp = int(hero.get("starting_hp", hero.get("startingHp", inspect_max_hp)))
+	var hp_stats: Dictionary = HeroDatabase.get_hero_hp_stats(hid) if (HeroDatabase and HeroDatabase.has_method("get_hero_hp_stats")) else {}
+	var inspect_lv := int(hp_stats.get("level", 1))
+	var inspect_max_hp = int(hp_stats.get("max_hp", hero.get("maxHp", 4)))
+	var inspect_start_hp = int(hp_stats.get("starting_hp", hero.get("starting_hp", hero.get("startingHp", inspect_max_hp))))
+	inspect_title_lbl.text = ("%s  ★ LV.2" % hname.to_upper()) if inspect_lv >= 2 else hname.to_upper()
 	var inspect_hp_str = "%d/%d" % [inspect_start_hp, inspect_max_hp] if inspect_start_hp < inspect_max_hp else "%d" % inspect_max_hp
-	inspect_sub_lbl.text = "Thế Lực: %s • Máu: %s đóa sen %s" % [fac, inspect_hp_str, tag]
+	var lv_note := " • ★Lv.2 (+1 Máu)" if inspect_lv >= 2 else ""
+	inspect_sub_lbl.text = "Thế Lực: %s • Máu: %s đóa sen %s%s" % [fac, inspect_hp_str, tag, lv_note]
 
 	var tex = HeroDatabase.get_avatar_texture(hero.get("avatarPath", "")) if HeroDatabase else null
 	if tex: inspect_avatar_rect.texture = tex
@@ -1431,8 +1468,8 @@ func _inspect_hero(hero: Dictionary) -> void:
 	for child in inspect_lotus_container.get_children():
 		child.queue_free()
 
-	var max_hp = int(hero.get("maxHp", 4))
-	var start_hp = int(hero.get("starting_hp", hero.get("startingHp", max_hp)))
+	var max_hp = inspect_max_hp
+	var start_hp = inspect_start_hp
 	var lotus_full_tex = load("res://assets/ui/lotus_full.png") if ResourceLoader.exists("res://assets/ui/lotus_full.png") else null
 	var lotus_empty_tex = load("res://assets/ui/lotus_empty.png") if ResourceLoader.exists("res://assets/ui/lotus_empty.png") else null
 	for i in range(max_hp):
@@ -1770,6 +1807,19 @@ func _lock_hero_for_slot(slot: Dictionary, hero: Dictionary) -> void:
 	slot["chosenHero"] = hero
 	slot["heroId"] = hid
 	slot["heroName"] = hname
+	var slot_lv := int(slot.get("heroLevel", 0))
+	if slot_lv <= 0:
+		slot_lv = HeroDatabase.get_hero_level(hid) if (bool(slot.get("isPlayer", false)) and HeroDatabase and HeroDatabase.has_method("get_hero_level")) else 1
+	slot["heroLevel"] = slot_lv
+	if not slot.has("maxHp") and HeroDatabase and HeroDatabase.has_method("get_hero_hp_stats"):
+		var hp_st: Dictionary = HeroDatabase.get_hero_hp_stats(hid, slot_lv)
+		var slot_max := int(hp_st.get("max_hp", int(hero.get("maxHp", 4)))) + (1 if str(slot.get("role", "")) == "KING" else 0)
+		var base_start := int(hp_st.get("base_starting_hp", int(hero.get("startingHp", 4))))
+		var base_max := int(hp_st.get("base_max_hp", int(hero.get("maxHp", 4))))
+		var slot_start := int(hp_st.get("starting_hp", slot_max)) if base_start < base_max else slot_max
+		slot["maxHp"] = slot_max
+		slot["startingHp"] = slot_start
+		slot["hp"] = slot_start
 	slot["isLocked"] = true
 
 	if slot.get("isPlayer", false):
@@ -2099,7 +2149,13 @@ func _apply_authoritative_draft_slots(server_slots: Array, reveal_for_battle: bo
 				else:
 					local_s["chosenHero"] = null
 				local_s["isLocked"] = true
+				if s_info.has("heroLevel"):
+					local_s["heroLevel"] = int(s_info.get("heroLevel", 1))
 				local_s["maxHp"] = int(s_info.get("maxHp", locked_hero.get("maxHp", 4)))
+				if s_info.has("startingHp"):
+					local_s["startingHp"] = int(s_info.get("startingHp", local_s["maxHp"]))
+				if s_info.has("hp"):
+					local_s["hp"] = int(s_info.get("hp", local_s.get("startingHp", local_s["maxHp"])))
 				local_s["hoverHeroId"] = 0
 				local_s["hoverHeroName"] = ""
 				if not was_locked or old_hid != hid:
