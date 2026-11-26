@@ -108,6 +108,16 @@ var _left_hero_count_lbl: Label = null
 var _quest_badge_dot: Control = null
 var _checkin_nav_btn: Button = null
 var _checkin_badge_dot: Control = null
+var _custom_room_nav_btn: Button = null
+var _custom_room_create_mode: String = "2v2"
+var _custom_room_status_lbl: Label = null
+var _custom_room_copy_feedback_lbl: Label = null
+var _custom_room_code_input: LineEdit = null
+var _active_custom_room: Dictionary = {}
+var _party_match_code: String = ""
+var _party_members_snapshot: Array = []
+var _party_is_host: bool = false
+var _party_host_uid: String = ""
 var _battle_card_title_lbl: Label = null
 var _top_avatar_rect: TextureRect = null
 
@@ -129,6 +139,18 @@ func _ready() -> void:
 			NetworkClient.social_error.connect(_on_social_error)
 		if not NetworkClient.connection_established.is_connected(_on_social_connection_established):
 			NetworkClient.connection_established.connect(_on_social_connection_established)
+		if NetworkClient.has_signal("custom_room_updated") and not NetworkClient.custom_room_updated.is_connected(_on_custom_room_updated):
+			NetworkClient.custom_room_updated.connect(_on_custom_room_updated)
+		if NetworkClient.has_signal("custom_room_error") and not NetworkClient.custom_room_error.is_connected(_on_custom_room_error):
+			NetworkClient.custom_room_error.connect(_on_custom_room_error)
+		if NetworkClient.has_signal("custom_room_closed") and not NetworkClient.custom_room_closed.is_connected(_on_custom_room_closed):
+			NetworkClient.custom_room_closed.connect(_on_custom_room_closed)
+		if NetworkClient.has_signal("custom_room_started") and not NetworkClient.custom_room_started.is_connected(_on_custom_room_started):
+			NetworkClient.custom_room_started.connect(_on_custom_room_started)
+		if NetworkClient.has_signal("custom_room_matchmaking") and not NetworkClient.custom_room_matchmaking.is_connected(_on_custom_room_matchmaking):
+			NetworkClient.custom_room_matchmaking.connect(_on_custom_room_matchmaking)
+		if NetworkClient.has_signal("custom_room_party_redirect") and not NetworkClient.custom_room_party_redirect.is_connected(_on_custom_room_party_redirect):
+			NetworkClient.custom_room_party_redirect.connect(_on_custom_room_party_redirect)
 		if NetworkClient.is_connected_to_server:
 			_on_social_connection_established()
 	if DailyQuestSystem:
@@ -671,6 +693,8 @@ func _build_left_character_column() -> void:
 	left_box.add_child(_checkin_nav_btn)
 
 	left_box.add_child(_make_neon_left_button("TẬP HUẤN", "res://assets/ui/icons/icon_quests.svg", Color(0.72, 0.56, 1.0, 0.90), _start_mode_practice))
+	_custom_room_nav_btn = _make_neon_left_button("PHÒNG ĐẤU", "res://assets/ui/icons/icon_match.svg", Color(1.0, 0.45, 0.78, 0.92), _open_custom_room_hub_modal)
+	left_box.add_child(_custom_room_nav_btn)
 
 func _refresh_left_character_cards() -> void:
 	pass
@@ -1000,7 +1024,7 @@ func _build_right_action_deck() -> void:
 
 	# 3. Popover Mode Drawer (Added AFTER grid with z_index=50 so it is NEVER covered)
 	mode_drawer_panel = PanelContainer.new()
-	mode_drawer_panel.custom_minimum_size = Vector2(446, 196)
+	mode_drawer_panel.custom_minimum_size = Vector2(446, 238)
 	mode_drawer_panel.position = Vector2(810, 280)
 	mode_drawer_panel.visible = false
 	mode_drawer_panel.z_index = 50
@@ -1056,6 +1080,19 @@ func _build_right_action_deck() -> void:
 		if mode_id == "tutorial":
 			tutorial_mode_btn = m_btn
 		md_vbox.add_child(m_btn)
+
+	var custom_room_shortcut = Button.new()
+	custom_room_shortcut.custom_minimum_size = Vector2(0, 36)
+	custom_room_shortcut.text = "🏰  Tạo / Vào Phòng Bằng ID (6 Chữ Số)"
+	custom_room_shortcut.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_style_secondary_mode_button(custom_room_shortcut)
+	custom_room_shortcut.pressed.connect(func():
+		AudioManager.play_card_select()
+		if is_instance_valid(mode_drawer_panel):
+			mode_drawer_panel.visible = false
+		_open_custom_room_hub_modal()
+	)
+	md_vbox.add_child(custom_room_shortcut)
 
 	mode_drawer_panel.add_child(md_vbox)
 	deck.add_child(mode_drawer_panel)
@@ -2464,7 +2501,7 @@ func _update_tutorial_mode_visibility() -> void:
 		return
 	tutorial_mode_btn.visible = true
 	if is_instance_valid(mode_drawer_panel):
-		mode_drawer_panel.custom_minimum_size = Vector2(446, 196)
+		mode_drawer_panel.custom_minimum_size = Vector2(446, 238)
 
 # --- Ambient Particle Embers ---
 func _start_ambient_effects() -> void:
@@ -2748,6 +2785,11 @@ func _show_modal(title_text: String, content_node: Node) -> void:
 			modal_panel.custom_minimum_size = Vector2(1060, 600)
 			if is_instance_valid(modal_scroll):
 				modal_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		elif title_text.begins_with("🏰 PHÒNG"):
+			var is_eight_player_room := title_text.contains("VƯƠNG TRIỀU 8")
+			modal_panel.custom_minimum_size = Vector2(960, 610 if is_eight_player_room else 520)
+			if is_instance_valid(modal_scroll):
+				modal_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 		elif title_text.begins_with("📅 LỊCH ĐIỂM DANH"):
 			modal_panel.custom_minimum_size = Vector2(980, 640)
 			if is_instance_valid(modal_scroll):
@@ -2782,6 +2824,8 @@ func _show_modal(title_text: String, content_node: Node) -> void:
 func _hide_modal() -> void:
 	if is_matchmaking_active:
 		_cancel_matchmaking_internal()
+	if not _active_custom_room.is_empty():
+		_leave_active_custom_room()
 
 	_modal_open_seq += 1
 	var hide_seq: int = _modal_open_seq
@@ -11745,7 +11789,580 @@ func _build_2v2_content() -> Control:
 func _mode_player_count(mode_id: String) -> int:
 	return 5 if mode_id == "dynasty_5" else (8 if mode_id == "dynasty_8" else 4)
 
-func _start_2v2_matchmaking(mode_id: String = "2v2") -> void:
+func _mode_custom_title(mode_id: String) -> String:
+	match mode_id:
+		"dynasty_5":
+			return "VƯƠNG TRIỀU 5 NGƯỜI"
+		"dynasty_8":
+			return "VƯƠNG TRIỀU 8 NGƯỜI"
+		_:
+			return "2v2 (2 CHỖ CÙNG PHE)"
+
+func _open_custom_room_hub_modal() -> void:
+	if not _active_custom_room.is_empty():
+		var code := str(_active_custom_room.get("code", ""))
+		_show_modal("🏰 PHÒNG #%s — %s" % [code, _mode_custom_title(str(_active_custom_room.get("modeId", "2v2")))], _build_custom_room_lobby_content(_active_custom_room))
+	else:
+		_show_modal("🏰 PHÒNG ĐẤU — TẠO & VÀO BẰNG ID", _build_custom_room_hub_content())
+
+func _leave_active_custom_room() -> void:
+	var code := str(_active_custom_room.get("code", ""))
+	_active_custom_room = {}
+	if NetworkClient and not code.is_empty():
+		NetworkClient.leave_custom_room(code)
+
+func _set_custom_room_status(msg: String, is_error: bool = true) -> void:
+	if is_instance_valid(_custom_room_status_lbl):
+		_custom_room_status_lbl.text = msg
+		_custom_room_status_lbl.add_theme_color_override("font_color", Color(1.0, 0.42, 0.42) if is_error else Color(0.40, 0.95, 0.65))
+
+func _on_custom_room_updated(room: Dictionary, extra: Dictionary) -> void:
+	_active_custom_room = room.duplicate(true)
+	var code := str(room.get("code", ""))
+	var mode_id := str(room.get("modeId", "2v2"))
+	var returned := bool(extra.get("returnedFromMatchmaking", false))
+	if returned and is_matchmaking_active:
+		_cancel_matchmaking_internal()
+		_party_match_code = ""
+		_party_members_snapshot = []
+		_party_is_host = false
+		_party_host_uid = ""
+	_show_modal("🏰 PHÒNG #%s — %s" % [code, _mode_custom_title(mode_id)], _build_custom_room_lobby_content(room))
+
+func _on_custom_room_error(err_msg: String) -> void:
+	AudioManager.play_parry()
+	_set_custom_room_status("⚠️ " + err_msg, true)
+
+func _on_custom_room_closed(code: String, reason: String) -> void:
+	var active_code := str(_active_custom_room.get("code", ""))
+	var was_our_room := (not code.is_empty() and (code == active_code or code == _party_match_code))
+	_active_custom_room = {}
+	if not was_our_room:
+		return
+	if is_matchmaking_active:
+		_cancel_matchmaking_internal()
+	_party_match_code = ""
+	_party_members_snapshot = []
+	_party_is_host = false
+	_party_host_uid = ""
+	_show_modal("🏰 PHÒNG ĐẤU — TẠO & VÀO BẰNG ID", _build_custom_room_hub_content())
+	_set_custom_room_status("⚠️ " + reason, true)
+
+func _on_custom_room_started(payload: Dictionary) -> void:
+	_active_custom_room = {}
+	mm_is_cancelled = false
+	is_matchmaking_active = false
+	_party_match_code = ""
+	_party_members_snapshot = []
+	_party_is_host = false
+	_party_host_uid = ""
+	var room_dict: Dictionary = payload.get("room", {})
+	var my_uid := NetworkClient.get_party_session_user_id() if NetworkClient else (AuthManager.current_user_id if AuthManager else "")
+	var my_name := NetworkClient.get_party_session_user_name() if NetworkClient else (AuthManager.current_user_name if AuthManager else "Đại Tướng Quân")
+	var host_uid := str(room_dict.get("hostUserId", ""))
+	mm_current_room = room_dict
+	mm_active_room_id = str(room_dict.get("roomId", payload.get("roomId", "")))
+	mm_is_host = (host_uid == my_uid)
+	_sync_my_seat_from_room(room_dict, my_uid, my_name)
+	if AppwriteMatchmaking:
+		AppwriteMatchmaking.my_session_user_id = my_uid
+		AppwriteMatchmaking.my_session_user_name = my_name
+		AppwriteMatchmaking.current_room = room_dict
+		AppwriteMatchmaking.is_host = mm_is_host
+	AudioManager.play_victory()
+	_hide_modal_immediate()
+	get_tree().change_scene_to_file("res://scenes/hero_select.tscn")
+
+func _on_custom_room_matchmaking(payload: Dictionary) -> void:
+	_active_custom_room = {}
+	var mode_id := str(payload.get("modeId", "2v2"))
+	_start_2v2_matchmaking(mode_id, payload)
+
+func _on_custom_room_party_redirect(code: String, new_match_room_id: String) -> void:
+	if code.is_empty() or code != _party_match_code or new_match_room_id.is_empty():
+		return
+	mm_active_room_id = new_match_room_id
+	mm_is_host = false
+	if AppwriteMatchmaking:
+		AppwriteMatchmaking.is_host = false
+
+func _style_custom_mode_option(btn: Button, selected: bool) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.11, 0.20, 0.34, 0.98) if selected else Color(0.06, 0.09, 0.15, 0.92)
+	sb.border_color = COLOR_GOLD_PRIMARY if selected else Color(0.28, 0.36, 0.50, 0.72)
+	sb.set_border_width_all(2 if selected else 1)
+	sb.set_corner_radius_all(10)
+	sb.content_margin_left = 12
+	sb.content_margin_right = 12
+	sb.content_margin_top = 10
+	sb.content_margin_bottom = 10
+	var hov := sb.duplicate() as StyleBoxFlat
+	hov.border_color = Color(1.0, 0.90, 0.45, 1.0)
+	btn.add_theme_stylebox_override("normal", sb)
+	btn.add_theme_stylebox_override("hover", hov)
+	btn.add_theme_stylebox_override("pressed", hov)
+	btn.add_theme_stylebox_override("focus", hov)
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	btn.focus_mode = Control.FOCUS_NONE
+
+func _build_custom_room_hub_content() -> Control:
+	var root := VBoxContainer.new()
+	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_theme_constant_override("separation", 12)
+
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override("separation", 16)
+	root.add_child(cols)
+
+	# Left: Create Room with mode picker
+	var create_panel := PanelContainer.new()
+	create_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var cp_sb := StyleBoxFlat.new()
+	cp_sb.bg_color = Color(0.06, 0.08, 0.14, 0.96)
+	cp_sb.border_color = Color(0.25, 0.72, 0.95, 0.65)
+	cp_sb.set_border_width_all(2)
+	cp_sb.set_corner_radius_all(12)
+	cp_sb.set_content_margin_all(16)
+	create_panel.add_theme_stylebox_override("panel", cp_sb)
+	cols.add_child(create_panel)
+
+	var cv := VBoxContainer.new()
+	cv.add_theme_constant_override("separation", 10)
+	create_panel.add_child(cv)
+
+	var c_hdr := Label.new()
+	c_hdr.text = "✨ TẠO PHÒNG MỚI"
+	c_hdr.add_theme_font_size_override("font_size", 16)
+	c_hdr.add_theme_color_override("font_color", Color(1.0, 0.88, 0.40))
+	cv.add_child(c_hdr)
+
+	var c_sub := Label.new()
+	c_sub.text = "Chọn chế độ để nhận ID phòng 6 chữ số riêng biệt mời bạn bè:"
+	c_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	c_sub.add_theme_font_size_override("font_size", 12)
+	c_sub.add_theme_color_override("font_color", Color(0.75, 0.84, 0.95))
+	cv.add_child(c_sub)
+
+	var mode_specs := [
+		{
+			"id": "2v2",
+			"title": "⚔️ 2v2 Xếp Hạng (2 Chỗ · Cùng 1 Phe)",
+			"desc": "Chỉ mở 2 slot để 2 người chung đội (Phe Rồng), khi tìm trận giữ cùng team & tính Rank Sao."
+		},
+		{
+			"id": "dynasty_5",
+			"title": "👑 Vương Triều 5 Người (5 Chỗ Trống)",
+			"desc": "Tạo 5 chỗ để bạn bè cùng vào chơi; chỗ còn trống tự ghép thêm khi bắt đầu tìm trận."
+		},
+		{
+			"id": "dynasty_8",
+			"title": "🏯 Vương Triều 8 Người (8 Chỗ Trống)",
+			"desc": "Tạo 8 chỗ để tối đa 8 người cùng chơi; chỗ còn trống tự ghép thêm khi bắt đầu tìm trận."
+		}
+	]
+	var mode_btns: Dictionary = {}
+	for spec in mode_specs:
+		var m_id := str(spec["id"])
+		var btn := Button.new()
+		btn.custom_minimum_size = Vector2(0, 68)
+		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		btn.text = "%s
+%s" % [str(spec["title"]), str(spec["desc"])]
+		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		btn.add_theme_font_size_override("font_size", 12)
+		btn.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
+		_style_custom_mode_option(btn, _custom_room_create_mode == m_id)
+		btn.pressed.connect(func():
+			AudioManager.play_card_select()
+			_custom_room_create_mode = m_id
+			for k in mode_btns.keys():
+				_style_custom_mode_option(mode_btns[k], k == _custom_room_create_mode)
+		)
+		mode_btns[m_id] = btn
+		cv.add_child(btn)
+
+	var create_btn := Button.new()
+	create_btn.custom_minimum_size = Vector2(0, 48)
+	create_btn.text = "➕ TẠO PHÒNG & LẤY ID 6 SỐ"
+	_style_bronze_drum_cta(create_btn)
+	create_btn.pressed.connect(func():
+		AudioManager.play_card_select()
+		_set_custom_room_status("⏳ Đang khởi tạo phòng trên máy chủ...", false)
+		if NetworkClient:
+			if not NetworkClient.is_connected_to_server:
+				NetworkClient.connect_to_server()
+			NetworkClient.create_custom_room(_custom_room_create_mode)
+	)
+	cv.add_child(create_btn)
+
+	# Right: Join by 6-digit Room ID
+	var join_panel := PanelContainer.new()
+	join_panel.custom_minimum_size = Vector2(360, 0)
+	var jp_sb := StyleBoxFlat.new()
+	jp_sb.bg_color = Color(0.08, 0.06, 0.13, 0.96)
+	jp_sb.border_color = Color(0.96, 0.34, 0.68, 0.68)
+	jp_sb.set_border_width_all(2)
+	jp_sb.set_corner_radius_all(12)
+	jp_sb.set_content_margin_all(16)
+	join_panel.add_theme_stylebox_override("panel", jp_sb)
+	cols.add_child(join_panel)
+
+	var jv := VBoxContainer.new()
+	jv.add_theme_constant_override("separation", 12)
+	join_panel.add_child(jv)
+
+	var j_hdr := Label.new()
+	j_hdr.text = "🔑 NHẬP ID VÀO PHÒNG"
+	j_hdr.add_theme_font_size_override("font_size", 16)
+	j_hdr.add_theme_color_override("font_color", Color(1.0, 0.62, 0.85))
+	jv.add_child(j_hdr)
+
+	var j_desc := Label.new()
+	j_desc.text = "Nhập chính xác ID phòng gồm 6 chữ số từ bạn bè để tham gia ngay (2v2 cùng phe hoặc Vương Triều 5/8 người)."
+	j_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	j_desc.add_theme_font_size_override("font_size", 12)
+	j_desc.add_theme_color_override("font_color", Color(0.78, 0.82, 0.92))
+	jv.add_child(j_desc)
+
+	var code_edit := LineEdit.new()
+	code_edit.custom_minimum_size = Vector2(0, 56)
+	code_edit.max_length = 6
+	code_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	code_edit.placeholder_text = "Nhập 6 số (VD: 482913)"
+	code_edit.add_theme_font_size_override("font_size", 24)
+	code_edit.add_theme_color_override("font_color", Color(1.0, 0.92, 0.45))
+	var ce_norm := StyleBoxFlat.new()
+	ce_norm.bg_color = Color(0.03, 0.04, 0.08, 1.0)
+	ce_norm.border_color = Color(0.45, 0.55, 0.72, 0.85)
+	ce_norm.set_border_width_all(2)
+	ce_norm.set_corner_radius_all(10)
+	var ce_focus := ce_norm.duplicate() as StyleBoxFlat
+	ce_focus.border_color = COLOR_GOLD_PRIMARY
+	code_edit.add_theme_stylebox_override("normal", ce_norm)
+	code_edit.add_theme_stylebox_override("focus", ce_focus)
+	_custom_room_code_input = code_edit
+	jv.add_child(code_edit)
+
+	var submit_join := func():
+		AudioManager.play_card_select()
+		var raw_code := code_edit.text.strip_edges()
+		var digits_only := ""
+		for i in range(raw_code.length()):
+			var ch := raw_code.substr(i, 1)
+			if ch >= "0" and ch <= "9":
+				digits_only += ch
+		if digits_only.length() != 6:
+			_set_custom_room_status("⚠️ Vui lòng nhập đúng ID gồm 6 chữ số.", true)
+			return
+		_set_custom_room_status("⏳ Đang vào phòng #%s..." % digits_only, false)
+		if NetworkClient:
+			if not NetworkClient.is_connected_to_server:
+				NetworkClient.connect_to_server()
+			NetworkClient.join_custom_room(digits_only)
+
+	code_edit.text_submitted.connect(func(_t: String): submit_join.call())
+
+	var join_btn := Button.new()
+	join_btn.custom_minimum_size = Vector2(0, 48)
+	join_btn.text = "🚪 VÀO PHÒNG BẰNG ID"
+	var jb_norm := StyleBoxFlat.new()
+	jb_norm.bg_color = Color(0.12, 0.44, 0.72, 1.0)
+	jb_norm.border_color = Color(0.38, 0.88, 1.0, 0.95)
+	jb_norm.set_border_width_all(2)
+	jb_norm.set_corner_radius_all(10)
+	var jb_hov := jb_norm.duplicate() as StyleBoxFlat
+	jb_hov.bg_color = Color(0.18, 0.54, 0.86, 1.0)
+	join_btn.add_theme_stylebox_override("normal", jb_norm)
+	join_btn.add_theme_stylebox_override("hover", jb_hov)
+	join_btn.add_theme_stylebox_override("pressed", jb_norm)
+	join_btn.add_theme_stylebox_override("focus", jb_hov)
+	join_btn.add_theme_color_override("font_color", Color.WHITE)
+	join_btn.add_theme_color_override("font_hover_color", Color.WHITE)
+	join_btn.add_theme_font_size_override("font_size", 15)
+	join_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	join_btn.pressed.connect(submit_join)
+	jv.add_child(join_btn)
+
+	var tip_lbl := Label.new()
+	tip_lbl.text = "💡 Phòng lưu trực tiếp trên máy chủ trận đấu — không tốn tài nguyên và giữ nguyên đội hình khi ghép trận."
+	tip_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tip_lbl.add_theme_font_size_override("font_size", 11)
+	tip_lbl.add_theme_color_override("font_color", Color(0.58, 0.72, 0.85, 0.9))
+	jv.add_child(tip_lbl)
+
+	_custom_room_status_lbl = Label.new()
+	_custom_room_status_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_custom_room_status_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_custom_room_status_lbl.add_theme_font_size_override("font_size", 13)
+	if NetworkClient and not NetworkClient.is_connected_to_server:
+		_set_custom_room_status("⚠️ Đang kết nối máy chủ Render...", true)
+	else:
+		_custom_room_status_lbl.text = ""
+	root.add_child(_custom_room_status_lbl)
+
+	return root
+
+func _build_custom_room_slot_card(slot: Dictionary, code: String, is_2v2_room: bool, am_host: bool, my_uid: String) -> Control:
+	var is_empty := bool(slot.get("isEmpty", true))
+	var s_num := int(slot.get("slotNumber", 1))
+	var is_slot_host := bool(slot.get("isHost", false))
+	var uid := str(slot.get("userId", ""))
+	var is_me := (not is_empty and not my_uid.is_empty() and uid == my_uid)
+
+	var card := PanelContainer.new()
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.custom_minimum_size = Vector2(0, 128 if is_2v2_room else 112)
+	var sb := StyleBoxFlat.new()
+	if is_empty:
+		sb.bg_color = Color(0.05, 0.06, 0.10, 0.78)
+		sb.border_color = Color(0.25, 0.30, 0.42, 0.55)
+	elif is_2v2_room:
+		sb.bg_color = Color(0.07, 0.16, 0.28, 0.96)
+		sb.border_color = COLOR_GOLD_PRIMARY if is_me else Color(0.25, 0.82, 1.0, 0.88)
+	else:
+		sb.bg_color = Color(0.11, 0.14, 0.24, 0.96) if is_me else Color(0.07, 0.10, 0.17, 0.94)
+		sb.border_color = COLOR_GOLD_PRIMARY if is_me else Color(0.40, 0.65, 0.92, 0.75)
+	sb.set_border_width_all(2 if (is_me or not is_empty) else 1)
+	sb.set_corner_radius_all(10)
+	sb.set_content_margin_all(10)
+	card.add_theme_stylebox_override("panel", sb)
+
+	var vb := VBoxContainer.new()
+	vb.alignment = BoxContainer.ALIGNMENT_CENTER
+	vb.add_theme_constant_override("separation", 4)
+	card.add_child(vb)
+
+	var top_row := HBoxContainer.new()
+	var slot_lbl := Label.new()
+	slot_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slot_lbl.text = "🐉 ĐỒNG ĐỘI %d" % s_num if is_2v2_room else "CHỖ %d" % s_num
+	slot_lbl.add_theme_font_size_override("font_size", 11)
+	slot_lbl.add_theme_color_override("font_color", Color(0.40, 0.88, 1.0) if is_2v2_room else Color(0.75, 0.82, 0.92))
+	top_row.add_child(slot_lbl)
+
+	if not is_empty and is_slot_host:
+		var h_lbl := Label.new()
+		h_lbl.text = "👑 CHỦ PHÒNG"
+		h_lbl.add_theme_font_size_override("font_size", 10)
+		h_lbl.add_theme_color_override("font_color", COLOR_GOLD_ACCENT)
+		top_row.add_child(h_lbl)
+	elif not is_empty and am_host and not is_me:
+		var kick_btn := Button.new()
+		kick_btn.text = "✕"
+		kick_btn.tooltip_text = "Mời ra khỏi phòng"
+		kick_btn.custom_minimum_size = Vector2(22, 22)
+		_style_cancel_red_button(kick_btn)
+		kick_btn.add_theme_font_size_override("font_size", 10)
+		var cap_slot := s_num
+		kick_btn.pressed.connect(func():
+			AudioManager.play_card_select()
+			if NetworkClient:
+				NetworkClient.kick_custom_room_member(code, cap_slot)
+		)
+		top_row.add_child(kick_btn)
+	vb.add_child(top_row)
+
+	if is_empty:
+		var empty_lbl := Label.new()
+		empty_lbl.text = "⏳ Chỗ trống
+Nhập ID %s" % code
+		empty_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		empty_lbl.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		empty_lbl.add_theme_font_size_override("font_size", 12)
+		empty_lbl.add_theme_color_override("font_color", Color(0.50, 0.56, 0.68))
+		vb.add_child(empty_lbl)
+	else:
+		var uname := str(slot.get("userName", "Chiến Tướng"))
+		var name_lbl := Label.new()
+		name_lbl.text = ("%s (BẠN)" % uname) if is_me else uname
+		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		name_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		name_lbl.add_theme_font_size_override("font_size", 14 if is_2v2_room else 13)
+		name_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.52) if is_me else Color.WHITE)
+		vb.add_child(name_lbl)
+
+		var sub := Label.new()
+		var lv := int(slot.get("level", 1))
+		if is_2v2_room and RankSystem:
+			var r_idx := int(slot.get("rankIndex", 0))
+			var r_stars := int(slot.get("rankStars", 0))
+			sub.text = "Cấp %d · %s (%d⭐)" % [lv, RankSystem.get_rank_name(r_idx), r_stars]
+		else:
+			sub.text = "Cấp %d · ✅ Sẵn sàng" % lv
+		sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sub.add_theme_font_size_override("font_size", 11)
+		sub.add_theme_color_override("font_color", Color(0.45, 0.92, 0.62))
+		vb.add_child(sub)
+
+	return card
+
+func _build_custom_room_lobby_content(room: Dictionary) -> Control:
+	var code := str(room.get("code", ""))
+	var mode_id := str(room.get("modeId", "2v2"))
+	var is_2v2_room := (mode_id == "2v2")
+	var lobby_slots: int = int(room.get("lobbySlots", 2 if is_2v2_room else 5))
+	var match_max: int = int(room.get("matchMaxPlayers", 4 if is_2v2_room else lobby_slots))
+	var member_count: int = int(room.get("memberCount", 1))
+	var host_uid := str(room.get("hostUserId", ""))
+	var my_uid := NetworkClient.get_party_session_user_id() if NetworkClient else (AuthManager.current_user_id if AuthManager else "")
+	var am_host := (not my_uid.is_empty() and host_uid == my_uid)
+
+	var root := VBoxContainer.new()
+	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.add_theme_constant_override("separation", 12)
+
+	# 1. Top Room Code + Switch Mode Banner
+	var banner := PanelContainer.new()
+	var b_sb := StyleBoxFlat.new()
+	b_sb.bg_color = Color(0.06, 0.09, 0.16, 0.96)
+	b_sb.border_color = COLOR_GOLD_PRIMARY
+	b_sb.set_border_width_all(2)
+	b_sb.set_corner_radius_all(12)
+	b_sb.set_content_margin_all(14)
+	banner.add_theme_stylebox_override("panel", b_sb)
+	root.add_child(banner)
+
+	var bh := HBoxContainer.new()
+	bh.add_theme_constant_override("separation", 14)
+	banner.add_child(bh)
+
+	var id_vb := VBoxContainer.new()
+	id_vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	id_vb.add_theme_constant_override("separation", 3)
+	bh.add_child(id_vb)
+
+	var id_lbl := Label.new()
+	id_lbl.text = "🔑 ID PHÒNG:  %s" % code
+	id_lbl.add_theme_font_size_override("font_size", 24)
+	id_lbl.add_theme_color_override("font_color", Color(1.0, 0.90, 0.42))
+	id_vb.add_child(id_lbl)
+
+	var sub_lbl := Label.new()
+	if is_2v2_room:
+		sub_lbl.text = "⚔️ 2v2 Dual Cùng Phe (%d/2 chỗ) — Giữ cả 2 người chung Phe Rồng, tìm thêm 2 đối thủ & tính Rank Sao" % member_count
+	else:
+		sub_lbl.text = "👑 %s (%d/%d người) — Đủ %d người vào chọn tướng ngay, thiếu sẽ tìm trận ghép thêm như bình thường" % [
+			_mode_custom_title(mode_id), member_count, lobby_slots, match_max
+		]
+	sub_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sub_lbl.add_theme_font_size_override("font_size", 12)
+	sub_lbl.add_theme_color_override("font_color", Color(0.74, 0.86, 0.98))
+	id_vb.add_child(sub_lbl)
+
+	var copy_box := VBoxContainer.new()
+	copy_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	copy_box.add_theme_constant_override("separation", 4)
+	bh.add_child(copy_box)
+
+	var copy_btn := Button.new()
+	copy_btn.custom_minimum_size = Vector2(148, 38)
+	copy_btn.text = "📋 SAO CHÉP ID"
+	_style_white_gold_button(copy_btn, 8, 2, Vector2.ZERO)
+	copy_box.add_child(copy_btn)
+
+	_custom_room_copy_feedback_lbl = Label.new()
+	_custom_room_copy_feedback_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_custom_room_copy_feedback_lbl.add_theme_font_size_override("font_size", 11)
+	_custom_room_copy_feedback_lbl.add_theme_color_override("font_color", Color(0.40, 0.95, 0.62))
+	copy_box.add_child(_custom_room_copy_feedback_lbl)
+
+	copy_btn.pressed.connect(func():
+		AudioManager.play_card_select()
+		DisplayServer.clipboard_set(code)
+		if is_instance_valid(_custom_room_copy_feedback_lbl):
+			_custom_room_copy_feedback_lbl.text = "✓ Đã chép %s!" % code
+	)
+
+	if am_host:
+		var switch_row := HBoxContainer.new()
+		switch_row.alignment = BoxContainer.ALIGNMENT_CENTER
+		switch_row.add_theme_constant_override("separation", 10)
+		var modes_switch := [
+			{"id": "2v2", "label": "⚔️ 2v2 (2 Chỗ Cùng Phe)"},
+			{"id": "dynasty_5", "label": "👑 Vương Triều 5 Người"},
+			{"id": "dynasty_8", "label": "🏯 Vương Triều 8 Người"}
+		]
+		for sw in modes_switch:
+			var sw_id := str(sw["id"])
+			var sw_btn := Button.new()
+			sw_btn.custom_minimum_size = Vector2(210, 34)
+			sw_btn.text = str(sw["label"])
+			_style_custom_mode_option(sw_btn, sw_id == mode_id)
+			sw_btn.add_theme_color_override("font_color", Color(1.0, 0.92, 0.45) if sw_id == mode_id else Color(0.84, 0.90, 0.98))
+			sw_btn.pressed.connect(func():
+				AudioManager.play_card_select()
+				if sw_id != mode_id and NetworkClient:
+					NetworkClient.set_custom_room_mode(code, sw_id)
+			)
+			switch_row.add_child(sw_btn)
+		root.add_child(switch_row)
+
+	# 2. Slots Grid (2 for 2v2, 5 for dynasty_5, 8 for dynasty_8)
+	var grid := GridContainer.new()
+	grid.columns = 2 if is_2v2_room else (5 if lobby_slots == 5 else 4)
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 12)
+	var slots_arr: Array = room.get("slots", [])
+	for s in slots_arr:
+		if s is Dictionary:
+			grid.add_child(_build_custom_room_slot_card(s, code, is_2v2_room, am_host, my_uid))
+	root.add_child(grid)
+
+	_custom_room_status_lbl = Label.new()
+	_custom_room_status_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_custom_room_status_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_custom_room_status_lbl.add_theme_font_size_override("font_size", 13)
+	root.add_child(_custom_room_status_lbl)
+
+	# 3. Bottom Action Buttons
+	var act_row := HBoxContainer.new()
+	act_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	act_row.add_theme_constant_override("separation", 16)
+	root.add_child(act_row)
+
+	if am_host:
+		var start_btn := Button.new()
+		start_btn.custom_minimum_size = Vector2(300, 46)
+		if not is_2v2_room and member_count >= match_max:
+			start_btn.text = "⚔️ BẮT ĐẦU NGAY (ĐỦ %d/%d)" % [member_count, match_max]
+		else:
+			start_btn.text = "🔍 TÌM TRẬN NGAY (%d/%d)" % [member_count, match_max]
+		_style_bronze_drum_cta(start_btn)
+		start_btn.pressed.connect(func():
+			AudioManager.play_slash()
+			start_btn.disabled = true
+			_set_custom_room_status("⏳ Đang chuẩn bị vào trận...", false)
+			if NetworkClient:
+				NetworkClient.start_custom_room(code)
+		)
+		act_row.add_child(start_btn)
+	else:
+		var host_name := "Chủ phòng"
+		for s in slots_arr:
+			if s is Dictionary and bool(s.get("isHost", false)):
+				host_name = str(s.get("userName", "Chủ phòng"))
+				break
+		var wait_lbl := Label.new()
+		wait_lbl.text = "⏳ Đang chờ %s bắt đầu tìm trận..." % host_name
+		wait_lbl.add_theme_font_size_override("font_size", 14)
+		wait_lbl.add_theme_color_override("font_color", Color(0.45, 0.88, 1.0))
+		act_row.add_child(wait_lbl)
+
+	var leave_btn := Button.new()
+	leave_btn.custom_minimum_size = Vector2(180, 46)
+	leave_btn.text = "🚪 RỜI PHÒNG"
+	_style_cancel_red_button(leave_btn)
+	leave_btn.pressed.connect(func():
+		AudioManager.play_card_select()
+		_hide_modal()
+	)
+	act_row.add_child(leave_btn)
+
+	return root
+
+func _start_2v2_matchmaking(mode_id: String = "2v2", custom_match_payload: Dictionary = {}) -> void:
 	_cancel_matchmaking_internal()
 	var target_player_count := _mode_player_count(mode_id)
 	var is_dynasty_mode := mode_id.begins_with("dynasty_")
@@ -11928,7 +12545,9 @@ func _start_2v2_matchmaking(mode_id: String = "2v2") -> void:
 
 	var slot_nodes: Array = []
 
-	_show_modal("⚔️ TÌM TRẬN %s" % mode_title, container)
+	var party_code := str(custom_match_payload.get("code", ""))
+	var modal_title := ("⚔️ TÌM TRẬN %s (PHÒNG #%s)" % [mode_title, party_code]) if not party_code.is_empty() else ("⚔️ TÌM TRẬN %s" % mode_title)
+	_show_modal(modal_title, container)
 
 	is_matchmaking_active = true
 	mm_is_cancelled = false
@@ -11939,12 +12558,16 @@ func _start_2v2_matchmaking(mode_id: String = "2v2") -> void:
 	mm_is_host = false
 	mm_current_room = {}
 	mm_session_user_id = ""
+	_party_match_code = str(custom_match_payload.get("code", ""))
+	_party_host_uid = str(custom_match_payload.get("hostUserId", ""))
+	_party_members_snapshot = []
+	_party_is_host = false
 	if AppwriteMatchmaking:
 		AppwriteMatchmaking.current_room = {}
 		AppwriteMatchmaking.my_session_user_id = ""
 		AppwriteMatchmaking.my_session_user_name = ""
 
-	_run_2v2_matchmaking_loop(status_lbl, timer_lbl, slot_nodes, mode_id, target_player_count)
+	_run_2v2_matchmaking_loop(status_lbl, timer_lbl, slot_nodes, mode_id, target_player_count, custom_match_payload)
 	_update_matchmaking_timer(timer_lbl)
 
 func _update_matchmaking_timer(timer_lbl: Label) -> void:
@@ -11984,7 +12607,19 @@ func _style_cancel_red_button(btn: Button) -> void:
 	btn.add_theme_font_size_override("font_size", 14)
 
 func _cancel_2v2_matchmaking() -> void:
+	var p_code := _party_match_code
+	var was_p_host := _party_is_host
 	_cancel_matchmaking_internal()
+	if not p_code.is_empty():
+		_party_match_code = ""
+		_party_members_snapshot = []
+		_party_is_host = false
+		_party_host_uid = ""
+		if was_p_host and NetworkClient:
+			NetworkClient.cancel_custom_room_match(p_code)
+			return
+		if NetworkClient:
+			NetworkClient.leave_custom_room(p_code)
 	_hide_modal()
 
 func _update_matchmaking_status_count(status_lbl: Label, room: Dictionary, _time_remaining: float = -1.0) -> void:
@@ -12002,6 +12637,9 @@ func _update_matchmaking_status_count(status_lbl: Label, room: Dictionary, _time
 	if count >= target_count:
 		status_lbl.text = "⚔️ Đã tìm thấy trận đấu! Đang vào trận..."
 		status_lbl.add_theme_color_override("font_color", Color(0.35, 0.95, 0.5, 1.0))
+	elif not _party_match_code.is_empty():
+		status_lbl.text = "🔍 Phòng #%s đang ghép trận (%d/%d người)..." % [_party_match_code, count, target_count]
+		status_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.65, 1.0))
 	else:
 		status_lbl.text = "🔍 Đang tìm trận..."
 		status_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.65, 1.0))
@@ -12081,7 +12719,7 @@ func _sync_my_seat_from_room(room_data: Dictionary, my_uid: String, my_name: Str
 			print("[Matchmaking] Đồng bộ vị trí cố định: Ghế %d (UID: %s, Tên: %s, Phe: %s)" % [NetworkClient.my_seat, my_uid, my_name, "Rồng" if sl.get("isDragon", false) else "Phượng"])
 			return
 
-func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: Array, mode_id: String = "2v2", target_player_count: int = 4) -> void:
+func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: Array, mode_id: String = "2v2", target_player_count: int = 4, custom_match_payload: Dictionary = {}) -> void:
 	var base_uid = AuthManager.current_user_id if AuthManager and AuthManager.current_user_id != "" else ""
 	var pid_suffix = str(OS.get_process_id())
 	var my_user_id = base_uid
@@ -12104,49 +12742,78 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		# match against their own stale room.
 		await AppwriteMatchmaking.cleanup_user_waiting_rooms(my_user_id)
 
-	var inst_idx = NetworkClient.auto_instance_index if NetworkClient else 1
-	var own_room_id = "room_" + str(randi()).md5_text().substr(0, 8)
-	var own_team_seats = range(1, target_player_count + 1)
-	own_team_seats.shuffle()
-	var own_dragon_seats = own_team_seats.slice(0, maxi(1, target_player_count / 2))
-	var own_room = {
-		"roomId": own_room_id,
-		"modeId": mode_id,
-		"hostUserId": my_user_id,
-		"status": "WAITING",
-		"version": 1,
-		"hostRankPoints": my_rank_points,
-		"slots": []
-	}
-	for seat in range(1, target_player_count + 1):
-		own_room["slots"].append({"seatNumber": seat, "isDragon": own_dragon_seats.has(seat), "isAI": false, "userId": my_user_id if seat == 1 else "", "userName": my_user_name if seat == 1 else "", "rankPoints": my_rank_points if seat == 1 else 0, "isEmpty": seat != 1})
-	var own_created = await AppwriteMatchmaking.create_waiting_room(own_room)
-	if not own_created:
-		if NetworkClient and NetworkClient.has_method("send_matchmaking_stop"):
-			NetworkClient.send_matchmaking_stop()
-		is_matchmaking_active = false
-		if is_instance_valid(status_lbl):
-			status_lbl.text = "❌ Không thể tham gia hàng chờ. Vui lòng thử lại."
-		return
-	mm_current_room = own_room
-	mm_active_room_id = own_room_id
-	mm_is_host = true
-	if AppwriteMatchmaking:
-		AppwriteMatchmaking.is_host = true
-	if NetworkClient:
-		NetworkClient.my_seat = inst_idx
-		NetworkClient.update_debug_window_title(my_user_name)
-		NetworkClient.send_matchmaking_start(mode_id, own_room_id)
+	var is_party_match := not custom_match_payload.is_empty()
+	var party_room_seed: Dictionary = custom_match_payload.get("matchRoom", {}) if is_party_match else {}
+	var party_user_ids: Array = []
+	_party_members_snapshot = []
+	var am_party_leader := (not is_party_match) or (_party_host_uid == my_user_id)
+	_party_is_host = am_party_leader
+	if is_party_match:
+		for ps in party_room_seed.get("slots", []):
+			if ps is Dictionary and not bool(ps.get("isEmpty", true)) and str(ps.get("userId", "")) != "":
+				_party_members_snapshot.append(ps.duplicate(true))
+				party_user_ids.append(str(ps.get("userId", "")))
+	var party_size := maxi(1, _party_members_snapshot.size()) if is_party_match else 1
+	var require_2v2_pair := (is_party_match and mode_id == "2v2" and party_size >= 2)
 
-	# Include our own room in this first election. If every client excludes its
-	# own host room, the smallest two rooms can make a cycle (A joins B while B
-	# joins A). A shared smallest-room tie-break gives all clients one anchor.
-	var found_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, rank_diff, my_user_name, own_room_id, mode_id)
+	var inst_idx = NetworkClient.auto_instance_index if NetworkClient else 1
+	var own_room_id := ""
+	var own_room: Dictionary = {}
+	var found_room: Dictionary = {}
+	var saw_waiting_room := false
+
+	if am_party_leader:
+		if is_party_match and not party_room_seed.is_empty():
+			own_room = party_room_seed.duplicate(true)
+			own_room_id = str(own_room.get("roomId", ""))
+		else:
+			own_room_id = "room_" + str(randi()).md5_text().substr(0, 8)
+			var own_dragon_seats: Array = [1, 3] if mode_id == "2v2" else [1]
+			own_room = {
+				"roomId": own_room_id,
+				"modeId": mode_id,
+				"hostUserId": my_user_id,
+				"status": "WAITING",
+				"version": 1,
+				"hostRankPoints": my_rank_points,
+				"slots": []
+			}
+			for seat in range(1, target_player_count + 1):
+				own_room["slots"].append({"seatNumber": seat, "isDragon": own_dragon_seats.has(seat), "isAI": false, "userId": my_user_id if seat == 1 else "", "userName": my_user_name if seat == 1 else "", "rankPoints": my_rank_points if seat == 1 else 0, "isEmpty": seat != 1})
+
+		var own_created = await AppwriteMatchmaking.create_waiting_room(own_room)
+		if not own_created:
+			if NetworkClient and NetworkClient.has_method("send_matchmaking_stop"):
+				NetworkClient.send_matchmaking_stop()
+			is_matchmaking_active = false
+			if is_instance_valid(status_lbl):
+				status_lbl.text = "❌ Không thể tham gia hàng chờ. Vui lòng thử lại."
+			return
+		mm_current_room = own_room
+		mm_active_room_id = own_room_id
+		mm_is_host = true
+		if AppwriteMatchmaking:
+			AppwriteMatchmaking.is_host = true
+		_sync_my_seat_from_room(mm_current_room, my_user_id, my_user_name)
+		if NetworkClient:
+			NetworkClient.send_matchmaking_start(mode_id, own_room_id)
+
+		found_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, rank_diff, my_user_name, own_room_id, mode_id, party_size, require_2v2_pair, party_user_ids)
+	else:
+		mm_current_room = party_room_seed.duplicate(true)
+		mm_active_room_id = str(mm_current_room.get("roomId", ""))
+		mm_is_host = false
+		if AppwriteMatchmaking:
+			AppwriteMatchmaking.is_host = false
+		_sync_my_seat_from_room(mm_current_room, my_user_id, my_user_name)
+		if NetworkClient:
+			NetworkClient.send_matchmaking_start(mode_id, mm_active_room_id)
+		await get_tree().create_timer(0.35).timeout
 	if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
 		return
 
-	var saw_waiting_room = not found_room.is_empty()
-	if not found_room.is_empty():
+	saw_waiting_room = not found_room.is_empty()
+	if am_party_leader and not found_room.is_empty():
 		var target_real_count = 0
 		for target_slot in found_room.get("slots", []):
 			if not target_slot.get("isEmpty", false) and not target_slot.get("isAI", false) and target_slot.get("userId", "") != "":
@@ -12162,7 +12829,8 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 			print("[Matchmaking] Giữ phòng neo %s." % own_room_id)
 		else:
 			var old_room_id = mm_active_room_id
-			var joined = await AppwriteMatchmaking.join_room_slot(found_room, my_user_id, my_user_name, my_rank_points, inst_idx)
+			var party_to_join := _party_members_snapshot if is_party_match else [{"userId": my_user_id, "userName": my_user_name, "rankPoints": my_rank_points}]
+			var joined = await AppwriteMatchmaking.join_party_to_room(found_room, party_to_join, inst_idx, mode_id == "2v2")
 			if mm_is_cancelled or not is_instance_valid(status_lbl) or not is_instance_valid(timer_lbl):
 				return
 			if not joined.is_empty():
@@ -12171,21 +12839,21 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 				mm_is_host = false
 				_sync_my_seat_from_room(mm_current_room, my_user_id, my_user_name)
 				if old_room_id != mm_active_room_id:
+					if is_party_match and NetworkClient:
+						NetworkClient.redirect_custom_room_match(_party_match_code, mm_active_room_id)
 					await AppwriteMatchmaking.retire_merged_room(old_room_id)
 				if AppwriteMatchmaking:
 					AppwriteMatchmaking.is_host = false
-			else:
+			elif not is_party_match:
 				found_room = {}
-				# Room may have changed while joining. Re-scan instead of creating a
-				# second room and splitting clients.
 				for retry in range(10):
 					if mm_is_cancelled:
 						return
 					await get_tree().create_timer(0.5).timeout
-					var retry_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, rank_diff, my_user_name, mm_active_room_id, mode_id)
+					var retry_room = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, rank_diff, my_user_name, mm_active_room_id, mode_id, party_size, require_2v2_pair, party_user_ids)
 					if retry_room.is_empty():
 						continue
-					var retry_joined = await AppwriteMatchmaking.join_room_slot(retry_room, my_user_id, my_user_name, my_rank_points, inst_idx)
+					var retry_joined = await AppwriteMatchmaking.join_party_to_room(retry_room, party_to_join, inst_idx, mode_id == "2v2")
 					if retry_joined.is_empty():
 						continue
 					mm_current_room = retry_joined
@@ -12308,35 +12976,41 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		if poll_timer <= 0.0 or is_fast_test:
 			poll_timer = 4.5 # Đặt lại chu kỳ 4.5s để giảm lượt đọc Appwrite
 
-			# Keep consolidating rooms while they are waiting. Every client moves
-			# toward a room with more real players; ties use roomId for stability.
-			var merge_candidate = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, rank_diff, my_user_name, mm_active_room_id, mode_id)
-			if not merge_candidate.is_empty() and str(merge_candidate.get("roomId", "")) != mm_active_room_id:
-				var current_count = 0
-				for current_slot in mm_current_room.get("slots", []):
-					if not current_slot.get("isEmpty", false) and not current_slot.get("isAI", false) and current_slot.get("userId", "") != "":
-						current_count += 1
-				var candidate_count = 0
-				for candidate_slot in merge_candidate.get("slots", []):
-					if not candidate_slot.get("isEmpty", false) and not candidate_slot.get("isAI", false) and candidate_slot.get("userId", "") != "":
-						candidate_count += 1
-				print("[Matchmaking] Bầu phòng hiện tại=%s/%d ứng viên=%s/%d" % [mm_active_room_id, current_count, str(merge_candidate.get("roomId", "")), candidate_count])
-				var should_merge_live = candidate_count > current_count or (candidate_count == current_count and str(merge_candidate.get("roomId", "")) < mm_active_room_id)
-				if should_merge_live:
-					var previous_room_id = mm_active_room_id
-					var merged_room = await AppwriteMatchmaking.join_room_slot(merge_candidate, my_user_id, my_user_name, my_rank_points, inst_idx)
-					if not merged_room.is_empty():
-						mm_current_room = merged_room
-						mm_active_room_id = merged_room.get("roomId", "")
-						mm_is_host = false
-						AppwriteMatchmaking.is_host = false
-						_sync_my_seat_from_room(mm_current_room, my_user_id, my_user_name)
-						if previous_room_id != mm_active_room_id:
-							await AppwriteMatchmaking.retire_merged_room(previous_room_id)
-							last_real_player_at_ms = Time.get_ticks_msec()
-							guest_wait_timer = 0.0
-							last_real_player_count = candidate_count + 1
-							print("[Matchmaking] Gộp phòng %s vào %s (%d -> %d người thật)." % [previous_room_id, mm_active_room_id, current_count, candidate_count + 1])
+			if am_party_leader:
+				var merge_candidate = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, rank_diff, my_user_name, mm_active_room_id, mode_id, party_size, require_2v2_pair, party_user_ids)
+				if not merge_candidate.is_empty() and str(merge_candidate.get("roomId", "")) != mm_active_room_id:
+					var current_count = 0
+					for current_slot in mm_current_room.get("slots", []):
+						if not current_slot.get("isEmpty", false) and not current_slot.get("isAI", false) and current_slot.get("userId", "") != "":
+							current_count += 1
+					var candidate_count = 0
+					for candidate_slot in merge_candidate.get("slots", []):
+						if not candidate_slot.get("isEmpty", false) and not candidate_slot.get("isAI", false) and candidate_slot.get("userId", "") != "":
+							candidate_count += 1
+					print("[Matchmaking] Bầu phòng hiện tại=%s/%d ứng viên=%s/%d" % [mm_active_room_id, current_count, str(merge_candidate.get("roomId", "")), candidate_count])
+					var should_merge_live = candidate_count > current_count or (candidate_count == current_count and str(merge_candidate.get("roomId", "")) < mm_active_room_id)
+					if should_merge_live:
+						var previous_room_id = mm_active_room_id
+						var party_to_merge := _party_members_snapshot if is_party_match else [{"userId": my_user_id, "userName": my_user_name, "rankPoints": my_rank_points}]
+						var merged_room = await AppwriteMatchmaking.join_party_to_room(merge_candidate, party_to_merge, inst_idx, mode_id == "2v2")
+						if not merged_room.is_empty():
+							mm_current_room = merged_room
+							mm_active_room_id = merged_room.get("roomId", "")
+							mm_is_host = false
+							AppwriteMatchmaking.is_host = false
+							_sync_my_seat_from_room(mm_current_room, my_user_id, my_user_name)
+							if previous_room_id != mm_active_room_id:
+								if is_party_match and NetworkClient:
+									NetworkClient.redirect_custom_room_match(_party_match_code, mm_active_room_id)
+								await AppwriteMatchmaking.retire_merged_room(previous_room_id)
+								last_real_player_at_ms = Time.get_ticks_msec()
+								guest_wait_timer = 0.0
+								var merged_real := 0
+								for ms_slot in mm_current_room.get("slots", []):
+									if ms_slot is Dictionary and not ms_slot.get("isEmpty", false) and not ms_slot.get("isAI", false) and str(ms_slot.get("userId", "")) != "":
+										merged_real += 1
+								last_real_player_count = merged_real
+								print("[Matchmaking] Gộp phòng %s vào %s (%d -> %d người thật)." % [previous_room_id, mm_active_room_id, current_count, merged_real])
 
 			if mm_is_host:
 				if heartbeat_timer <= 0.0:
@@ -12448,14 +13122,12 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 		return
 
 	if mm_is_host:
-		# Bầu lại một lần cuối trước khi chèn bot. Các nick vào cùng lúc có
-		# thể chưa nhìn thấy đủ tài liệu Appwrite ở vòng poll trước; nếu còn
-		# room WAITING khác thì tất cả phải hội tụ về room có mã nhỏ nhất.
+		var final_party := _party_members_snapshot if is_party_match else [{"userId": my_user_id, "userName": my_user_name, "rankPoints": my_rank_points}]
 		for election_round in range(4):
-			var final_candidate = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, rank_diff, my_user_name, mm_active_room_id, mode_id)
+			var final_candidate = await AppwriteMatchmaking.find_best_waiting_room(my_user_id, my_rank_points, rank_diff, my_user_name, mm_active_room_id, mode_id, party_size, require_2v2_pair, party_user_ids)
 			if final_candidate.is_empty() or str(final_candidate.get("roomId", "")) == mm_active_room_id:
 				break
-			var final_joined = await AppwriteMatchmaking.join_room_slot(final_candidate, my_user_id, my_user_name, my_rank_points, inst_idx)
+			var final_joined = await AppwriteMatchmaking.join_party_to_room(final_candidate, final_party, inst_idx, mode_id == "2v2")
 			if final_joined.is_empty():
 				await get_tree().create_timer(0.35).timeout
 				continue
@@ -12466,6 +13138,8 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 			AppwriteMatchmaking.is_host = false
 			_sync_my_seat_from_room(mm_current_room, my_user_id, my_user_name)
 			if previous_final_room_id != mm_active_room_id:
+				if is_party_match and NetworkClient:
+					NetworkClient.redirect_custom_room_match(_party_match_code, mm_active_room_id)
 				await AppwriteMatchmaking.retire_merged_room(previous_final_room_id)
 			break
 
@@ -12531,40 +13205,71 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 				"isEmpty": false
 			})
 
-		# 1. Random ngẫu nhiên người chơi vào các vị trí ghế
-		existing_players.shuffle()
-
-		# 2. Khởi tạo danh sách phe (Rồng / Phượng) tương ứng với số ghế
-		var team_roles: Array[bool] = []
-		if target_player_count == 4:
-			team_roles = [true, true, false, false]
-			team_roles.shuffle()
-		elif target_player_count == 5:
-			team_roles = [true, true, false, false, false]
-			team_roles.shuffle()
-		elif target_player_count == 8:
-			team_roles = [true, true, true, true, false, false, false, false]
-			team_roles.shuffle()
-		else:
-			for i in range(target_player_count):
-				team_roles.append(i % 2 == 0)
-			team_roles.shuffle()
-
-		# 3. Cố định vị trí và phe vào slots trước khi bắt đầu chọn tướng
 		var final_slots: Array = []
-		for idx in range(existing_players.size()):
-			var p = existing_players[idx]
-			var s_num = idx + 1
-			var is_drag: bool = team_roles[idx] if (idx >= 0 and idx < team_roles.size()) else (idx % 2 == 0)
-			final_slots.append({
-				"seatNumber": s_num,
-				"userId": str(p.get("userId", "")),
-				"userName": str(p.get("userName", "")),
-				"rankPoints": int(p.get("rankPoints", 0)),
-				"isDragon": is_drag,
-				"isAI": bool(p.get("isAI", false)),
-				"isEmpty": false
-			})
+		if target_player_count == 4 and mode_id == "2v2":
+			# Bảo toàn cặp Phe Rồng (ghế 1, 3) & Phe Phượng (ghế 2, 4) để bạn bè 2v2 luôn chung 1 đội!
+			var seats_2v2: Array = [null, null, null, null]
+			var leftover_players: Array = []
+			for p in existing_players:
+				var desired := int(p.get("seatNumber", 0))
+				if desired >= 1 and desired <= 4 and seats_2v2[desired - 1] == null:
+					seats_2v2[desired - 1] = p
+				else:
+					leftover_players.append(p)
+			for p in leftover_players:
+				var want_drag := bool(p.get("isDragon", true))
+				var pref_order: Array[int] = [0, 2, 1, 3] if want_drag else [1, 3, 0, 2]
+				for idx in pref_order:
+					if seats_2v2[idx] == null:
+						seats_2v2[idx] = p
+						break
+			for idx in range(4):
+				var s_num := idx + 1
+				var p = seats_2v2[idx]
+				if p == null:
+					var bot_name = AppwriteMatchmaking.get_realistic_gamer_name(bot_seed_base + s_num * 17, used_names)
+					used_names.append(bot_name)
+					p = {
+						"userId": "bot_" + str(randi()).md5_text().substr(0, 6),
+						"userName": bot_name,
+						"rankPoints": maxi(20, my_rank_points + randi_range(-15, 15)),
+						"isAI": true
+					}
+				final_slots.append({
+					"seatNumber": s_num,
+					"userId": str(p.get("userId", "")),
+					"userName": str(p.get("userName", "")),
+					"rankPoints": int(p.get("rankPoints", 0)),
+					"isDragon": (s_num == 1 or s_num == 3),
+					"isAI": bool(p.get("isAI", false)),
+					"isEmpty": false
+				})
+		else:
+			existing_players.shuffle()
+			var team_roles: Array[bool] = []
+			if target_player_count == 5:
+				team_roles = [true, true, false, false, false]
+				team_roles.shuffle()
+			elif target_player_count == 8:
+				team_roles = [true, true, true, true, false, false, false, false]
+				team_roles.shuffle()
+			else:
+				for i in range(target_player_count):
+					team_roles.append(i % 2 == 0)
+				team_roles.shuffle()
+			for idx in range(existing_players.size()):
+				var p = existing_players[idx]
+				var s_num = idx + 1
+				var is_drag: bool = team_roles[idx] if (idx >= 0 and idx < team_roles.size()) else (idx % 2 == 0)
+				final_slots.append({
+					"seatNumber": s_num,
+					"userId": str(p.get("userId", "")),
+					"userName": str(p.get("userName", "")),
+					"rankPoints": int(p.get("rankPoints", 0)),
+					"isDragon": is_drag,
+					"isAI": bool(p.get("isAI", false)),
+					"isEmpty": false
+				})
 
 		mm_current_room["slots"] = final_slots
 		mm_current_room["status"] = "STARTED"
@@ -12601,6 +13306,10 @@ func _run_2v2_matchmaking_loop(status_lbl: Label, timer_lbl: Label, slot_nodes: 
 	await get_tree().create_timer(1.2).timeout
 	if mm_is_cancelled:
 		return
+	_party_match_code = ""
+	_party_members_snapshot = []
+	_party_is_host = false
+	_party_host_uid = ""
 	_hide_modal()
 	get_tree().change_scene_to_file("res://scenes/hero_select.tscn")
 

@@ -23,8 +23,10 @@ import {
 import { HERO_MAX_HP, HEROES } from "./functions/game-engine/src/heroes.js";
 import { getModeRules } from "./functions/game-engine/src/modeRegistry.js";
 import { createLobbyChatStore, LOBBY_CHAT_HISTORY_LIMIT } from "./lobby_chat_store.js";
+import { createCustomRoomStore, mergeAppwriteMatchmakingRooms } from "./custom_room_store.js";
 
 const rooms = new Map();
+const customRoomStore = createCustomRoomStore();
 // Social data is kept in the Render process so online players can search and
 // exchange friend requests without coupling the lobby to a match room.
 const socialProfiles = new Map();
@@ -338,17 +340,8 @@ async function sweepAppwriteMatchmaking() {
       const seen = new Set(anchorPlayers.map((player) => String(player.userId)));
       for (const source of candidates.slice(1)) {
         if (anchor.slots.every((slot) => !slot.isEmpty && !slot.isAI)) break;
-        let changed = false;
-        for (const player of matchmakingRealPlayers(source)) {
-          const uid = String(player.userId);
-          if (seen.has(uid)) continue;
-          const target = anchor.slots.find((slot) => slot.isEmpty || slot.userId === "empty");
-          if (!target) break;
-          Object.assign(target, { ...player, isEmpty: false, isAI: false });
-          seen.add(uid);
-          changed = true;
-        }
-        if (!changed) continue;
+        const mergeOutcome = mergeAppwriteMatchmakingRooms(anchor, source);
+        if (!mergeOutcome.changed) continue;
         const anchorPath = `/databases/${APPWRITE_MATCHMAKING_DATABASE}/collections/${APPWRITE_MATCHMAKING_COLLECTION}/documents/${encodeURIComponent(anchor.documentId)}`;
         const updated = await appwriteMatchmakingRequest(anchorPath, { method: "PATCH", body: JSON.stringify(matchmakingRoomPayload(anchor)) });
         if (!updated?.ok) continue;
@@ -523,16 +516,49 @@ if (clusterChannel) {
 
 const MAX_WS_MESSAGE_BYTES = 64 * 1024;
 const MAX_ACTIONS_PER_SECOND = 30;
+const CUSTOM_ROOM_ACTIONS = new Set([
+  "CUSTOM_ROOM_CREATE", "CUSTOM_ROOM_JOIN", "CUSTOM_ROOM_SET_MODE",
+  "CUSTOM_ROOM_KICK", "CUSTOM_ROOM_LEAVE", "CUSTOM_ROOM_START",
+  "CUSTOM_ROOM_CANCEL_MATCH", "CUSTOM_ROOM_REDIRECT_MATCH"
+]);
+
 const ALLOWED_WS_ACTIONS = new Set([
   "JOIN_ROOM", "INIT_GAME", "JOIN_DRAFT", "PICK_HERO", "HOVER_HERO", "GET_STATE", "PING",
   "MATCHMAKING_START", "MATCHMAKING_STOP",
   "USE_SKILL", "TOGGLE_SKILL", "PLAY_CARD", "RESPOND_ACTION", "END_TURN",
   "DISCARD_CARDS", "AI_STEP", "AI_REACTION", "CHECK_ACTIVE_MATCH", "RECONNECT_GAME",
   "SOCIAL_REGISTER", "FRIEND_LIST", "FRIEND_SEARCH", "FRIEND_REQUEST", "FRIEND_RESPOND",
-  "CHAT_SUBSCRIBE", "CHAT_UNSUBSCRIBE", "CHAT_SEND", "MATCHMAKING_START", "MATCHMAKING_STOP"
+  "CHAT_SUBSCRIBE", "CHAT_UNSUBSCRIBE", "CHAT_SEND",
+  ...CUSTOM_ROOM_ACTIONS
 ]);
 
 const SOCIAL_ACTIONS = new Set(["SOCIAL_REGISTER", "FRIEND_LIST", "FRIEND_SEARCH", "FRIEND_REQUEST", "FRIEND_RESPOND"]);
+
+function sendCustomRoomError(socket, error) {
+  if (socket?.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ type: "CUSTOM_ROOM_ERROR", error: String(error || "Lỗi phòng") }));
+  }
+}
+
+function broadcastCustomRoomState(room, extra = {}) {
+  if (!room) return;
+  const raw = JSON.stringify({
+    type: "CUSTOM_ROOM_STATE",
+    room: customRoomStore.serializeRoom(room),
+    ...extra,
+  });
+  for (const ws of customRoomStore.roomSockets(room)) {
+    if (ws?.readyState === WebSocket.OPEN) ws.send(raw);
+  }
+}
+
+function broadcastCustomRoomMessage(room, msgObj) {
+  if (!room) return;
+  const raw = JSON.stringify(msgObj);
+  for (const ws of customRoomStore.roomSockets(room)) {
+    if (ws?.readyState === WebSocket.OPEN) ws.send(raw);
+  }
+}
 
 function foldVietnamese(text) {
   if (!text) return "";
@@ -869,10 +895,10 @@ function validateClientPayload(payload, rawBytes) {
   if (rawBytes > MAX_WS_MESSAGE_BYTES) return "Gói tin vượt giới hạn cho phép";
   if (typeof payload.action !== "string" || !ALLOWED_WS_ACTIONS.has(payload.action)) return "Hành động không hợp lệ";
   if (payload.roomId !== undefined && (typeof payload.roomId !== "string" || payload.roomId.length > 128)) return "Mã phòng không hợp lệ";
-  for (const key of ["cardId", "targetCardId", "skillId", "heroName", "userId", "userName", "targetUserId", "query", "requestId", "fromUserId", "fromUserName", "title"]) {
+  for (const key of ["cardId", "targetCardId", "skillId", "heroName", "userId", "userName", "targetUserId", "query", "requestId", "fromUserId", "fromUserName", "title", "code", "modeId", "newMatchRoomId"]) {
     if (payload[key] !== undefined && (typeof payload[key] !== "string" || payload[key].length > 256)) return `${key} không hợp lệ`;
   }
-  for (const key of ["seat", "targetSeat", "targetSeat2", "expectedVersion", "level", "profileBg", "rankIndex", "rankStars", "rankAcc", "militaryPoints", "wins", "losses", "generalsCount", "exp"]) {
+  for (const key of ["seat", "targetSeat", "targetSeat2", "expectedVersion", "level", "profileBg", "rankIndex", "rankStars", "rankAcc", "militaryPoints", "wins", "losses", "generalsCount", "exp", "slotNumber", "rankPoints"]) {
     if (payload[key] !== undefined && (!Number.isInteger(Number(payload[key])) || Number(payload[key]) < 0)) return `${key} không hợp lệ`;
   }
   if (payload.cardIds !== undefined && (!Array.isArray(payload.cardIds) || payload.cardIds.length > 20 || payload.cardIds.some((id) => typeof id !== "string" || id.length > 256))) return "Danh sách lá bài không hợp lệ";
@@ -1804,6 +1830,12 @@ async function tickDraftRoom(roomId, room) {
 }
 
 setInterval(() => {
+  for (const expired of customRoomStore.pruneIdle()) {
+    const rawClosed = JSON.stringify({ type: "CUSTOM_ROOM_CLOSED", code: expired.code, reason: "Phòng đã đóng do không hoạt động" });
+    for (const ws of expired.sockets) {
+      if (ws?.readyState === WebSocket.OPEN) ws.send(rawClosed);
+    }
+  }
   if (rooms.size === 0) return;
   const now = Date.now();
   for (const [roomId, room] of rooms.entries()) {
@@ -2059,6 +2091,120 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
           }
         }
 
+        if (CUSTOM_ROOM_ACTIONS.has(action)) {
+          const actorId = socialUserId(userId || socket.socialUserId);
+          if (!actorId) return sendCustomRoomError(socket, "Chưa đăng nhập tài khoản");
+          const actorMember = {
+            userId: actorId,
+            userName: socialUserName(userName),
+            level: Number(payload.level) || 1,
+            rankIndex: Number(payload.rankIndex) || 0,
+            rankStars: Number(payload.rankStars) || 0,
+            rankPoints: Number(payload.rankPoints) || 0,
+            title: String(payload.title || ""),
+            profileBg: Number(payload.profileBg) || 0,
+            socket,
+          };
+
+          if (action === "CUSTOM_ROOM_CREATE") {
+            const res = customRoomStore.createRoom(actorMember, payload.modeId || "2v2");
+            if (!res.ok) return sendCustomRoomError(socket, res.error);
+            if (res.previous?.removed && res.previous.room) broadcastCustomRoomState(res.previous.room);
+            broadcastCustomRoomState(res.room);
+            return;
+          }
+          if (action === "CUSTOM_ROOM_JOIN") {
+            const res = customRoomStore.joinRoom(payload.code, actorMember);
+            if (res.previous?.removed && res.previous.room) broadcastCustomRoomState(res.previous.room);
+            if (!res.ok) return sendCustomRoomError(socket, res.error);
+            broadcastCustomRoomState(res.room);
+            return;
+          }
+          if (action === "CUSTOM_ROOM_SET_MODE") {
+            const res = customRoomStore.setMode(payload.code, actorId, payload.modeId);
+            if (!res.ok) return sendCustomRoomError(socket, res.error);
+            broadcastCustomRoomState(res.room);
+            return;
+          }
+          if (action === "CUSTOM_ROOM_KICK") {
+            const res = customRoomStore.kickMember(payload.code, actorId, payload.slotNumber);
+            if (!res.ok) return sendCustomRoomError(socket, res.error);
+            if (res.kickedSocket?.readyState === WebSocket.OPEN) {
+              res.kickedSocket.send(JSON.stringify({ type: "CUSTOM_ROOM_CLOSED", code: res.room?.code || String(payload.code || ""), reason: "Chủ phòng đã mời bạn ra khỏi phòng" }));
+            }
+            if (res.room) broadcastCustomRoomState(res.room);
+            return;
+          }
+          if (action === "CUSTOM_ROOM_LEAVE") {
+            const res = customRoomStore.leaveRoom(actorId, payload.code || "");
+            if (res.removedSocket?.readyState === WebSocket.OPEN) {
+              res.removedSocket.send(JSON.stringify({ type: "CUSTOM_ROOM_CLOSED", code: res.code || "", reason: "Bạn đã rời phòng" }));
+            }
+            if (res.room) broadcastCustomRoomState(res.room);
+            return;
+          }
+          if (action === "CUSTOM_ROOM_START") {
+            const res = customRoomStore.startRoom(payload.code, actorId);
+            if (!res.ok) return sendCustomRoomError(socket, res.error);
+            if (res.kind === "DIRECT_DRAFT") {
+              const draftRoom = createDraftRoom(res.matchRoom.roomId, {
+                modeId: res.matchRoom.modeId,
+                slots: res.matchRoom.slots,
+                userId: actorId,
+                userName: actorMember.userName,
+              }, 1);
+              const startedPayload = {
+                type: "CUSTOM_ROOM_STARTED",
+                code: res.room.code,
+                roomId: res.matchRoom.roomId,
+                modeId: res.matchRoom.modeId,
+                room: {
+                  ...res.matchRoom,
+                  slots: draftRoom.draft.slots.map((s) => ({
+                    seatNumber: s.seat,
+                    userId: s.userId,
+                    userName: s.userName,
+                    rankPoints: 0,
+                    isDragon: s.isDragon,
+                    isAI: false,
+                    isEmpty: false,
+                    role: s.role,
+                  })),
+                },
+              };
+              broadcastCustomRoomMessage(res.room, startedPayload);
+              customRoomStore.finishRoomToLobbyCleanup(res.room.code);
+            } else {
+              broadcastCustomRoomMessage(res.room, {
+                type: "CUSTOM_ROOM_MATCHMAKING",
+                code: res.room.code,
+                room: customRoomStore.serializeRoom(res.room),
+                modeId: res.matchRoom.modeId,
+                targetPlayerCount: res.targetPlayerCount,
+                hostUserId: res.room.hostUserId,
+                matchRoom: res.matchRoom,
+              });
+            }
+            return;
+          }
+          if (action === "CUSTOM_ROOM_CANCEL_MATCH") {
+            const res = customRoomStore.cancelMatchmaking(payload.code, actorId);
+            if (!res.ok) return sendCustomRoomError(socket, res.error);
+            broadcastCustomRoomState(res.room, { returnedFromMatchmaking: true });
+            return;
+          }
+          if (action === "CUSTOM_ROOM_REDIRECT_MATCH") {
+            const res = customRoomStore.redirectMatchmaking(payload.code, actorId, payload.newMatchRoomId);
+            if (!res.ok) return sendCustomRoomError(socket, res.error);
+            broadcastCustomRoomMessage(res.room, {
+              type: "CUSTOM_ROOM_PARTY_REDIRECT",
+              code: res.room.code,
+              matchRoomId: res.matchRoomId,
+            });
+            return;
+          }
+        }
+
         if (!roomId) {
           return socket.send(JSON.stringify({ type: "ERROR", error: "Thiếu roomId" }));
         }
@@ -2098,6 +2244,8 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
 
         // A. KHỞI TẠO HOẶC THAM GIA PHÒNG CHỌN TƯỚNG
         if (action === "JOIN_DRAFT") {
+          const customMatch = /^rc_(\d{6})_/.exec(roomId);
+          if (customMatch) customRoomStore.finishRoomToLobbyCleanup(customMatch[1]);
           const noActiveSockets = !room || !room.sockets || Array.from(room.sockets.values()).every((s) => s.readyState !== WebSocket.OPEN);
           const requestedSeatCount = draftSeatCount(String(payload.modeId || "2v2"));
           const draftShapeChanged = !!room?.draft && (String(room.draft.modeId || "2v2") !== String(payload.modeId || "2v2") || room.draft.slots.length !== requestedSeatCount);
@@ -2453,6 +2601,8 @@ Deno.serve({ port: Number(Deno.env.get("PORT")) || 8080 }, async (req) => {
 
     socket.onclose = () => {
       unregisterMatchmakingSocket(socket);
+      const leftCustom = customRoomStore.handleDisconnect(socket);
+      if (leftCustom?.removed && leftCustom.room) broadcastCustomRoomState(leftCustom.room);
       lobbyChatSockets.delete(socket);
       if (socket.socialUserId) {
         const social = socialProfiles.get(socket.socialUserId);

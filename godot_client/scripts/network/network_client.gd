@@ -18,6 +18,12 @@ signal social_error(message: String)
 signal chat_message_received(message: Dictionary)
 signal chat_history_received(channel: String, target_room: String)
 signal chat_error(channel: String, message: String)
+signal custom_room_updated(room: Dictionary, extra: Dictionary)
+signal custom_room_error(message: String)
+signal custom_room_closed(code: String, reason: String)
+signal custom_room_started(payload: Dictionary)
+signal custom_room_matchmaking(payload: Dictionary)
+signal custom_room_party_redirect(code: String, match_room_id: String)
 
 const CHAT_HISTORY_LIMIT: int = 50
 const LOBBY_CHAT_CACHE_FILE := "user://lobby_chat_cache.json"
@@ -66,6 +72,7 @@ var _reconnect_timer: float = 0.0
 
 var _instance_lock_server: TCPServer = null
 var auto_instance_index: int = 1
+var custom_room_state: Dictionary = {}
 
 func _detect_instance_index() -> int:
 	var all_args = OS.get_cmdline_args() + OS.get_cmdline_user_args()
@@ -230,6 +237,7 @@ func _process(delta: float) -> void:
 			_on_candidate_failed("Đóng kết nối (Code %d, Reason: %s)" % [code, reason])
 		elif is_connected_to_server:
 			is_connected_to_server = false
+			custom_room_state = {}
 			current_ping = -1
 			_ping_awaiting_pong = false
 			ping_updated.emit(-1)
@@ -294,6 +302,30 @@ func _handle_server_message(raw_json: String) -> void:
 		return
 	if msg_type == "SOCIAL_ERROR":
 		social_error.emit(str(data.get("error", "Lỗi hệ thống bạn bè")))
+		return
+
+	if msg_type == "CUSTOM_ROOM_STATE":
+		var rm = data.get("room", {})
+		if rm is Dictionary:
+			custom_room_state = rm
+		custom_room_updated.emit(custom_room_state, data)
+		return
+	if msg_type == "CUSTOM_ROOM_ERROR":
+		custom_room_error.emit(str(data.get("error", "Lỗi phòng chờ")))
+		return
+	if msg_type == "CUSTOM_ROOM_CLOSED":
+		custom_room_state = {}
+		custom_room_closed.emit(str(data.get("code", "")), str(data.get("reason", "Phòng đã đóng")))
+		return
+	if msg_type == "CUSTOM_ROOM_STARTED":
+		custom_room_state = {}
+		custom_room_started.emit(data)
+		return
+	if msg_type == "CUSTOM_ROOM_MATCHMAKING":
+		custom_room_matchmaking.emit(data)
+		return
+	if msg_type == "CUSTOM_ROOM_PARTY_REDIRECT":
+		custom_room_party_redirect.emit(str(data.get("code", "")), str(data.get("matchRoomId", "")))
 		return
 
 	if msg_type == "CHAT_MESSAGE" or msg_type == "CHAT_HISTORY":
@@ -532,6 +564,72 @@ func send_friend_request(target_user_id: String) -> void:
 func respond_friend_request(request_id: String, accept: bool) -> void:
 	if AuthManager and not AuthManager.current_user_id.is_empty():
 		send_json({"action": "FRIEND_RESPOND", "userId": AuthManager.current_user_id, "requestId": request_id, "accept": accept})
+
+func get_party_session_user_id() -> String:
+	var base_uid := AuthManager.current_user_id if AuthManager and not AuthManager.current_user_id.is_empty() else ""
+	if OS.is_debug_build() or base_uid.is_empty():
+		return (base_uid if not base_uid.is_empty() else "guest") + "_" + str(OS.get_process_id())
+	return base_uid
+
+func get_party_session_user_name() -> String:
+	var uname := AuthManager.current_user_name if AuthManager and not AuthManager.current_user_name.is_empty() else ""
+	if (uname == "" or uname == "Đại Tướng Quân") and AuthManager and not AuthManager.current_user_email.is_empty():
+		uname = AuthManager.current_user_email.split("@")[0].to_upper()
+	return uname if not uname.is_empty() else "Đại Tướng Quân"
+
+func _custom_room_member_payload(action_name: String, extra: Dictionary = {}) -> Dictionary:
+	var payload: Dictionary = _build_social_chat_profile()
+	payload["action"] = action_name
+	payload["userId"] = get_party_session_user_id()
+	payload["userName"] = get_party_session_user_name()
+	payload["rankPoints"] = (AuthManager.current_2v2_rank_index * 6 + AuthManager.current_2v2_stars) if AuthManager else 0
+	for k in extra.keys():
+		payload[k] = extra[k]
+	return payload
+
+func create_custom_room(mode_id: String = "2v2") -> bool:
+	if not is_connected_to_server or socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
+		custom_room_error.emit("Chưa kết nối máy chủ Render. Vui lòng chờ một chút rồi thử lại.")
+		return false
+	send_json(_custom_room_member_payload("CUSTOM_ROOM_CREATE", {"modeId": mode_id}))
+	return true
+
+func join_custom_room(code: String) -> bool:
+	if not is_connected_to_server or socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
+		custom_room_error.emit("Chưa kết nối máy chủ Render. Vui lòng chờ một chút rồi thử lại.")
+		return false
+	send_json(_custom_room_member_payload("CUSTOM_ROOM_JOIN", {"code": code.strip_edges()}))
+	return true
+
+func set_custom_room_mode(code: String, mode_id: String) -> void:
+	if is_connected_to_server:
+		send_json(_custom_room_member_payload("CUSTOM_ROOM_SET_MODE", {"code": code, "modeId": mode_id}))
+
+func kick_custom_room_member(code: String, slot_number: int) -> void:
+	if is_connected_to_server:
+		send_json(_custom_room_member_payload("CUSTOM_ROOM_KICK", {"code": code, "slotNumber": slot_number}))
+
+func leave_custom_room(code: String = "") -> void:
+	var target_code := code if not code.is_empty() else str(custom_room_state.get("code", ""))
+	if target_code.is_empty():
+		return
+	custom_room_state = {}
+	if is_connected_to_server:
+		send_json(_custom_room_member_payload("CUSTOM_ROOM_LEAVE", {"code": target_code}))
+
+func start_custom_room(code: String) -> void:
+	if not is_connected_to_server or socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
+		custom_room_error.emit("Mất kết nối máy chủ Render.")
+		return
+	send_json(_custom_room_member_payload("CUSTOM_ROOM_START", {"code": code}))
+
+func cancel_custom_room_match(code: String) -> void:
+	if not code.is_empty() and is_connected_to_server:
+		send_json(_custom_room_member_payload("CUSTOM_ROOM_CANCEL_MATCH", {"code": code}))
+
+func redirect_custom_room_match(code: String, new_match_room_id: String) -> void:
+	if not code.is_empty() and not new_match_room_id.is_empty() and is_connected_to_server:
+		send_json(_custom_room_member_payload("CUSTOM_ROOM_REDIRECT_MATCH", {"code": code, "newMatchRoomId": new_match_room_id}))
 
 func send_join_draft(target_room: String, seat: int, user_id: String, user_name: String, slots_data: Array = [], mode_id: String = "2v2", available_hero_ids: Array = []) -> void:
 	room_id = target_room

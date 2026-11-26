@@ -222,7 +222,7 @@ func _send_http_request(url: String, method: int, body_json: String = "") -> Dic
 	}
 
 # --- 1. Find Best Waiting Room ---
-func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_diff: int = 999999, my_user_name: String = "", include_room_id: String = "", mode_id: String = "") -> Dictionary:
+func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_diff: int = 999999, my_user_name: String = "", include_room_id: String = "", mode_id: String = "", required_slots: int = 1, require_2v2_team_pair: bool = false, party_user_ids: Array = []) -> Dictionary:
 	var q_equal = "{\"method\":\"equal\",\"attribute\":\"userId\",\"values\":[\"ROOM_WAITING\"]}".uri_encode()
 	var q_order = "{\"method\":\"orderDesc\",\"attribute\":\"$createdAt\"}".uri_encode()
 	var q_limit = "{\"method\":\"limit\",\"values\":[100]}".uri_encode()
@@ -249,11 +249,12 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 		if not is_requested_room and is_same_user(str(room.get("hostUserId", "")), "", my_user_id, my_user_name):
 			continue
 		var present = false
-		var has_empty = false
+		var empty_count = 0
 		var real_count = 0
-		for slot in room.get("slots", []):
+		var r_slots: Array = room.get("slots", [])
+		for slot in r_slots:
 			if slot.get("isEmpty", false):
-				has_empty = true
+				empty_count += 1
 			elif is_same_user(str(slot.get("userId", "")), str(slot.get("userName", "")), my_user_id, my_user_name):
 				present = true
 				# When evaluating our own published room, count our slot too.
@@ -262,9 +263,18 @@ func find_best_waiting_room(my_user_id: String, my_rank_points: int, max_rank_di
 				if is_requested_room:
 					real_count += 1
 			elif not slot.get("isAI", false) and slot.get("userId", "") != "":
+				var s_uid := str(slot.get("userId", ""))
+				if not is_requested_room and party_user_ids.has(s_uid):
+					present = true
 				real_count += 1
-		if (present and not is_requested_room) or not has_empty:
-			continue
+		if not is_requested_room:
+			if present or empty_count < maxi(1, required_slots):
+				continue
+			if require_2v2_team_pair and mode_id == "2v2":
+				var dragon_pair_ok := r_slots.size() >= 4 and bool(r_slots[0].get("isEmpty", false)) and bool(r_slots[2].get("isEmpty", false))
+				var phoenix_pair_ok := r_slots.size() >= 4 and bool(r_slots[1].get("isEmpty", false)) and bool(r_slots[3].get("isEmpty", false))
+				if not (dragon_pair_ok or phoenix_pair_ok):
+					continue
 		var diff = 0 if mode_id.begins_with("dynasty_") else abs(int(room.get("hostRankPoints", 0)) - my_rank_points)
 		var room_id = str(room.get("roomId", ""))
 		var best_room_id = str(best_room.get("roomId", "~"))
@@ -338,59 +348,105 @@ func _release_room_lock(room_id: String) -> void:
 	var docs_url = "%s/databases/%s/collections/%s/documents" % [ENDPOINT, DATABASE_ID, COLLECTION_ID]
 	await _send_http_request(docs_url + "/" + _match_lock_doc_id(room_id), HTTPClient.METHOD_DELETE)
 
-# --- 3. Join Room Slot ---
+# --- 3. Join Room Slot(s) ---
 func join_room_slot(room: Dictionary, my_user_id: String, my_user_name: String, my_rank_points: int, desired_seat: int = 0) -> Dictionary:
-	if room.is_empty():
+	return await join_party_to_room(room, [{
+		"userId": my_user_id,
+		"userName": my_user_name,
+		"rankPoints": my_rank_points
+	}], desired_seat, false)
+
+func join_party_to_room(room: Dictionary, party_members: Array, desired_seat: int = 0, preserve_2v2_team: bool = true) -> Dictionary:
+	if room.is_empty() or party_members.is_empty():
 		return {}
 
 	var room_id = str(room.get("roomId", ""))
+	var primary_uid = str(party_members[0].get("userId", ""))
 	# Re-read and verify after every write. Appwrite does not expose a compare
 	# and swap update here, so a lost concurrent write is retried safely.
 	for attempt in range(6):
 		# Spread simultaneous joins slightly so each client reads the newest
 		# document after the previous slot claim has reached Appwrite.
 		if attempt == 0:
-			var join_jitter = float(abs(my_user_id.hash()) % 350) / 1000.0
+			var join_jitter = float(abs(primary_uid.hash()) % 350) / 1000.0
 			if join_jitter > 0.0:
 				await get_tree().create_timer(join_jitter).timeout
-		if not await _acquire_room_lock(room_id, my_user_id):
+		if not await _acquire_room_lock(room_id, primary_uid):
 			continue
 		var latest_room = await poll_room_state(room_id)
 		if latest_room.is_empty() or latest_room.get("status") != "WAITING":
 			await _release_room_lock(room_id)
 			return {}
-		for existing_slot in latest_room.get("slots", []):
-			if is_same_user(str(existing_slot.get("userId", "")), str(existing_slot.get("userName", "")), my_user_id, my_user_name):
-				await _release_room_lock(room_id)
-				return latest_room
-		var target_index = -1
-		if desired_seat >= 1 and desired_seat <= latest_room.get("slots", []).size():
-			if latest_room["slots"][desired_seat - 1].get("isEmpty", false):
-				target_index = desired_seat - 1
-		if target_index < 0:
-			for idx in range(latest_room.get("slots", []).size()):
-				if latest_room["slots"][idx].get("isEmpty", false):
-					target_index = idx
+
+		var slots_arr: Array = latest_room.get("slots", [])
+		var missing_members: Array = []
+		for member in party_members:
+			var m_uid := str(member.get("userId", ""))
+			var m_name := str(member.get("userName", ""))
+			var already := false
+			for existing_slot in slots_arr:
+				if is_same_user(str(existing_slot.get("userId", "")), str(existing_slot.get("userName", "")), m_uid, m_name):
+					already = true
 					break
-		if target_index < 0:
+			if not already:
+				missing_members.append(member)
+
+		if missing_members.is_empty():
+			await _release_room_lock(room_id)
+			return latest_room
+
+		var mode_id := str(latest_room.get("modeId", "2v2"))
+		var target_indices: Array[int] = []
+		var assign_dragon: Array[bool] = []
+
+		if mode_id == "2v2" and preserve_2v2_team and party_members.size() >= 2 and missing_members.size() == 2 and slots_arr.size() >= 4:
+			var dragon_ok := bool(slots_arr[0].get("isEmpty", false)) and bool(slots_arr[2].get("isEmpty", false))
+			var phoenix_ok := bool(slots_arr[1].get("isEmpty", false)) and bool(slots_arr[3].get("isEmpty", false))
+			if dragon_ok:
+				target_indices = [0, 2]
+				assign_dragon = [true, true]
+			elif phoenix_ok:
+				target_indices = [1, 3]
+				assign_dragon = [false, false]
+		else:
+			if missing_members.size() == 1 and desired_seat >= 1 and desired_seat <= slots_arr.size():
+				if slots_arr[desired_seat - 1].get("isEmpty", false):
+					target_indices.append(desired_seat - 1)
+			for idx in range(slots_arr.size()):
+				if target_indices.size() >= missing_members.size():
+					break
+				if not target_indices.has(idx) and slots_arr[idx].get("isEmpty", false):
+					target_indices.append(idx)
+			for idx in target_indices:
+				if mode_id == "2v2":
+					assign_dragon.append(idx == 0 or idx == 2)
+				else:
+					assign_dragon.append(bool(slots_arr[idx].get("isDragon", idx == 0)))
+
+		if target_indices.size() < missing_members.size():
 			await _release_room_lock(room_id)
 			return {}
-		# Dictionary.merge does not overwrite existing keys by default. Empty
-		# slots already contain userId="empty", so use overwrite=true or the
-		# successful PATCH would still serialize an empty slot.
-		var join_rank_points: int = 0 if str(latest_room.get("modeId", "2v2")).begins_with("dynasty_") else my_rank_points
-		latest_room["slots"][target_index].merge({"userId": my_user_id, "userName": my_user_name, "rankPoints": join_rank_points, "isAI": false, "isEmpty": false}, true)
+
+		for i in range(missing_members.size()):
+			var member = missing_members[i]
+			var idx := target_indices[i]
+			var join_rank_points: int = 0 if mode_id.begins_with("dynasty_") else int(member.get("rankPoints", 0))
+			slots_arr[idx].merge({
+				"userId": str(member.get("userId", "")),
+				"userName": str(member.get("userName", "")),
+				"rankPoints": join_rank_points,
+				"isDragon": assign_dragon[i],
+				"isAI": false,
+				"isEmpty": false
+			}, true)
+
 		latest_room["version"] = int(latest_room.get("version", 1)) + 1
 		var doc_id = get_deterministic_doc_id("r_", room_id)
 		var patch_url = "%s/databases/%s/collections/%s/documents/%s" % [ENDPOINT, DATABASE_ID, COLLECTION_ID, doc_id]
 		var now = get_now_ms()
 		var res = await _send_http_request(patch_url, HTTPClient.METHOD_PATCH, JSON.stringify({"data": {"userId": "ROOM_WAITING", "userName": encode_room_string(latest_room), "rankPoints": int(latest_room.get("hostRankPoints", 0)), "timestamp": now}, "permissions": PUBLIC_DOC_PERMISSIONS}))
-		print("[AppwriteMatchmaking] JOIN PATCH room=%s code=%d attempt=%d" % [room_id, int(res["code"]), attempt + 1])
+		print("[AppwriteMatchmaking] JOIN PATCH room=%s code=%d attempt=%d count=%d" % [room_id, int(res["code"]), attempt + 1, missing_members.size()])
 		if res["code"] == 200:
-			# The room lock serializes slot claims. Do not immediately read the
-			# document again: Appwrite can briefly return an older replica, which
-			# made a successful join look failed and caused a stale retry to erase
-			# the previous player's slot.
 			await _release_room_lock(room_id)
 			return latest_room
 		await _release_room_lock(room_id)
