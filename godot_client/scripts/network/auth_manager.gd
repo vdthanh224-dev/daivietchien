@@ -29,7 +29,11 @@ var current_level: int = 1
 var current_exp: int = 0
 var current_silver: int = 5000
 var current_gold: int = 0
+const SHARDS_PER_DUPLICATE_HERO: int = 10
+const SHARDS_TO_HERO_TICKET: int = 30
+
 var current_generals: Array = ["ly_thuong_kiet"]
+var hero_shards: Dictionary = {}
 var current_hero_tickets: int = 0
 var current_skin_tickets: int = 0
 var checkin_7day_claimed: Array = []
@@ -291,6 +295,76 @@ func consume_skin_tickets(amount: int) -> bool:
 	save_profile_to_appwrite()
 	profile_updated.emit()
 	return true
+
+# --- Mảnh Danh Tướng (Quy đổi khi quay trùng tướng ở Thần Điện) ---
+func _parse_hero_shards(raw_val) -> Dictionary:
+	var source: Dictionary = {}
+	if raw_val is String and raw_val.strip_edges() != "":
+		var parsed = JSON.parse_string(raw_val)
+		if parsed is Dictionary:
+			source = parsed
+	elif raw_val is Dictionary:
+		source = raw_val
+	var cleaned: Dictionary = {}
+	for k in source.keys():
+		var hid := int(str(k).strip_edges())
+		var amt := int(source[k])
+		if hid > 0 and amt > 0:
+			var key := str(hid)
+			cleaned[key] = int(cleaned.get(key, 0)) + amt
+	return cleaned
+
+func get_hero_shards(hero_id: int) -> int:
+	if hero_id <= 0:
+		return 0
+	return maxi(0, int(hero_shards.get(str(hero_id), 0)))
+
+func get_total_hero_shards() -> int:
+	var total := 0
+	for v in hero_shards.values():
+		total += maxi(0, int(v))
+	return total
+
+func add_hero_shards(hero_id: int, amount: int, auto_save: bool = true) -> int:
+	if hero_id <= 0 or amount <= 0:
+		return get_hero_shards(hero_id)
+	var key := str(hero_id)
+	var updated := get_hero_shards(hero_id) + amount
+	hero_shards[key] = updated
+	if auto_save:
+		save_session()
+		save_profile_to_appwrite()
+		profile_updated.emit()
+	return updated
+
+func exchange_hero_shards_for_ticket(hero_id: int, batch_count: int = 1) -> Dictionary:
+	if hero_id <= 0 or batch_count <= 0:
+		return {"ok": false, "reason": "Yêu cầu quy đổi không hợp lệ."}
+	var needed := SHARDS_TO_HERO_TICKET * batch_count
+	var have := get_hero_shards(hero_id)
+	if have < needed:
+		return {
+			"ok": false,
+			"reason": "Cần %d mảnh (hiện có %d)." % [needed, have],
+			"needed": needed,
+			"remaining": have
+		}
+	var remaining := have - needed
+	var key := str(hero_id)
+	if remaining <= 0:
+		hero_shards.erase(key)
+	else:
+		hero_shards[key] = remaining
+	current_hero_tickets += batch_count
+	save_session()
+	save_profile_to_appwrite()
+	profile_updated.emit()
+	return {
+		"ok": true,
+		"tickets_gained": batch_count,
+		"shards_spent": needed,
+		"remaining": remaining
+	}
 
 # --- Danh hiệu & Nền hồ sơ tướng ---
 func get_available_titles() -> Array:
@@ -920,6 +994,10 @@ func fetch_profile_from_appwrite(on_completed: Callable = Callable()) -> void:
 						needs_init_on_appwrite = true
 					if current_generals.is_empty():
 						current_generals = ["ly_thuong_kiet"]
+					if data.has("heroShards"):
+						hero_shards = _parse_hero_shards(data["heroShards"])
+					else:
+						hero_shards = {}
 
 					if data.has("heroTickets"):
 						current_hero_tickets = int(data["heroTickets"])
@@ -1086,6 +1164,7 @@ func _execute_save_profile_to_appwrite() -> void:
 		"wins": current_wins,
 		"losses": current_losses,
 		"generals": ",".join(current_generals),
+		"heroShards": JSON.stringify(hero_shards),
 		"tutorialRewardClaimed": tutorial_reward_claimed,
 		"onboardingComplete": onboarding_completed or tutorial_reward_claimed,
 		"tutorialCompleted": onboarding_completed or tutorial_reward_claimed,
@@ -1536,6 +1615,7 @@ func reset_to_defaults() -> void:
 	monthly_checkin_milestones.clear()
 	_debug_calendar_date.clear()
 	current_generals = ["ly_thuong_kiet"]
+	hero_shards.clear()
 	current_2v2_points = 1200
 	current_2v2_rank_index = 0
 	current_2v2_stars = 0
@@ -2012,6 +2092,7 @@ func save_session() -> void:
 			"monthlyCheckinDays": monthly_checkin_days,
 			"monthlyCheckinMilestones": monthly_checkin_milestones,
 			"generals": current_generals,
+			"heroShards": hero_shards,
 			"rank2v2Points": current_2v2_points,
 			"rank2v2Index": current_2v2_rank_index,
 			"rank2v2Stars": current_2v2_stars,
@@ -2108,6 +2189,7 @@ func load_saved_session() -> void:
 					current_generals = data.get("generals", ["ly_thuong_kiet"])
 					if current_generals.is_empty():
 						current_generals = ["ly_thuong_kiet"]
+					hero_shards = _parse_hero_shards(data.get("heroShards", {}))
 					current_2v2_points = int(data.get("rank2v2Points", 1200))
 					current_2v2_rank_index = int(data.get("rank2v2Index", 0))
 					current_2v2_stars = int(data.get("rank2v2Stars", 0))

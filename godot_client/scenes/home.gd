@@ -3960,6 +3960,34 @@ func _show_hero_detail_popup(hero: Dictionary, is_owned: bool, parent_layer: Con
 	own_panel.add_child(own_lbl)
 	left_col.add_child(own_panel)
 
+	var cur_hero_shards: int = AuthManager.get_hero_shards(hid) if AuthManager else 0
+	if cur_hero_shards > 0:
+		var shard_panel = PanelContainer.new()
+		var sp_style = StyleBoxFlat.new()
+		sp_style.bg_color = Color(0.12, 0.16, 0.28, 0.95)
+		sp_style.border_color = Color(0.42, 0.84, 1.0, 0.85)
+		sp_style.border_width_left = 1
+		sp_style.border_width_top = 1
+		sp_style.border_width_right = 1
+		sp_style.border_width_bottom = 1
+		sp_style.corner_radius_top_left = 6
+		sp_style.corner_radius_top_right = 6
+		sp_style.corner_radius_bottom_right = 6
+		sp_style.corner_radius_bottom_left = 6
+		sp_style.content_margin_left = 8
+		sp_style.content_margin_right = 8
+		sp_style.content_margin_top = 4
+		sp_style.content_margin_bottom = 4
+		shard_panel.add_theme_stylebox_override("panel", sp_style)
+
+		var shard_lbl = Label.new()
+		shard_lbl.text = "🧩 Đang có: %d Mảnh tướng" % cur_hero_shards
+		shard_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		shard_lbl.add_theme_font_size_override("font_size", 11)
+		shard_lbl.add_theme_color_override("font_color", Color(0.62, 0.90, 1.0, 1.0))
+		shard_panel.add_child(shard_lbl)
+		left_col.add_child(shard_panel)
+
 	# --- RIGHT COLUMN (Tabs: Kỹ Năng & Ngoại Trang) ---
 	var right_col = VBoxContainer.new()
 	right_col.size_flags_horizontal = SIZE_EXPAND_FILL
@@ -4974,8 +5002,9 @@ func _show_fullscreen_than_dien() -> void:
 	title_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.42, 1.0))
 	title_vbox.add_child(title_lbl)
 
+	var shards_per_dupe_hd: int = AuthManager.SHARDS_PER_DUPLICATE_HERO if AuthManager else 10
 	var sub_title = Label.new()
-	sub_title.text = "Hiệu triệu 50 Hào Kiệt Đại Việt (Tướng 1 → 50) • Trùng tướng nhận 1,000 Bạc"
+	sub_title.text = "Hiệu triệu 50 Hào Kiệt Đại Việt (Tướng 1 → 50) • Trùng tướng nhận +%d Mảnh tướng đó" % shards_per_dupe_hd
 	sub_title.add_theme_font_size_override("font_size", 12)
 	sub_title.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
 	title_vbox.add_child(sub_title)
@@ -5568,11 +5597,13 @@ func _show_fullscreen_than_dien() -> void:
 	r1.add_theme_color_override("font_color", Color(0.85, 0.88, 0.92, 0.95))
 	rpv.add_child(r1)
 
+	var shards_per_dupe_rule: int = AuthManager.SHARDS_PER_DUPLICATE_HERO if AuthManager else 10
+	var shards_per_tkt_rule: int = AuthManager.SHARDS_TO_HERO_TICKET if AuthManager else 30
 	var r2 = Label.new()
-	r2.text = "• Khi quay trúng Danh Tướng đã sở hữu → Tự động quy đổi thành +1,000 BẠC 🪙 nạp ngay vào ngân khố!"
+	r2.text = "• Khi quay trúng Danh Tướng đã sở hữu → Tự động quy đổi thành +%d MẢNH TƯỚNG ĐÓ 🧩 (%d mảnh đổi 1 Vé Hiệu Triệu tại Túi Đồ)!" % [shards_per_dupe_rule, shards_per_tkt_rule]
 	r2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	r2.add_theme_font_size_override("font_size", 11)
-	r2.add_theme_color_override("font_color", Color(1.0, 0.90, 0.45, 1.0))
+	r2.add_theme_color_override("font_color", Color(0.55, 0.90, 1.0, 1.0))
 	rpv.add_child(r2)
 
 	var r3 = Label.new()
@@ -5625,8 +5656,9 @@ func _show_fullscreen_than_dien() -> void:
 	)
 	summon_hbox.add_child(btn_roll_5)
 
+	var shards_per_dupe_note: int = AuthManager.SHARDS_PER_DUPLICATE_HERO if AuthManager else 10
 	var note_lbl = Label.new()
-	note_lbl.text = "• Bể hiệu triệu gồm 50 Danh Tướng • Tự động bồi hoàn 1,000 Bạc khi trùng lặp"
+	note_lbl.text = "• Bể hiệu triệu gồm 50 Danh Tướng • Tự động quy đổi +%d Mảnh tướng đó khi trùng lặp" % shards_per_dupe_note
 	note_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	note_lbl.add_theme_font_size_override("font_size", 11)
 	note_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
@@ -5644,21 +5676,26 @@ func _execute_gacha_summon(count: int) -> void:
 	# Deduct tickets
 	AuthManager.consume_hero_tickets(count)
 
+	var shards_per_dupe: int = AuthManager.SHARDS_PER_DUPLICATE_HERO
 	var results: Array[Dictionary] = []
 	for i in range(count):
 		# Pool: heroes 1 -> 50
 		var rolled_id = randi_range(1, 50)
 		var hero = HeroDatabase.get_hero(rolled_id) if HeroDatabase else {}
 		var is_owned = HeroDatabase.is_hero_owned(rolled_id) if HeroDatabase else false
+		var hero_name = str(hero.get("name", "Tướng #%d" % rolled_id))
 
 		if is_owned:
-			# Quy đổi thành 1000 Bạc
-			AuthManager.current_silver += 1000
+			# Quy đổi thành mảnh của chính Danh Tướng vừa quay trúng
+			var updated_shards := AuthManager.add_hero_shards(rolled_id, shards_per_dupe, false)
 			results.append({
 				"hero": hero,
 				"id": rolled_id,
+				"hero_name": hero_name,
 				"is_new": false,
-				"silver_gain": 1000
+				"shards_gain": shards_per_dupe,
+				"total_shards": updated_shards,
+				"silver_gain": 0
 			})
 		else:
 			var slug = hero.get("slug", "")
@@ -5669,7 +5706,10 @@ func _execute_gacha_summon(count: int) -> void:
 			results.append({
 				"hero": hero,
 				"id": rolled_id,
+				"hero_name": hero_name,
 				"is_new": true,
+				"shards_gain": 0,
+				"total_shards": AuthManager.get_hero_shards(rolled_id),
 				"silver_gain": 0
 			})
 
@@ -5677,13 +5717,16 @@ func _execute_gacha_summon(count: int) -> void:
 	AuthManager.save_profile_to_appwrite()
 	AuthManager.profile_updated.emit()
 	_refresh_user_profile_ui()
+	_refresh_inventory_content()
 
 	_play_gacha_reveal_animation(results, count)
 
 func _build_gacha_card(res: Dictionary, is_small: bool) -> Control:
 	var hero: Dictionary = res.get("hero", {})
 	var is_new: bool = res.get("is_new", false)
-	var silver_gain: int = res.get("silver_gain", 0)
+	var shards_gain: int = int(res.get("shards_gain", 0))
+	var total_shards: int = int(res.get("total_shards", 0))
+	var hero_name: String = str(res.get("hero_name", hero.get("name", "Danh Tướng")))
 
 	var card = PanelContainer.new()
 	var card_size = Vector2(215, 395) if is_small else Vector2(340, 520)
@@ -5827,8 +5870,8 @@ func _build_gacha_card(res: Dictionary, is_small: bool) -> Control:
 	else:
 		var conv_panel = PanelContainer.new()
 		var cps = StyleBoxFlat.new()
-		cps.bg_color = Color(0.18, 0.22, 0.32, 0.95)
-		cps.border_color = Color(0.95, 0.85, 0.35, 0.9)
+		cps.bg_color = Color(0.10, 0.20, 0.34, 0.96)
+		cps.border_color = Color(0.42, 0.84, 1.0, 0.92)
 		cps.border_width_left = 1
 		cps.border_width_right = 1
 		cps.border_width_top = 1
@@ -5837,13 +5880,22 @@ func _build_gacha_card(res: Dictionary, is_small: bool) -> Control:
 		cps.corner_radius_top_right = 6
 		cps.corner_radius_bottom_right = 6
 		cps.corner_radius_bottom_left = 6
+		cps.content_margin_left = 6
+		cps.content_margin_right = 6
+		cps.content_margin_top = 4
+		cps.content_margin_bottom = 4
 		conv_panel.add_theme_stylebox_override("panel", cps)
 
 		var conv_lbl = Label.new()
-		conv_lbl.text = "+1,000 BẠC 🪙"
+		var req_shards: int = AuthManager.SHARDS_TO_HERO_TICKET if AuthManager else 30
+		if is_small:
+			conv_lbl.text = "+%d Mảnh %s 🧩\n(Hiện có: %d)" % [shards_gain, hero_name, total_shards]
+		else:
+			conv_lbl.text = "+%d MẢNH %s 🧩\n(Kho mảnh: %d/%d)" % [shards_gain, hero_name.to_upper(), total_shards, req_shards]
+		conv_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		conv_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		conv_lbl.add_theme_font_size_override("font_size", 13 if is_small else 15)
-		conv_lbl.add_theme_color_override("font_color", Color(1.0, 0.90, 0.35, 1.0))
+		conv_lbl.add_theme_font_size_override("font_size", 11 if is_small else 13)
+		conv_lbl.add_theme_color_override("font_color", Color(0.62, 0.92, 1.0, 1.0))
 		conv_panel.add_child(conv_lbl)
 		vbox.add_child(conv_panel)
 
@@ -5984,10 +6036,12 @@ func _play_gacha_reveal_animation(results: Array, count: int) -> void:
 
 	# Summary Bar
 	var new_count = results.filter(func(r): return r.get("is_new", false)).size()
-	var total_silver = results.filter(func(r): return not r.get("is_new", false)).size() * 1000
+	var total_shards_gained := 0
+	for r_item in results:
+		total_shards_gained += int(r_item.get("shards_gain", 0))
 
 	var sum_lbl = Label.new()
-	sum_lbl.text = "🎉 Thu được: %d Danh Tướng Mới  |  Quy đổi +%s Bạc" % [new_count, _format_number(total_silver)]
+	sum_lbl.text = "🎉 Thu được: %d Danh Tướng Mới  |  Quy đổi +%d Mảnh Tướng" % [new_count, total_shards_gained]
 	sum_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sum_lbl.add_theme_font_size_override("font_size", 14)
 	sum_lbl.add_theme_color_override("font_color", Color(0.95, 0.88, 0.50, 1.0))
@@ -7618,7 +7672,41 @@ func _build_inventory_content() -> Control:
 		}
 	]
 
-	if _inventory_current_tab > 2:
+	# Bổ sung toàn bộ Mảnh Tướng đang sở hữu (mỗi tướng > 0 mảnh là 1 ô riêng trong Túi Đồ)
+	var shards_map: Dictionary = AuthManager.hero_shards if AuthManager else {}
+	var shard_ids: Array[int] = []
+	for shard_key in shards_map.keys():
+		var sh_id := int(str(shard_key))
+		if sh_id > 0 and int(shards_map[shard_key]) > 0:
+			shard_ids.append(sh_id)
+	shard_ids.sort()
+	var shards_per_ticket: int = AuthManager.SHARDS_TO_HERO_TICKET if AuthManager else 30
+	for sh_id in shard_ids:
+		var sh_count := int(shards_map[str(sh_id)])
+		var sh_hero: Dictionary = HeroDatabase.get_hero(sh_id) if HeroDatabase else {}
+		var sh_name := str(sh_hero.get("name", "Tướng #%d" % sh_id))
+		var sh_faction := str(sh_hero.get("faction", "Đại Việt"))
+		var sh_avatar := str(sh_hero.get("avatarPath", ""))
+		var sh_tex: Texture2D = HeroDatabase.get_avatar_texture(sh_avatar, sh_id) if HeroDatabase else null
+		all_items.append({
+			"id": "hero_shard_%d" % sh_id,
+			"item_type": "hero_shard",
+			"hero_id": sh_id,
+			"hero_name": sh_name,
+			"name": "Mảnh %s" % sh_name,
+			"category": 3,
+			"category_name": "Mảnh Danh Tướng",
+			"rarity": "shard",
+			"rarity_name": sh_faction,
+			"rarity_color": Color(0.42, 0.84, 1.0, 1.0),
+			"icon": "🧩",
+			"texture": sh_tex,
+			"count": sh_count,
+			"desc": "Mảnh tướng riêng của %s (%s), tự động quy đổi khi quay trùng ở Thần Điện." % [sh_name, sh_faction],
+			"usage_tip": "💡 Quy đổi: %d Mảnh %s = 1 Vé Hiệu Triệu 📜 (Hiện có: %d/%d)." % [shards_per_ticket, sh_name, sh_count, shards_per_ticket]
+		})
+
+	if _inventory_current_tab > 3:
 		_inventory_current_tab = 0
 
 	# Lọc theo tab hiện tại
@@ -7647,13 +7735,14 @@ func _build_inventory_content() -> Control:
 	var tabs_info = [
 		{"idx": 0, "text": "🎒 TẤT CẢ"},
 		{"idx": 1, "text": "📜 LỆNH BÀI"},
-		{"idx": 2, "text": "🪙 TIỀN TỆ"}
+		{"idx": 2, "text": "🪙 TIỀN TỆ"},
+		{"idx": 3, "text": "🧩 MẢNH"}
 	]
 
 	for ti in tabs_info:
 		var tab_btn = Button.new()
 		tab_btn.text = ti["text"]
-		tab_btn.custom_minimum_size = Vector2(105, 34)
+		tab_btn.custom_minimum_size = Vector2(96, 34)
 		var is_active = (_inventory_current_tab == ti["idx"])
 		var tb_style = StyleBoxFlat.new()
 		tb_style.corner_radius_top_left = 6
@@ -7718,8 +7807,9 @@ func _build_inventory_content() -> Control:
 	cap_hbox.add_theme_constant_override("separation", 12)
 	cap_panel.add_child(cap_hbox)
 
+	var total_slots_cap: int = maxi(24, int(ceil(float(filtered_items.size()) / 6.0)) * 6)
 	var cap_lbl = Label.new()
-	cap_lbl.text = "📦 Ô chứa: %d/24" % filtered_items.size()
+	cap_lbl.text = "📦 Ô chứa: %d/%d" % [filtered_items.size(), total_slots_cap]
 	cap_lbl.add_theme_font_size_override("font_size", 11)
 	cap_lbl.add_theme_color_override("font_color", Color(0.85, 0.85, 0.90))
 	cap_hbox.add_child(cap_lbl)
@@ -7865,8 +7955,8 @@ func _build_inventory_content() -> Control:
 			btn.add_theme_stylebox_override("pressed", s)
 			btn.add_theme_stylebox_override("focus", s)
 
-	# Điền các ô vật phẩm (tối thiểu 24 ô chuẩn RPG)
-	var total_slots: int = maxi(24, filtered_items.size())
+	# Điền các ô vật phẩm (tối thiểu 24 ô chuẩn RPG, bội số 6 nếu nhiều mảnh tướng)
+	var total_slots: int = total_slots_cap
 	for idx in range(total_slots):
 		var btn = Button.new()
 		btn.custom_minimum_size = Vector2(76, 76)
@@ -7876,15 +7966,36 @@ func _build_inventory_content() -> Control:
 			var item = filtered_items[idx]
 			btn.tooltip_text = "%s (%s)" % [item["name"], item["rarity_name"]]
 
-			# Icon ở giữa
-			var icon_lbl = Label.new()
-			icon_lbl.text = item["icon"]
-			icon_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			icon_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			icon_lbl.set_anchors_preset(PRESET_FULL_RECT)
-			icon_lbl.add_theme_font_size_override("font_size", 30)
-			icon_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			btn.add_child(icon_lbl)
+			# Icon hoặc Chân dung tướng ở giữa
+			var item_tex = item.get("texture", null)
+			if item_tex is Texture2D:
+				var tex_rect = TextureRect.new()
+				tex_rect.texture = item_tex
+				tex_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				tex_rect.set_anchors_preset(PRESET_FULL_RECT)
+				tex_rect.offset_left = 7
+				tex_rect.offset_top = 7
+				tex_rect.offset_right = -7
+				tex_rect.offset_bottom = -7
+				tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				btn.add_child(tex_rect)
+
+				var shard_tag = Label.new()
+				shard_tag.text = str(item.get("icon", "🧩"))
+				shard_tag.position = Vector2(4, 2)
+				shard_tag.add_theme_font_size_override("font_size", 11)
+				shard_tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				btn.add_child(shard_tag)
+			else:
+				var icon_lbl = Label.new()
+				icon_lbl.text = item["icon"]
+				icon_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				icon_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+				icon_lbl.set_anchors_preset(PRESET_FULL_RECT)
+				icon_lbl.add_theme_font_size_override("font_size", 30)
+				icon_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				btn.add_child(icon_lbl)
 
 			# Số lượng ở góc dưới phải
 			var qty_badge = PanelContainer.new()
@@ -8085,13 +8196,35 @@ func _populate_inventory_inspector(inspector_vbox: VBoxContainer, item: Dictiona
 	ip_style.shadow_size = 6
 	icon_panel.add_theme_stylebox_override("panel", ip_style)
 
-	var i_icon = Label.new()
-	i_icon.text = str(item.get("icon", "📦"))
-	i_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	i_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	i_icon.add_theme_font_size_override("font_size", 32)
-	i_icon.set_anchors_preset(Control.PRESET_FULL_RECT)
-	icon_panel.add_child(i_icon)
+	var insp_tex = item.get("texture", null)
+	if insp_tex is Texture2D:
+		var insp_rect = TextureRect.new()
+		insp_rect.texture = insp_tex
+		insp_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		insp_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		insp_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		insp_rect.offset_left = 4
+		insp_rect.offset_top = 4
+		insp_rect.offset_right = -4
+		insp_rect.offset_bottom = -4
+		icon_panel.add_child(insp_rect)
+
+		var corner_tag = Label.new()
+		corner_tag.text = str(item.get("icon", "🧩"))
+		corner_tag.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		corner_tag.offset_left = -18
+		corner_tag.offset_top = 1
+		corner_tag.offset_right = -2
+		corner_tag.add_theme_font_size_override("font_size", 11)
+		icon_panel.add_child(corner_tag)
+	else:
+		var i_icon = Label.new()
+		i_icon.text = str(item.get("icon", "📦"))
+		i_icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		i_icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		i_icon.add_theme_font_size_override("font_size", 32)
+		i_icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+		icon_panel.add_child(i_icon)
 	item_top.add_child(icon_panel)
 
 	var item_meta = VBoxContainer.new()
@@ -8340,6 +8473,74 @@ func _populate_inventory_inspector(inspector_vbox: VBoxContainer, item: Dictiona
 				_show_monthly_checkin_modal()
 			)
 			act_vbox.add_child(checkin_btn)
+
+	if str(item.get("item_type", "")) == "hero_shard":
+		var sh_id := int(item.get("hero_id", 0))
+		var sh_count := int(item.get("count", 0))
+		var req_shards: int = AuthManager.SHARDS_TO_HERO_TICKET if AuthManager else 30
+
+		var ex_btn = Button.new()
+		ex_btn.custom_minimum_size = Vector2(0, 36)
+		if sh_count >= req_shards and AuthManager:
+			ex_btn.text = "📜 ĐỔI %d MẢNH → 1 VÉ HIỆU TRIỆU" % req_shards
+			var ex_style = StyleBoxFlat.new()
+			ex_style.bg_color = Color(0.18, 0.56, 0.85, 1.0)
+			ex_style.corner_radius_top_left = 6
+			ex_style.corner_radius_top_right = 6
+			ex_style.corner_radius_bottom_right = 6
+			ex_style.corner_radius_bottom_left = 6
+			ex_btn.add_theme_stylebox_override("normal", ex_style)
+			ex_btn.add_theme_stylebox_override("hover", ex_style)
+			ex_btn.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+			ex_btn.pressed.connect(func():
+				var res := AuthManager.exchange_hero_shards_for_ticket(sh_id, 1)
+				if res.get("ok", false):
+					AudioManager.play_victory()
+					_refresh_user_profile_ui()
+					_refresh_inventory_content()
+				else:
+					AudioManager.play_parry()
+			)
+		else:
+			ex_btn.text = "📜 ĐỔI VÉ HIỆU TRIỆU (CẦN %d/%d MẢNH)" % [sh_count, req_shards]
+			ex_btn.disabled = true
+			var dis_ex = StyleBoxFlat.new()
+			dis_ex.bg_color = Color(0.16, 0.14, 0.20, 0.7)
+			dis_ex.corner_radius_top_left = 6
+			dis_ex.corner_radius_top_right = 6
+			dis_ex.corner_radius_bottom_right = 6
+			dis_ex.corner_radius_bottom_left = 6
+			ex_btn.add_theme_stylebox_override("disabled", dis_ex)
+			ex_btn.add_theme_color_override("font_color_disabled", Color(0.58, 0.62, 0.72))
+		act_vbox.add_child(ex_btn)
+
+		var batches: int = int(sh_count / req_shards)
+		if batches >= 2 and AuthManager:
+			var max_btn = Button.new()
+			max_btn.custom_minimum_size = Vector2(0, 32)
+			max_btn.text = "🌟 ĐỔI NHANH %d VÉ (%d MẢNH)" % [batches, batches * req_shards]
+			_style_white_gold_button(max_btn, 6, 2, Vector2(0, 1))
+			max_btn.pressed.connect(func():
+				var res := AuthManager.exchange_hero_shards_for_ticket(sh_id, batches)
+				if res.get("ok", false):
+					AudioManager.play_victory()
+					_refresh_user_profile_ui()
+					_refresh_inventory_content()
+				else:
+					AudioManager.play_parry()
+			)
+			act_vbox.add_child(max_btn)
+
+		var goto_td = Button.new()
+		goto_td.custom_minimum_size = Vector2(0, 32)
+		goto_td.text = "⛩️ ĐẾN THẦN ĐIỆN"
+		_style_white_gold_button(goto_td, 6, 2, Vector2(0, 1))
+		goto_td.pressed.connect(func():
+			AudioManager.play_card_select()
+			if is_instance_valid(modal_overlay): modal_overlay.visible = false
+			_show_fullscreen_than_dien()
+		)
+		act_vbox.add_child(goto_td)
 
 	inspector_vbox.add_child(act_vbox)
 
