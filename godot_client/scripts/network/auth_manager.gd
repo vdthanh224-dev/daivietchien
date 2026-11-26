@@ -34,6 +34,10 @@ var current_hero_tickets: int = 0
 var current_skin_tickets: int = 0
 var checkin_7day_claimed: Array = []
 var last_checkin_date: String = ""
+var monthly_checkin_month: String = ""
+var monthly_checkin_days: Array = []
+var monthly_checkin_milestones: Array = []
+var _debug_calendar_date: Dictionary = {}
 var current_2v2_points: int = 1200
 var current_2v2_rank_index: int = 0
 var current_2v2_stars: int = 0
@@ -334,7 +338,185 @@ func set_profile_bg(hero_id: int) -> void:
 	profile_updated.emit()
 
 
-# --- 7-Day Login Rewards ---
+# --- Monthly Calendar Login Rewards ---
+const MONTHLY_MILESTONES = [
+	{"days": 5,  "tickets": 2, "silver": 2000,  "gold": 0,  "label": "5 Ngày"},
+	{"days": 10, "tickets": 3, "silver": 3000,  "gold": 20, "label": "10 Ngày"},
+	{"days": 15, "tickets": 4, "silver": 5000,  "gold": 30, "label": "15 Ngày"},
+	{"days": 20, "tickets": 5, "silver": 6000,  "gold": 50, "label": "20 Ngày"},
+	{"days": 25, "tickets": 7, "silver": 10000, "gold": 80, "label": "25 Ngày"},
+]
+
+static func get_days_in_month(year: int, month: int) -> int:
+	var days_per_month := [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+	if month < 1 or month > 12:
+		return 30
+	if month == 2 and ((year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)):
+		return 29
+	return days_per_month[month]
+
+static func get_first_weekday_monday_index(year: int, month: int) -> int:
+	# Convert Godot weekday (0=Sun..6=Sat) to Vietnamese calendar column (0=Mon..6=Sun).
+	var noon_unix: int = int(Time.get_unix_time_from_datetime_dict({
+		"year": year, "month": month, "day": 1, "hour": 12, "minute": 0, "second": 0
+	}))
+	var dt := Time.get_datetime_dict_from_unix_time(noon_unix)
+	return (int(dt.get("weekday", 1)) + 6) % 7
+
+func _parse_int_array(raw_val: Variant, min_val: int, max_val: int) -> Array:
+	var parsed: Variant = raw_val
+	if raw_val is String:
+		if str(raw_val).strip_edges().is_empty():
+			return []
+		parsed = JSON.parse_string(str(raw_val))
+	var out: Array = []
+	if parsed is Array:
+		for item in parsed:
+			var v := int(item)
+			if v >= min_val and v <= max_val and not out.has(v):
+				out.append(v)
+	out.sort()
+	return out
+
+func _sync_monthly_checkin_month(target_month: String) -> void:
+	if monthly_checkin_month != target_month:
+		if not monthly_checkin_month.is_empty():
+			monthly_checkin_days.clear()
+			monthly_checkin_milestones.clear()
+		monthly_checkin_month = target_month
+
+func get_monthly_calendar_context() -> Dictionary:
+	var dt: Dictionary = _debug_calendar_date if not _debug_calendar_date.is_empty() else Time.get_datetime_dict_from_system()
+	var year: int = int(dt.get("year", 2026))
+	var month: int = clampi(int(dt.get("month", 1)), 1, 12)
+	var days_in_month: int = get_days_in_month(year, month)
+	var day: int = clampi(int(dt.get("day", 1)), 1, days_in_month)
+	var month_key := "%04d-%02d" % [year, month]
+	_sync_monthly_checkin_month(month_key)
+	return {
+		"year": year,
+		"month": month,
+		"day": day,
+		"month_key": month_key,
+		"days_in_month": days_in_month,
+		"first_weekday_idx": get_first_weekday_monday_index(year, month),
+	}
+
+func get_monthly_day_reward(day_num: int, days_in_month: int = 31) -> Dictionary:
+	if day_num == days_in_month:
+		return {"day": day_num, "tickets": 5, "silver": 5000, "gold": 50, "special": true}
+	if day_num == 28:
+		return {"day": day_num, "tickets": 4, "silver": 4000, "gold": 30, "special": true}
+	if day_num == 21:
+		return {"day": day_num, "tickets": 3, "silver": 3000, "gold": 20, "special": true}
+	if day_num == 14:
+		return {"day": day_num, "tickets": 3, "silver": 2500, "gold": 15, "special": true}
+	if day_num == 7:
+		return {"day": day_num, "tickets": 2, "silver": 2000, "gold": 10, "special": true}
+	if day_num == 1:
+		return {"day": day_num, "tickets": 1, "silver": 1500, "gold": 10, "special": true}
+	if day_num % 5 == 0:
+		return {"day": day_num, "tickets": 2 if day_num >= 15 else 1, "silver": 1500 + day_num * 50, "gold": 15 if day_num >= 15 else 0, "special": true}
+	if day_num % 3 == 0:
+		return {"day": day_num, "tickets": 1, "silver": 1000 + day_num * 40, "gold": 0, "special": false}
+	if day_num % 2 == 0:
+		return {"day": day_num, "tickets": 0, "silver": 1200 + day_num * 50, "gold": 10, "special": false}
+	return {"day": day_num, "tickets": 0, "silver": 1000 + day_num * 50, "gold": 0, "special": false}
+
+func is_monthly_day_claimed(day_num: int) -> bool:
+	get_monthly_calendar_context()
+	return monthly_checkin_days.has(day_num)
+
+func can_claim_monthly_checkin_today() -> bool:
+	var ctx := get_monthly_calendar_context()
+	return not monthly_checkin_days.has(int(ctx["day"]))
+
+func is_monthly_milestone_claimed(target_days: int) -> bool:
+	get_monthly_calendar_context()
+	return monthly_checkin_milestones.has(target_days)
+
+func can_claim_monthly_milestone(target_days: int) -> bool:
+	var ctx := get_monthly_calendar_context()
+	return monthly_checkin_days.size() >= target_days and not monthly_checkin_milestones.has(target_days)
+
+func can_claim_any_monthly_reward() -> bool:
+	if can_claim_monthly_checkin_today():
+		return true
+	for ms in MONTHLY_MILESTONES:
+		if can_claim_monthly_milestone(int(ms["days"])):
+			return true
+	return false
+
+func claim_monthly_checkin_today() -> Dictionary:
+	var ctx := get_monthly_calendar_context()
+	var today_day: int = int(ctx["day"])
+	var month_key: String = str(ctx["month_key"])
+	var days_in_month: int = int(ctx["days_in_month"])
+	if monthly_checkin_days.has(today_day):
+		return {"success": false, "message": "Hôm nay (%02d/%02d) Đại Tướng Quân đã điểm danh rồi!" % [today_day, int(ctx["month"])]}
+
+	var reward := get_monthly_day_reward(today_day, days_in_month)
+	var tickets: int = int(reward.get("tickets", 0))
+	var silver: int = int(reward.get("silver", 0))
+	var gold: int = int(reward.get("gold", 0))
+
+	monthly_checkin_month = month_key
+	monthly_checkin_days.append(today_day)
+	monthly_checkin_days.sort()
+	last_checkin_date = "%s-%02d" % [month_key, today_day]
+	current_hero_tickets += tickets
+	current_silver += silver
+	current_gold += gold
+
+	_save_local_user_checkin()
+	save_session()
+	save_profile_to_appwrite()
+	profile_updated.emit()
+	print("[AuthManager] Điểm danh lịch tháng %s (Ngày %d): +%d Vé, +%d Bạc, +%d Kim Cương" % [month_key, today_day, tickets, silver, gold])
+	return {"success": true, "day": today_day, "month_key": month_key, "tickets": tickets, "silver": silver, "gold": gold}
+
+func claim_monthly_milestone(target_days: int) -> Dictionary:
+	get_monthly_calendar_context()
+	if monthly_checkin_milestones.has(target_days):
+		return {"success": false, "message": "Mốc thưởng này đã được nhận rồi!"}
+	if monthly_checkin_days.size() < target_days:
+		return {"success": false, "message": "Cần điểm danh đủ %d ngày trong tháng!" % target_days}
+	for ms in MONTHLY_MILESTONES:
+		if int(ms["days"]) == target_days:
+			var tickets: int = int(ms["tickets"])
+			var silver: int = int(ms["silver"])
+			var gold: int = int(ms["gold"])
+			monthly_checkin_milestones.append(target_days)
+			monthly_checkin_milestones.sort()
+			current_hero_tickets += tickets
+			current_silver += silver
+			current_gold += gold
+			_save_local_user_checkin()
+			save_session()
+			save_profile_to_appwrite()
+			profile_updated.emit()
+			return {"success": true, "days": target_days, "tickets": tickets, "silver": silver, "gold": gold}
+	return {"success": false, "message": "Mốc điểm danh không hợp lệ!"}
+
+func dev_set_calendar_day(day_num: int) -> void:
+	var ctx := get_monthly_calendar_context()
+	_debug_calendar_date = {
+		"year": int(ctx["year"]),
+		"month": int(ctx["month"]),
+		"day": clampi(day_num, 1, int(ctx["days_in_month"]))
+	}
+
+func dev_reset_monthly_checkin() -> void:
+	_debug_calendar_date.clear()
+	monthly_checkin_days.clear()
+	monthly_checkin_milestones.clear()
+	last_checkin_date = ""
+	_save_local_user_checkin()
+	save_session()
+	save_profile_to_appwrite()
+	profile_updated.emit()
+
+# --- 7-Day Login Rewards (Legacy Compatibility) ---
 const SEVEN_DAY_REWARDS = [
 	{"day": 1, "tickets": 1, "silver": 1000, "title": "Khởi Sự Nghĩa Quân"},
 	{"day": 2, "tickets": 2, "silver": 2000, "title": "Binh Hùng Tướng Mạnh"},
@@ -370,9 +552,22 @@ func _load_local_user_checkin() -> void:
 							checkin_7day_claimed.append(d_int)
 				if parsed.has("last_date") and last_checkin_date == "":
 					last_checkin_date = str(parsed["last_date"])
+				var file_month := str(parsed.get("monthly_month", ""))
+				if not file_month.is_empty():
+					if monthly_checkin_month.is_empty():
+						monthly_checkin_month = file_month
+					if file_month == monthly_checkin_month:
+						for d_m in _parse_int_array(parsed.get("monthly_days", []), 1, 31):
+							if not monthly_checkin_days.has(d_m):
+								monthly_checkin_days.append(d_m)
+						monthly_checkin_days.sort()
+						for ms_m in _parse_int_array(parsed.get("monthly_milestones", []), 1, 31):
+							if not monthly_checkin_milestones.has(ms_m):
+								monthly_checkin_milestones.append(ms_m)
+						monthly_checkin_milestones.sort()
 
 func _save_local_user_checkin() -> void:
-	if current_user_id == "":
+	if disable_session_save or current_user_id == "":
 		return
 	var path = _get_user_checkin_file(current_user_id)
 	var file = FileAccess.open(path, FileAccess.WRITE)
@@ -380,18 +575,17 @@ func _save_local_user_checkin() -> void:
 		file.store_string(JSON.stringify({
 			"userId": current_user_id,
 			"claimed": checkin_7day_claimed,
-			"last_date": last_checkin_date
+			"last_date": last_checkin_date,
+			"monthly_month": monthly_checkin_month,
+			"monthly_days": monthly_checkin_days,
+			"monthly_milestones": monthly_checkin_milestones
 		}))
 
 func is_checkin_day_claimed(day_num: int) -> bool:
 	return checkin_7day_claimed.has(day_num)
 
 func can_claim_checkin_today() -> bool:
-	var today = Time.get_date_string_from_system()
-	if last_checkin_date == today:
-		return false
-	# Đủ 7 ngày là xong, không có ngày thứ 8 và không bao giờ lặp lại
-	return checkin_7day_claimed.size() < 7
+	return can_claim_any_monthly_reward()
 
 func get_next_checkin_day() -> int:
 	return clampi(checkin_7day_claimed.size() + 1, 1, 7)
@@ -443,6 +637,10 @@ func claim_7day_reward(day_num: int) -> Dictionary:
 func dev_reset_7day_checkin() -> void:
 	checkin_7day_claimed.clear()
 	last_checkin_date = ""
+	monthly_checkin_month = ""
+	monthly_checkin_days.clear()
+	monthly_checkin_milestones.clear()
+	_debug_calendar_date.clear()
 	_save_local_user_checkin()
 	save_session()
 	save_profile_to_appwrite()
@@ -742,6 +940,12 @@ func fetch_profile_from_appwrite(on_completed: Callable = Callable()) -> void:
 							checkin_7day_claimed = c_val
 					if data.has("lastCheckinDate"):
 						last_checkin_date = str(data["lastCheckinDate"])
+					if data.has("monthlyCheckinMonth"):
+						monthly_checkin_month = str(data["monthlyCheckinMonth"])
+					if data.has("monthlyCheckinDays"):
+						monthly_checkin_days = _parse_int_array(data["monthlyCheckinDays"], 1, 31)
+					if data.has("monthlyCheckinMilestones"):
+						monthly_checkin_milestones = _parse_int_array(data["monthlyCheckinMilestones"], 1, 31)
 					if data.has("dailyQuestsData"):
 						var q_val = data["dailyQuestsData"]
 						if q_val is String and q_val != "":
@@ -870,6 +1074,9 @@ func _execute_save_profile_to_appwrite() -> void:
 		"skinTickets": current_skin_tickets,
 		"checkin7DayClaimed": JSON.stringify(checkin_7day_claimed),
 		"lastCheckinDate": last_checkin_date,
+		"monthlyCheckinMonth": monthly_checkin_month,
+		"monthlyCheckinDays": JSON.stringify(monthly_checkin_days),
+		"monthlyCheckinMilestones": JSON.stringify(monthly_checkin_milestones),
 		"dailyQuestsData": JSON.stringify(daily_quests_data),
 		"militaryPoints": get_military_points(),
 		"rank2v2Points": current_2v2_points,
@@ -1324,6 +1531,10 @@ func reset_to_defaults() -> void:
 	current_skin_tickets = 0
 	checkin_7day_claimed.clear()
 	last_checkin_date = ""
+	monthly_checkin_month = ""
+	monthly_checkin_days.clear()
+	monthly_checkin_milestones.clear()
+	_debug_calendar_date.clear()
 	current_generals = ["ly_thuong_kiet"]
 	current_2v2_points = 1200
 	current_2v2_rank_index = 0
@@ -1797,6 +2008,9 @@ func save_session() -> void:
 			"skinTickets": current_skin_tickets,
 			"checkin7DayClaimed": checkin_7day_claimed,
 			"lastCheckinDate": last_checkin_date,
+			"monthlyCheckinMonth": monthly_checkin_month,
+			"monthlyCheckinDays": monthly_checkin_days,
+			"monthlyCheckinMilestones": monthly_checkin_milestones,
 			"generals": current_generals,
 			"rank2v2Points": current_2v2_points,
 			"rank2v2Index": current_2v2_rank_index,
@@ -1884,6 +2098,9 @@ func load_saved_session() -> void:
 					if saved_claimed is Array:
 						checkin_7day_claimed = saved_claimed
 					last_checkin_date = str(data.get("lastCheckinDate", ""))
+					monthly_checkin_month = str(data.get("monthlyCheckinMonth", ""))
+					monthly_checkin_days = _parse_int_array(data.get("monthlyCheckinDays", []), 1, 31)
+					monthly_checkin_milestones = _parse_int_array(data.get("monthlyCheckinMilestones", []), 1, 31)
 					var saved_quests = data.get("dailyQuestsData", {})
 					if saved_quests is Dictionary:
 						daily_quests_data = saved_quests

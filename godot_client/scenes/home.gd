@@ -104,6 +104,8 @@ var _left_hero_cards_container: VBoxContainer = null
 var _left_hero_page: int = 0
 var _left_hero_count_lbl: Label = null
 var _quest_badge_dot: Control = null
+var _checkin_nav_btn: Button = null
+var _checkin_badge_dot: Control = null
 var _battle_card_title_lbl: Label = null
 var _top_avatar_rect: TextureRect = null
 
@@ -601,7 +603,7 @@ func _build_hero_center_stage() -> void:
 	tap_btn.position = Vector2(95, 72)
 	tap_btn.size = Vector2(325, 435)
 	_style_transparent_button(tap_btn)
-	tap_btn.tooltip_text = "Chạm để nghe thoại Danh Tướng"
+	tap_btn.tooltip_text = "Chạm để xem thoại Danh Tướng"
 	tap_btn.pressed.connect(_trigger_hero_interaction)
 	stage.add_child(tap_btn)
 
@@ -650,7 +652,22 @@ func _build_left_character_column() -> void:
 
 	left_box.add_child(_make_neon_left_button("KHO TƯỚNG", "res://assets/ui/icons/icon_heroes.svg", Color(0.20, 0.85, 1.0, 0.92), _show_fullscreen_heroes))
 	left_box.add_child(_make_neon_left_button("TÚI ĐỒ", "res://assets/ui/icons/icon_bag.svg", Color(1.0, 0.75, 0.25, 0.92), _open_inventory_modal))
-	left_box.add_child(_make_neon_left_button("ĐẤU TẬP 2v2", "res://assets/ui/icons/icon_match.svg", Color(0.32, 0.92, 0.64, 0.90), _start_mode_practice_2v2))
+
+	_checkin_nav_btn = _make_neon_left_button("ĐIỂM DANH", "res://assets/ui/icons/icon_event.svg", Color(0.32, 0.92, 0.64, 0.90), _show_monthly_checkin_modal)
+	var ci_dot = PanelContainer.new()
+	ci_dot.custom_minimum_size = Vector2(12, 12)
+	ci_dot.position = Vector2(164, 10)
+	var ci_sb = StyleBoxFlat.new()
+	ci_sb.bg_color = Color(1.0, 0.2, 0.2, 1.0)
+	ci_sb.set_corner_radius_all(6)
+	ci_sb.shadow_color = Color(1.0, 0.2, 0.2, 0.7)
+	ci_sb.shadow_size = 5
+	ci_dot.add_theme_stylebox_override("panel", ci_sb)
+	ci_dot.mouse_filter = MOUSE_FILTER_IGNORE
+	_checkin_badge_dot = ci_dot
+	_checkin_nav_btn.add_child(ci_dot)
+	left_box.add_child(_checkin_nav_btn)
+
 	left_box.add_child(_make_neon_left_button("TẬP HUẤN", "res://assets/ui/icons/icon_quests.svg", Color(0.72, 0.56, 1.0, 0.90), _start_mode_practice))
 
 func _refresh_left_character_cards() -> void:
@@ -981,7 +998,7 @@ func _build_right_action_deck() -> void:
 
 	# 3. Popover Mode Drawer (Added AFTER grid with z_index=50 so it is NEVER covered)
 	mode_drawer_panel = PanelContainer.new()
-	mode_drawer_panel.custom_minimum_size = Vector2(446, 238)
+	mode_drawer_panel.custom_minimum_size = Vector2(446, 196)
 	mode_drawer_panel.position = Vector2(810, 280)
 	mode_drawer_panel.visible = false
 	mode_drawer_panel.z_index = 50
@@ -1017,8 +1034,7 @@ func _build_right_action_deck() -> void:
 	md_vbox.add_child(md_hdr)
 
 	var modes_list = [
-		{"id": "2v2", "icon": "⚔️", "title": "Đấu Trường 2v2", "sub": "Xếp Hạng"},
-		{"id": "practice_2v2", "icon": "🤖", "title": "Đấu Tập 2v2", "sub": "Với Máy (Miễn Phí)"},
+		{"id": "2v2", "icon": "⚔️", "title": "Đấu Trường 2v2", "sub": "Xếp Hạng (Người Chơi)"},
 		{"id": "dynasty_5", "icon": "👑", "title": "Vương Triều 5 người", "sub": "Vương Triều"},
 		{"id": "dynasty_8", "icon": "👑", "title": "Vương Triều 8 người", "sub": "Vương Triều"},
 		{"id": "tutorial", "icon": "🎓", "title": "Tập Huấn Tân Thủ", "sub": "Hướng Dẫn Cơ Bản"}
@@ -1504,12 +1520,12 @@ func _build_15day_event_content() -> Control:
 	act_row.add_child(enter_2v2_btn)
 
 	var checkin_btn = Button.new()
-	checkin_btn.text = "⭐ Điểm Danh 7 Ngày"
+	checkin_btn.text = "📅 Lịch Điểm Danh"
 	checkin_btn.custom_minimum_size = Vector2(170, 44)
 	_style_secondary_mode_button(checkin_btn)
 	checkin_btn.pressed.connect(func():
 		AudioManager.play_card_select()
-		_show_modal("QUÀ ĐIỂM DANH 7 NGÀY", _build_7day_rewards_content())
+		_show_monthly_checkin_modal()
 	)
 	act_row.add_child(checkin_btn)
 	checkin_btn_ref = checkin_btn
@@ -1903,8 +1919,6 @@ func _on_battle_cta_pressed() -> void:
 	match current_selected_mode:
 		"2v2":
 			_start_mode_2v2()
-		"practice_2v2":
-			_start_mode_practice_2v2()
 		"dynasty_5":
 			_start_mode_dynasty()
 		"dynasty_8":
@@ -1915,7 +1929,6 @@ func _on_battle_cta_pressed() -> void:
 			_start_mode_2v2()
 
 func _trigger_hero_interaction() -> void:
-	AudioManager.play_skill()
 	if is_instance_valid(hero_dialogue_bubble):
 		if _hero_dialogue_tween and _hero_dialogue_tween.is_valid():
 			_hero_dialogue_tween.kill()
@@ -2215,6 +2228,7 @@ func _build_modal_layer() -> void:
 	modal_overlay = ColorRect.new()
 	modal_overlay.set_anchors_preset(PRESET_FULL_RECT)
 	modal_overlay.color = Color(0.02, 0.04, 0.08, 0.75)
+	modal_overlay.z_index = 100
 	modal_overlay.visible = false
 	add_child(modal_overlay)
 
@@ -2448,7 +2462,7 @@ func _update_tutorial_mode_visibility() -> void:
 		return
 	tutorial_mode_btn.visible = true
 	if is_instance_valid(mode_drawer_panel):
-		mode_drawer_panel.custom_minimum_size = Vector2(446, 238)
+		mode_drawer_panel.custom_minimum_size = Vector2(446, 196)
 
 # --- Ambient Particle Embers ---
 func _start_ambient_effects() -> void:
@@ -2678,6 +2692,10 @@ func _show_modal(title_text: String, content_node: Node) -> void:
 				modal_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		elif title_text.begins_with("HỒ SƠ") or title_text.begins_with("CHỌN NỀN"):
 			modal_panel.custom_minimum_size = Vector2(1060, 600)
+			if is_instance_valid(modal_scroll):
+				modal_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		elif title_text.begins_with("📅 LỊCH ĐIỂM DANH"):
+			modal_panel.custom_minimum_size = Vector2(980, 640)
 			if is_instance_valid(modal_scroll):
 				modal_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 		elif title_text == "TRÂN BẢO CÁC":
@@ -4388,206 +4406,399 @@ func _build_heroes_content() -> Control:
 	dummy.custom_minimum_size = Vector2(1, 1)
 	return dummy
 
-# --- QUÀ 7 NGÀY ĐIỂM DANH ---
+# --- LỊCH ĐIỂM DANH THÁNG ---
+func _format_short_silver(amount: int) -> String:
+	if amount >= 1000:
+		var k := float(amount) / 1000.0
+		return ("%.1fK" % k).replace(".0K", "K")
+	return str(amount)
+
+func _format_compact_reward(reward: Dictionary) -> String:
+	var parts: Array[String] = []
+	var tickets := int(reward.get("tickets", 0))
+	var gold := int(reward.get("gold", 0))
+	var silver := int(reward.get("silver", 0))
+	if tickets > 0:
+		parts.append("📜%d" % tickets)
+	if gold > 0:
+		parts.append("💎%d" % gold)
+	if silver > 0:
+		parts.append("🪙%s" % _format_short_silver(silver))
+	return "  ".join(parts)
+
+func _show_monthly_checkin_modal() -> void:
+	var ctx: Dictionary = AuthManager.get_monthly_calendar_context() if AuthManager and AuthManager.has_method("get_monthly_calendar_context") else {
+		"year": 2026, "month": 11, "day": 1
+	}
+	var m_num := int(ctx.get("month", 11))
+	var y_num := int(ctx.get("year", 2026))
+	_show_modal("📅 LỊCH ĐIỂM DANH THÁNG %02d/%d" % [m_num, y_num], _build_monthly_checkin_content())
+
 func _update_checkin_button_status() -> void:
-	if not is_instance_valid(checkin_btn_ref):
-		return
-	if AuthManager:
-		var claimed_cnt = AuthManager.checkin_7day_claimed.size()
-		if claimed_cnt >= 7:
-			checkin_btn_ref.text = "👑 Điểm Danh (7/7 Xong)"
-		elif AuthManager.can_claim_checkin_today():
-			checkin_btn_ref.text = "⭐ Điểm Danh (Có Quà!)"
-		else:
-			checkin_btn_ref.text = "⭐ Điểm Danh (%d/7)" % claimed_cnt
+	var has_reward: bool = AuthManager.can_claim_any_monthly_reward() if AuthManager and AuthManager.has_method("can_claim_any_monthly_reward") else false
+	if is_instance_valid(_checkin_badge_dot):
+		_checkin_badge_dot.visible = has_reward
+	if is_instance_valid(checkin_btn_ref):
+		if AuthManager and AuthManager.has_method("get_monthly_calendar_context"):
+			var ctx := AuthManager.get_monthly_calendar_context()
+			var cnt: int = AuthManager.monthly_checkin_days.size()
+			var total_d: int = int(ctx.get("days_in_month", 30))
+			if has_reward:
+				checkin_btn_ref.text = "📅 Điểm Danh (%d/%d · Có Quà!)" % [cnt, total_d]
+			else:
+				checkin_btn_ref.text = "📅 Lịch Điểm Danh (%d/%d)" % [cnt, total_d]
 
 func _build_7day_rewards_content() -> Control:
+	return _build_monthly_checkin_content()
+
+func _build_monthly_checkin_content() -> Control:
 	var container = VBoxContainer.new()
-	container.add_theme_constant_override("separation", 14)
+	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	container.add_theme_constant_override("separation", 10)
 
-	var desc_lbl = Label.new()
-	desc_lbl.text = "Triều đình ban thưởng mỗi ngày đăng nhập! Nhận Vé Quay Tướng để hiệu triệu 50 Hào Kiệt Đại Việt tại Thần Điện."
-	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc_lbl.add_theme_font_size_override("font_size", 13)
-	desc_lbl.add_theme_color_override("font_color", COLOR_TEXT_MUTED)
-	container.add_child(desc_lbl)
+	var ctx: Dictionary = AuthManager.get_monthly_calendar_context() if AuthManager and AuthManager.has_method("get_monthly_calendar_context") else {
+		"year": 2026, "month": 11, "day": 26, "days_in_month": 30, "first_weekday_idx": 6
+	}
+	var year_num: int = int(ctx.get("year", 2026))
+	var month_num: int = int(ctx.get("month", 11))
+	var today_day: int = int(ctx.get("day", 1))
+	var days_in_month: int = int(ctx.get("days_in_month", 30))
+	var first_weekday_idx: int = int(ctx.get("first_weekday_idx", 0))
+	var claimed_count: int = AuthManager.monthly_checkin_days.size() if AuthManager else 0
+	var can_claim_today: bool = AuthManager.can_claim_monthly_checkin_today() if AuthManager and AuthManager.has_method("can_claim_monthly_checkin_today") else false
 
-	var claimed_count: int = AuthManager.checkin_7day_claimed.size() if AuthManager else 0
-	var can_claim_today: bool = AuthManager.can_claim_checkin_today() if AuthManager else false
-	var next_day: int = AuthManager.get_next_checkin_day() if AuthManager else 1
-
+	# 1. Header Banner (Tháng / Năm + Tổng tiến trình + Nút Điểm Danh Hôm Nay)
 	var status_panel = PanelContainer.new()
 	var sp_style = StyleBoxFlat.new()
-	sp_style.bg_color = Color(0.12, 0.14, 0.20, 0.95)
-	sp_style.border_width_left = 2
-	sp_style.border_color = COLOR_GOLD_PRIMARY
-	sp_style.corner_radius_top_left = 6
-	sp_style.corner_radius_bottom_left = 6
-	sp_style.content_margin_left = 12
-	sp_style.content_margin_right = 12
-	sp_style.content_margin_top = 8
-	sp_style.content_margin_bottom = 8
+	sp_style.bg_color = Color(0.08, 0.11, 0.18, 0.96)
+	sp_style.border_color = Color(0.22, 0.84, 1.0, 0.72)
+	sp_style.set_border_width_all(2)
+	sp_style.set_corner_radius_all(12)
+	sp_style.content_margin_left = 14
+	sp_style.content_margin_right = 14
+	sp_style.content_margin_top = 10
+	sp_style.content_margin_bottom = 10
 	status_panel.add_theme_stylebox_override("panel", sp_style)
 
 	var status_hbox = HBoxContainer.new()
-	var prog_lbl = Label.new()
-	prog_lbl.text = "⭐ Tiến trình: %d/7 Ngày" % claimed_count
-	prog_lbl.add_theme_font_size_override("font_size", 13)
-	prog_lbl.add_theme_color_override("font_color", COLOR_GOLD_PRIMARY)
-	status_hbox.add_child(prog_lbl)
+	status_hbox.add_theme_constant_override("separation", 14)
 
-	var spacer = Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	status_hbox.add_child(spacer)
+	var info_vbox = VBoxContainer.new()
+	info_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_vbox.add_theme_constant_override("separation", 3)
 
-	var state_lbl = Label.new()
-	if claimed_count >= 7:
-		state_lbl.text = "👑 ĐÃ HOÀN THÀNH 7 NGÀY ĐIỂM DANH"
-		state_lbl.add_theme_color_override("font_color", Color(0.2, 0.85, 0.3, 1.0))
-	elif can_claim_today:
-		state_lbl.text = "⚡ CÓ THỂ NHẬN QUÀ NGÀY %d!" % next_day
-		state_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2, 1.0))
+	var month_hdr = Label.new()
+	month_hdr.text = "🗓️ THÁNG %02d · NĂM %d  —  ĐIỂM DANH MỖI NGÀY" % [month_num, year_num]
+	month_hdr.add_theme_font_size_override("font_size", 14)
+	month_hdr.add_theme_color_override("font_color", Color(1.0, 0.88, 0.40, 1.0))
+	info_vbox.add_child(month_hdr)
+
+	var sub_lbl = Label.new()
+	sub_lbl.text = "Hôm nay: %02d/%02d/%d   •   Đã điểm danh: %d/%d ngày trong tháng" % [today_day, month_num, year_num, claimed_count, days_in_month]
+	sub_lbl.add_theme_font_size_override("font_size", 12)
+	sub_lbl.add_theme_color_override("font_color", Color(0.75, 0.86, 0.96, 0.95))
+	info_vbox.add_child(sub_lbl)
+	status_hbox.add_child(info_vbox)
+
+	var claim_today_btn = Button.new()
+	claim_today_btn.custom_minimum_size = Vector2(215, 42)
+	if can_claim_today:
+		claim_today_btn.text = "🎁 ĐIỂM DANH NGÀY %02d" % today_day
+		_style_bronze_drum_cta(claim_today_btn)
+		claim_today_btn.pressed.connect(func():
+			claim_today_btn.disabled = true
+			if AuthManager:
+				AuthManager.claim_monthly_checkin_today()
+			AudioManager.play_victory()
+			_refresh_user_profile_ui()
+			_update_checkin_button_status()
+			_show_monthly_checkin_modal()
+		)
 	else:
-		state_lbl.text = "⏰ ĐÃ ĐIỂM DANH HÔM NAY (HẸN GẶP LẠI NGÀY MAI)"
-		state_lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.8, 1.0))
-	state_lbl.add_theme_font_size_override("font_size", 12)
-	status_hbox.add_child(state_lbl)
+		claim_today_btn.text = "✓ ĐÃ ĐIỂM DANH HÔM NAY"
+		claim_today_btn.disabled = true
+		_style_white_gold_button(claim_today_btn, 8, 1, Vector2.ZERO)
+	status_hbox.add_child(claim_today_btn)
 
 	status_panel.add_child(status_hbox)
 	container.add_child(status_panel)
 
-	# Grid: Ngày 1-4 hàng trên, Ngày 5-7 hàng dưới
-	var grid_top = HBoxContainer.new()
-	grid_top.add_theme_constant_override("separation", 10)
-	container.add_child(grid_top)
+	# 2. Mốc tích lũy trong tháng (5 / 10 / 15 / 20 / 25 ngày)
+	var milestones_row = HBoxContainer.new()
+	milestones_row.add_theme_constant_override("separation", 8)
+	var milestones_list = AuthManager.MONTHLY_MILESTONES if AuthManager else []
+	for ms in milestones_list:
+		var target_d: int = int(ms["days"])
+		var ms_claimed: bool = AuthManager.is_monthly_milestone_claimed(target_d) if AuthManager else false
+		var ms_ready: bool = AuthManager.can_claim_monthly_milestone(target_d) if AuthManager else false
 
-	var grid_bot = HBoxContainer.new()
-	grid_bot.add_theme_constant_override("separation", 10)
-	container.add_child(grid_bot)
-
-	var rewards_list = AuthManager.SEVEN_DAY_REWARDS if AuthManager else [
-		{"day": 1, "tickets": 1, "silver": 1000},
-		{"day": 2, "tickets": 2, "silver": 2000},
-		{"day": 3, "tickets": 3, "silver": 3000},
-		{"day": 4, "tickets": 4, "silver": 4000},
-		{"day": 5, "tickets": 5, "silver": 5000},
-		{"day": 6, "tickets": 6, "silver": 6000},
-		{"day": 7, "tickets": 7, "silver": 7000}
-	]
-
-	for day_data in rewards_list:
-		var d_num: int = int(day_data["day"])
-		var tickets: int = int(day_data["tickets"])
-		var silver: int = int(day_data["silver"])
-		var is_claimed: bool = AuthManager.is_checkin_day_claimed(d_num) if AuthManager else false
-		var is_claimable: bool = (d_num == next_day and can_claim_today)
-
-		var card = PanelContainer.new()
-		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		card.custom_minimum_size = Vector2(0, 130)
-
-		var cs = StyleBoxFlat.new()
-		if is_claimed:
-			cs.bg_color = Color(0.10, 0.12, 0.16, 0.95)
-			cs.border_color = Color(0.3, 0.5, 0.4, 0.6)
-			cs.border_width_left = 1
-			cs.border_width_right = 1
-			cs.border_width_top = 1
-			cs.border_width_bottom = 1
-		elif is_claimable:
-			cs.bg_color = Color(0.20, 0.12, 0.08, 0.98)
-			cs.border_color = COLOR_GOLD_PRIMARY
-			cs.border_width_left = 2
-			cs.border_width_right = 2
-			cs.border_width_top = 2
-			cs.border_width_bottom = 2
-			cs.shadow_color = Color(0.9, 0.6, 0.1, 0.4)
-			cs.shadow_size = 8
+		var ms_card = PanelContainer.new()
+		ms_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var ms_sb = StyleBoxFlat.new()
+		if ms_claimed:
+			ms_sb.bg_color = Color(0.08, 0.16, 0.13, 0.95)
+			ms_sb.border_color = Color(0.28, 0.82, 0.52, 0.72)
+		elif ms_ready:
+			ms_sb.bg_color = Color(0.20, 0.12, 0.08, 0.98)
+			ms_sb.border_color = Color(1.0, 0.84, 0.30, 1.0)
 		else:
-			cs.bg_color = Color(0.08, 0.09, 0.13, 0.95)
-			cs.border_color = Color(0.25, 0.28, 0.35, 0.5)
-			cs.border_width_left = 1
-			cs.border_width_right = 1
-			cs.border_width_top = 1
-			cs.border_width_bottom = 1
+			ms_sb.bg_color = Color(0.06, 0.08, 0.13, 0.94)
+			ms_sb.border_color = Color(0.28, 0.34, 0.46, 0.55)
+		ms_sb.set_border_width_all(2 if ms_ready else 1)
+		ms_sb.set_corner_radius_all(8)
+		ms_sb.content_margin_left = 8
+		ms_sb.content_margin_right = 8
+		ms_sb.content_margin_top = 6
+		ms_sb.content_margin_bottom = 6
+		ms_card.add_theme_stylebox_override("panel", ms_sb)
 
-		cs.corner_radius_top_left = 8
-		cs.corner_radius_top_right = 8
-		cs.corner_radius_bottom_right = 8
-		cs.corner_radius_bottom_left = 8
-		cs.content_margin_left = 10
-		cs.content_margin_right = 10
-		cs.content_margin_top = 10
-		cs.content_margin_bottom = 10
-		card.add_theme_stylebox_override("panel", cs)
+		var ms_hb = HBoxContainer.new()
+		ms_hb.add_theme_constant_override("separation", 6)
 
-		var card_vbox = VBoxContainer.new()
-		card_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-		card_vbox.add_theme_constant_override("separation", 6)
+		var ms_info = VBoxContainer.new()
+		ms_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ms_info.add_theme_constant_override("separation", 1)
 
-		# Day Header
-		var day_hdr = Label.new()
-		if d_num == 7:
-			day_hdr.text = "👑 NGÀY 7"
-			day_hdr.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2, 1.0))
-		else:
-			day_hdr.text = "NGÀY %d" % d_num
-			day_hdr.add_theme_color_override("font_color", COLOR_GOLD_PRIMARY if not is_claimed else Color(0.6, 0.6, 0.6, 1.0))
-		day_hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		day_hdr.add_theme_font_size_override("font_size", 13)
-		card_vbox.add_child(day_hdr)
+		var ms_title = Label.new()
+		ms_title.text = "🏆 %s" % str(ms.get("label", "%d Ngày" % target_d))
+		ms_title.add_theme_font_size_override("font_size", 11)
+		ms_title.add_theme_color_override("font_color", Color(1.0, 0.88, 0.42) if not ms_claimed else Color(0.45, 0.92, 0.65))
+		ms_info.add_child(ms_title)
 
-		# Reward line
-		var reward_hbox = HBoxContainer.new()
-		reward_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-		reward_hbox.add_theme_constant_override("separation", 8)
+		var ms_rew = Label.new()
+		ms_rew.text = _format_compact_reward(ms)
+		ms_rew.add_theme_font_size_override("font_size", 10)
+		ms_rew.add_theme_color_override("font_color", Color(0.88, 0.92, 0.98))
+		ms_info.add_child(ms_rew)
+		ms_hb.add_child(ms_info)
 
-		var t_lbl = Label.new()
-		t_lbl.text = "📜 %d Vé" % tickets
-		t_lbl.add_theme_font_size_override("font_size", 13)
-		t_lbl.add_theme_color_override("font_color", Color(1.0, 0.45, 0.35, 1.0))
-		reward_hbox.add_child(t_lbl)
-
-		var s_lbl = Label.new()
-		s_lbl.text = "🪙 +%s" % _format_number(silver)
-		s_lbl.add_theme_font_size_override("font_size", 13)
-		s_lbl.add_theme_color_override("font_color", Color(0.95, 0.85, 0.45, 1.0))
-		reward_hbox.add_child(s_lbl)
-		card_vbox.add_child(reward_hbox)
-
-		# Claim Button
-		var claim_btn = Button.new()
-		claim_btn.custom_minimum_size = Vector2(0, 32)
-		if is_claimed:
-			claim_btn.text = "✓ ĐÃ NHẬN"
-			claim_btn.disabled = true
-			_style_white_gold_button(claim_btn, 6, 1, Vector2.ZERO)
-		elif is_claimable:
-			claim_btn.text = "🎁 NHẬN NGAY"
-			_style_bronze_drum_cta(claim_btn)
-			claim_btn.pressed.connect(func():
-				claim_btn.disabled = true
+		var ms_btn = Button.new()
+		ms_btn.custom_minimum_size = Vector2(56, 28)
+		ms_btn.add_theme_font_size_override("font_size", 10)
+		if ms_claimed:
+			ms_btn.text = "✓"
+			ms_btn.disabled = true
+			_style_white_gold_button(ms_btn, 6, 1, Vector2.ZERO)
+		elif ms_ready:
+			ms_btn.text = "NHẬN"
+			_style_bronze_drum_cta(ms_btn)
+			var cap_d := target_d
+			ms_btn.pressed.connect(func():
+				ms_btn.disabled = true
 				if AuthManager:
-					AuthManager.claim_7day_reward(d_num)
+					AuthManager.claim_monthly_milestone(cap_d)
 				AudioManager.play_victory()
 				_refresh_user_profile_ui()
 				_update_checkin_button_status()
-				_show_modal("QUÀ ĐIỂM DANH 7 NGÀY", _build_7day_rewards_content())
+				_show_monthly_checkin_modal()
 			)
 		else:
-			claim_btn.text = "🔒 CHƯA MỞ"
-			claim_btn.disabled = true
-			_style_white_gold_button(claim_btn, 6, 1, Vector2.ZERO)
-		card_vbox.add_child(claim_btn)
+			ms_btn.text = "%d/%d" % [mini(claimed_count, target_d), target_d]
+			ms_btn.disabled = true
+			_style_white_gold_button(ms_btn, 6, 1, Vector2.ZERO)
+		ms_hb.add_child(ms_btn)
 
-		card.add_child(card_vbox)
+		ms_card.add_child(ms_hb)
+		milestones_row.add_child(ms_card)
+	container.add_child(milestones_row)
 
-		if d_num <= 4:
-			grid_top.add_child(card)
+	# 3. Khung Cuốn Lịch Tháng (7 Cột: Thứ 2 -> Chủ Nhật)
+	var calendar_frame = PanelContainer.new()
+	var cf_style = StyleBoxFlat.new()
+	cf_style.bg_color = Color(0.045, 0.055, 0.095, 0.98)
+	cf_style.border_color = Color(0.85, 0.68, 0.25, 0.65)
+	cf_style.set_border_width_all(2)
+	cf_style.set_corner_radius_all(12)
+	cf_style.content_margin_left = 10
+	cf_style.content_margin_right = 10
+	cf_style.content_margin_top = 8
+	cf_style.content_margin_bottom = 10
+	calendar_frame.add_theme_stylebox_override("panel", cf_style)
+
+	var cal_vbox = VBoxContainer.new()
+	cal_vbox.add_theme_constant_override("separation", 6)
+
+	# Header thứ trong tuần
+	var weekday_hdr = GridContainer.new()
+	weekday_hdr.columns = 7
+	weekday_hdr.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	weekday_hdr.add_theme_constant_override("h_separation", 6)
+	var weekday_names := ["THỨ 2", "THỨ 3", "THỨ 4", "THỨ 5", "THỨ 6", "THỨ 7", "CHỦ NHẬT"]
+	for w_idx in range(7):
+		var w_pill = PanelContainer.new()
+		w_pill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var wp_sb = StyleBoxFlat.new()
+		wp_sb.bg_color = Color(0.11, 0.14, 0.22, 0.95) if w_idx < 5 else Color(0.16, 0.11, 0.20, 0.95)
+		wp_sb.set_corner_radius_all(6)
+		wp_sb.content_margin_top = 4
+		wp_sb.content_margin_bottom = 4
+		w_pill.add_theme_stylebox_override("panel", wp_sb)
+		var w_lbl = Label.new()
+		w_lbl.text = weekday_names[w_idx]
+		w_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		w_lbl.add_theme_font_size_override("font_size", 11)
+		if w_idx == 5:
+			w_lbl.add_theme_color_override("font_color", Color(0.32, 0.88, 1.0, 1.0))
+		elif w_idx == 6:
+			w_lbl.add_theme_color_override("font_color", Color(1.0, 0.48, 0.65, 1.0))
 		else:
-			grid_bot.add_child(card)
+			w_lbl.add_theme_color_override("font_color", Color(0.92, 0.84, 0.56, 1.0))
+		w_pill.add_child(w_lbl)
+		weekday_hdr.add_child(w_pill)
+	cal_vbox.add_child(weekday_hdr)
 
-	# Developer / Tester Helper Bar
+	# Lưới các ngày trong tháng
+	var date_grid = GridContainer.new()
+	date_grid.columns = 7
+	date_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	date_grid.add_theme_constant_override("h_separation", 6)
+	date_grid.add_theme_constant_override("v_separation", 6)
+
+	var make_empty_cell := func() -> PanelContainer:
+		var filler = PanelContainer.new()
+		filler.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		filler.custom_minimum_size = Vector2(0, 52)
+		var fs = StyleBoxFlat.new()
+		fs.bg_color = Color(0.03, 0.035, 0.06, 0.55)
+		fs.border_color = Color(0.14, 0.16, 0.22, 0.35)
+		fs.set_border_width_all(1)
+		fs.set_corner_radius_all(8)
+		filler.add_theme_stylebox_override("panel", fs)
+		return filler
+
+	for _lead in range(first_weekday_idx):
+		date_grid.add_child(make_empty_cell.call())
+
+	for d_num in range(1, days_in_month + 1):
+		var reward := AuthManager.get_monthly_day_reward(d_num, days_in_month) if AuthManager else {"day": d_num, "silver": 1000}
+		var is_claimed: bool = AuthManager.is_monthly_day_claimed(d_num) if AuthManager else false
+		var is_today: bool = (d_num == today_day)
+		var is_claimable: bool = (is_today and can_claim_today)
+		var is_missed: bool = (d_num < today_day and not is_claimed)
+		var is_special: bool = bool(reward.get("special", false))
+		var col_idx: int = (first_weekday_idx + d_num - 1) % 7
+
+		var cell = PanelContainer.new()
+		cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		cell.custom_minimum_size = Vector2(0, 52)
+		var cs = StyleBoxFlat.new()
+		if is_claimable:
+			cs.bg_color = Color(0.20, 0.13, 0.07, 0.98)
+			cs.border_color = Color(1.0, 0.84, 0.28, 1.0)
+			cs.set_border_width_all(2)
+			cs.shadow_color = Color(1.0, 0.72, 0.15, 0.45)
+			cs.shadow_size = 8
+		elif is_claimed:
+			cs.bg_color = Color(0.07, 0.16, 0.12, 0.96)
+			cs.border_color = Color(0.28, 0.82, 0.52, 0.78)
+			cs.set_border_width_all(2 if is_today else 1)
+		elif is_missed:
+			cs.bg_color = Color(0.05, 0.06, 0.09, 0.82)
+			cs.border_color = Color(0.18, 0.20, 0.26, 0.42)
+			cs.set_border_width_all(1)
+		elif is_special:
+			cs.bg_color = Color(0.11, 0.09, 0.17, 0.96)
+			cs.border_color = Color(0.86, 0.56, 0.96, 0.65)
+			cs.set_border_width_all(1)
+		else:
+			cs.bg_color = Color(0.07, 0.09, 0.14, 0.95)
+			cs.border_color = Color(0.24, 0.29, 0.39, 0.55)
+			cs.set_border_width_all(1)
+		cs.set_corner_radius_all(8)
+		cs.content_margin_left = 7
+		cs.content_margin_right = 7
+		cs.content_margin_top = 5
+		cs.content_margin_bottom = 5
+		cell.add_theme_stylebox_override("panel", cs)
+
+		var cv = VBoxContainer.new()
+		cv.add_theme_constant_override("separation", 3)
+		cv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+		# Top line of date cell: date number + tag
+		var top_row = HBoxContainer.new()
+		top_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var num_lbl = Label.new()
+		num_lbl.text = "%02d" % d_num
+		num_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		num_lbl.add_theme_font_size_override("font_size", 13)
+		if is_claimable:
+			num_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.40, 1.0))
+		elif is_claimed:
+			num_lbl.add_theme_color_override("font_color", Color(0.45, 0.95, 0.65, 1.0))
+		elif is_missed:
+			num_lbl.add_theme_color_override("font_color", Color(0.42, 0.46, 0.54, 0.75))
+		elif col_idx == 6:
+			num_lbl.add_theme_color_override("font_color", Color(1.0, 0.52, 0.68, 1.0))
+		elif col_idx == 5:
+			num_lbl.add_theme_color_override("font_color", Color(0.35, 0.88, 1.0, 1.0))
+		else:
+			num_lbl.add_theme_color_override("font_color", Color(0.95, 0.96, 1.0, 1.0))
+		top_row.add_child(num_lbl)
+
+		var tag_lbl = Label.new()
+		tag_lbl.add_theme_font_size_override("font_size", 9)
+		if is_claimable:
+			tag_lbl.text = "HÔM NAY"
+			tag_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.25, 1.0))
+		elif is_claimed:
+			tag_lbl.text = "✓ NHẬN"
+			tag_lbl.add_theme_color_override("font_color", Color(0.40, 0.95, 0.60, 1.0))
+		elif is_missed:
+			tag_lbl.text = "Đã qua"
+			tag_lbl.add_theme_color_override("font_color", Color(0.45, 0.48, 0.56, 0.7))
+		elif is_special:
+			tag_lbl.text = "★ QUÀ LỚN"
+			tag_lbl.add_theme_color_override("font_color", Color(0.95, 0.72, 1.0, 0.95))
+		top_row.add_child(tag_lbl)
+		cv.add_child(top_row)
+
+		# Bottom line of date cell: rewards
+		var rew_lbl = Label.new()
+		rew_lbl.text = _format_compact_reward(reward)
+		rew_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		rew_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		rew_lbl.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		rew_lbl.add_theme_font_size_override("font_size", 11)
+		if is_missed:
+			rew_lbl.add_theme_color_override("font_color", Color(0.48, 0.52, 0.60, 0.65))
+		elif is_claimed:
+			rew_lbl.add_theme_color_override("font_color", Color(0.65, 0.85, 0.74, 0.85))
+		elif is_claimable:
+			rew_lbl.add_theme_color_override("font_color", Color(1.0, 0.94, 0.68, 1.0))
+		else:
+			rew_lbl.add_theme_color_override("font_color", Color(0.88, 0.92, 0.98, 0.95))
+		cv.add_child(rew_lbl)
+		cell.add_child(cv)
+
+		if is_claimable:
+			var tap_day = Button.new()
+			tap_day.set_anchors_preset(PRESET_FULL_RECT)
+			_style_transparent_button(tap_day)
+			tap_day.tooltip_text = "Nhấn để điểm danh ngày %02d/%02d" % [d_num, month_num]
+			tap_day.pressed.connect(func():
+				tap_day.disabled = true
+				if AuthManager:
+					AuthManager.claim_monthly_checkin_today()
+				AudioManager.play_victory()
+				_refresh_user_profile_ui()
+				_update_checkin_button_status()
+				_show_monthly_checkin_modal()
+			)
+			cell.add_child(tap_day)
+
+		date_grid.add_child(cell)
+
+	var total_cells := first_weekday_idx + days_in_month
+	var trailing := (7 - (total_cells % 7)) % 7
+	for _trail in range(trailing):
+		date_grid.add_child(make_empty_cell.call())
+
+	cal_vbox.add_child(date_grid)
+	calendar_frame.add_child(cal_vbox)
+	container.add_child(calendar_frame)
+
+	# 4. Developer / Tester Helper Bar
 	if AuthManager and AuthManager.is_dev_machine():
 		var dev_bar = HBoxContainer.new()
 		dev_bar.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -4600,22 +4811,25 @@ func _build_7day_rewards_content() -> Control:
 		dev_bar.add_child(test_lbl)
 
 		var btn_adv = Button.new()
-		btn_adv.text = "⏩ Mở ngày tiếp theo"
+		var next_sim_day := mini(today_day + 1, days_in_month)
+		btn_adv.text = "⏩ Thử ngày %02d" % next_sim_day
 		btn_adv.add_theme_font_size_override("font_size", 11)
 		_style_white_gold_button(btn_adv, 4, 1, Vector2.ZERO)
 		btn_adv.pressed.connect(func():
-			AuthManager.dev_advance_checkin_day()
-			_show_modal("QUÀ ĐIỂM DANH 7 NGÀY", _build_7day_rewards_content())
+			AuthManager.dev_set_calendar_day(next_sim_day)
+			_update_checkin_button_status()
+			_show_monthly_checkin_modal()
 		)
 		dev_bar.add_child(btn_adv)
 
 		var btn_rst = Button.new()
-		btn_rst.text = "🔄 Reset chu kỳ 7 ngày"
+		btn_rst.text = "🔄 Reset lịch tháng"
 		btn_rst.add_theme_font_size_override("font_size", 11)
 		_style_white_gold_button(btn_rst, 4, 1, Vector2.ZERO)
 		btn_rst.pressed.connect(func():
-			AuthManager.dev_reset_7day_checkin()
-			_show_modal("QUÀ ĐIỂM DANH 7 NGÀY", _build_7day_rewards_content())
+			AuthManager.dev_reset_monthly_checkin()
+			_update_checkin_button_status()
+			_show_monthly_checkin_modal()
 		)
 		dev_bar.add_child(btn_rst)
 
@@ -4626,7 +4840,7 @@ func _build_7day_rewards_content() -> Control:
 		btn_tickets.pressed.connect(func():
 			AuthManager.add_hero_tickets(10)
 			_refresh_user_profile_ui()
-			_show_modal("QUÀ ĐIỂM DANH 7 NGÀY", _build_7day_rewards_content())
+			_show_monthly_checkin_modal()
 		)
 		dev_bar.add_child(btn_tickets)
 
@@ -4820,12 +5034,12 @@ func _show_fullscreen_than_dien() -> void:
 	header_hbox.add_child(silver_pill)
 
 	var btn_7d = Button.new()
-	btn_7d.custom_minimum_size = Vector2(130, 38)
-	btn_7d.text = "🎁 Quà 7 Ngày"
+	btn_7d.custom_minimum_size = Vector2(146, 38)
+	btn_7d.text = "📅 Lịch Điểm Danh"
 	_style_white_gold_button(btn_7d, 6, 2, Vector2(0, 1))
 	btn_7d.pressed.connect(func():
 		AudioManager.play_card_select()
-		_show_modal("QUÀ ĐIỂM DANH 7 NGÀY", _build_7day_rewards_content())
+		_show_monthly_checkin_modal()
 	)
 	header_hbox.add_child(btn_7d)
 
@@ -5362,7 +5576,7 @@ func _show_fullscreen_than_dien() -> void:
 	rpv.add_child(r2)
 
 	var r3 = Label.new()
-	r3.text = "• Nhận thêm Vé Triệu Hồi và Bạc miễn phí mỗi ngày tại Quà 7 Ngày Điểm Danh!"
+	r3.text = "• Nhận thêm Vé Triệu Hồi, Bạc & Kim Cương miễn phí mỗi ngày tại Lịch Điểm Danh Hằng Tháng!"
 	r3.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	r3.add_theme_font_size_override("font_size", 11)
 	r3.add_theme_color_override("font_color", Color(0.4, 0.92, 0.6, 0.95))
@@ -5836,7 +6050,7 @@ func _build_insufficient_tickets_content(needed: int) -> Control:
 	container.add_child(icon_l)
 
 	var msg_l = Label.new()
-	msg_l.text = "Bạn không đủ Vé Quay Tướng!\nCần: %d Vé  |  Hiện có: %d Vé\n\nHãy nhận ngay Quà Điểm Danh 7 Ngày để thu thập thêm Vé Quay Tướng hoàn toàn miễn phí!" % [
+	msg_l.text = "Bạn không đủ Vé Quay Tướng!\nCần: %d Vé  |  Hiện có: %d Vé\n\nHãy nhận ngay tại Lịch Điểm Danh Tháng để thu thập thêm Vé Quay Tướng hoàn toàn miễn phí!" % [
 		needed, AuthManager.current_hero_tickets if AuthManager else 0
 	]
 	msg_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -5860,11 +6074,11 @@ func _build_insufficient_tickets_content(needed: int) -> Control:
 	btn_hbox.add_child(btn_shop)
 
 	var btn_claim = Button.new()
-	btn_claim.text = "🎁 QUÀ 7 NGÀY"
-	btn_claim.custom_minimum_size = Vector2(160, 42)
+	btn_claim.text = "📅 LỊCH ĐIỂM DANH"
+	btn_claim.custom_minimum_size = Vector2(170, 42)
 	_style_white_gold_button(btn_claim, 8, 4, Vector2(0, 2))
 	btn_claim.pressed.connect(func():
-		_show_modal("QUÀ ĐIỂM DANH 7 NGÀY", _build_7day_rewards_content())
+		_show_monthly_checkin_modal()
 	)
 	btn_hbox.add_child(btn_claim)
 
@@ -7361,7 +7575,7 @@ func _build_inventory_content() -> Control:
 			"icon": "📜",
 			"count": tickets,
 			"desc": "Lệnh bài triệu hồi truyền thừa từ Thần Điện cổ xưa. Dùng để chiêu mộ và triệu hồi các bậc Danh Tướng, Hào Kiệt Đại Việt vào trướng phủ bảo vệ giang sơn xã tắc.",
-			"usage_tip": "💡 Nhận qua: Hoàn thành Quân Lệnh Triều Đình, Điểm Danh 7 Ngày, Trân Bảo Các."
+			"usage_tip": "💡 Nhận qua: Hoàn thành Quân Lệnh Triều Đình, Lịch Điểm Danh Tháng, Trân Bảo Các."
 		},
 		{
 			"id": "skin_ticket",
@@ -7387,7 +7601,7 @@ func _build_inventory_content() -> Control:
 			"icon": "🪙",
 			"count": silver,
 			"desc": "Tiền tệ phổ biến lưu hành toàn cõi Đại Việt. Dùng để bổng lộc quân sĩ, mua vé triệu hồi danh tướng và trang phục tại Trân Bảo Các.",
-			"usage_tip": "💡 Nhận qua: Chiến thắng trận đấu 2v2, Điểm Danh 7 Ngày, Thưởng Quân Lệnh, Giftcode."
+			"usage_tip": "💡 Nhận qua: Chiến thắng trận đấu 2v2, Lịch Điểm Danh Tháng, Thưởng Quân Lệnh, Giftcode."
 		},
 		{
 			"id": "gold",
@@ -7400,7 +7614,7 @@ func _build_inventory_content() -> Control:
 			"icon": "💎",
 			"count": gold,
 			"desc": "Đá quý cao cấp và quý giá nhất Đại Việt. Dùng để quy đổi các bảo vật vô song, vé triệu hồi và đặc quyền tối thượng tại Trân Bảo Các.",
-			"usage_tip": "💡 Nhận qua: Sự kiện Đua Top 15 Ngày, Điểm Danh 7 Ngày, Quà Tri Ân, Giftcode."
+			"usage_tip": "💡 Nhận qua: Sự kiện Đua Top 15 Ngày, Lịch Điểm Danh Tháng, Quà Tri Ân, Giftcode."
 		}
 	]
 
@@ -8119,11 +8333,11 @@ func _populate_inventory_inspector(inspector_vbox: VBoxContainer, item: Dictiona
 
 			var checkin_btn = Button.new()
 			checkin_btn.custom_minimum_size = Vector2(0, 32)
-			checkin_btn.text = "🎁 QUÀ ĐIỂM DANH 7 NGÀY"
+			checkin_btn.text = "📅 LỊCH ĐIỂM DANH THÁNG"
 			_style_white_gold_button(checkin_btn, 6, 2, Vector2(0, 1))
 			checkin_btn.pressed.connect(func():
 				AudioManager.play_card_select()
-				_show_modal("QUÀ ĐIỂM DANH 7 NGÀY", _build_7day_rewards_content())
+				_show_monthly_checkin_modal()
 			)
 			act_vbox.add_child(checkin_btn)
 
